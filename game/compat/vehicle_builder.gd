@@ -90,9 +90,13 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         wheel_nodes.append(node)
         wheels_built += 1
 
+    # Last, because it is sized to what everything above it drew.
+    var probe: ReflectionProbe = ActorProbe.add(root)
+
     return {
         "error": "",
         "root": root,
+        "probe": probe,
         "actor": actor,
         # How a rig-space point becomes a point in the vehicle's local space. Declared so
         # checks can place rig coordinates without knowing how the frame is wired.
