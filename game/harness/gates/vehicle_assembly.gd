@@ -18,6 +18,9 @@ const PRESET: String = "diag_topdown"
 ## Generous enough to absorb projection rounding and a point's own size, far tighter than
 ## the distances a misplaced part travels.
 const PIXEL_SEARCH_RADIUS: int = 14
+## How far the drawn silhouette may sit from where the rig projects it, in pixels. A part
+## in the wrong place moves it by hundreds.
+const SILHOUETTE_TOLERANCE_PX: float = 40.0
 ## Millimetres for part vertices. Wheels are checked against their axle midpoint through
 ## the geometry that is actually drawn, and a rim mesh is not perfectly centred on its
 ## axle, so wheels get their own looser bound: this is about catching a part in the wrong
@@ -141,8 +144,14 @@ func _check_rendered_positions(
             % [missing.size(), index, ", ".join(missing), shot["png"]]
         )
 
-    # Same question of the body. Checking only the wheels would miss the case where the
-    # wheels are right and the body is somewhere else, which looks identical in a still.
+    # Same question of the body, asked as a silhouette rather than per vertex. Sampling
+    # individual vertices fails on the far side of the vehicle, where nearer geometry
+    # hides them: that is occlusion, not misplacement, and an earlier version of this
+    # check reported exactly that as a failure. Where the drawn pixels lie cannot be
+    # faked by occlusion.
+    # Body only: the expected bounds below are computed from the body parts, so leaving
+    # the wheels visible would compare a body-and-wheels silhouette against a body-only
+    # projection and report a mismatch that is purely the check's own doing.
     _paint(vehicle, false)
     for node: Node in _descendants(vehicle):
         var mesh_instance: MeshInstance3D = node as MeshInstance3D
@@ -155,29 +164,47 @@ func _check_rendered_positions(
     if body_image == null:
         return "cannot read %s" % body_shot["png"]
 
-    var body_missing: int = 0
-    var body_checked: int = 0
-    var first_missing: String = ""
+    var expected_min: Vector2 = Vector2(INF, INF)
+    var expected_max: Vector2 = Vector2(-INF, -INF)
     for part: SkinnedFlexbody in parts:
-        var step: int = maxi(part.vertex_count / 8, 1)
+        var step: int = maxi(part.vertex_count / 64, 1)
         for i: int in range(0, part.vertex_count, step):
-            var world: Vector3 = vehicle.global_transform * (
-                rig_to_local * part.rest_vertices[i]
-            )
+            var world: Vector3 = vehicle.global_transform * (rig_to_local * part.rest_vertices[i])
             if camera.is_position_behind(world):
-                continue
-            body_checked += 1
-            if not _marker_near(body_image, camera.unproject_position(world)):
-                body_missing += 1
-                if first_missing == "":
-                    first_missing = "%s vertex %d at %s" % [part.mesh_instance.name, i, world]
-    if body_missing > 0:
+                return ""
+            var screen: Vector2 = camera.unproject_position(world)
+            expected_min = expected_min.min(screen)
+            expected_max = expected_max.max(screen)
+
+    var drawn: Rect2 = _marker_bounds(body_image)
+    if drawn.size == Vector2.ZERO:
+        return "the vehicle rendered nothing at all; artifact: %s" % body_shot["png"]
+    var expected: Rect2 = Rect2(expected_min, expected_max - expected_min)
+    var centre_error: float = drawn.get_center().distance_to(expected.get_center())
+    var size_error: float = (drawn.size - expected.size).length()
+    if centre_error > SILHOUETTE_TOLERANCE_PX or size_error > SILHOUETTE_TOLERANCE_PX:
         return (
-            "no vehicle rendered where the rig puts %d of %d sampled body vertices"
-            % [body_missing, body_checked]
-            + " (first: %s); artifact: %s" % [first_missing, body_shot["png"]]
+            "the vehicle is drawn at %s but its rig places it at %s (centre off by %.0f px,"
+            % [drawn, expected, centre_error]
+            + " size off by %.0f px); artifact: %s" % [size_error, body_shot["png"]]
         )
     return ""
+
+
+## Screen bounds of everything painted with the marker colour.
+func _marker_bounds(image: Image) -> Rect2:
+    var size: Vector2i = image.get_size()
+    var found_min: Vector2 = Vector2(INF, INF)
+    var found_max: Vector2 = Vector2(-INF, -INF)
+    for y: int in range(0, size.y, 2):
+        for x: int in range(0, size.x, 2):
+            var pixel: Color = image.get_pixel(x, y)
+            if pixel.r > 0.5 and pixel.b > 0.5 and pixel.g < 0.4:
+                found_min = found_min.min(Vector2(float(x), float(y)))
+                found_max = found_max.max(Vector2(float(x), float(y)))
+    if found_min.x == INF:
+        return Rect2()
+    return Rect2(found_min, found_max - found_min)
 
 
 func _marker_near(image: Image, at: Vector2) -> bool:

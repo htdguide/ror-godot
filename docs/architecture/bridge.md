@@ -102,31 +102,32 @@ The frame's own algebra is verified by `actor_frame_rigid_motion`: rigid vehicle
 appears in the frame while actor-local bone transforms stay put to within 4e-6, against a
 deformation response five orders of magnitude larger.
 
-Wiring it into the render path is still **not done**, and the cause is now localised.
+Wiring it into the render path is still **not done**, and the fault is now named.
 
-`vehicle_assembly` was extended to read pixels rather than model the renderer: the vehicle
-is painted one unambiguous colour, each part's rig position is projected to screen, and
-the rendered image must actually contain the vehicle there. With that in place, wiring the
-frame fails cleanly and specifically:
+`vehicle_assembly` compares the vehicle's drawn silhouette against where its rig projects
+it. With the frame wired, the body is drawn **874 x 374 px where the rig places it at
+368 x 857 px** — the same extents transposed. The body is rendered rotated exactly 90
+degrees, which is the frame's own yaw, applied once and never undone.
 
-> no vehicle rendered where the rig puts **79 of 146 sampled body vertices**
+That means **the bone transforms are not reaching the vehicle's geometry**: the body is
+drawn at `instance * vertex`, not `instance * bone * vertex`. Reading the bones back with
+`skeleton_bone_get_transform` returns exactly `T^-1`, so they are written correctly and
+simply not used for these meshes.
 
-The wheels pass. It is the skinned body that goes missing, which the previous
-transform-against-transform checks could not see because they agreed with a model that was
-itself correct.
+Two engine questions were eliminated on the way, both by measurement:
 
-**The lead:** `skinning_transform_semantics` establishes `world = instance * bone * vertex`
-with a translated instance. Giving that same instance a 90 degree yaw makes the skinned
-point **vanish from the frame entirely** — not move, vanish — even with a generous
-`custom_aabb` set. The vehicle frame is a 90 degree yaw plus a 0.9 m translation, and the
-body is exactly what disappears. Those are almost certainly the same fault.
+- Composition is `instance * bone * vertex`, confirmed at 1 px
+  (`skinning_transform_semantics`).
+- Rotation is not the problem. `skinned_rotation_sweep` tracks a skinned point through 0,
+  30, 60, 85, 90, 95, 180 and 270 degrees of instance yaw, all within 1 px. An earlier
+  version of that sweep reported the point vanishing between 85 and 95 degrees; the scene
+  had the blockout scale props in it and the point was passing inside one of the boxes.
 
-Next step is to chase the vanishing directly, in the one-vertex rig where nothing else can
-interfere: vary the instance rotation from zero upward and find where the point is lost,
-check whether it is culling (does `instance_set_ignore_culling` or a larger custom AABB
-bring it back) or the skinning transform itself. The one-vertex rig is cheap to reason
-about and has already settled one question that two rounds of vehicle-render inference
-could not.
+So the difference lies in the mesh, not the transform. The one-vertex rig that skins
+correctly is a single-bone `PRIMITIVE_POINTS` mesh; the vehicle parts are indexed
+triangles with UVs and a few hundred bones. Next step is to walk the rig toward the
+vehicle one property at a time — triangles, then UVs, then many bones — and find which one
+stops the skinning being applied.
 
 The frame's orientation convention was wrong once and is fixed: upstream's `cameras`
 section names a centre, a node *behind* it and a node to its *left*, so the roll node must
