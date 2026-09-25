@@ -973,9 +973,19 @@ not two. Headless is suitable because conversion is `Image` and file I/O, not re
 
 Legacy assets are diffuse-only, 512–1024, low-poly. Derived parameters:
 
-- **Roughness** from inverse diffuse luma passed through a material-class lookup, where the class is
-  inferred from the OGRE material and texture names (paint, chrome, glass, rubber, plastic, cloth,
-  rust, mud) with a hand-maintained override table for the hero assets and for mis-detected names.
+- **Material class drives everything the legacy format never stored.** Each legacy material is
+  assigned a class (car paint, chrome, glass, rubber/tyre, leather/cloth, plastic, rust, lamp lens,
+  carbon) and the class supplies metallic, roughness, clearcoat, IOR, transmission, sheen and
+  anisotropy. The mod's diffuse texture stays as albedo, untouched. Classification trusts, in order:
+  the `.material` script itself (specular colour and shininess map onto roughness; `scene_blend
+  alpha_blend` means glass or decal; `cull_hardware none` means a thin panel — authored data, not a
+  guess), then material/texture/submesh names, then image statistics, then a sidecar override placed
+  beside the mod. Full reasoning and the rejected alternatives are in
+  `decisions/0001-legacy-material-classification.md`.
+- **Baked-in lighting is a known limitation, not a solved problem.** Legacy diffuse maps often have
+  shading, AO and specular highlights painted in, which double-shades under IBL. De-lighting is
+  opt-in per material rather than applied across the library: for assets we do not own, a wrong
+  automatic correction is worse than an honest limitation.
 - **Metallic** defaults to 0 with an explicit chrome/bare-metal allowlist. Guessing metallic from
   images is the fastest way to make everything look like foil.
 - **Normal maps: none derived.** Stated in M2 and repeated here because it will be tempting:

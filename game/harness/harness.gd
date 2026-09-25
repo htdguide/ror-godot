@@ -116,7 +116,11 @@ func _run_capture() -> void:
         _die(EXIT_USAGE, err)
         return
     if args.has_flag("play"):
-        print("HARNESS_PLAY interactive mode; close the window to exit")
+        var rig: PlayRig = PlayRig.new()
+        rig.name = "PlayRig"
+        add_child(rig)
+        rig.setup(camera, world, weather)
+        print("HARNESS_PLAY interactive mode; press Esc or close the window to exit")
         return
     var out_dir: String = args.get_string("out", "adhoc")
     var converge: int = args.get_int("converge", HarnessCfg.CONVERGE_FRAMES)
