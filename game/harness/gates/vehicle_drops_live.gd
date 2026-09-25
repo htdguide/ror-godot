@@ -9,9 +9,8 @@ extends GateBase
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
 const PRESET: String = "hero_3q"
-## The step this core needs on a real rig; see solver_settles_vehicle for why it is not
-## upstream's 2 kHz yet.
-const SUBSTEP_HZ: float = 10000.0
+## Upstream's rate. See solver_settles_vehicle for how the gap to it was closed.
+const SUBSTEP_HZ: float = 2000.0
 const FRAME_HZ: float = 60.0
 const FRAMES: int = 90
 const DROP_HEIGHT_M: float = 0.8

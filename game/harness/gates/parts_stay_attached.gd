@@ -15,7 +15,7 @@ extends GateBase
 
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
-const SUBSTEP_HZ: float = 10000.0
+const SUBSTEP_HZ: float = 2000.0
 const SETTLE_SECONDS: float = 2.0
 const DROP_HEIGHT_M: float = 0.3
 ## Suspension travel is real movement of real parts: the hero truck's axle and leaf

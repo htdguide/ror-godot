@@ -13,6 +13,13 @@ extends RefCounted
 const DEFAULT_SPRING: float = 9000000.0
 const DEFAULT_DAMP: float = 12000.0
 const GRAVITY: Vector3 = Vector3(0.0, -9.81, 0.0)
+## Upstream's DEFAULT_DRAG: per-node viscous drag against still air, quadratic in speed.
+##
+## Upstream uses this for every rig that does not declare a `fusedrag` section, and a single
+## fuselage drag vector for those that do. The hero truck declares one, so its aerodynamics
+## are not yet upstream's — see docs/PLAN.md. Per-node drag is the general case and the one
+## worth having first; the fuselage model is a named gap rather than a forgotten one.
+const AIR_DRAG: float = 0.05
 
 
 ## Builds the solver for `truck`. `drop_height_m` lifts the rig so its lowest node starts
@@ -48,6 +55,7 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
     _add_steering(solver, truck)
     _configure_engine(solver, truck)
     solver.set_gravity(GRAVITY)
+    solver.set_air_drag(AIR_DRAG, true)
     return {"error": "", "solver": solver, "masses": masses}
 
 

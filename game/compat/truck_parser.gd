@@ -86,9 +86,7 @@ var errors: PackedStringArray = PackedStringArray()
 var _node_id_to_index: Dictionary = {}
 var _camera_ids: PackedStringArray = PackedStringArray()
 var _node_defaults: NodeRows.Defaults = NodeRows.Defaults.new()
-## Upstream's defaults from SimConstants, in force until a directive changes them.
-var _beam_spring: float = 9000000.0
-var _beam_damp: float = 12000.0
+var _beam_defaults: BeamDefaults = BeamDefaults.new()
 var _section: String = ""
 
 
@@ -177,7 +175,9 @@ func _parse_row(line: String) -> void:
     if directive != "":
         var arguments: PackedStringArray = TruckLexer.directive_fields(line, directive)
         if directive == "set_beam_defaults":
-            _parse_beam_defaults(arguments)
+            _beam_defaults.read_defaults(arguments)
+        elif directive == "set_beam_defaults_scale":
+            _beam_defaults.read_scale(arguments)
         elif directive == "set_node_defaults":
             _node_defaults = NodeRows.parse_defaults(arguments, _node_defaults)
         # Every other directive is recognised so that it is not mistaken for data. Acting
@@ -251,16 +251,8 @@ func _parse_beam(line: String) -> void:
         return
     beams.append(a)
     beams.append(b)
-    beam_spring.append(_beam_spring)
-    beam_damp.append(_beam_damp)
-
-
-## "set_beam_defaults spring, damp, ...". A negative value means "keep upstream's default".
-func _parse_beam_defaults(fields: PackedStringArray) -> void:
-    if fields.size() >= 1 and fields[0].to_float() >= 0.0:
-        _beam_spring = fields[0].to_float()
-    if fields.size() >= 2 and fields[1].to_float() >= 0.0:
-        _beam_damp = fields[1].to_float()
+    beam_spring.append(_beam_defaults.spring())
+    beam_damp.append(_beam_defaults.damp())
 
 
 func _parse_texcoord(line: String) -> void:
@@ -319,6 +311,11 @@ func _parse_mesh_wheel(line: String) -> void:
     # `set_node_defaults -1, 1.06` immediately above its front wheels and `-1, 1.12` above
     # its rear pair, and those two numbers are the grip its tyres have.
     row["friction"] = _node_defaults.friction
+    # Upstream takes a meshwheels2 rim's rate from the beam defaults rather than from the
+    # wheel's own spring, which is the tyre's. The hero truck states
+    # `set_beam_defaults 4000000, 150` immediately above its wheels for exactly this.
+    row["rim_spring"] = _beam_defaults.spring()
+    row["rim_damp"] = _beam_defaults.damp()
     wheels.append(row)
 
 
@@ -370,7 +367,11 @@ func _parse_joint(line: String) -> void:
     if not BeamRows.handles(_section):
         return
     var row: Dictionary = BeamRows.joint(
-        _section, TruckLexer.fields(line), _node_id_to_index, _beam_spring, _beam_damp
+        _section,
+        TruckLexer.fields(line),
+        _node_id_to_index,
+        _beam_defaults.spring(),
+        _beam_defaults.damp()
     )
     if (row["error"] as String) != "":
         errors.append("%s %s: %s" % [_section, row["error"], line])

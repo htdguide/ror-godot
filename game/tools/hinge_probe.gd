@@ -7,7 +7,7 @@ extends SceneTree
 ## Rigid motion of the whole vehicle is removed first, so what is left is the part moving
 ## against the rig rather than the rig moving against the world.
 
-const SUBSTEP_HZ: float = 10000.0
+const SUBSTEP_HZ: float = 2000.0
 const SETTLE_SECONDS: float = 2.0
 const DROP_HEIGHT_M: float = 0.3
 

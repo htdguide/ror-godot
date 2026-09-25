@@ -15,7 +15,8 @@ extends GateBase
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
 const PRESET: String = "hero_3q"
-const SUBSTEP_HZ: float = 10000.0
+## Upstream's rate. See solver_settles_vehicle for how the gap to it was closed.
+const SUBSTEP_HZ: float = 2000.0
 const SETTLE_SECONDS: float = 1.0
 const DRIVE_SECONDS: float = 3.0
 const THROTTLE: float = 0.2

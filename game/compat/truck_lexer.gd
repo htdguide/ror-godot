@@ -99,9 +99,15 @@ static func is_section_header(line: String, current_section: String) -> bool:
 
 
 ## The directive this line states, or "" when it is data.
+##
+## The keyword has to end at a separator, because one directive's name is a prefix of
+## another's: `set_beam_defaults_scale` begins with `set_beam_defaults`. Matched on the
+## prefix alone it was read as a `set_beam_defaults` whose first argument was the text
+## `_scale`, which parses as zero — so every beam declared before the file's first real
+## `set_beam_defaults` was given a spring of 0 N/m, and the scale itself never applied.
 static func directive_of(line: String) -> String:
     for directive: String in DIRECTIVES:
-        if line.begins_with(directive):
+        if _states_keyword(line, directive):
             return directive
     return ""
 
@@ -109,15 +115,20 @@ static func directive_of(line: String) -> String:
 ## Whether this line is a metadata keyword rather than a row of the open section.
 static func is_metadata(line: String) -> bool:
     for keyword: String in METADATA_KEYWORDS:
-        if line == keyword:
+        if _states_keyword(line, keyword):
             return true
-        if line.begins_with(keyword) and line.length() > keyword.length():
-            # A keyword followed by a separator, so that a section whose name merely starts
-            # with one of these words is not swallowed.
-            var next: String = line[keyword.length()]
-            if next == " " or next == "\t" or next == ",":
-                return true
     return false
+
+
+## Whether `line` is `keyword`, alone or followed by its arguments. A keyword runs to a
+## separator or to the end of the line, never into the middle of a longer word.
+static func _states_keyword(line: String, keyword: String) -> bool:
+    if line == keyword:
+        return true
+    if not line.begins_with(keyword) or line.length() <= keyword.length():
+        return false
+    var next: String = line[keyword.length()]
+    return next == " " or next == "\t" or next == ","
 
 
 ## The arguments of a directive line, with the keyword removed.

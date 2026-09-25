@@ -6,9 +6,9 @@ extends RefCounted
 ## stay stable on a real rig, and it is measured rather than chosen. See
 ## `solver_settles_vehicle` for what it currently is and why.
 
-## Solver substeps per second. Upstream runs 2 kHz; this core needs more, and the gap is a
-## measure of what is still missing rather than a tuning knob.
-const SUBSTEP_HZ: float = 10000.0
+## Solver substeps per second: upstream's own rate. Measured rather than chosen — the hero
+## rig diverges at 1.5 kHz and settles from 2 kHz up. See `game/tools/stability_probe.gd`.
+const SUBSTEP_HZ: float = 2000.0
 ## A frame never steps more than this, so a stall in the window slows the simulation down
 ## instead of spending minutes catching up and locking the process.
 const MAX_SUBSTEPS_PER_FRAME: int = 400

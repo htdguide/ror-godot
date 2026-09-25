@@ -13,9 +13,11 @@ extends RefCounted
 ## Generated nodes are appended after the file's own, so every index the file stated —
 ## beams, flexbody forsets, cameras, cab triangles — keeps its meaning.
 
-## Upstream's rim beams for meshwheels2 come from the beam defaults rather than the
-## wheel's own spring, which is the tyre's. Falling back to the tyre value makes the rim
-## as soft as the sidewall and the wheel folds up under load.
+## Used only when a wheel row carries no recorded beam defaults, which a hand-built test
+## rig may not. A real file always states them: upstream's rim beams for meshwheels2 come
+## from the beam defaults rather than the wheel's own spring, which is the tyre's, and
+## falling back to the tyre value makes the rim as soft as the sidewall so the wheel folds
+## up under load.
 const RIM_SPRING_FALLBACK: float = 4000000.0
 const RIM_DAMP_FALLBACK: float = 150.0
 
@@ -134,8 +136,8 @@ static func _generate_one(truck: TruckParser, wheel: Dictionary) -> void:
 
     var tyre_spring: float = wheel["spring"] as float
     var tyre_damp: float = wheel["damping"] as float
-    var rim_spring: float = RIM_SPRING_FALLBACK
-    var rim_damp: float = RIM_DAMP_FALLBACK
+    var rim_spring: float = wheel.get("rim_spring", RIM_SPRING_FALLBACK) as float
+    var rim_damp: float = wheel.get("rim_damp", RIM_DAMP_FALLBACK) as float
     for i: int in rays:
         var o: int = outer[i]
         var n: int = inner[i]

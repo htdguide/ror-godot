@@ -20,7 +20,8 @@ extends GateBase
 
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
-const SUBSTEP_HZ: float = 10000.0
+## Upstream's rate. See solver_settles_vehicle for how the gap to it was closed.
+const SUBSTEP_HZ: float = 2000.0
 const SETTLE_SECONDS: float = 1.0
 ## Long enough for the steering ramp to reach the command and for the rig to settle into the
 ## turn before the path is measured.

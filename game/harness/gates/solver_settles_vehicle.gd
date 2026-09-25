@@ -8,14 +8,13 @@ extends GateBase
 
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
-## Upstream runs at 2 kHz. This core needs 10 kHz on the same rig, and that gap is the
-## measure of what is still missing rather than a tuning knob: upstream distributes node
-## mass from beam volume instead of using the minimass floor everywhere, adds per-node air
-## drag, and gives rope, support and shock beams their own force laws. Each of those damps
-## or slows the stiff modes that force the smaller step here. Measured: this rig diverges
-## at 2 kHz within 0.006 s and settles at both 10 kHz and 40 kHz, so the force law is
-## right and the regime is not yet upstream's.
-const SUBSTEP_HZ: float = 10000.0
+## Upstream's own rate, and now this core's. Getting here took two fixes and neither was a
+## tuning knob: node masses read from the file instead of the minimass floor everywhere took
+## the requirement from 10 kHz to 3 kHz, and applying `set_beam_defaults_scale` — which the
+## parser had been silently reading as an ordinary `set_beam_defaults` — took it from 3 kHz
+## to 2 kHz. `game/tools/stability_probe.gd` is the measurement; the rig diverges at 1.5 kHz
+## and settles from 2 kHz up.
+const SUBSTEP_HZ: float = 2000.0
 const SETTLE_SECONDS: float = 2.0
 const DROP_HEIGHT_M: float = 0.3
 ## Upstream treats anything past Mach 20 as an explosion and resets the actor. A vehicle
@@ -26,9 +25,9 @@ const EXPLOSION_SPEED: float = 100.0
 const ENERGY_GROWTH_TOLERANCE: float = 1.05
 ## A settled rig rests on the ground, not above or through it.
 const GROUND_TOLERANCE_M: float = 0.05
-## Residual motion once the rig is down. It is not zero and is not claimed to be: without
-## upstream's per-node air drag the only damping is in the beams, so the rig keeps
-## vibrating. Bounding it catches a regression toward instability without pretending the
+## Residual motion once the rig is down. It is not zero and is not claimed to be: a rig this
+## lightly damped keeps ringing, and at upstream's rate it rings more than it did at five
+## times the rate. Bounding it catches a regression toward instability without pretending the
 ## rig is at rest.
 const RESIDUAL_MOTION_LIMIT: float = 10.0
 
@@ -36,7 +35,7 @@ const RESIDUAL_MOTION_LIMIT: float = 10.0
 static func meta() -> Dictionary:
     return {
         "name": "solver_settles_vehicle",
-        "proves": "a real vehicle rig falls, contacts hard ground and stays bounded at upstream's stiffness",
+        "proves": "a real vehicle rig falls, contacts hard ground and stays bounded at upstream's stiffness and upstream's 2 kHz substep rate",
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
             "no node over %.0f m/s; energy no higher than %.0f%% of its start; lowest node"
@@ -46,7 +45,10 @@ static func meta() -> Dictionary:
         "why": (
             "a solver correct on a single spring can still be unstable on a rig with"
             + " hundreds of stiff beams. Stability is the property a vehicle needs and"
-            + " the one a closed-form spring test cannot show."
+            + " the one a closed-form spring test cannot show. Running it at upstream's own"
+            + " rate is also what keeps the rate honest: this rig needed five times the"
+            + " substeps until its masses and its beam defaults were read properly, and"
+            + " nothing but a gate at 2 kHz stops that creeping back."
         ),
         "budget_s": 120.0,
         "needs_gpu": false,
