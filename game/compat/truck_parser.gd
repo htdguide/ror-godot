@@ -49,6 +49,12 @@ var minimass_kg: float = 0.0
 ## declares none.
 var cinecam_position: Vector3 = Vector3.ZERO
 var has_cinecam: bool = false
+## Every cinecam the vehicle declares, in file order. A rig commonly lists several
+## switchable views and only some of them sit inside the cab: the hero truck's first
+## entry is a raised centre view 0.22 m above its own roof, and its second is the
+## driver's eye. Which one a caller wants depends on what it is for, so the choice is
+## left to the caller rather than made here.
+var cinecams: PackedVector3Array = PackedVector3Array()
 var sections_seen: Dictionary = {}
 var sections_parsed: Dictionary = {}
 var errors: PackedStringArray = PackedStringArray()
@@ -150,7 +156,38 @@ func _begin_section(line: String) -> bool:
     return true
 
 
+## Directives are not section rows. They may appear anywhere, they carry no section
+## header, and they look exactly like data to a parser that only tracks the last header
+## it saw. Left unhandled they are read as rows of whatever section preceded them: the
+## hero truck's `set_node_defaults` and `set_beam_defaults` lines, sitting after its
+## cinecam section, parsed as two more cinecams at (0, -1, 1.06) and (0, 4000000, 150).
+##
+## `forset` is deliberately absent: it belongs to the flexbody above it and that section
+## consumes it itself.
+const DIRECTIVES: Array[String] = [
+    "set_node_defaults",
+    "set_beam_defaults",
+    "set_beam_defaults_scale",
+    "set_inertia_defaults",
+    "set_default_minimass",
+    "set_managedmaterials_options",
+    "set_skeleton_settings",
+    "detacher_group",
+    "enable_advanced_deformation",
+    "disable_default_sounds",
+    "end_section",
+]
+
+
 func _parse_row(line: String) -> void:
+    for directive: String in DIRECTIVES:
+        if not line.begins_with(directive):
+            continue
+        if directive == "set_beam_defaults":
+            _parse_beam_defaults(line)
+        # Every other directive is recognised so that it is not mistaken for data. Acting
+        # on them is a separate job; being silently parsed as geometry is the bug.
+        return
     sections_seen[_section] = int(sections_seen.get(_section, 0)) + 1
     match _section:
         "nodes", "nodes2":
@@ -203,9 +240,6 @@ func _node_index(id: String) -> int:
 
 
 func _parse_beam(line: String) -> void:
-    if line.begins_with("set_beam_defaults"):
-        _parse_beam_defaults(line)
-        return
     var fields: PackedStringArray = _fields(line)
     if fields.size() < 2:
         return
@@ -243,14 +277,16 @@ func _parse_texcoord(line: String) -> void:
 
 ## "x, y, z, node1..node8, spring, damp" — only the position is needed here.
 func _parse_cinecam(line: String) -> void:
-    if has_cinecam:
-        return
     var fields: PackedStringArray = _fields(line)
     if fields.size() < 3:
         return
-    cinecam_position = Vector3(
+    var position: Vector3 = Vector3(
         fields[0].to_float(), fields[1].to_float(), fields[2].to_float()
     )
+    cinecams.append(position)
+    if has_cinecam:
+        return
+    cinecam_position = position
     has_cinecam = true
 
 
@@ -321,7 +357,9 @@ func _parse_flexbody(line: String) -> void:
             errors.append("forset before any flexbody: %s" % line)
             return
         var last: Dictionary = flexbodies[flexbodies.size() - 1]
-        last["forset"] = _parse_forset(line.substr("forset".length()))
+        last["forset"] = NodeIdRanges.resolve(
+            line.substr("forset".length()), _node_id_to_index
+        )
         return
     var fields: PackedStringArray = _fields(line)
     if fields.size() < 10:
@@ -342,36 +380,6 @@ func _parse_flexbody(line: String) -> void:
         "mesh": fields[9],
         "forset": PackedInt32Array(),
     })
-
-
-## "0-91", "0,5,7-9": inclusive ranges over node *ids*.
-##
-## The range is walked in id space and each id resolved separately. Resolving only the two
-## endpoints and walking the indices between them assumes ids and indices run together,
-## which they do not: this file has ids that resolve one index apart from their numeric
-## value, so whole parts were being bound to the wrong nodes — the door hung open and the
-## tailgate went missing.
-func _parse_forset(spec: String) -> PackedInt32Array:
-    var out: PackedInt32Array = PackedInt32Array()
-    for part: String in spec.replace(" ", ",").split(","):
-        var token: String = part.strip_edges()
-        if token.is_empty():
-            continue
-        var dash: int = token.find("-", 1)
-        if dash > 0:
-            var first_id: String = token.substr(0, dash).strip_edges()
-            var last_id: String = token.substr(dash + 1).strip_edges()
-            if not first_id.is_valid_int() or not last_id.is_valid_int():
-                continue
-            for id: int in range(first_id.to_int(), last_id.to_int() + 1):
-                var resolved: int = _node_index(str(id))
-                if resolved >= 0:
-                    out.append(resolved)
-        else:
-            var single: int = _node_index(token)
-            if single >= 0:
-                out.append(single)
-    return out
 
 
 func _parse_cab(line: String) -> void:

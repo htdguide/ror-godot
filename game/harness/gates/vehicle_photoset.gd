@@ -150,17 +150,48 @@ func _cabin_eye(
     built: Dictionary, truck: TruckParser, rig_to_local: Transform3D, bounds: AABB
 ) -> Vector3:
     var root: Node3D = built["root"] as Node3D
+    var cabin: AABB = _cabin_bounds(built)
+    if cabin.size != Vector3.ZERO:
+        # A rig lists several switchable cinecams and only some of them are inside the
+        # cab. The hero truck's first is 0.22 m above its own roof, which pointed this
+        # shot at the sky over the bodywork; its second is the driver's eye. Take the
+        # first that is actually within the cab, which is a property of the vehicle
+        # rather than a guess about which index a mod author used.
+        for position: Vector3 in truck.cinecams:
+            if cabin.has_point(position):
+                return root.global_transform * (rig_to_local * position)
+        # No cinecam is inside the cab. The upper middle of the cab is a better guess
+        # than any of them, and better than the whole vehicle's centre, which lands in
+        # the engine bay on a truck whose bed is half its length.
+        var eye: Vector3 = cabin.get_center() + Vector3(0.0, cabin.size.y * 0.2, 0.0)
+        return root.global_transform * (rig_to_local * eye)
     if truck.has_cinecam:
         return root.global_transform * (rig_to_local * truck.cinecam_position)
+    return bounds.get_center() + Vector3(0.0, bounds.size.y * 0.2, 0.0)
+
+
+## Rest bounds of the cab volume, in rig space.
+##
+## The glazing is the better subject than the body: a pickup's body part spans the bed as
+## well as the cab, so a point can be inside it and still be out in the open air over the
+## load bed. The windows enclose the cab and nothing else.
+func _cabin_bounds(built: Dictionary) -> AABB:
+    for subject: String in ["window", "body"]:
+        var box: AABB = _part_bounds(built, subject)
+        if box.size != Vector3.ZERO:
+            return box
+    return AABB()
+
+
+func _part_bounds(built: Dictionary, subject: String) -> AABB:
     for part: SkinnedFlexbody in built["parts"] as Array[SkinnedFlexbody]:
-        if not str(part.mesh_instance.name).to_lower().contains("body"):
+        if not str(part.mesh_instance.name).to_lower().contains(subject):
             continue
         var box: AABB = AABB(part.rest_vertices[0], Vector3.ZERO)
         for vertex: Vector3 in part.rest_vertices:
             box = box.expand(vertex)
-        var eye: Vector3 = box.get_center() + Vector3(0.0, box.size.y * 0.15, 0.0)
-        return root.global_transform * (rig_to_local * eye)
-    return bounds.get_center() + Vector3(0.0, bounds.size.y * 0.2, 0.0)
+        return box
+    return AABB()
 
 
 ## Share of the frame that is not sky or ground. The vehicle is the only other thing in

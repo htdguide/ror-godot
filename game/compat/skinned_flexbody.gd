@@ -10,7 +10,11 @@ extends RefCounted
 ## The mesh also carries the CPU reference position per vertex in CUSTOM0, so the same
 ## error shader that verified the spike can verify a real vehicle.
 
-const AABB_EXTENT: float = 100.0
+## Slack on the posed bounds. The bounds are recomputed every pose, so this only has to
+## cover one frame of deformation, and a panel does not travel far in one frame. It is
+## generous anyway: too tight and the renderer culls a vehicle that is still on screen,
+## which is a far worse failure than a slightly conservative box.
+const BOUNDS_MARGIN: float = 0.5
 
 var mesh: ArrayMesh
 var mesh_instance: MeshInstance3D
@@ -22,6 +26,9 @@ var vertex_count: int = 0
 ## Rest positions, kept so the rendered position of a vertex can be computed
 ## independently of the GPU and checked against it.
 var rest_vertices: PackedVector3Array = PackedVector3Array()
+## Rest bounds of the vertices belonging to each bone, so a pose's bounds cost one
+## transform per bone rather than one per vertex.
+var _bone_rest_bounds: Array[AABB] = []
 
 var _uvs: PackedVector2Array = PackedVector2Array()
 var _normals: PackedVector3Array = PackedVector3Array()
@@ -57,9 +64,7 @@ func build(
     mesh_instance.mesh = mesh
     if material != null:
         mesh_instance.material_override = material
-    mesh_instance.custom_aabb = AABB(
-        -Vector3.ONE * AABB_EXTENT, Vector3.ONE * AABB_EXTENT * 2.0
-    )
+    _build_bone_rest_bounds()
     parent.add_child(mesh_instance)
 
     skeleton_rid = RenderingServer.skeleton_create()
@@ -98,6 +103,50 @@ func set_pose(
     # applied twice. A standalone part carries it itself.
     if apply_to_instance and mesh_instance != null:
         mesh_instance.transform = actor
+    _update_bounds()
+
+
+## Groups the rest vertices by the bone that moves them. A bone is a rigid transform, so
+## the posed bounds of its vertices are that transform applied to their rest bounds.
+func _build_bone_rest_bounds() -> void:
+    var bone_of_vertex: PackedInt32Array = binding["bone_of_vertex"] as PackedInt32Array
+    var started: PackedByteArray = PackedByteArray()
+    started.resize(triads.size())
+    _bone_rest_bounds.resize(triads.size())
+    for i: int in rest_vertices.size():
+        var bone: int = bone_of_vertex[i]
+        if started[bone] == 0:
+            _bone_rest_bounds[bone] = AABB(rest_vertices[i], Vector3.ZERO)
+            started[bone] = 1
+        else:
+            _bone_rest_bounds[bone] = _bone_rest_bounds[bone].expand(rest_vertices[i])
+    for bone: int in triads.size():
+        if started[bone] == 0:
+            _bone_rest_bounds[bone] = AABB()
+
+
+## Sets the instance's bounds to where this pose actually put the geometry.
+##
+## A server-driven skeleton has no node tracking its deformed bounds, so without this the
+## instance reports its rest mesh's bounds. Those are in rig space while the skinned
+## vertices are in actor-local space, which makes every measurement taken from the
+## vehicle's bounds -- camera framing, the driver's eye, ground placement -- disagree with
+## what is on screen by the whole offset between the two spaces.
+func _update_bounds() -> void:
+    if mesh_instance == null or _bone_rest_bounds.is_empty():
+        return
+    var bounds: AABB = AABB()
+    var started: bool = false
+    for bone: int in _bone_rest_bounds.size():
+        var rest: AABB = _bone_rest_bounds[bone]
+        if rest.size == Vector3.ZERO and rest.position == Vector3.ZERO:
+            continue
+        var posed: AABB = RenderingServer.skeleton_bone_get_transform(skeleton_rid, bone) * rest
+        bounds = posed if not started else bounds.merge(posed)
+        started = true
+    if not started:
+        return
+    mesh_instance.custom_aabb = bounds.grow(BOUNDS_MARGIN)
 
 
 ## The actor-local bone transforms for a pose, without writing them. Used to check that

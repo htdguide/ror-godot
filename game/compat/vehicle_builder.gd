@@ -104,7 +104,10 @@ static func world_bounds(root: Node3D) -> AABB:
         var mesh_instance: MeshInstance3D = node as MeshInstance3D
         if mesh_instance == null or mesh_instance.mesh == null:
             continue
-        var world: AABB = mesh_instance.global_transform * mesh_instance.mesh.get_aabb()
+        # The instance's own AABB, not the mesh's: a skinned part's mesh holds rest
+        # positions in rig space, while what it draws is in actor-local space, and only
+        # the instance knows the difference (SkinnedFlexbody keeps it up to date).
+        var world: AABB = mesh_instance.global_transform * mesh_instance.get_aabb()
         bounds = world if not started else bounds.merge(world)
         started = true
     return bounds
