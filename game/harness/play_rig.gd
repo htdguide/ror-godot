@@ -25,9 +25,13 @@ var _yaw: float = 0.0
 var _pitch: float = 0.0
 var _frames: int = 0
 var _shots: int = 0
+var _drive: PlayDrive = null
+var _chasing: bool = false
 
 
-func setup(camera: Camera3D, world: Node3D, weather: String) -> void:
+## `vehicle` is a VehicleBuilder result, or empty when no vehicle was loaded. With one, the
+## solver runs and the window is a driving session rather than a camera fly-through.
+func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary = {}) -> void:
     _camera = camera
     _world = world
     _yaw = camera.rotation.y
@@ -36,6 +40,14 @@ func setup(camera: Camera3D, world: Node3D, weather: String) -> void:
         _weather_names.append(key)
     _weather_index = maxi(0, _weather_names.find(weather))
     _hud = _build_hud()
+    if not vehicle.is_empty():
+        var drive: PlayDrive = PlayDrive.new()
+        var error: String = drive.setup(vehicle)
+        if error != "":
+            printerr("PLAY  the vehicle cannot be driven: " + error)
+        else:
+            _drive = drive
+            _chasing = true
     _print_help()
 
 
@@ -63,19 +75,42 @@ func _print_help() -> void:
             + "PLAY  P save a screenshot to artifacts/human"
         )
     )
+    if _drive != null:
+        print(DriveCfg.HELP)
 
 
 func _process(delta: float) -> void:
+    if _drive != null:
+        _drive.step(delta)
+        if _chasing:
+            _chase(delta)
     _move(delta)
     _frames += 1
     if _hud.visible and _frames % HUD_REFRESH_FRAMES == 0:
         _hud.text = _hud_text()
 
 
+## Rides behind the vehicle in its own frame, lagging so that a turn is visible as a turn.
+## Godot's +Z points backwards, which is also where the actor frame's +Z points, so the
+## offset is behind the vehicle without a sign flip.
+func _chase(delta: float) -> void:
+    var frame: Transform3D = _drive.frame
+    var wanted: Vector3 = frame * DriveCfg.CHASE_OFFSET
+    var aim: Vector3 = frame * DriveCfg.CHASE_AIM
+    var smoothing: float = clampf(DriveCfg.CHASE_SMOOTHING * delta * 60.0, 0.0, 1.0)
+    var position: Vector3 = _camera.position.lerp(wanted, smoothing)
+    if position.distance_to(aim) < 0.01:
+        return
+    _camera.look_at_from_position(position, aim, Vector3.UP)
+    _yaw = _camera.rotation.y
+    _pitch = _camera.rotation.x
+
+
+## WASD and Q/E only: the arrow keys belong to the driver once a vehicle is loaded, and
+## having them do two things at once is the sort of thing that makes a session report
+## "the steering is broken".
 func _move(delta: float) -> void:
-    var direction: Vector3 = Vector3(
-        Input.get_axis(&"ui_left", &"ui_right"), 0.0, Input.get_axis(&"ui_up", &"ui_down")
-    )
+    var direction: Vector3 = Vector3.ZERO
     if Input.is_key_pressed(KEY_D):
         direction.x += 1.0
     if Input.is_key_pressed(KEY_A):
@@ -117,7 +152,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_key(keycode: Key) -> void:
+    if _drive != null and _drive.on_key(keycode):
+        return
     match keycode:
+        KEY_F5:
+            _chasing = _drive != null
+            print("PLAY  chase camera %s" % ("on" if _chasing else "unavailable"))
+        KEY_F6:
+            _chasing = false
+            print("PLAY  free camera")
         KEY_F1:
             _hud.visible = not _hud.visible
         KEY_F2:
@@ -200,7 +243,16 @@ func _hud_text() -> String:
             ),
             Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0,
             Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0,
-            "click to look  WASD move  Q/E down/up  Shift boost  F1 hud  F2 weather"
-            + "  F3 shadows  F4 sun  P shot  Esc release/quit",
+            _footer(),
         ]
     )
+
+
+func _footer() -> String:
+    var keys: String = (
+        "click to look  WASD move  Q/E down/up  Shift boost  F1 hud  F2 weather"
+        + "  F3 shadows  F4 sun  P shot  Esc release/quit"
+    )
+    if _drive == null:
+        return keys
+    return _drive.hud_line() + "\n" + keys + "  F5/F6 chase/free"

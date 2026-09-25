@@ -136,8 +136,17 @@ static func _descendants(node: Node) -> Array[Node]:
 
 
 ## Drives the whole vehicle to a node pose: the frame on the root, deformation in the
-## bones. This is the per-frame entry point the solver will call.
-static func apply_pose(built: Dictionary, truck: TruckParser, nodes: PackedVector3Array) -> void:
+## bones. This is the per-frame entry point the solver calls.
+##
+## `wheel_angles` spins the rims, one accumulated angle in radians per wheel. A wheel's
+## drawn geometry is posed by its axle nodes, and an axle node does not rotate — so without
+## this a vehicle drives along with its wheels standing perfectly still.
+static func apply_pose(
+    built: Dictionary,
+    truck: TruckParser,
+    nodes: PackedVector3Array,
+    wheel_angles: PackedFloat32Array = PackedFloat32Array()
+) -> void:
     var actor: Transform3D = ActorFrame.of(nodes, truck.camera_nodes)
     var root: Node3D = built["root"] as Node3D
     # Keep whatever the caller did to place the vehicle for a camera, and change only the
@@ -159,6 +168,27 @@ static func apply_pose(built: Dictionary, truck: TruckParser, nodes: PackedVecto
     var wheel_nodes: Array[Node3D] = built["wheel_nodes"] as Array[Node3D]
     for i: int in mini(wheel_nodes.size(), truck.wheels.size()):
         wheel_nodes[i].transform = to_local * WheelBuilder.rim_transform(nodes, truck.wheels[i])
+        if i < wheel_angles.size():
+            _spin_wheel(wheel_nodes[i], truck.wheels[i], wheel_angles[i])
+
+
+## Turns one wheel's drawn geometry about its axle.
+##
+## The angle comes from the solver, which measures tread speed about the axle it was given:
+## the axle nodes ordered so the first has the smaller z. The rim frame points its own X
+## outward instead, which is the opposite direction on the left of the vehicle to the right,
+## so the sign follows the side the wheel is on and not the angle.
+##
+## Which way round the pair goes is measured, not derived: `wheels_roll_on_screen` tracks a
+## tread vertex and requires the contact patch to be the slowest part of the tyre. Inverted,
+## it read 2583% instead of the 4% it reads now.
+static func _spin_wheel(holder: Node3D, wheel: Dictionary, angle: float) -> void:
+    var sign: float = 1.0 if (wheel["side"] as String) == "r" else -1.0
+    var spin: Transform3D = Transform3D(Basis(Vector3.RIGHT, angle * sign), Vector3.ZERO)
+    for child: Node in holder.get_children():
+        var mesh: MeshInstance3D = child as MeshInstance3D
+        if mesh != null:
+            mesh.transform = spin
 
 
 ## One flexbody, bound to its locator triads and skinned.

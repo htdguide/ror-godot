@@ -23,6 +23,9 @@ var camera: Camera3D
 var frame_index: int = 0
 var preset_name: String = ""
 var preset: Dictionary = {}
+## The vehicle loaded by --vehicle, as VehicleBuilder returned it. Kept so a human session
+## can drive the same built vehicle rather than building a second one.
+var vehicle: Dictionary = {}
 
 var _main: Node
 var _run_started: bool = false
@@ -128,7 +131,7 @@ func _run_capture() -> void:
         var rig: PlayRig = PlayRig.new()
         rig.name = "PlayRig"
         add_child(rig)
-        rig.setup(camera, world, weather)
+        rig.setup(camera, world, weather, vehicle)
         print("HARNESS_PLAY interactive mode; press Esc or close the window to exit")
         return
     var out_dir: String = args.get_string("out", "adhoc")
@@ -267,11 +270,15 @@ func _load_vehicle(spec: String) -> String:
         return built["error"] as String
     var root: Node3D = built["root"] as Node3D
     world.add_child(root)
-    # Stand it on the ground, where a person expects to find it.
     var bounds: AABB = VehicleBuilder.world_bounds(root)
-    root.position += Vector3(
-        -bounds.get_center().x, -bounds.position.y, -bounds.get_center().z
-    )
+    # Stand it on the ground, where a person expects to find it. A driving session skips
+    # this: the solver spawns the rig above the ground itself and every pose after that
+    # carries the rig's own position, so shifting it here would offset it twice.
+    if not args.has_flag("play"):
+        root.position += Vector3(
+            -bounds.get_center().x, -bounds.position.y, -bounds.get_center().z
+        )
+    vehicle = built
     print("HARNESS_VEHICLE " + JSON.stringify({
         "parts": int(built["built"]), "wheels": int(built["wheels"]),
         "size": "%.2f x %.2f x %.2f" % [bounds.size.x, bounds.size.y, bounds.size.z],
