@@ -96,6 +96,28 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
     }
 
 
+## World bounds of everything a built vehicle draws.
+static func world_bounds(root: Node3D) -> AABB:
+    var bounds: AABB = AABB()
+    var started: bool = false
+    for node: Node in _descendants(root):
+        var mesh_instance: MeshInstance3D = node as MeshInstance3D
+        if mesh_instance == null or mesh_instance.mesh == null:
+            continue
+        var world: AABB = mesh_instance.global_transform * mesh_instance.mesh.get_aabb()
+        bounds = world if not started else bounds.merge(world)
+        started = true
+    return bounds
+
+
+static func _descendants(node: Node) -> Array[Node]:
+    var out: Array[Node] = []
+    for child: Node in node.get_children():
+        out.append(child)
+        out.append_array(_descendants(child))
+    return out
+
+
 ## Drives the whole vehicle to a node pose: the frame on the root, deformation in the
 ## bones. This is the per-frame entry point the solver will call.
 static func apply_pose(built: Dictionary, truck: TruckParser, nodes: PackedVector3Array) -> void:

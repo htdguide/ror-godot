@@ -4,6 +4,7 @@
 #   tools/play.sh                        default preset, windowed
 #   tools/play.sh --shot diag_grid_wide  start from a named camera preset
 #   tools/play.sh --weather golden_dusk  any weather or time-of-day preset
+#   tools/play.sh --truck                the hero vehicle, to fly around and inspect
 #
 # The window is tracked while it lives and the tracking file is removed on exit, so a
 # session can never be forgotten: tools/windows.sh list always tells the truth.
@@ -24,10 +25,20 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# --truck is shorthand: loading the hero vehicle is the common reason to open a window.
+args=("$@")
+for i in "${!args[@]}"; do
+    if [[ "${args[$i]}" == "--truck" ]]; then
+        args[$i]="--vehicle"
+        args=("${args[@]:0:$((i+1))}" "assets/mods/ChevyS1023:S10offroad.truck" "${args[@]:$((i+1))}")
+        break
+    fi
+done
+
 printf '{"pid": %d, "purpose": "human session", "started": "%s", "args": "%s"}\n' \
     "$$" "$(date -u +%FT%TZ)" "$*" > "$track_file"
 
 echo "play.sh: opening a window. Close it to end the session."
-"$GODOT" --path "$GAME_DIR" --resolution "$RESOLUTION" -- --play "$@" &
+"$GODOT" --path "$GAME_DIR" --resolution "$RESOLUTION" -- --play ${args[@]+"${args[@]}"} &
 engine_pid=$!
 wait "$engine_pid"

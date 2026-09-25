@@ -117,6 +117,13 @@ func _run_capture() -> void:
     if err != "":
         _die(EXIT_USAGE, err)
         return
+    var vehicle_path: String = args.get_string("vehicle", "")
+    if vehicle_path != "":
+        var loaded: String = _load_vehicle(vehicle_path)
+        if loaded != "":
+            _die(EXIT_USAGE, loaded)
+            return
+
     if args.has_flag("play"):
         var rig: PlayRig = PlayRig.new()
         rig.name = "PlayRig"
@@ -238,6 +245,32 @@ func use_measurement_environment() -> void:
     var ground: MeshInstance3D = world.get_node_or_null(^"Ground") as MeshInstance3D
     if ground != null:
         ground.visible = false
+
+
+## Loads a vehicle into the current world, for human sessions and ad-hoc shots. The path
+## is a mod directory and a vehicle file, separated by a colon.
+func _load_vehicle(spec: String) -> String:
+    var parts: PackedStringArray = spec.split(":")
+    if parts.size() != 2:
+        return "expected --vehicle <mod dir>:<truck file>, got '%s'" % spec
+    var mod_dir: String = parts[0]
+    if not mod_dir.is_absolute_path():
+        mod_dir = SourceScan.repo_root().path_join(mod_dir)
+    var built: Dictionary = VehicleBuilder.build(mod_dir, parts[1])
+    if (built.get("error", "") as String) != "":
+        return built["error"] as String
+    var root: Node3D = built["root"] as Node3D
+    world.add_child(root)
+    # Stand it on the ground, where a person expects to find it.
+    var bounds: AABB = VehicleBuilder.world_bounds(root)
+    root.position += Vector3(
+        -bounds.get_center().x, -bounds.position.y, -bounds.get_center().z
+    )
+    print("HARNESS_VEHICLE " + JSON.stringify({
+        "parts": int(built["built"]), "wheels": int(built["wheels"]),
+        "size": "%.2f x %.2f x %.2f" % [bounds.size.x, bounds.size.y, bounds.size.z],
+    }))
+    return ""
 
 
 ## Builds the world a gate asked for. Gates never construct scenes themselves.

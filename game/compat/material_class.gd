@@ -49,6 +49,11 @@ static func apply(material: StandardMaterial3D, class_name_key: String) -> void:
     if float(params["emission"]) > 0.0:
         material.emission_enabled = true
         material.emission_energy_multiplier = float(params["emission"])
+    # Culling stays as authored. Disabling it globally was tried, to stop single-sided
+    # panels reading as transparent when seen from behind, and it made the vehicle worse:
+    # the inside faces of the far panels then draw over the near ones, and from the sides
+    # the truck renders as a smooth white shell with no detail. A panel that is invisible
+    # from its back face is what the mod actually is.
     if bool(params["transmission"]):
         material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
         material.cull_mode = BaseMaterial3D.CULL_DISABLED

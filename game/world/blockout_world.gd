@@ -77,10 +77,10 @@ static func _build_sky(weather: Dictionary) -> Sky:
 static func _build_sun(weather: Dictionary) -> DirectionalLight3D:
     var sun: DirectionalLight3D = DirectionalLight3D.new()
     sun.name = "Sun"
-    var euler_deg: Vector3 = weather.get("sun_euler_deg", Vector3.ZERO) as Vector3
-    sun.rotation = Vector3(
-        deg_to_rad(euler_deg.x), deg_to_rad(euler_deg.y), deg_to_rad(euler_deg.z)
-    )
+    # Aimed by where the sun is, not by Euler angles. "Up and over the camera's shoulder"
+    # is a thing anyone can reason about; the pitch and yaw that produce it are not.
+    var toward_sun: Vector3 = (weather.get("sun_from", Vector3.UP) as Vector3).normalized()
+    sun.look_at_from_position(Vector3.ZERO, -toward_sun, Vector3.UP)
     sun.light_energy = float(weather.get("sun_energy", 1.0))
     sun.light_color = weather.get("sun_color", Color.WHITE) as Color
     sun.shadow_enabled = true

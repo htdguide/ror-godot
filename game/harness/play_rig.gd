@@ -141,8 +141,8 @@ func _cycle_weather() -> void:
     var sun: DirectionalLight3D = _world.get_node_or_null(^"Sun") as DirectionalLight3D
     var env: WorldEnvironment = _world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
     if sun != null:
-        var euler: Vector3 = preset["sun_euler_deg"] as Vector3
-        sun.rotation = Vector3(deg_to_rad(euler.x), deg_to_rad(euler.y), deg_to_rad(euler.z))
+        var toward_sun: Vector3 = (preset.get("sun_from", Vector3.UP) as Vector3).normalized()
+        sun.look_at_from_position(sun.position, sun.position - toward_sun, Vector3.UP)
         sun.light_energy = float(preset["sun_energy"])
         sun.light_color = preset["sun_color"] as Color
     if env != null:

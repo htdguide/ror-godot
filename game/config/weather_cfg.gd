@@ -7,7 +7,7 @@ extends RefCounted
 ## M2 fills in the full set once there is a sky, fog and PBR materials to drive.
 ##
 ## Keys:
-##   sun_euler_deg  Vector3 directional light rotation in degrees
+##   sun_from       Vector3 direction from the scene toward the sun
 ##   sun_energy     float directional light energy
 ##   sun_color      Color directional light colour
 ##   ambient_energy float flat ambient energy, replaced by sky IBL at M2
@@ -19,7 +19,10 @@ const PRESETS: Dictionary = {
         # reflect and shadows are filled by sky light instead of a constant.
         "physical_sky": true,
         "sky_energy": 1.0,
-        "sun_euler_deg": Vector3(-55.0, -125.0, 0.0),
+        # High and over the camera's shoulder, so the side being looked at is the side
+        # being lit. A sun behind the subject makes every judgement about materials a
+        # judgement about shadow instead.
+        "sun_from": Vector3(0.55, 0.78, 0.62),
         # A clear midday sun is bright, and the sky fills the shadows on its own. With a
         # physical sky the ambient term is the sky's own irradiance rather than a flat
         # colour, so it runs at full strength instead of being dialled down.
@@ -31,7 +34,7 @@ const PRESETS: Dictionary = {
     # A black, unlit environment. Measurement gates encode numbers into pixels, so any
     # ambient contribution would be added to the value being read back.
     "spike_black": {
-        "sun_euler_deg": Vector3(-90.0, 0.0, 0.0),
+        "sun_from": Vector3(0.0, 1.0, 0.0),
         "sun_energy": 0.0,
         "sun_color": Color(0.0, 0.0, 0.0),
         "ambient_energy": 0.0,
@@ -40,7 +43,7 @@ const PRESETS: Dictionary = {
     "golden_dusk": {
         "physical_sky": true,
         "sky_energy": 1.0,
-        "sun_euler_deg": Vector3(-8.0, -110.0, 0.0),
+        "sun_from": Vector3(0.82, 0.18, 0.54),
         "sun_energy": 0.9,
         "sun_color": Color(1.0, 0.72, 0.45),
         "sky_top": Color(0.16, 0.22, 0.42),

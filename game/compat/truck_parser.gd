@@ -45,6 +45,10 @@ var camera_nodes: Dictionary = {}
 ## Minimum node mass in kilograms, from the minimass section. Upstream uses it as a floor
 ## when distributing a vehicle's mass over its nodes.
 var minimass_kg: float = 0.0
+## Driver's eye position from the cinecam section, in rig space. Empty when the vehicle
+## declares none.
+var cinecam_position: Vector3 = Vector3.ZERO
+var has_cinecam: bool = false
 var sections_seen: Dictionary = {}
 var sections_parsed: Dictionary = {}
 var errors: PackedStringArray = PackedStringArray()
@@ -167,6 +171,8 @@ func _parse_row(line: String) -> void:
             _parse_cameras(line)
         "minimass":
             _parse_minimass(line)
+        "cinecam":
+            _parse_cinecam(line)
         _:
             return
     sections_parsed[_section] = int(sections_parsed.get(_section, 0)) + 1
@@ -233,6 +239,19 @@ func _parse_texcoord(line: String) -> void:
         return
     texcoord_nodes.append(node)
     texcoords.append(Vector2(fields[1].to_float(), fields[2].to_float()))
+
+
+## "x, y, z, node1..node8, spring, damp" — only the position is needed here.
+func _parse_cinecam(line: String) -> void:
+    if has_cinecam:
+        return
+    var fields: PackedStringArray = _fields(line)
+    if fields.size() < 3:
+        return
+    cinecam_position = Vector3(
+        fields[0].to_float(), fields[1].to_float(), fields[2].to_float()
+    )
+    has_cinecam = true
 
 
 func _parse_minimass(line: String) -> void:
@@ -325,7 +344,13 @@ func _parse_flexbody(line: String) -> void:
     })
 
 
-## "0-91", "0,5,7-9": ranges are inclusive and refer to node ids, not indices.
+## "0-91", "0,5,7-9": inclusive ranges over node *ids*.
+##
+## The range is walked in id space and each id resolved separately. Resolving only the two
+## endpoints and walking the indices between them assumes ids and indices run together,
+## which they do not: this file has ids that resolve one index apart from their numeric
+## value, so whole parts were being bound to the wrong nodes — the door hung open and the
+## tailgate went missing.
 func _parse_forset(spec: String) -> PackedInt32Array:
     var out: PackedInt32Array = PackedInt32Array()
     for part: String in spec.replace(" ", ",").split(","):
@@ -334,12 +359,14 @@ func _parse_forset(spec: String) -> PackedInt32Array:
             continue
         var dash: int = token.find("-", 1)
         if dash > 0:
-            var first: int = _node_index(token.substr(0, dash))
-            var last: int = _node_index(token.substr(dash + 1))
-            if first < 0 or last < 0:
+            var first_id: String = token.substr(0, dash).strip_edges()
+            var last_id: String = token.substr(dash + 1).strip_edges()
+            if not first_id.is_valid_int() or not last_id.is_valid_int():
                 continue
-            for i: int in range(first, last + 1):
-                out.append(i)
+            for id: int in range(first_id.to_int(), last_id.to_int() + 1):
+                var resolved: int = _node_index(str(id))
+                if resolved >= 0:
+                    out.append(resolved)
         else:
             var single: int = _node_index(token)
             if single >= 0:

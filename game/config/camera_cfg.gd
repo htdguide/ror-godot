@@ -58,6 +58,18 @@ const PRESETS: Dictionary = {
     # Straight down on the vehicle, so all four wheels project to separate points with
     # nothing in front of them. Used by checks that sample rendered pixels at known
     # positions, where an occluded sample would read as a missing part.
+    # Behind and to the side, where the tailgate and the bed opening are both visible.
+    "hero_rear": {
+        "pos": Vector3(-4.6, 1.8, 3.2),
+        "look_at": Vector3(0.4, 0.8, 0.0),
+        "focal_mm": 50.0,
+        "f_stop": 5.6,
+        "shutter_s": 0.008,
+        "exposure": 1.0,
+        "scenario": "static",
+        "weather": "noon_clear",
+        "props": false,
+    },
     "diag_topdown": {
         "pos": Vector3(0.0, 9.0, 0.0),
         "look_at": Vector3(0.0, 0.0, 0.0),

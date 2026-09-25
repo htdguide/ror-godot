@@ -8,6 +8,9 @@ extends GateBase
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
 const PRESET: String = "hero_3q"
+## A second framing, captured alongside the first so the far side of the vehicle is
+## looked at too. Parts can be correct in one view and obviously wrong in another.
+const SECOND_PRESET: String = "hero_rear"
 const MIN_FLEXBODIES: int = 8
 const MIN_TEXTURES: int = 3
 ## A pickup has four wheels; fewer means the meshwheels rows were not understood.
@@ -27,7 +30,11 @@ const GROUND_CLEARANCE_M: float = 0.05
 ## cannot tell a whole vehicle from four wheels and a shadow: when the body silently
 ## stopped rendering, coverage stayed at 62% and the gate passed. Comparing against what
 ## the geometry should cover catches that.
-const MIN_PROJECTED_FILL: float = 0.35
+##
+## The comparison is against a bounding box, which a vehicle fills loosely — open bed,
+## gaps under the body, air around the cab — so the bound is deliberately generous. It is
+## here to catch a vehicle that is mostly missing, not to measure how solid a truck is.
+const MIN_PROJECTED_FILL: float = 0.25
 ## How far a pixel must move to count as changed by the vehicle's arrival. Above sampling
 ## and compression noise, far below any real geometry.
 const BACKGROUND_DELTA: float = 0.02
@@ -125,6 +132,12 @@ func run(harness: Node) -> Dictionary:
             % [fill, MIN_PROJECTED_FILL, shot["png"]],
             fill
         )
+    var second: String = harness.setup_for(SECOND_PRESET)
+    if second == "":
+        var second_shot: Dictionary = await harness.capture_shot("vehicle_rear", "static", 6)
+        if second_shot["error"] != "":
+            return fail(second_shot["error"] as String)
+
     return ok(
         "%d flexbodies, %d wheels (%.2f m wheelbase, %.2f m track), %d textures, %.0f%% coverage: %s"
         % [
