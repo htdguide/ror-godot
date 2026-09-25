@@ -51,6 +51,7 @@ static func _build_environment(weather: Dictionary) -> WorldEnvironment:
     env.ambient_light_energy = float(weather.get("ambient_energy", 0.0))
     env.tonemap_mode = RenderCfg.TONEMAP as Environment.ToneMapper
     env.tonemap_white = RenderCfg.WHITE
+    env.tonemap_exposure = RenderCfg.EXPOSURE
     var holder: WorldEnvironment = WorldEnvironment.new()
     holder.name = "WorldEnvironment"
     holder.environment = env
@@ -58,12 +59,14 @@ static func _build_environment(weather: Dictionary) -> WorldEnvironment:
 
 
 static func _build_sky(weather: Dictionary) -> Sky:
-    var material: PhysicalSkyMaterial = PhysicalSkyMaterial.new()
-    material.rayleigh_coefficient = RenderCfg.RAYLEIGH
-    material.mie_coefficient = RenderCfg.MIE
-    material.turbidity = RenderCfg.TURBIDITY
-    material.sun_disk_scale = RenderCfg.SUN_DISK_SCALE
-    material.ground_color = RenderCfg.GROUND_COLOR
+    var material: ProceduralSkyMaterial = ProceduralSkyMaterial.new()
+    material.sky_top_color = weather.get("sky_top", RenderCfg.SKY_TOP) as Color
+    material.sky_horizon_color = weather.get("sky_horizon", RenderCfg.SKY_HORIZON) as Color
+    material.sky_curve = RenderCfg.SKY_CURVE
+    material.ground_bottom_color = RenderCfg.GROUND_COLOR
+    material.ground_horizon_color = RenderCfg.GROUND_HORIZON
+    material.sun_angle_max = RenderCfg.SUN_ANGLE_MAX_DEG
+    material.sun_curve = RenderCfg.SUN_CURVE
     material.energy_multiplier = float(weather.get("sky_energy", RenderCfg.SKY_ENERGY))
     var sky: Sky = Sky.new()
     sky.sky_material = material

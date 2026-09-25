@@ -62,6 +62,8 @@ func run(harness: Node) -> Dictionary:
     var err: String = harness.setup_for(PRESET)
     if err != "":
         return fail(err)
+    # Numbers are read back out of pixels here, so nothing else may draw into the frame.
+    harness.use_measurement_environment()
 
     var report: PackedStringArray = PackedStringArray()
     var unskinned: PackedStringArray = PackedStringArray()

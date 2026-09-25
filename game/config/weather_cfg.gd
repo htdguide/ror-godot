@@ -23,7 +23,7 @@ const PRESETS: Dictionary = {
         # A clear midday sun is bright, and the sky fills the shadows on its own. With a
         # physical sky the ambient term is the sky's own irradiance rather than a flat
         # colour, so it runs at full strength instead of being dialled down.
-        "sun_energy": 3.0,
+        "sun_energy": 1.6,
         "sun_color": Color(1.0, 0.97, 0.92),
         "ambient_energy": 1.0,
         "bg_color": Color(0.42, 0.55, 0.72),
@@ -41,8 +41,10 @@ const PRESETS: Dictionary = {
         "physical_sky": true,
         "sky_energy": 1.0,
         "sun_euler_deg": Vector3(-8.0, -110.0, 0.0),
-        "sun_energy": 2.2,
+        "sun_energy": 0.9,
         "sun_color": Color(1.0, 0.72, 0.45),
+        "sky_top": Color(0.16, 0.22, 0.42),
+        "sky_horizon": Color(0.86, 0.58, 0.36),
         "ambient_energy": 1.0,
         "bg_color": Color(0.26, 0.24, 0.32),
     },

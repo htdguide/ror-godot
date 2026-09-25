@@ -46,6 +46,8 @@ func run(harness: Node) -> Dictionary:
     var err: String = harness.setup_for(PRESET)
     if err != "":
         return fail(err)
+    # Numbers are read back out of pixels here, so nothing else may draw into the frame.
+    harness.use_measurement_environment()
 
     var instance: MeshInstance3D = MeshInstance3D.new()
     instance.mesh = _point_mesh()
