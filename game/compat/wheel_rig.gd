@@ -24,6 +24,12 @@ const RIM_DAMP_FALLBACK: float = 150.0
 ## braked, propulsed, arm, mass, spring, damping, side, meshname, material". Lives here
 ## rather than in the parser because the tread generated below is the only thing that
 ## reads most of these fields.
+##
+## `braked`, `propulsed` and `arm` are what make a wheel a driven wheel rather than a
+## castor. The hero truck states `4, 1, 8` on its front pair and `1, 1, 15` on its rear:
+## four-wheel drive, brakes all round, and a reference arm node per wheel for the reaction
+## torque to push against. Dropped, every wheel rolls freely and no amount of engine makes
+## the rig move.
 static func parse_row(fields: PackedStringArray, id_to_index: Dictionary) -> Dictionary:
     if fields.size() < 16:
         return {"error": "row has %d fields, expected at least 16" % fields.size()}
@@ -39,12 +45,20 @@ static func parse_row(fields: PackedStringArray, id_to_index: Dictionary) -> Dic
         "rays": fields[3].to_int(),
         "node1": node1,
         "node2": node2,
+        "braked": fields[7].to_int(),
+        "propulsed": fields[8].to_int(),
+        # A wheel with no resolvable arm node falls back to its own axle, which upstream
+        # also does: the reaction then has no lever and is skipped rather than misapplied.
+        "arm_node": int(id_to_index.get(fields[9], -1)),
         "mass": fields[10].to_float(),
         "spring": fields[11].to_float(),
         "damping": fields[12].to_float(),
         "side": fields[13].to_lower(),
         "mesh": fields[14],
         "material": fields[15],
+        # Filled in by `generate` once the tread exists.
+        "first_tread": -1,
+        "tread_count": 0,
     }
 
 
@@ -53,6 +67,7 @@ static func generate(truck: TruckParser) -> Dictionary:
     var nodes_before: int = truck.nodes.size()
     var beams_before: int = truck.beams.size() / 2
     for wheel: Dictionary in truck.wheels:
+        _order_axis(truck, wheel)
         _generate_one(truck, wheel)
     return {
         "nodes": truck.nodes.size() - nodes_before,
@@ -60,10 +75,36 @@ static func generate(truck: TruckParser) -> Dictionary:
     }
 
 
+## Upstream orders every wheel's axle nodes so that the first has the smaller z, before
+## anything reads them. Files do not: the hero truck states its left wheels outer node
+## first and its right wheels outer node first too, which on opposite sides of the vehicle
+## are opposite directions in space.
+##
+## Everything downstream is then handed an axis vector pointing outward on one side of the
+## rig and inward on the other. The tread zig-zag winds the opposite way, and — because
+## drive torque is applied about that axis — the same engine torque drives the left wheels
+## forward and the right wheels backward. Measured on the hero truck: 6 s at full throttle
+## moved it 4.70 m, 3.41 m of that sideways, with the left tread at 20.7 m/s and the right
+## at 1.4 m/s. The rig was fighting itself.
+static func _order_axis(truck: TruckParser, wheel: Dictionary) -> void:
+    var node1: int = wheel["node1"] as int
+    var node2: int = wheel["node2"] as int
+    if truck.nodes[node1].z <= truck.nodes[node2].z:
+        return
+    wheel["node1"] = node2
+    wheel["node2"] = node1
+
+
 static func _generate_one(truck: TruckParser, wheel: Dictionary) -> void:
     var rays: int = wheel["rays"] as int
     if rays < 3:
         return
+    # The tread nodes are contiguous and alternate between the two axle planes, which is
+    # the layout upstream's wheel force code assumes: even nodes brace to the first axle
+    # node, odd ones to the second. Recording where they start is what lets the solver
+    # find them without a second copy of the layout rule.
+    wheel["first_tread"] = truck.nodes.size()
+    wheel["tread_count"] = 2 * rays
     var axis_a: int = wheel["node1"] as int
     var axis_b: int = wheel["node2"] as int
     var origin_a: Vector3 = truck.nodes[axis_a]
@@ -80,10 +121,15 @@ static func _generate_one(truck: TruckParser, wheel: Dictionary) -> void:
     var ray: Vector3 = _perpendicular(axis) * (wheel["tire_radius"] as float)
     var outer: PackedInt32Array = PackedInt32Array()
     var inner: PackedInt32Array = PackedInt32Array()
+    # Upstream spreads the wheel's stated mass evenly over its tread nodes, and exempts them
+    # from the rig's own mass distribution and from the minimass floor: a tyre weighs what
+    # its row says, not what the structure around it works out to.
+    var tread_mass: float = (wheel["mass"] as float) / float(2 * rays)
+    var friction: float = wheel.get("friction", 1.0) as float
     for i: int in rays:
-        outer.append(_add_node(truck, origin_a + ray))
+        outer.append(_add_node(truck, origin_a + ray, tread_mass, friction))
         ray = ray.rotated(axis, step)
-        inner.append(_add_node(truck, origin_b + ray))
+        inner.append(_add_node(truck, origin_b + ray, tread_mass, friction))
         ray = ray.rotated(axis, step)
 
     var tyre_spring: float = wheel["spring"] as float
@@ -107,12 +153,16 @@ static func _generate_one(truck: TruckParser, wheel: Dictionary) -> void:
         _add_beam(truck, n, next_o, rim_spring, rim_damp)
 
 
-static func _add_node(truck: TruckParser, position: Vector3) -> int:
+static func _add_node(
+    truck: TruckParser, position: Vector3, mass: float, friction: float
+) -> int:
     var index: int = truck.nodes.size()
     truck.nodes.append(position)
     # Generated nodes carry an id no file can state, so a later reference to a numeric id
     # can never resolve to one of these by accident.
     truck.node_ids.append("@wheel%d" % index)
+    truck.node_mass.append(mass)
+    truck.node_friction.append(friction)
     return index
 
 

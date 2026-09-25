@@ -57,21 +57,10 @@ func run(harness: Node) -> Dictionary:
     var truck: TruckParser = built["truck"] as TruckParser
     harness.world.add_child(built["root"] as Node3D)
 
-    var solver: RefCounted = ClassDB.instantiate("RorSolver") as RefCounted
-    if solver == null:
-        return fail("RorSolver is not registered")
-    var lowest: float = INF
-    for node: Vector3 in truck.nodes:
-        lowest = minf(lowest, node.y)
-    var lift: Vector3 = Vector3(0.0, DROP_HEIGHT_M - lowest, 0.0)
-    for node: Vector3 in truck.nodes:
-        solver.add_node(node + lift, maxf(truck.minimass_kg, 1.0))
-    for i: int in range(0, truck.beams.size(), 2):
-        solver.add_beam(
-            truck.beams[i], truck.beams[i + 1], 0.0,
-            truck.beam_spring[i / 2], truck.beam_damp[i / 2]
-        )
-    solver.set_gravity(Vector3(0.0, -9.81, 0.0))
+    var rig: Dictionary = RigBuilder.build(truck, DROP_HEIGHT_M)
+    if (rig["error"] as String) != "":
+        return fail(rig["error"] as String)
+    var solver: RefCounted = rig["solver"] as RefCounted
     solver.set_ground(0.0, true)
 
     var substeps: int = int(SUBSTEP_HZ / FRAME_HZ)

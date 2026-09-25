@@ -96,22 +96,10 @@ func run(_harness: Node) -> Dictionary:
 
 
 func _settle(truck: TruckParser) -> PackedVector3Array:
-    var solver: RefCounted = ClassDB.instantiate("RorSolver") as RefCounted
-    if solver == null:
+    var built: Dictionary = RigBuilder.build(truck, DROP_HEIGHT_M)
+    if (built["error"] as String) != "":
         return PackedVector3Array()
-    var mass: float = maxf(truck.minimass_kg, 1.0)
-    var lowest: float = INF
-    for node: Vector3 in truck.nodes:
-        lowest = minf(lowest, node.y)
-    for node: Vector3 in truck.nodes:
-        solver.add_node(node + Vector3(0.0, DROP_HEIGHT_M - lowest, 0.0), mass)
-    for i: int in range(0, truck.beams.size(), 2):
-        var beam: int = i / 2
-        solver.add_beam(
-            truck.beams[i], truck.beams[i + 1], 0.0,
-            truck.beam_spring[beam], truck.beam_damp[beam]
-        )
-    solver.set_gravity(Vector3(0.0, -9.81, 0.0))
+    var solver: RefCounted = built["solver"] as RefCounted
     solver.set_ground(0.0, true)
     solver.step(1.0 / SUBSTEP_HZ, int(SETTLE_SECONDS * SUBSTEP_HZ))
     var out: PackedVector3Array = PackedVector3Array()

@@ -8,9 +8,6 @@ extends GateBase
 
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
-## Upstream's defaults, from SimConstants.
-const DEFAULT_SPRING: float = 9000000.0
-const DEFAULT_DAMP: float = 12000.0
 ## Upstream runs at 2 kHz. This core needs 10 kHz on the same rig, and that gap is the
 ## measure of what is still missing rather than a tuning knob: upstream distributes node
 ## mass from beam volume instead of using the minimass floor everywhere, adds per-node air
@@ -69,27 +66,10 @@ func run(_harness: Node) -> Dictionary:
     if truck.beams.is_empty():
         return fail("%s has no beams" % TRUCK)
 
-    var solver: RefCounted = ClassDB.instantiate("RorSolver") as RefCounted
-    if solver == null:
-        return fail("RorSolver is not registered: the GDExtension did not load")
-
-    # Mass distribution is not yet faithful: upstream derives node masses from beam volume
-    # with minimass as a floor, and this uses the floor for every node. That changes how
-    # the rig settles, not whether it stays stable, which is what this gate is about.
-    var mass: float = maxf(truck.minimass_kg, 1.0)
-    var lowest: float = INF
-    for node: Vector3 in truck.nodes:
-        lowest = minf(lowest, node.y)
-    for node: Vector3 in truck.nodes:
-        solver.add_node(node + Vector3(0.0, DROP_HEIGHT_M - lowest, 0.0), mass)
-    for i: int in range(0, truck.beams.size(), 2):
-        var beam: int = i / 2
-        var spring: float = (
-            truck.beam_spring[beam] if beam < truck.beam_spring.size() else DEFAULT_SPRING
-        )
-        var damp: float = truck.beam_damp[beam] if beam < truck.beam_damp.size() else DEFAULT_DAMP
-        solver.add_beam(truck.beams[i], truck.beams[i + 1], 0.0, spring, damp)
-    solver.set_gravity(Vector3(0.0, -9.81, 0.0))
+    var built: Dictionary = RigBuilder.build(truck, DROP_HEIGHT_M)
+    if (built["error"] as String) != "":
+        return fail(built["error"] as String)
+    var solver: RefCounted = built["solver"] as RefCounted
     solver.set_ground(0.0, true)
 
     var dt: float = 1.0 / SUBSTEP_HZ

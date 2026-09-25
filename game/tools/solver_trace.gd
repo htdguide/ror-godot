@@ -23,22 +23,15 @@ func _initialize() -> void:
         printerr(error)
         quit(1)
         return
-    var solver: RefCounted = ClassDB.instantiate("RorSolver") as RefCounted
-    for node: Vector3 in truck.nodes:
-        solver.add_node(node, truck.minimass_kg)
-    for i: int in range(0, truck.beams.size(), 2):
-        solver.add_beam(
-            truck.beams[i], truck.beams[i + 1], 0.0,
-            truck.beam_spring[i / 2], truck.beam_damp[i / 2]
-        )
-    var lowest: float = INF
-    for node: Vector3 in truck.nodes:
-        lowest = minf(lowest, node.y)
-    for n: int in solver.node_count():
-        solver.set_node_position(n, truck.nodes[n] + Vector3(0.0, 0.3 - lowest, 0.0))
-    solver.set_gravity(Vector3(0.0, -9.81, 0.0))
+    var built: Dictionary = RigBuilder.build(truck, 0.3)
+    if (built["error"] as String) != "":
+        printerr(built["error"])
+        quit(1)
+        return
+    var solver: RefCounted = built["solver"] as RefCounted
     solver.set_ground(0.0, true)
-    print("nodes=%d beams=%d (gravity and ground on)" % [solver.node_count(), solver.beam_count()])
+    print("nodes=%d beams=%d mass=%.1f kg (gravity and ground on)"
+        % [solver.node_count(), solver.beam_count(), solver.total_mass()])
 
     # What is attached to the node that runs away, and is any of it pre-stretched?
     var watch: int = 104
