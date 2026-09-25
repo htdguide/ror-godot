@@ -12,53 +12,46 @@ Read `docs/PLAN.md` first — it is the approved plan and it is authoritative. T
 
 ## Where things stand
 
-HEAD is `581f8b8`. `./tools/gate.sh --all` is green across 40 gates; run it before you start
+HEAD is `6a8913f`. `./tools/gate.sh --all` is green across 44 gates; run it before you start
 so you know that is still true. The hero asset is an unmodified community mod at
 `assets/mods/ChevyS1023` (`S10offroad.truck`), loaded through the compatibility shim with no
 conversion step.
 
-Working today: OGRE `.mesh` reading, DDS textures, PBR materials derived from
-`managedmaterials`, flexbodies skinned to solver nodes through `RenderingServer` skeletons,
-rigid props, generated wheel tread, and a node/beam solver in a C++ GDExtension that the
-truck actually drives on. `tools/play.sh --truck` opens a window and hands over the
-controls: throttle, brakes, steering, gears, a chase camera and a HUD.
-
-The solver has the force sources a driven rig needs, each a port of upstream's own law and
-each in its own file: ground contact with static and Stribeck friction (`ror_ground`), wheel
-torque and braking (`ror_wheels`), engine, gearbox and clutch (`ror_drivetrain`), steering
-through hydro rest length (`ror_steering`), per-node air drag, and travel bounds for shocks,
-ropes and support beams.
+**It drives.** `tools/play.sh --truck` opens a window on the valley and hands over the
+controls: throttle, brakes, steering, gears, ignition, lights, respawn, chase camera and a
+HUD. The solver has the force sources a driven rig needs, each a port of upstream's own law
+and each in its own file: ground contact with static and Stribeck friction (`ror_ground`),
+wheel torque and braking (`ror_wheels`), engine, gearbox and clutch (`ror_drivetrain`),
+steering through hydro rest length (`ror_steering`), per-node air drag, travel bounds for
+shocks, ropes and support beams, and a heightfield so it stands on terrain rather than a plane.
 
 **The 2 kHz gap is closed.** The rig settles at upstream's own rate and diverges at 1.5 kHz;
-`game/tools/stability_probe.gd` measures it by sweeping. Neither suspect named in the last
-handoff was the cause. Node masses did most of it (10 kHz to 3 kHz): the hero truck states a
-weight on all 250 of its nodes and they were all being floored to minimass. Applying
-`set_beam_defaults_scale` did the rest (3 kHz to 2 kHz). Air drag changed the stability floor
-not at all, though it halves the residual ringing.
+`game/tools/stability_probe.gd` measures it by sweeping. Node masses did most of it (10 kHz to
+3 kHz) and `set_beam_defaults_scale` the rest. Air drag was not a factor either way.
 
-Terrain3D is adopted, pinned at `v1.0.2-stable`, built by `tools/build_terrain3d.sh` and
-proven to load on Godot 4.7. There is no terrain yet — only an infinite checkerboard ground
-plane.
+**Terrain3D is in and used.** Pinned at `v1.0.2-stable`, built by `tools/build_terrain3d.sh`
+— a fresh checkout has no terrain until that is run, and the terrain gates skip cleanly.
+There is a generated valley, collision mode `Disabled`, and the solver collides against the
+same surface the renderer draws, checked to 0.0 mm.
+
+Also working: OGRE `.mesh` reading, DDS textures, PBR materials from `managedmaterials`,
+flexbodies skinned to solver nodes, rigid props, generated wheel tread that now spins,
+flares as real lamps, and a reflection probe per actor.
 
 ## What to do next
 
-**1. Build the terrain.** Terrain3D is installed but nothing uses it. A bare `Terrain3D` node
-has a null `data` and a null collision object until its data directory is set, so start
-there. Then `tools/import_dem.gd` (DEM to height/control/colour images through
-`Terrain3DData.import_images`), collision mode `Disabled`, and
-`res://compat/terrain3d_collision_bridge.gd` wrapping `get_height` / `get_normal` behind the
-height-query interface the solver's ground contact needs — bulk region access, not per-wheel
-scalar calls. `ror_ground` already takes a surface normal per node, so a sloped terrain needs
-no new force law, only a real height and normal to hand it. Valley One's layout is in
-PLAN §0.5.
+**1. Valley One v2 content.** The valley is a generated shape with no materials, no
+vegetation and no features. Six of the eight money shots name content that does not exist —
+a conifer stand, a river, a tunnel, a rock traverse, a lake — so the shot list is blocked on
+this rather than on the shots. PLAN §0.5 stages it; §0.6 names the seams:
+`tools/import_dem.gd` for real elevation data, `res://shaders/terrain3d_override.gdshader`
+for the material, `Terrain3DInstancer` for vegetation. Anything third-party needs its own ask.
 
-**2. M2 leftovers.** Per-actor `ReflectionProbe`, a ground material worth looking at, and the
-eight money shots under the weather presets.
+**2. The drivability scenarios.** PLAN M1 acceptance 7 wants `switchback_climb`,
+`ford_crossing` and `rut_traverse` completing without the actor falling through, getting
+stuck or exploding. The rig drives and the terrain queries work, so these are now writable.
 
-**3. Small and visible.** The `flares` section (12 entries on the hero truck) is unparsed, so
-headlights and tail lights are texture only with no actual lamps.
-
-**4. Fidelity gaps that are named rather than forgotten.**
+**3. Fidelity gaps that are named rather than forgotten.**
 
 - The hero truck declares a `fusedrag` section. Upstream gives such a rig a single fuselage
   drag vector instead of the per-node drag it currently gets.
@@ -71,7 +64,10 @@ headlights and tail lights are texture only with no actual lamps.
 - Beam deformation and breaking are not implemented.
 - Traction control and ABS are not implemented; neither is declared by the hero rig. At full
   throttle it breaks traction and the wheels run away, which is what a 4WD truck with 11 kNm
-  at the wheels does on concrete, but with no drag or TC to bound it the spin is unphysical.
+  at the wheels does on concrete, but with no aerodynamic drag on the body to bound it the
+  spin is unphysical.
+- Flares are placed and lit but not animated: indicators do not blink, brake lights do not
+  follow the pedal, and reversing lights do not follow the gear.
 
 ## How to work here
 
