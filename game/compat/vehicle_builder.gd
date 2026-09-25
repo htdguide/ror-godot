@@ -26,13 +26,13 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
 
     var root: Node3D = Node3D.new()
     root.name = "Vehicle"
-    # The actor frame is computed and reported, but not yet applied to the render path.
-    # Applying it — frame on the root, bones and wheels in actor-local space — should be a
-    # no-op by construction, since T * (T^-1 * v) is v. It is not: the body and wheels
-    # separate by about half a metre. The algebra is verified by actor_frame_rigid_motion
-    # and the render is verified with the frame at identity, so rather than ship a
-    # transform that is half understood, the render stays in rig space until the
-    # discrepancy is explained. See docs/architecture/bridge.md.
+    # The actor frame is computed but NOT applied to the render path. Wiring it —  frame
+    # on the root, bones and wheels in actor-local space — makes two wheels render out on
+    # open ground, while vehicle_assembly measures every part and every wheel's drawn
+    # geometry within a millimetre of its rig position. The gate and the image disagree,
+    # so one of them is wrong, and the gate is the thing to fix first: a gate that passes
+    # while the render is visibly broken is worse than no gate at all. See
+    # docs/architecture/bridge.md.
     var actor: Transform3D = ActorFrame.of(truck.nodes, truck.camera_nodes)
     var render_frame: Transform3D = Transform3D.IDENTITY
     var parts: Array[SkinnedFlexbody] = []
@@ -61,7 +61,9 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
     var wheels_built: int = 0
     for index: int in truck.wheels.size():
         var wheel: Dictionary = truck.wheels[index]
-        var node: Node3D = _build_wheel(wheel, truck, mod_dir, mesh_reader, dds_reader, textures)
+        var node: Node3D = _build_wheel(
+            wheel, truck, render_frame, mod_dir, mesh_reader, dds_reader, textures
+        )
         if node == null:
             skipped.append("wheel %s" % wheel["mesh"])
             continue
@@ -143,13 +145,16 @@ static func _build_skinned_flexbody(
 static func _build_wheel(
     wheel: Dictionary,
     truck: TruckParser,
+    render_frame: Transform3D,
     mod_dir: String,
     mesh_reader: RefCounted,
     dds_reader: RefCounted,
     textures: Dictionary
 ) -> Node3D:
     var holder: Node3D = Node3D.new()
-    holder.transform = WheelBuilder.rim_transform(truck.nodes, wheel)
+    holder.transform = render_frame.affine_inverse() * WheelBuilder.rim_transform(
+        truck.nodes, wheel
+    )
 
     var rim_path: String = mod_dir.path_join(wheel["mesh"] as String)
     if FileAccess.file_exists(rim_path):

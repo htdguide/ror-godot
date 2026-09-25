@@ -102,17 +102,35 @@ The frame's own algebra is verified by `actor_frame_rigid_motion`: rigid vehicle
 appears in the frame while actor-local bone transforms stay put to within 4e-6, against a
 deformation response five orders of magnitude larger.
 
-Wiring it into the render path is still **not done**. An earlier attempt produced a
-vehicle whose body and wheels sat about half a metre apart. With the composition and the
-bone writes since measured and both correct, that failure is most likely a transient state
-during editing — the root left at identity while wheel placements still carried `T^-1` —
-rather than anything about the engine. It could not be reproduced in the current tree.
+Wiring it into the render path is still **not done**, and the reason is now sharper than
+"it looked wrong".
 
-That is a reason to redo the wiring as one atomic change, with a gate that checks assembly
-numerically: body and wheel world positions must agree with the rig positions they came
-from, to a tolerance in millimetres. The eye cannot tell a correctly assembled truck from
-one whose parts share a consistent error, which is exactly what a whole-vehicle transform
-mistake looks like.
+The wiring was redone as one atomic change — frame on the root, bones actor-local, wheel
+placements actor-local — with `vehicle_assembly` written first to check it numerically.
+That gate compares every part's rendered vertex positions and every wheel's drawn geometry
+against the rig's own node positions, relative to a reference vertex so the result does
+not depend on where the vehicle is placed for the camera.
+
+**With the frame wired, the gate measures every part within 0.001 mm and every wheel
+within 0 mm of its rig position, and the render still puts two wheels out on open ground.**
+
+The gate and the image disagree, so one of them is wrong, and the gate is what to fix
+first: a gate that passes while the render is visibly broken is worse than having no gate,
+because it will be trusted later on a change nobody looks at. Candidate explanations, none
+yet confirmed:
+
+- The gate models the renderer's composition rather than reading the frame, so a
+  divergence between model and engine is invisible to it — even though that composition is
+  itself measured by `skinning_transform_semantics`.
+- The wheel check compares `mesh.get_aabb()` transformed by the node's global transform,
+  which is the same model, not the drawn result.
+
+The way to settle it is to make the check read pixels rather than transforms: project each
+wheel's axle midpoint to screen and require the rendered pixel there to belong to the
+vehicle. That closes the loop the current gate leaves open.
+
+Until then the render path stays in rig space, where it is verified correct, and the frame
+is computed but unused there.
 
 The frame's orientation convention was wrong once and is fixed: upstream's `cameras`
 section names a centre, a node *behind* it and a node to its *left*, so the roll node must

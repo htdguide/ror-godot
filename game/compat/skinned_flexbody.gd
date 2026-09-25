@@ -19,6 +19,9 @@ var triads: Array[Vector3i] = []
 var binding: Dictionary = {}
 var bind_inverse: Array[Transform3D] = []
 var vertex_count: int = 0
+## Rest positions, kept so the rendered position of a vertex can be computed
+## independently of the GPU and checked against it.
+var rest_vertices: PackedVector3Array = PackedVector3Array()
 
 var _uvs: PackedVector2Array = PackedVector2Array()
 
@@ -34,6 +37,7 @@ func build(
     uvs: PackedVector2Array = PackedVector2Array()
 ) -> String:
     vertex_count = vertices.size()
+    rest_vertices = vertices
     binding = FlexbodyBinder.bind(nodes, forset, vertices)
     triads = binding["triads"] as Array[Vector3i]
     if triads.is_empty():
@@ -101,6 +105,17 @@ func local_bone_transforms(
 func set_reference(nodes: PackedVector3Array, rest: PackedVector3Array, indices: PackedInt32Array) -> void:
     mesh.clear_surfaces()
     _add_surface(rest, indices, FlexbodyBinder.reference_positions(nodes, binding, triads))
+
+
+## Where a vertex actually lands, composed the way the engine does it:
+## instance_global_transform * bone_transform * vertex, as measured by
+## skinning_transform_semantics.
+func rendered_position(vertex_index: int) -> Vector3:
+    var bone: int = (binding["bone_of_vertex"] as PackedInt32Array)[vertex_index]
+    var bone_transform: Transform3D = RenderingServer.skeleton_bone_get_transform(
+        skeleton_rid, bone
+    )
+    return mesh_instance.global_transform * (bone_transform * rest_vertices[vertex_index])
 
 
 func free_resources() -> void:
