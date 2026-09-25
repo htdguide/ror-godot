@@ -8,6 +8,7 @@ export_presets.cfg
 build/
 bin/
 *.o
+*.os
 *.obj
 *.so
 *.dylib
@@ -27,3 +28,8 @@ artifacts/
 .vscode/
 .idea/
 *.swp
+
+# Community mods. Not committed: Rigs of Rods repository content carries varied and
+# often unstated licensing, and this project has no right to redistribute it. Mods are
+# fetched or copied in locally; gates skip cleanly when one is absent.
+assets/mods/

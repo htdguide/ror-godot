@@ -62,6 +62,18 @@ has no corresponding record under `LICENSES/`.
 - Cost if dropped: the clipmap mesh and the foliage instancer would have to be written. The collision
   bridge and our shader override are ours and portable.
 
+### Chevrolet S10 pack (hero asset, not redistributed)
+- Local path: `assets/mods/ChevyS1023` — **gitignored, never committed**
+- Source: Rigs of Rods repository, supplied by the project owner
+- Licence: not stated in the package. No licence file ships with it, so no redistribution
+  right can be assumed. It is used locally as a test and hero asset only.
+- Why this one: `S10offroad.truck` has 255 nodes and uses `flexbodies` with external
+  OGRE meshes, `managedmaterials` with inline material definitions, and `submesh`/`cab`
+  sections. It therefore exercises both deformation paths of ADR 0003 and the legacy
+  material classification of ADR 0001, which upstream's own content pack cannot.
+- Consequence: gates that need it must skip cleanly when it is absent, so a fresh clone
+  still runs the suite green.
+
 ## Rejected
 
 - Unreal Engine marketplace and Quixel/Megascans content. Licensed for use in Unreal Engine only. The
