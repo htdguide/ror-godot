@@ -25,6 +25,21 @@ struct RorNode {
     bool ground_contact = false;
 };
 
+// How a beam behaves outside the travel it was given. Upstream's `bounded` field.
+enum class BeamBound {
+    // A plain structural member: the same spring in tension and compression.
+    NORMAL = 0,
+    // A shock absorber. Inside its travel it is as soft as its own rates say; past either
+    // bound its spring and damping ramp towards the rig's structural defaults, which is
+    // what stops a suspension travelling through its own bump stops.
+    SHOCK1 = 1,
+    // A rope. Carries tension and nothing else: slack rope pushes nothing.
+    ROPE = 2,
+    // A support beam. Carries compression and nothing else: it holds a part up and lets it
+    // be lifted away freely.
+    SUPPORT = 3,
+};
+
 // A damped spring between two nodes. `rest_length` is live: steering and commands work
 // by changing it, which is upstream's actuation mechanism rather than an added force.
 struct RorBeam {
@@ -36,6 +51,15 @@ struct RorBeam {
     float reference_length = 0.0f;
     float spring = 0.0f;
     float damping = 0.0f;
+    BeamBound bound = BeamBound::NORMAL;
+    // Travel either side of the rest length, as a fraction of it. Upstream's `shortbound`
+    // is how far the beam may compress and `longbound` how far it may stretch.
+    float short_bound = 0.0f;
+    float long_bound = 0.0f;
+    // The rates a shock ramps towards once it is past a bound: the rig's own structural
+    // defaults where the shock was declared, not the shock's soft rates.
+    float bound_spring = 0.0f;
+    float bound_damp = 0.0f;
 };
 
 using NodeArray = std::vector<RorNode>;

@@ -66,6 +66,11 @@ var drivetrain: Dictionary = DriveRows.empty()
 ## One entry per `hydros` row: {beam: int, factor: float}. `beam` indexes `beams`, so the
 ## solver can find the beam a steering ram actuates without re-deriving it.
 var hydros: Array[Dictionary] = []
+## One entry per beam that has a travel limit rather than being a plain spring: shocks, ropes
+## and support beams. {beam, bound, short_bound, long_bound, bound_spring, bound_damp,
+## precompression}. Without these a shock is a soft spring with no bump stop, so a suspension
+## travels through its own limits and a door damper never resists.
+var bounded_beams: Array[Dictionary] = []
 ## Whether the rig declares an `axles` section. Upstream doubles a rig's drive torque when
 ## it does, for backwards compatibility, so it changes how hard the rig pulls.
 var has_axles: bool = false
@@ -84,7 +89,7 @@ var sections_parsed: Dictionary = {}
 var errors: PackedStringArray = PackedStringArray()
 
 var _node_id_to_index: Dictionary = {}
-var _camera_ids: PackedStringArray = PackedStringArray()
+var _cameras: CameraRows = CameraRows.new()
 var _node_defaults: NodeRows.Defaults = NodeRows.Defaults.new()
 var _beam_defaults: BeamDefaults = BeamDefaults.new()
 var _section: String = ""
@@ -125,15 +130,15 @@ func parse_text(text: String) -> String:
 ## Sections that name nodes may appear before the nodes section itself, so their
 ## references are resolved once the whole file has been read.
 func _resolve_deferred() -> void:
-    if _camera_ids.size() < 3:
+    cinecams = _cameras.positions
+    if not cinecams.is_empty():
+        cinecam_position = cinecams[0]
+        has_cinecam = true
+    var resolved: Dictionary = _cameras.resolve(_node_id_to_index)
+    if (resolved["error"] as String) != "":
+        errors.append(resolved["error"] as String)
         return
-    var centre: int = _node_index(_camera_ids[0])
-    var dir: int = _node_index(_camera_ids[1])
-    var roll: int = _node_index(_camera_ids[2])
-    if centre < 0 or dir < 0 or roll < 0:
-        errors.append("cameras references unknown node: %s" % ", ".join(_camera_ids))
-        return
-    camera_nodes = {"centre": centre, "dir": dir, "roll": roll}
+    camera_nodes = resolved["nodes"] as Dictionary
 
 
 ## Share of content lines that landed in a section this parser understands.
@@ -202,11 +207,11 @@ func _parse_row(line: String) -> void:
         "meshwheels2", "meshwheels":
             _parse_mesh_wheel(line)
         "cameras":
-            _parse_cameras(line)
+            _cameras.read_cameras(TruckLexer.fields(line))
         "minimass":
             _parse_minimass(line)
         "cinecam":
-            _parse_cinecam(line)
+            _cameras.read_cinecam(TruckLexer.fields(line))
         "axles", "interaxles":
             has_axles = true
         _:
@@ -264,38 +269,10 @@ func _parse_texcoord(line: String) -> void:
     texcoords.append(row["uv"] as Vector2)
 
 
-## "x, y, z, node1..node8, spring, damp" — only the position is needed here.
-func _parse_cinecam(line: String) -> void:
-    var fields: PackedStringArray = TruckLexer.fields(line)
-    if fields.size() < 3:
-        return
-    var position: Vector3 = Vector3(
-        fields[0].to_float(), fields[1].to_float(), fields[2].to_float()
-    )
-    cinecams.append(position)
-    if has_cinecam:
-        return
-    cinecam_position = position
-    has_cinecam = true
-
-
 func _parse_minimass(line: String) -> void:
     var fields: PackedStringArray = TruckLexer.fields(line)
     if fields.size() >= 1:
         minimass_kg = fields[0].to_float()
-
-
-## Rows are "centre_node, direction_node, roll_node". Only the first is kept: it is the
-## actor's main camera, and one frame per actor is what the bridge needs.
-func _parse_cameras(line: String) -> void:
-    if not _camera_ids.is_empty():
-        return
-    var fields: PackedStringArray = TruckLexer.fields(line)
-    if fields.size() < 3:
-        return
-    # Resolution is deferred: a cameras section may appear before the nodes it names, as
-    # it does in upstream's own DAF semi, and resolving eagerly rejects a valid file.
-    _camera_ids = PackedStringArray([fields[0], fields[1], fields[2]])
 
 
 func _parse_mesh_wheel(line: String) -> void:
@@ -366,22 +343,42 @@ func _parse_prop(line: String) -> void:
 func _parse_joint(line: String) -> void:
     if not BeamRows.handles(_section):
         return
+    var fields: PackedStringArray = TruckLexer.fields(line)
     var row: Dictionary = BeamRows.joint(
-        _section,
-        TruckLexer.fields(line),
-        _node_id_to_index,
-        _beam_defaults.spring(),
-        _beam_defaults.damp()
+        _section, fields, _node_id_to_index, _beam_defaults, _joint_length(fields)
     )
     if (row["error"] as String) != "":
         errors.append("%s %s: %s" % [_section, row["error"], line])
         return
+    var beam: int = beams.size() / 2
     if _section == "hydros" and (row["factor"] as float) != 0.0:
-        hydros.append({"beam": beams.size() / 2, "factor": row["factor"] as float})
+        hydros.append({"beam": beam, "factor": row["factor"] as float})
+    if (row["bound"] as int) != BeamRows.BOUND_NORMAL:
+        bounded_beams.append({
+            "beam": beam,
+            "bound": row["bound"],
+            "short_bound": row["short_bound"],
+            "long_bound": row["long_bound"],
+            "bound_spring": row["bound_spring"],
+            "bound_damp": row["bound_damp"],
+            "precompression": row["precompression"],
+        })
     beams.append(row["a"] as int)
     beams.append(row["b"] as int)
     beam_spring.append(row["spring"] as float)
     beam_damp.append(row["damp"] as float)
+
+
+## The rest length of the beam a row declares, for the rows that state their travel in metres
+## rather than as a fraction of it.
+func _joint_length(fields: PackedStringArray) -> float:
+    if fields.size() < 2:
+        return 0.0
+    var a: int = int(_node_id_to_index.get(fields[0], -1))
+    var b: int = int(_node_id_to_index.get(fields[1], -1))
+    if a < 0 or b < 0:
+        return 0.0
+    return nodes[a].distance_to(nodes[b])
 
 
 func _parse_cab(line: String) -> void:

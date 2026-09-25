@@ -49,3 +49,18 @@ func spring() -> float:
 
 func damp() -> float:
     return _damp * _damp_scale
+
+
+## The stated rates, without the scale.
+##
+## These are what a shock ramps towards once it is past its travel. Upstream records a
+## shock's handover rates from the unscaled `springiness` and `damping_constant` while giving
+## ordinary beams the scaled ones, so on the hero truck a shock hands over to 1.9 MN/m while
+## the structure around it is built at 0.85 of its stated rate. That asymmetry is upstream's
+## and it is load-bearing: scaling the handover too would make every bump stop 15% softer.
+func spring_unscaled() -> float:
+    return _spring
+
+
+func damp_unscaled() -> float:
+    return _damp

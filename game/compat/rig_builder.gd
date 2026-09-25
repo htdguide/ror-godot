@@ -51,6 +51,7 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
         var damp: float = truck.beam_damp[beam] if beam < truck.beam_damp.size() else DEFAULT_DAMP
         solver.add_beam(truck.beams[i], truck.beams[i + 1], 0.0, spring, damp)
 
+    _add_bounds(solver, truck)
     _add_wheels(solver, truck)
     _add_steering(solver, truck)
     _configure_engine(solver, truck)
@@ -69,6 +70,20 @@ static func from_file(mod_dir: String, truck_file: String, drop_height_m: float 
     var built: Dictionary = build(truck, drop_height_m)
     built["truck"] = truck
     return built
+
+
+## Travel limits, before anything reads a beam's length: pre-compression changes it.
+static func _add_bounds(solver: RefCounted, truck: TruckParser) -> void:
+    for entry: Dictionary in truck.bounded_beams:
+        solver.set_beam_bounds(
+            entry["beam"] as int,
+            entry["bound"] as int,
+            entry["short_bound"] as float,
+            entry["long_bound"] as float,
+            entry["bound_spring"] as float,
+            entry["bound_damp"] as float,
+            entry["precompression"] as float
+        )
 
 
 static func _add_wheels(solver: RefCounted, truck: TruckParser) -> void:

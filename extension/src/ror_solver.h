@@ -62,6 +62,11 @@ public:
     void add_node_force(int node, const godot::Vector3 &force);
     // Actuation. Changing a beam's rest length is how upstream moves a rig from within.
     void set_beam_rest_length(int beam, float length);
+    // Gives a beam a travel range and what happens outside it. `bound_type` is a BeamBound.
+    // `precompression` scales the beam's rest and reference length, which is how a shock is
+    // installed already under load. See ror_node.h for what each bound type means.
+    void set_beam_bounds(int beam, int bound_type, float short_bound, float long_bound,
+                         float bound_spring, float bound_damp, float precompression);
     float get_beam_rest_length(int beam) const;
     float get_beam_reference_length(int beam) const;
 
@@ -139,6 +144,7 @@ private:
 
     void integrate(float dt);
     void apply_air_drag();
+    static void apply_bound_law(const RorBeam &beam, float extension, float &spring, float &damping);
     void accumulate_beam_forces();
     void apply_ground_contact(float dt);
 };

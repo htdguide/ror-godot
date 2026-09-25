@@ -104,6 +104,23 @@ void RorSolver::set_beam_rest_length(int beam, float length) {
     }
 }
 
+void RorSolver::set_beam_bounds(int beam, int bound_type, float short_bound, float long_bound,
+                                float bound_spring, float bound_damp, float precompression) {
+    if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
+        return;
+    }
+    RorBeam &target = m_beams[beam];
+    target.bound = static_cast<BeamBound>(bound_type);
+    target.short_bound = short_bound;
+    target.long_bound = long_bound;
+    target.bound_spring = bound_spring;
+    target.bound_damp = bound_damp;
+    if (precompression > 0.0f && precompression != 1.0f) {
+        target.rest_length *= precompression;
+        target.reference_length *= precompression;
+    }
+}
+
 float RorSolver::get_beam_rest_length(int beam) const {
     if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
         return 0.0f;
@@ -180,10 +197,53 @@ void RorSolver::accumulate_beam_forces() {
         const float extension = length - beam.rest_length;
         // Rate of stretch along the beam, which is what the damper resists.
         const float closing_speed = (a.velocity - b.velocity).dot(direction);
-        const float magnitude = -beam.spring * extension - beam.damping * closing_speed;
+        float spring = beam.spring;
+        float damping = beam.damping;
+        apply_bound_law(beam, extension, spring, damping);
+        const float magnitude = -spring * extension - damping * closing_speed;
         const Vector3 force = direction * magnitude;
         a.forces += force;
         b.forces -= force;
+    }
+}
+
+// What a beam does outside the travel it was given. Upstream's `CalcBeams` branches, and the
+// reason a rig has suspension rather than springs: a shock is soft over its own travel and
+// then hands over to the structure around it.
+void RorSolver::apply_bound_law(const RorBeam &beam, float extension, float &spring, float &damping) {
+    switch (beam.bound) {
+        case BeamBound::NORMAL:
+            return;
+        case BeamBound::SHOCK1: {
+            // How far past a bound the beam is, in metres. Not normalised, so the handover
+            // to the structural rates gets firmer the further it is pushed — which is what
+            // makes a bump stop feel like one instead of a wall.
+            float overshoot = 0.0f;
+            if (extension > beam.long_bound * beam.rest_length) {
+                overshoot = extension - beam.long_bound * beam.rest_length;
+            } else if (extension < -beam.short_bound * beam.rest_length) {
+                overshoot = -extension - beam.short_bound * beam.rest_length;
+            }
+            if (overshoot != 0.0f) {
+                spring += (beam.bound_spring - spring) * overshoot;
+                damping += (beam.bound_damp - damping) * overshoot;
+            }
+            return;
+        }
+        case BeamBound::ROPE:
+            // Slack: a rope pushes nothing.
+            if (extension < 0.0f) {
+                spring = 0.0f;
+                damping *= 0.1f;
+            }
+            return;
+        case BeamBound::SUPPORT:
+            // Lifted away: a support beam pulls nothing.
+            if (extension > 0.0f) {
+                spring = 0.0f;
+                damping *= 0.1f;
+            }
+            return;
     }
 }
 

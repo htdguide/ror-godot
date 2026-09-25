@@ -211,6 +211,9 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_node_friction", "node", "friction_coef"), &RorSolver::set_node_friction);
     ClassDB::bind_method(D_METHOD("add_node_force", "node", "force"), &RorSolver::add_node_force);
     ClassDB::bind_method(D_METHOD("set_beam_rest_length", "beam", "length"), &RorSolver::set_beam_rest_length);
+    ClassDB::bind_method(D_METHOD("set_beam_bounds", "beam", "bound_type", "short_bound",
+                                  "long_bound", "bound_spring", "bound_damp", "precompression"),
+                         &RorSolver::set_beam_bounds);
     ClassDB::bind_method(D_METHOD("get_beam_rest_length", "beam"), &RorSolver::get_beam_rest_length);
     ClassDB::bind_method(D_METHOD("get_beam_reference_length", "beam"), &RorSolver::get_beam_reference_length);
 

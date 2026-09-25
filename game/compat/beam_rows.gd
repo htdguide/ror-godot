@@ -34,19 +34,43 @@ const FACTOR_FIELD: Dictionary = {
     "hydros": 2,
 }
 
+## What a section's beams do outside their travel, matching the solver's BeamBound. A shock
+## ramps towards the structural rates past either bound; a rope carries tension only; a
+## support beam carries compression only.
+const BOUND_NORMAL: int = 0
+const BOUND_SHOCK: int = 1
+const BOUND_ROPE: int = 2
+const BOUND_SUPPORT: int = 3
+const BOUND_TYPE: Dictionary = {
+    "shocks": BOUND_SHOCK,
+    "shocks2": BOUND_SHOCK,
+    "ropes": BOUND_ROPE,
+    "supportbeams": BOUND_SUPPORT,
+}
+## Where a shock row states its travel: "node1, node2, springin, dampin, shortbound,
+## longbound, precomp, options". The bounds are fractions of the beam's own rest length,
+## unless the row carries the `m` option, in which case they are metres.
+const SHOCK_SHORT_BOUND_FIELD: int = 4
+const SHOCK_PRECOMPRESSION_FIELD: int = 6
+const SHOCK_OPTIONS_FIELD: int = 7
+
 
 static func handles(section: String) -> bool:
-    return SPRING_FIELD.has(section)
+    return SPRING_FIELD.has(section) or BOUND_TYPE.has(section)
 
 
-## Returns {"error": String, "a": int, "b": int, "spring": float, "damp": float,
-## "factor": float}. `factor` is zero for every section that does not actuate.
+## Returns {"error", "a", "b", "spring", "damp", "factor", "bound", "short_bound",
+## "long_bound", "bound_spring", "bound_damp", "precompression"}.
+##
+## `factor` is zero for every section that does not actuate, and `bound` is BOUND_NORMAL for
+## every section whose beams have no travel limit. `length_m` is the beam's rest length, which
+## a shock row needs only when it states its bounds in metres.
 static func joint(
     section: String,
     fields: PackedStringArray,
     id_to_index: Dictionary,
-    default_spring: float,
-    default_damp: float
+    defaults: BeamDefaults,
+    length_m: float = 0.0
 ) -> Dictionary:
     if fields.size() < 2:
         return {"error": "row has %d fields, expected at least 2" % fields.size()}
@@ -54,9 +78,9 @@ static func joint(
     var b: int = int(id_to_index.get(fields[1], -1))
     if a < 0 or b < 0:
         return {"error": "row references an unknown node"}
-    var spring: float = default_spring
-    var damp: float = default_damp
-    var at: int = int(SPRING_FIELD[section])
+    var spring: float = defaults.spring()
+    var damp: float = defaults.damp()
+    var at: int = int(SPRING_FIELD.get(section, -1))
     if at >= 0 and fields.size() > at + 1:
         # A shock's stated rates are used as stated, soft ones included. The hero truck's
         # door dampers ask for a spring of 1 N/m and mean it: the doors hang on the
@@ -68,4 +92,42 @@ static func joint(
     var factor_at: int = int(FACTOR_FIELD.get(section, -1))
     if factor_at >= 0 and fields.size() > factor_at:
         factor = fields[factor_at].to_float()
-    return {"error": "", "a": a, "b": b, "spring": spring, "damp": damp, "factor": factor}
+    var row: Dictionary = {
+        "error": "",
+        "a": a,
+        "b": b,
+        "spring": spring,
+        "damp": damp,
+        "factor": factor,
+        "bound": int(BOUND_TYPE.get(section, BOUND_NORMAL)),
+        "short_bound": 0.0,
+        "long_bound": 0.0,
+        # A shock past its travel hands over to the structural rates as stated, unscaled.
+        "bound_spring": defaults.spring_unscaled(),
+        "bound_damp": defaults.damp_unscaled(),
+        "precompression": 1.0,
+    }
+    if (row["bound"] as int) == BOUND_SHOCK:
+        _read_shock_travel(fields, row, length_m)
+    return row
+
+
+## A shock's travel and pre-compression.
+static func _read_shock_travel(
+    fields: PackedStringArray, row: Dictionary, length_m: float
+) -> void:
+    if fields.size() <= SHOCK_SHORT_BOUND_FIELD + 1:
+        return
+    var short_bound: float = fields[SHOCK_SHORT_BOUND_FIELD].to_float()
+    var long_bound: float = fields[SHOCK_SHORT_BOUND_FIELD + 1].to_float()
+    var options: String = (
+        fields[SHOCK_OPTIONS_FIELD] if fields.size() > SHOCK_OPTIONS_FIELD else ""
+    )
+    # The `m` option states the bounds in metres rather than as fractions of the beam.
+    if options.contains("m") and length_m > 0.0:
+        short_bound /= length_m
+        long_bound /= length_m
+    row["short_bound"] = maxf(short_bound, 0.0)
+    row["long_bound"] = maxf(long_bound, 0.0)
+    if fields.size() > SHOCK_PRECOMPRESSION_FIELD:
+        row["precompression"] = maxf(fields[SHOCK_PRECOMPRESSION_FIELD].to_float(), 0.0)
