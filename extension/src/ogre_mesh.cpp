@@ -212,6 +212,16 @@ bool OgreMeshReader::read_submesh(Cursor &c, int64_t end, Array &submeshes) {
                 indices_32bit ? static_cast<int32_t>(c.u32()) : static_cast<int32_t>(c.u16());
     }
 
+    // OGRE winds its front faces clockwise; Godot expects counter-clockwise. Without
+    // reversing each triangle every surface faces away from the viewer: it is culled from
+    // the front and drawn from behind, so a vehicle can be seen through from outside
+    // while its interior faces are visible, and tail lights only appear from behind.
+    for (int64_t i = 0; i + 2 < indices.size(); i += 3) {
+        const int32_t swap = indices[i + 1];
+        indices[i + 1] = indices[i + 2];
+        indices[i + 2] = swap;
+    }
+
     Geometry own;
     while (c.at + CHUNK_HEADER_SIZE <= end) {
         const int64_t chunk_start = c.at;

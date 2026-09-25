@@ -256,6 +256,12 @@ func _load_vehicle(spec: String) -> String:
     var mod_dir: String = parts[0]
     if not mod_dir.is_absolute_path():
         mod_dir = SourceScan.repo_root().path_join(mod_dir)
+    # The blockout scale props exist to give an empty frame something to measure. With a
+    # vehicle loaded they are just obstacles for it to sit inside.
+    for prop: Node in world.get_children():
+        if str(prop.name).begins_with("Box") or str(prop.name) == "Sphere":
+            prop.queue_free()
+
     var built: Dictionary = VehicleBuilder.build(mod_dir, parts[1])
     if (built.get("error", "") as String) != "":
         return built["error"] as String
