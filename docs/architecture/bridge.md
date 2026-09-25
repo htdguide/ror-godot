@@ -123,11 +123,25 @@ Two engine questions were eliminated on the way, both by measurement:
   version of that sweep reported the point vanishing between 85 and 95 degrees; the scene
   had the blockout scale props in it and the point was passing inside one of the boxes.
 
-So the difference lies in the mesh, not the transform. The one-vertex rig that skins
-correctly is a single-bone `PRIMITIVE_POINTS` mesh; the vehicle parts are indexed
-triangles with UVs and a few hundred bones. Next step is to walk the rig toward the
-vehicle one property at a time — triangles, then UVs, then many bones — and find which one
-stops the skinning being applied.
+The difference is not in the mesh either. `skinning_mesh_variants` walks a synthetic mesh
+from a single-bone points cloud all the way to the vehicle's shape — unindexed triangles,
+indexed triangles, UVs, a `CUSTOM0` stream, a 292-bone skeleton, a bone index of 291, and
+an instance whose own transform is identity under a rotated parent. **All eight skin
+correctly, within 1 pixel.**
+
+So every property the vehicle's meshes have, in isolation, works. What remains is that for
+the real vehicle meshes the model and the pixels disagree: reading bone 0 back gives
+exactly `T^-1`, the instance's global transform is exactly the frame, and computing
+`instance * bone * vertex` by hand gives precisely the position the rig predicts — while
+the drawn silhouette is that shape rotated by the frame's yaw.
+
+The next experiment bisects code path against data: put a synthetic quad through
+`SkinnedFlexbody` itself, with the same calls in the same order, and see whether it skins.
+If it does, the difference is the real mesh's data — 1860 vertices, 292 triads, real
+indices — and the search narrows to what in that data differs from the synthetic case. If
+it does not, the difference is in `SkinnedFlexbody`'s own sequence, most likely the fact
+that it writes the pose twice: once inside `build()` with an identity frame, and again
+immediately afterwards with the real one.
 
 The frame's orientation convention was wrong once and is fixed: upstream's `cameras`
 section names a centre, a node *behind* it and a node to its *left*, so the roll node must
