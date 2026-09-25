@@ -21,6 +21,9 @@ const PIXEL_SEARCH_RADIUS: int = 14
 ## How far the drawn silhouette may sit from where the rig projects it, in pixels. A part
 ## in the wrong place moves it by hundreds.
 const SILHOUETTE_TOLERANCE_PX: float = 40.0
+## Parts smaller than this are allowed to render nothing at this framing: a few square
+## pixels can fall between the sampling grid.
+const SMALL_PART_VERTICES: int = 64
 ## Millimetres for part vertices. Wheels are checked against their axle midpoint through
 ## the geometry that is actually drawn, and a rim mesh is not perfectly centred on its
 ## axle, so wheels get their own looser bound: this is about catching a part in the wrong
@@ -144,50 +147,60 @@ func _check_rendered_positions(
             % [missing.size(), index, ", ".join(missing), shot["png"]]
         )
 
-    # Same question of the body, asked as a silhouette rather than per vertex. Sampling
-    # individual vertices fails on the far side of the vehicle, where nearer geometry
-    # hides them: that is occlusion, not misplacement, and an earlier version of this
-    # check reported exactly that as a failure. Where the drawn pixels lie cannot be
-    # faked by occlusion.
-    # Body only: the expected bounds below are computed from the body parts, so leaving
-    # the wheels visible would compare a body-and-wheels silhouette against a body-only
-    # projection and report a mismatch that is purely the check's own doing.
+    # Same question of the body, asked per part and as a silhouette. Per part, because a
+    # whole-vehicle silhouette cannot say which piece moved; as a silhouette, because
+    # sampling individual vertices fails on the far side of the vehicle where nearer
+    # geometry hides them, and that is occlusion rather than misplacement.
+    var misplaced: PackedStringArray = PackedStringArray()
+    for part: SkinnedFlexbody in parts:
+        var outcome: String = await _check_part_silhouette(harness, vehicle, part, rig_to_local)
+        if outcome != "":
+            misplaced.append(outcome)
+    if misplaced.size() > 0:
+        return "%d of %d parts are drawn away from their rig position: %s" % [
+            misplaced.size(), parts.size(), ", ".join(misplaced)
+        ]
+    return ""
+
+
+## Renders one part alone and compares where it is drawn with where its rig puts it.
+func _check_part_silhouette(
+    harness: Node, vehicle: Node3D, part: SkinnedFlexbody, rig_to_local: Transform3D
+) -> String:
     _paint(vehicle, false)
     for node: Node in _descendants(vehicle):
         var mesh_instance: MeshInstance3D = node as MeshInstance3D
         if mesh_instance != null:
-            mesh_instance.visible = not _under_wheel(mesh_instance)
-    var body_shot: Dictionary = await harness.capture_shot("vehicle_assembly_body", "static", 4)
-    if body_shot["error"] != "":
-        return body_shot["error"] as String
-    var body_image: Image = Image.load_from_file(body_shot["png"] as String)
-    if body_image == null:
-        return "cannot read %s" % body_shot["png"]
+            mesh_instance.visible = mesh_instance == part.mesh_instance
 
+    var name: String = str(part.mesh_instance.name)
+    var shot: Dictionary = await harness.capture_shot("vehicle_assembly_part/" + name, "static", 3)
+    if shot["error"] != "":
+        return "%s: %s" % [name, shot["error"]]
+    var image: Image = Image.load_from_file(shot["png"] as String)
+    if image == null:
+        return "%s: cannot read capture" % name
+
+    var camera: Camera3D = harness.camera
     var expected_min: Vector2 = Vector2(INF, INF)
     var expected_max: Vector2 = Vector2(-INF, -INF)
-    for part: SkinnedFlexbody in parts:
-        var step: int = maxi(part.vertex_count / 64, 1)
-        for i: int in range(0, part.vertex_count, step):
-            var world: Vector3 = vehicle.global_transform * (rig_to_local * part.rest_vertices[i])
-            if camera.is_position_behind(world):
-                return ""
-            var screen: Vector2 = camera.unproject_position(world)
-            expected_min = expected_min.min(screen)
-            expected_max = expected_max.max(screen)
+    var step: int = maxi(part.vertex_count / 64, 1)
+    for i: int in range(0, part.vertex_count, step):
+        var world: Vector3 = vehicle.global_transform * (rig_to_local * part.rest_vertices[i])
+        if camera.is_position_behind(world):
+            return ""
+        var screen: Vector2 = camera.unproject_position(world)
+        expected_min = expected_min.min(screen)
+        expected_max = expected_max.max(screen)
 
-    var drawn: Rect2 = _marker_bounds(body_image)
+    var drawn: Rect2 = _marker_bounds(image)
     if drawn.size == Vector2.ZERO:
-        return "the vehicle rendered nothing at all; artifact: %s" % body_shot["png"]
+        # Small parts can be a few pixels; absence is only meaningful for large ones.
+        return "" if part.vertex_count < SMALL_PART_VERTICES else "%s: nothing drawn" % name
     var expected: Rect2 = Rect2(expected_min, expected_max - expected_min)
     var centre_error: float = drawn.get_center().distance_to(expected.get_center())
-    var size_error: float = (drawn.size - expected.size).length()
-    if centre_error > SILHOUETTE_TOLERANCE_PX or size_error > SILHOUETTE_TOLERANCE_PX:
-        return (
-            "the vehicle is drawn at %s but its rig places it at %s (centre off by %.0f px,"
-            % [drawn, expected, centre_error]
-            + " size off by %.0f px); artifact: %s" % [size_error, body_shot["png"]]
-        )
+    if centre_error > SILHOUETTE_TOLERANCE_PX:
+        return "%s: drawn %.0f px from its rig position" % [name, centre_error]
     return ""
 
 

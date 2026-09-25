@@ -135,13 +135,28 @@ exactly `T^-1`, the instance's global transform is exactly the frame, and comput
 `instance * bone * vertex` by hand gives precisely the position the rig predicts — while
 the drawn silhouette is that shape rotated by the frame's yaw.
 
-The next experiment bisects code path against data: put a synthetic quad through
-`SkinnedFlexbody` itself, with the same calls in the same order, and see whether it skins.
-If it does, the difference is the real mesh's data — 1860 vertices, 292 triads, real
-indices — and the search narrows to what in that data differs from the synthetic case. If
-it does not, the difference is in `SkinnedFlexbody`'s own sequence, most likely the fact
-that it writes the pose twice: once inside `build()` with an identity frame, and again
-immediately afterwards with the real one.
+The bisect has been run. `skinned_flexbody_path` puts a synthetic quad through
+`SkinnedFlexbody` itself — same class, same calls, same order, under a parent carrying a
+frame that is both rotated 90 degrees and translated like the vehicle's own.
+**It skins correctly, 1 pixel from its rig position.** So the class and its sequence are
+not the fault, including the fact that it writes the pose twice.
+
+`vehicle_assembly` now checks each part separately rather than the vehicle as a whole.
+With the frame wired, **all 17 parts are drawn away from their rig positions**, by 51 px
+for the gauges up to 792 px for the tailgate — the displacement growing with distance,
+which is a rotation about a point rather than anything part-specific.
+
+So: the transform composition is right, rotation is fine, every mesh property skins in
+isolation, and the class skins synthetic data under the same frame — yet all seventeen real
+parts draw as though rotated. The remaining difference between the passing synthetic case
+and the failing real one is the data itself: 1860 vertices and 292 triads per part, against
+4 vertices and a handful of triads.
+
+A first attempt to close that gap by running a large lattice through the class was
+withdrawn: it compared the centroid of the *visible* pixels against the projected centroid
+of the whole object, and the lattice extends well outside the frame, so the two are not the
+same quantity. That is the same mistake as the occluded-vertex sampling and the props in
+the rotation sweep. Any scale test has to compare silhouettes of something fully in frame.
 
 The frame's orientation convention was wrong once and is fixed: upstream's `cameras`
 section names a centre, a node *behind* it and a node to its *left*, so the roll node must
