@@ -55,6 +55,8 @@ Three details that are easy to get wrong:
 - **Node names must be unique.** Godot discards a duplicate name and replaces it with a
   generated one, so anything finding nodes by name stops working while the render still
   looks correct.
+- **Attach the skeleton once the instance is in the tree**, or re-attach on `tree_entered`.
+  An attachment made outside the tree is lost on entry and the mesh draws unskinned.
 
 ## Two paths
 
@@ -96,67 +98,38 @@ scene is how a wrong convention gets baked in permanently.
 Also verified by readback: `SkinnedFlexbody.set_pose` writes exactly `T^-1 * F_current *
 F_bind^-1`, confirmed against `RenderingServer.skeleton_bone_get_transform`.
 
-## Open: applying the actor frame in the render path
+## The actor frame, and the bug that hid behind it
 
-The frame's own algebra is verified by `actor_frame_rigid_motion`: rigid vehicle motion
-appears in the frame while actor-local bone transforms stay put to within 4e-6, against a
-deformation response five orders of magnitude larger.
+The frame is wired: the vehicle root carries it, bones and wheel placements are
+actor-local, and `vehicle_assembly` measures every part and wheel within a millimetre of
+its rig position with the drawn silhouette agreeing.
 
-Wiring it into the render path is still **not done**, and the fault is now named.
+Getting there took four rounds, and the cause was none of the things it looked like:
 
-`vehicle_assembly` compares the vehicle's drawn silhouette against where its rig projects
-it. With the frame wired, the body is drawn **874 x 374 px where the rig places it at
-368 x 857 px** — the same extents transposed. The body is rendered rotated exactly 90
-degrees, which is the frame's own yaw, applied once and never undone.
+> **A skeleton attached to a `MeshInstance3D` that is outside the scene tree is lost when
+> that node enters the tree.** The mesh then draws unskinned, with no error anywhere.
 
-That means **the bone transforms are not reaching the vehicle's geometry**: the body is
-drawn at `instance * vertex`, not `instance * bone * vertex`. Reading the bones back with
-`skeleton_bone_get_transform` returns exactly `T^-1`, so they are written correctly and
-simply not used for these meshes.
+`VehicleBuilder` builds its parts and hands back a root that the caller adds to the tree,
+so every attachment was being discarded a moment after it was made. Every check that
+modelled the renderer agreed with itself — bone readback returned `T^-1`, the instance's
+global transform was the frame, and `instance * bone * vertex` computed by hand matched the
+rig — because the model was right and the GPU simply was not using the bones.
+`SkinnedFlexbody` now re-attaches on `tree_entered`, which also makes it independent of
+whether its parent was in the tree when it was built.
 
-Two engine questions were eliminated on the way, both by measurement:
+What the search cost, and what it bought: composition, rotation, every mesh property, the
+class itself and the real data at every size were each eliminated by measurement, and each
+of those is now a gate. Three separate false leads came from the same mistake — comparing a
+measurement of what is *visible* against a computation over *everything*:
 
-- Composition is `instance * bone * vertex`, confirmed at 1 px
-  (`skinning_transform_semantics`).
-- Rotation is not the problem. `skinned_rotation_sweep` tracks a skinned point through 0,
-  30, 60, 85, 90, 95, 180 and 270 degrees of instance yaw, all within 1 px. An earlier
-  version of that sweep reported the point vanishing between 85 and 95 degrees; the scene
-  had the blockout scale props in it and the point was passing inside one of the boxes.
+- sampling individual vertices on a top-down view, where half of them are occluded;
+- a rotation sweep whose scene still contained the blockout scale props, so the point
+  passed inside a box and appeared to vanish;
+- a scale test comparing the centroid of visible pixels against the projected centroid of
+  an object extending outside the frame.
 
-The difference is not in the mesh either. `skinning_mesh_variants` walks a synthetic mesh
-from a single-bone points cloud all the way to the vehicle's shape — unindexed triangles,
-indexed triangles, UVs, a `CUSTOM0` stream, a 292-bone skeleton, a bone index of 291, and
-an instance whose own transform is identity under a rotated parent. **All eight skin
-correctly, within 1 pixel.**
-
-So every property the vehicle's meshes have, in isolation, works. What remains is that for
-the real vehicle meshes the model and the pixels disagree: reading bone 0 back gives
-exactly `T^-1`, the instance's global transform is exactly the frame, and computing
-`instance * bone * vertex` by hand gives precisely the position the rig predicts — while
-the drawn silhouette is that shape rotated by the frame's yaw.
-
-The bisect has been run. `skinned_flexbody_path` puts a synthetic quad through
-`SkinnedFlexbody` itself — same class, same calls, same order, under a parent carrying a
-frame that is both rotated 90 degrees and translated like the vehicle's own.
-**It skins correctly, 1 pixel from its rig position.** So the class and its sequence are
-not the fault, including the fact that it writes the pose twice.
-
-`vehicle_assembly` now checks each part separately rather than the vehicle as a whole.
-With the frame wired, **all 17 parts are drawn away from their rig positions**, by 51 px
-for the gauges up to 792 px for the tailgate — the displacement growing with distance,
-which is a rotation about a point rather than anything part-specific.
-
-So: the transform composition is right, rotation is fine, every mesh property skins in
-isolation, and the class skins synthetic data under the same frame — yet all seventeen real
-parts draw as though rotated. The remaining difference between the passing synthetic case
-and the failing real one is the data itself: 1860 vertices and 292 triads per part, against
-4 vertices and a handful of triads.
-
-A first attempt to close that gap by running a large lattice through the class was
-withdrawn: it compared the centroid of the *visible* pixels against the projected centroid
-of the whole object, and the lattice extends well outside the frame, so the two are not the
-same quantity. That is the same mistake as the occluded-vertex sampling and the props in
-the rotation sweep. Any scale test has to compare silhouettes of something fully in frame.
+The gate that finally caught the real fault compares *silhouettes*, per part, of geometry
+kept fully in frame.
 
 The frame's orientation convention was wrong once and is fixed: upstream's `cameras`
 section names a centre, a node *behind* it and a node to its *left*, so the roll node must

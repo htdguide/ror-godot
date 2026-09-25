@@ -34,7 +34,8 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
     # while the render is visibly broken is worse than no gate at all. See
     # docs/architecture/bridge.md.
     var actor: Transform3D = ActorFrame.of(truck.nodes, truck.camera_nodes)
-    var render_frame: Transform3D = Transform3D.IDENTITY
+    root.transform = actor
+    var render_frame: Transform3D = actor
     var parts: Array[SkinnedFlexbody] = []
     var textures: Dictionary = {}
     var built: int = 0

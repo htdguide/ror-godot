@@ -61,9 +61,19 @@ func build(
 
     skeleton_rid = RenderingServer.skeleton_create()
     RenderingServer.skeleton_allocate_data(skeleton_rid, triads.size())
-    RenderingServer.instance_attach_skeleton(mesh_instance.get_instance(), skeleton_rid)
+    _attach_skeleton()
+    # A visual instance attached to a skeleton while it is outside the scene tree loses
+    # that attachment when it enters one, and then draws unskinned with no error anywhere.
+    # Re-attaching on entry costs nothing and makes the class independent of whether its
+    # parent was in the tree when it was built.
+    mesh_instance.tree_entered.connect(_attach_skeleton)
     set_pose(nodes)
     return ""
+
+
+func _attach_skeleton() -> void:
+    if mesh_instance != null and skeleton_rid.is_valid():
+        RenderingServer.instance_attach_skeleton(mesh_instance.get_instance(), skeleton_rid)
 
 
 ## Writes one pose. With an actor frame, bone transforms are expressed in actor-local
