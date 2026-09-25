@@ -18,6 +18,10 @@ const CONVERGE: int = 6
 ## outside views do, and the bottom view is mostly frame rails, so the bound is low: this
 ## catches an empty frame, not a poor composition.
 const MIN_COVERAGE: float = 0.02
+const LABEL_MARGIN: int = 32
+const DIGIT_WIDTH: int = 60
+const DIGIT_HEIGHT: int = 110
+const DIGIT_THICKNESS: int = 14
 
 
 static func meta() -> Dictionary:
@@ -62,10 +66,10 @@ func run(harness: Node) -> Dictionary:
     var rig_to_local: Transform3D = built["rig_to_local"] as Transform3D
     var interior: Vector3 = _cabin_eye(built, truck, rig_to_local, bounds)
 
-    var empty: Dictionary = {}
     var thin: PackedStringArray = PackedStringArray()
     var report: PackedStringArray = PackedStringArray()
-    for view: String in Photoset.VIEWS:
+    for index: int in Photoset.VIEWS.size():
+        var view: String = Photoset.VIEWS[index]
         var placement: Dictionary = Photoset.placement(view, bounds, interior)
         harness.camera.position = placement["pos"] as Vector3
         harness.camera.look_at_from_position(
@@ -74,6 +78,7 @@ func run(harness: Node) -> Dictionary:
         var shot: Dictionary = await harness.capture_shot("photoset/" + view, "static", CONVERGE)
         if shot["error"] != "":
             return fail("%s: %s" % [view, shot["error"]])
+        _stamp_number(shot["png"] as String, index + 1)
         var coverage: float = _coverage(shot["png"] as String)
         report.append("%s %.0f%%" % [view, coverage * 100.0])
         if coverage < MIN_COVERAGE:
@@ -85,6 +90,54 @@ func run(harness: Node) -> Dictionary:
             thin.size()
         )
     return ok("%d views captured: %s" % [Photoset.VIEWS.size(), ", ".join(report)], 0)
+
+
+## Stamps a view's number into the corner of its capture.
+##
+## Drawn as filled rectangles rather than text. Godot's Label in a CanvasLayer did not
+## appear in the captures, and ffmpeg's drawtext filter is missing from this build, so
+## both of the obvious ways to label an image failed silently. Seven segments cannot.
+const SEGMENTS: Dictionary = {
+    1: [2, 5],
+    2: [0, 2, 3, 4, 6],
+    3: [0, 2, 3, 5, 6],
+    4: [1, 2, 3, 5],
+    5: [0, 1, 3, 5, 6],
+    6: [0, 1, 3, 4, 5, 6],
+    7: [0, 2, 5],
+    8: [0, 1, 2, 3, 4, 5, 6],
+}
+
+
+func _stamp_number(png_path: String, number: int) -> void:
+    var image: Image = Image.load_from_file(png_path)
+    if image == null:
+        return
+    var x: int = LABEL_MARGIN
+    var y: int = LABEL_MARGIN
+    var w: int = DIGIT_WIDTH
+    var h: int = DIGIT_HEIGHT
+    var t: int = DIGIT_THICKNESS
+    # Backing plate, so the digit reads over sky or bodywork alike.
+    _fill(image, x - t, y - t, w + t * 3, h + t * 3, Color(0.0, 0.0, 0.0, 1.0))
+    # Segment rectangles: 0 top, 1 upper left, 2 upper right, 3 middle, 4 lower left,
+    # 5 lower right, 6 bottom.
+    var boxes: Array = [
+        [x, y, w, t], [x, y, t, h / 2], [x + w - t, y, t, h / 2],
+        [x, y + h / 2 - t / 2, w, t], [x, y + h / 2, t, h / 2],
+        [x + w - t, y + h / 2, t, h / 2], [x, y + h - t, w, t],
+    ]
+    for segment: int in SEGMENTS.get(number, []) as Array:
+        var box: Array = boxes[segment]
+        _fill(image, box[0] as int, box[1] as int, box[2] as int, box[3] as int, Color.WHITE)
+    image.save_png(png_path)
+
+
+func _fill(image: Image, x: int, y: int, w: int, h: int, colour: Color) -> void:
+    var size: Vector2i = image.get_size()
+    for row: int in range(maxi(y, 0), mini(y + h, size.y)):
+        for column: int in range(maxi(x, 0), mini(x + w, size.x)):
+            image.set_pixel(column, row, colour)
 
 
 ## Where a driver's eyes would be.

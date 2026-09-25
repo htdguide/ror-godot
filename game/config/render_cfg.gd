@@ -14,7 +14,10 @@ const TONEMAP_FILMIC: int = Environment.TONE_MAPPER_FILMIC
 const TONEMAP: int = TONEMAP_AGX
 ## White point in scene-referred units. Raising it darkens the image and holds more
 ## highlight detail before the curve rolls off.
-const WHITE: float = 6.0
+## Raised so a sunlit light-coloured panel rolls off instead of clipping. At 6.0 the
+## truck's own paint blew out to featureless white whenever the sun was behind the
+## camera, which reads as the surface being transparent rather than over-exposed.
+const WHITE: float = 12.0
 
 ## Auto-exposure is never used: its convergence is temporal, so a capture would depend on
 ## how many frames preceded it. Each camera preset carries a fixed exposure instead.
@@ -23,7 +26,7 @@ const AUTO_EXPOSURE: bool = false
 ## Scene-referred exposure applied before the tonemapper. The physical sky and a sun of
 ## unit energy together put the scene well above the range AgX maps to display white, and
 ## without this the sky washes out to grey and the ground blows out entirely.
-const EXPOSURE: float = 1.0
+const EXPOSURE: float = 0.7
 
 ## Sky-based image lighting. The radiance map is what gives metal something to reflect and
 ## shadowed surfaces something other than flat ambient.

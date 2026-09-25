@@ -14,6 +14,8 @@ ARTIFACTS="$REPO_ROOT/artifacts/photoset"
 "$REPO_ROOT/tools/gate.sh" vehicle_photoset "$@" | grep -E 'HARNESS_GATE_RESULT' || true
 
 command -v ffmpeg >/dev/null || { echo "photoset.sh: ffmpeg not installed" >&2; exit 2; }
+# Views are labelled in-frame by the gate itself, because ffmpeg's drawtext filter is
+# absent from some builds, including this one.
 list="$(mktemp)"
 count=0
 for view in front back left right top bottom three_quarter interior; do
@@ -27,6 +29,6 @@ done
 
 out="$REPO_ROOT/artifacts/photoset-sheet.png"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$list" \
-    -vf "scale=640:-1,tile=4x2" -frames:v 1 "$out"
+    -vf "scale=960:-1,tile=4x2" -frames:v 1 "$out"
 rm -f "$list"
 echo "photoset.sh: $count views -> $out"
