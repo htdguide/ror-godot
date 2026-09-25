@@ -8,3 +8,6 @@
 	path = vendor/godot-cpp
 	url = https://github.com/godotengine/godot-cpp.git
 	branch = 4.5
+[submodule "vendor/terrain3d"]
+	path = vendor/terrain3d
+	url = https://github.com/TokisanGames/Terrain3D.git

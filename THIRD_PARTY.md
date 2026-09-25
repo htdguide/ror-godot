@@ -23,6 +23,7 @@ has no corresponding record under `LICENSES/`.
 ### Rigs of Rods recipe
 - Source: https://github.com/htdguide/rigs-of-rods-recipe
 - Location: `vendor/rigs-of-rods-recipe` (git submodule, shallow)
+- Pin: commit `57f24bf`
 - Licence: see the upstream repository; used as reference documentation only, never
   linked or shipped.
 - Why: 342 markdown twins of the Rigs of Rods sources, explaining each file in prose and
@@ -32,9 +33,36 @@ has no corresponding record under `LICENSES/`.
   solver from OGRE.
 - Cost if dropped: none technically; it is documentation.
 
+### Terrain3D
+- Source: https://github.com/TokisanGames/Terrain3D (asset library #3892)
+- Location: `vendor/terrain3d` (git submodule, shallow), built into `game/addons/terrain_3d`
+- Pin: tag `v1.0.2-stable`, commit `0077405b52e353c5e5dc3a094e7ede49833ba6fe`
+- Licence: **MIT** — `LICENSES/terrain3d-v1.0.2-stable-MIT.txt`
+- Attribution: Copyright (c) 2023-2026 Cory Petkovsek, Roope Palmroos, and Contributors.
+- Approved: 2026-09-26, by the project owner, per `docs/PLAN.md` §0 and §0.6.
+- Why: it is the terrain engine, not a demo map — a C++ GDExtension clipmap terrain with a
+  splat texture array and an instancer for vegetation. That is the same architecture this
+  plan had already chosen, so writing it ourselves buys nothing but bugs, and it removes
+  the clipmap mesh, LOD ring logic, splat scheme and scattering system M8 had budgeted.
+  Being C++ it also spends no GDScript time per frame.
+- Compatibility: `terrain.gdextension` declares `compatibility_minimum = 4.4` and the
+  project runs Godot 4.7. GDExtension is forward compatible, which is the same argument
+  that lets our own bridge build against godot-cpp 4.5 and load on 4.7.
+- Built, not vendored: the published release carries binaries for eight platforms, 41 MB of
+  which this macOS-only project does not run, and `.gitignore` would exclude the binaries
+  anyway and leave a checkout that looks complete and does not load. `tools/build_terrain3d.sh`
+  builds it from the pinned submodule instead, exactly as our own GDExtension is built.
+- Collision mode is `Disabled`: Rigs of Rods' own collision stays authoritative and Godot
+  physics never touches the terrain. Height and normal queries come from
+  `Terrain3DData.get_height` / `get_normal` and direct region image access, which needs no
+  physics and is what the height-query bridge exposes to the solver.
+- Cost if dropped: the clipmap and the instancer, roughly the work M8 originally budgeted.
+  The collision bridge and the shader override are ours and portable.
+
 ### godot-cpp
 - Source: https://github.com/godotengine/godot-cpp
 - Location: `vendor/godot-cpp` (git submodule, branch 4.5)
+- Pin: commit `27d9dd23c838`
 - Licence: MIT
 - Why: the official GDExtension C++ bindings. Required by the chosen approach of wrapping
   the existing Rigs of Rods solver rather than reimplementing it.
@@ -49,18 +77,6 @@ has no corresponding record under `LICENSES/`.
 - Why: supplies real vehicles and a terrain from upstream, so gates can be checked
   against upstream's own published data instead of expectations written here. Both of its
   vehicles use the `submesh` path, which is how ADR 0003 came to be written.
-
-### Terrain3D
-- Source: https://github.com/TokisanGames/Terrain3D (Godot asset library #3892)
-- Location: `addons/terrain_3d` (not yet installed)
-- Pin: to be set when installed; Godot 4.7 compatibility must be confirmed first, as release 1.0.2
-  advertises 4.4–4.6+.
-- Licence: MIT
-- Why: a maintained C++ clipmap terrain system with a 32-texture splat array, foliage instancing,
-  code-driven heightmap import, optional collision, and a customisable material shader. It is the same
-  architecture we would have written, so writing it ourselves buys only bugs.
-- Cost if dropped: the clipmap mesh and the foliage instancer would have to be written. The collision
-  bridge and our shader override are ours and portable.
 
 ### Chevrolet S10 pack (hero asset, not redistributed)
 - Local path: `assets/mods/ChevyS1023` — **gitignored, never committed**

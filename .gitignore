@@ -34,6 +34,13 @@ history/
 .idea/
 *.swp
 
+# Terrain3D is generated, not committed: the pin is the submodule commit in
+# vendor/terrain3d and tools/build_terrain3d.sh rebuilds the addon from it. Committing the
+# published release instead would mean 41 MB of binaries for platforms this project does
+# not target, and the binaries would be caught by the rules above anyway, leaving a
+# checkout that looks complete and does not load.
+game/addons/
+
 # Community mods. Not committed: Rigs of Rods repository content carries varied and
 # often unstated licensing, and this project has no right to redistribute it. Mods are
 # fetched or copied in locally; gates skip cleanly when one is absent.
