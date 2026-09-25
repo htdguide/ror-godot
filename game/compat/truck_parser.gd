@@ -29,6 +29,10 @@ var flexbodies: Array[Dictionary] = []
 ## carries more than it is usually credited with: an explicit transparency effect, and a
 ## specular map that is a real roughness source rather than a guess from diffuse luma.
 var managed_materials: Dictionary = {}
+## One entry per meshwheels2 wheel: {tire_radius, rim_radius, width, rays, node1, node2,
+## side, mesh, material}. The rim is an external mesh posed by the axle nodes; the tyre is
+## swept procedurally, which is why it needs the radii and ray count rather than a file.
+var wheels: Array[Dictionary] = []
 var sections_seen: Dictionary = {}
 var sections_parsed: Dictionary = {}
 var errors: PackedStringArray = PackedStringArray()
@@ -122,6 +126,8 @@ func _parse_row(line: String) -> void:
             _parse_flexbody(line)
         "managedmaterials":
             _parse_managed_material(line)
+        "meshwheels2", "meshwheels":
+            _parse_mesh_wheel(line)
         _:
             return
     sections_parsed[_section] = int(sections_parsed.get(_section, 0)) + 1
@@ -174,6 +180,33 @@ func _parse_texcoord(line: String) -> void:
         return
     texcoord_nodes.append(node)
     texcoords.append(Vector2(fields[1].to_float(), fields[2].to_float()))
+
+
+## Rows are "tire_radius, rim_radius, width, rays, node1, node2, snode, braked, propulsed,
+## arm, mass, spring, damping, side, meshname material".
+func _parse_mesh_wheel(line: String) -> void:
+    if line.begins_with("set_"):
+        return  # Inline defaults directives, not wheel rows.
+    var fields: PackedStringArray = _fields(line)
+    if fields.size() < 16:
+        errors.append("meshwheel row with %d fields: %s" % [fields.size(), line])
+        return
+    var node1: int = _node_index(fields[4])
+    var node2: int = _node_index(fields[5])
+    if node1 < 0 or node2 < 0:
+        errors.append("meshwheel references unknown node: %s" % line)
+        return
+    wheels.append({
+        "tire_radius": fields[0].to_float(),
+        "rim_radius": fields[1].to_float(),
+        "width": fields[2].to_float(),
+        "rays": fields[3].to_int(),
+        "node1": node1,
+        "node2": node2,
+        "side": fields[13].to_lower(),
+        "mesh": fields[14],
+        "material": fields[15],
+    })
 
 
 ## Rows are "name effect texture...". A "-" stands for an absent texture.

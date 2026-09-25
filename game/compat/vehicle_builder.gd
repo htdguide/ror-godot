@@ -48,14 +48,94 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         root.add_child(node)
         built += 1
 
+    var wheels_built: int = 0
+    for index: int in truck.wheels.size():
+        var wheel: Dictionary = truck.wheels[index]
+        var node: Node3D = _build_wheel(wheel, truck, mod_dir, mesh_reader, dds_reader, textures)
+        if node == null:
+            skipped.append("wheel %s" % wheel["mesh"])
+            continue
+        # Names must be unique or Godot discards them entirely, replacing the node name
+        # with a generated one, and anything that finds nodes by name stops working.
+        node.name = "Wheel_%d_%s" % [index, wheel["side"]]
+        root.add_child(node)
+        wheels_built += 1
+
     return {
         "error": "",
         "root": root,
+        "wheels": wheels_built,
         "truck": truck,
         "built": built,
         "skipped": skipped,
         "textures": textures.size(),
     }
+
+
+## A wheel is a rim mesh posed by the axle nodes plus a tyre swept around them.
+static func _build_wheel(
+    wheel: Dictionary,
+    truck: TruckParser,
+    mod_dir: String,
+    mesh_reader: RefCounted,
+    dds_reader: RefCounted,
+    textures: Dictionary
+) -> Node3D:
+    var holder: Node3D = Node3D.new()
+    holder.transform = WheelBuilder.rim_transform(truck.nodes, wheel)
+
+    var rim_path: String = mod_dir.path_join(wheel["mesh"] as String)
+    if FileAccess.file_exists(rim_path):
+        var result: Dictionary = mesh_reader.read_file(rim_path)
+        if (result.get("error", "") as String) == "":
+            var rim: MeshInstance3D = MeshInstance3D.new()
+            rim.name = "Rim"
+            rim.mesh = _mesh_from(result, truck, mod_dir, dds_reader, textures)
+            if rim.mesh != null:
+                holder.add_child(rim)
+
+    var tyre: MeshInstance3D = MeshInstance3D.new()
+    tyre.name = "Tyre"
+    tyre.mesh = WheelBuilder.build_tyre(truck.nodes, wheel)
+    tyre.material_override = _material_for(
+        wheel["material"] as String, truck, mod_dir, dds_reader, textures
+    )
+    holder.add_child(tyre)
+    return holder
+
+
+## Builds an ArrayMesh from a read OGRE mesh, with a material per submesh.
+static func _mesh_from(
+    result: Dictionary,
+    truck: TruckParser,
+    mod_dir: String,
+    dds_reader: RefCounted,
+    textures: Dictionary
+) -> ArrayMesh:
+    var mesh: ArrayMesh = ArrayMesh.new()
+    var surfaces: int = 0
+    for submesh: Dictionary in result["submeshes"] as Array:
+        var positions: PackedVector3Array = submesh["positions"] as PackedVector3Array
+        var indices: PackedInt32Array = submesh["indices"] as PackedInt32Array
+        if positions.is_empty() or indices.is_empty():
+            continue
+        var arrays: Array = []
+        arrays.resize(Mesh.ARRAY_MAX)
+        arrays[Mesh.ARRAY_VERTEX] = positions
+        var normals: PackedVector3Array = submesh["normals"] as PackedVector3Array
+        if normals.size() == positions.size():
+            arrays[Mesh.ARRAY_NORMAL] = normals
+        var uvs: PackedVector2Array = submesh["uvs"] as PackedVector2Array
+        if uvs.size() == positions.size():
+            arrays[Mesh.ARRAY_TEX_UV] = uvs
+        arrays[Mesh.ARRAY_INDEX] = indices
+        mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+        mesh.surface_set_material(
+            surfaces,
+            _material_for(submesh["material"] as String, truck, mod_dir, dds_reader, textures)
+        )
+        surfaces += 1
+    return null if surfaces == 0 else mesh
 
 
 static func _build_flexbody(
