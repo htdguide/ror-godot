@@ -18,6 +18,10 @@ extends GateBase
 ## makes the skinned point vanish from the frame entirely, which is the open problem
 ## recorded in docs/architecture/bridge.md rather than something for this gate to chase.
 
+## How far the marker channel must lead the others. Absolute thresholds break as soon as
+## a tonemapper is in the pipeline: an unshaded ALBEDO is still tonemapped, so a pure blue
+## marker no longer lands near (0, 0, 1) on screen. Hue dominance survives that.
+const MARKER_DOMINANCE: float = 0.08
 const PRESET: String = "diag_origin"
 const POINT: Vector3 = Vector3(0.0, 1.0, 0.0)
 const BONE_OFFSET: Vector3 = Vector3(1.5, 0.0, 0.0)
@@ -145,7 +149,7 @@ func _rendered_centre(png_path: String) -> Vector2:
     for y: int in size.y:
         for x: int in size.x:
             var pixel: Color = image.get_pixel(x, y)
-            if pixel.b > 0.5 and pixel.r < 0.3 and pixel.g < 0.3:
+            if pixel.b > pixel.r + MARKER_DOMINANCE and pixel.b > pixel.g + MARKER_DOMINANCE:
                 total += Vector2(float(x), float(y))
                 count += 1
     return Vector2(-1.0, -1.0) if count == 0 else total / float(count)

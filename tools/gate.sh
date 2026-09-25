@@ -59,6 +59,27 @@ run_engine() {
         -- "$@"
 }
 
+# Artifacts are pruned, so without this the record of how the project looked is thrown
+# away. Every captured frame is copied into history/ under the run's date and commit, and
+# nothing there is ever deleted: it is the visual history of the project.
+archive_history() {
+    [[ -d "$ARTIFACTS" ]] || return 0
+    local sha stamp dest
+    sha="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo nogit)"
+    stamp="$(date +%Y%m%d-%H%M%S)"
+    dest="$REPO_ROOT/history/$stamp-$sha"
+    local found=0
+    while IFS= read -r png; do
+        local relative target
+        relative="${png#"$ARTIFACTS/"}"
+        target="$dest/$relative"
+        mkdir -p "$(dirname "$target")"
+        cp "$png" "$target"
+        found=1
+    done < <(find "$ARTIFACTS" -name '*.png' -not -path "*/windows/*" 2>/dev/null)
+    [[ $found -eq 1 ]] && echo "history: archived to history/$stamp-$sha" >&2
+}
+
 prune_artifacts() {
     [[ -d "$ARTIFACTS" ]] || return 0
     # Artifacts are disposable and bounded: keep the last KEEP_RUNS run directories.
@@ -121,6 +142,7 @@ case "${1:-}" in
                 failed=1
             fi
         done < <(list_gates)
+        archive_history
         prune_artifacts
         [[ $failed -eq 0 ]] && echo "all gates passed" || echo "FAILURES present" >&2
         exit "$failed"
@@ -135,6 +157,7 @@ case "${1:-}" in
         shift
         output="$(run_engine --gate "$gate" "$@" 2>&1)"
         printf '%s\n' "$output"
+        archive_history
         prune_artifacts
         printf '%s\n' "$output" | grep -q '"pass":true' || exit 1
         ;;

@@ -20,6 +20,11 @@ bin/
 # Harness artifacts: disposable and bounded (see docs/guides/harness.md)
 artifacts/
 
+# Visual history: every captured frame, kept forever, never pruned. Not committed —
+# thousands of full-resolution frames do not belong in the repository — but never deleted
+# either, so the project's appearance over time can be reviewed locally.
+history/
+
 # macOS
 .DS_Store
 ._*

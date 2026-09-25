@@ -28,6 +28,9 @@ const GROUND_CLEARANCE_M: float = 0.05
 ## stopped rendering, coverage stayed at 62% and the gate passed. Comparing against what
 ## the geometry should cover catches that.
 const MIN_PROJECTED_FILL: float = 0.35
+## How far a pixel must move to count as changed by the vehicle's arrival. Above sampling
+## and compression noise, far below any real geometry.
+const BACKGROUND_DELTA: float = 0.02
 
 
 static func meta() -> Dictionary:
@@ -57,6 +60,13 @@ func run(harness: Node) -> Dictionary:
     var err: String = harness.setup_for(PRESET)
     if err != "":
         return fail(err)
+
+    # The empty scene first. Coverage is then measured as what changed when the vehicle
+    # arrived, which needs no assumptions about sky or floor colour — an earlier version
+    # classified pixels by hue and broke the moment the background became a real sky.
+    var empty_shot: Dictionary = await harness.capture_shot("vehicle_empty", "static", 6)
+    if empty_shot["error"] != "":
+        return fail(empty_shot["error"] as String)
 
     var result: Dictionary = VehicleBuilder.build(mod_dir, TRUCK)
     if (result.get("error", "") as String) != "":
@@ -97,7 +107,9 @@ func run(harness: Node) -> Dictionary:
     var shot: Dictionary = await harness.capture_shot("vehicle", "static", 12)
     if shot["error"] != "":
         return fail(shot["error"] as String)
-    var coverage: float = _coverage(shot["png"] as String)
+    var coverage: float = _coverage_against(
+        empty_shot["png"] as String, shot["png"] as String
+    )
     if coverage < MIN_COVERAGE:
         return fail(
             "vehicle covers %.2f%% of the frame, under %.0f%%; artifact: %s"
@@ -174,24 +186,20 @@ func _all_descendants(node: Node) -> Array[Node]:
     return out
 
 
-## Share of sampled pixels that differ from the empty-scene background. The ground plane
-## and sky are flat, so anything textured stands out from them.
-func _coverage(png_path: String) -> float:
-    var image: Image = Image.load_from_file(png_path)
-    if image == null:
+## Share of sampled pixels that changed when the vehicle was added. Background-agnostic
+## by construction, which a colour classifier is not.
+func _coverage_against(empty_path: String, with_vehicle_path: String) -> float:
+    var empty: Image = Image.load_from_file(empty_path)
+    var full: Image = Image.load_from_file(with_vehicle_path)
+    if empty == null or full == null or empty.get_size() != full.get_size():
         return 0.0
-    var size: Vector2i = image.get_size()
-    var sky: Color = image.get_pixel(size.x / 2, 8)
+    var size: Vector2i = full.get_size()
     var differing: int = 0
     var sampled: int = 0
     for y: int in range(0, size.y, 4):
         for x: int in range(0, size.x, 4):
             sampled += 1
-            var pixel: Color = image.get_pixel(x, y)
-            # Distance from both the sky and the grey checker floor.
-            if absf(pixel.r - pixel.b) > 0.06 or pixel.g > pixel.b + 0.04:
-                differing += 1
-            elif _colour_distance(pixel, sky) > 0.35 and pixel.r > 0.05:
+            if _colour_distance(full.get_pixel(x, y), empty.get_pixel(x, y)) > BACKGROUND_DELTA:
                 differing += 1
     return float(differing) / float(maxi(sampled, 1))
 

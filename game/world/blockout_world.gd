@@ -35,15 +35,40 @@ static func build(weather: Dictionary, include_props: bool = true) -> Node3D:
 
 static func _build_environment(weather: Dictionary) -> WorldEnvironment:
     var env: Environment = Environment.new()
-    env.background_mode = Environment.BG_COLOR
-    env.background_color = weather.get("bg_color", Color.BLACK) as Color
-    env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    env.ambient_light_color = weather.get("bg_color", Color.GRAY) as Color
+    if bool(weather.get("physical_sky", false)):
+        env.background_mode = Environment.BG_SKY
+        env.sky = _build_sky(weather)
+        # The sky lights the scene: diffuse from its irradiance, specular from its
+        # radiance map. This is what makes metal look like metal without a light rig.
+        env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+        env.ambient_light_sky_contribution = RenderCfg.AMBIENT_FROM_SKY
+        env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+    else:
+        env.background_mode = Environment.BG_COLOR
+        env.background_color = weather.get("bg_color", Color.BLACK) as Color
+        env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+        env.ambient_light_color = weather.get("bg_color", Color.GRAY) as Color
     env.ambient_light_energy = float(weather.get("ambient_energy", 0.0))
+    env.tonemap_mode = RenderCfg.TONEMAP as Environment.ToneMapper
+    env.tonemap_white = RenderCfg.WHITE
     var holder: WorldEnvironment = WorldEnvironment.new()
     holder.name = "WorldEnvironment"
     holder.environment = env
     return holder
+
+
+static func _build_sky(weather: Dictionary) -> Sky:
+    var material: PhysicalSkyMaterial = PhysicalSkyMaterial.new()
+    material.rayleigh_coefficient = RenderCfg.RAYLEIGH
+    material.mie_coefficient = RenderCfg.MIE
+    material.turbidity = RenderCfg.TURBIDITY
+    material.sun_disk_scale = RenderCfg.SUN_DISK_SCALE
+    material.ground_color = RenderCfg.GROUND_COLOR
+    material.energy_multiplier = float(weather.get("sky_energy", RenderCfg.SKY_ENERGY))
+    var sky: Sky = Sky.new()
+    sky.sky_material = material
+    sky.radiance_size = RenderCfg.SKY_RADIANCE_SIZE as Sky.RadianceSize
+    return sky
 
 
 static func _build_sun(weather: Dictionary) -> DirectionalLight3D:

@@ -70,6 +70,20 @@ A capture is only comparable if the run that produced it is reproducible.
   sheet plus a consecutive-frame difference sheet. The difference sheet is how ghosting,
   smear and particle boiling become visible in a still image.
 
+## Visual history
+
+Artifacts are pruned, so `tools/gate.sh` copies every captured frame into `history/` under
+the run's date and short commit before pruning. Nothing there is ever deleted. It is not
+committed — thousands of full-resolution frames do not belong in a repository — but it is
+never thrown away either, so how the project looked at any point can be reviewed locally.
+
+    tools/history.sh list                      what has been archived, newest first
+    tools/history.sh shots vehicle/hero_3q.png every version of one capture, oldest first
+    tools/history.sh sheet vehicle/hero_3q.png those versions as one contact sheet
+
+The contact sheet is the useful one: one image showing a single framing across every run
+that produced it, which is how a slow drift becomes visible.
+
 ## Writing a gate
 
 A gate is a script in `game/harness/gates/` extending `GateBase`. It declares metadata

@@ -11,6 +11,10 @@ extends GateBase
 ## against a projection of all geometry is only valid when nothing is cut off, and getting
 ## that wrong has already produced two false results in this investigation.
 
+## How far the marker channel must lead the others. Absolute thresholds break as soon as
+## a tonemapper is in the pipeline: an unshaded ALBEDO is still tonemapped, so a pure blue
+## marker no longer lands near (0, 0, 1) on screen. Hue dominance survives that.
+const MARKER_DOMINANCE: float = 0.08
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
 const MESH: String = "S10bodyshort.mesh"
@@ -180,7 +184,7 @@ func _compare(
     for y: int in range(0, size.y, 2):
         for x: int in range(0, size.x, 2):
             var pixel: Color = image.get_pixel(x, y)
-            if pixel.b > 0.5 and pixel.r < 0.3 and pixel.g < 0.3:
+            if pixel.b > pixel.r + MARKER_DOMINANCE and pixel.b > pixel.g + MARKER_DOMINANCE:
                 drawn_min = drawn_min.min(Vector2(float(x), float(y)))
                 drawn_max = drawn_max.max(Vector2(float(x), float(y)))
     if drawn_min.x == INF:

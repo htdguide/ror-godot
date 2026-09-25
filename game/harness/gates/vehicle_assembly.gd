@@ -11,6 +11,10 @@ extends GateBase
 ## result is independent of where the vehicle is put for the camera, and a rotation
 ## applied to only part of the vehicle shows up immediately.
 
+## How far the marker channel must lead the others. Absolute thresholds break as soon as
+## a tonemapper is in the pipeline: an unshaded ALBEDO is still tonemapped, so a pure blue
+## marker no longer lands near (0, 0, 1) on screen. Hue dominance survives that.
+const MARKER_DOMINANCE: float = 0.08
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
 const PRESET: String = "diag_topdown"
@@ -212,7 +216,7 @@ func _marker_bounds(image: Image) -> Rect2:
     for y: int in range(0, size.y, 2):
         for x: int in range(0, size.x, 2):
             var pixel: Color = image.get_pixel(x, y)
-            if pixel.r > 0.5 and pixel.b > 0.5 and pixel.g < 0.4:
+            if pixel.r > pixel.g + MARKER_DOMINANCE and pixel.b > pixel.g + MARKER_DOMINANCE:
                 found_min = found_min.min(Vector2(float(x), float(y)))
                 found_max = found_max.max(Vector2(float(x), float(y)))
     if found_min.x == INF:
@@ -229,7 +233,7 @@ func _marker_near(image: Image, at: Vector2) -> bool:
             if x < 0 or y < 0 or x >= size.x or y >= size.y:
                 continue
             var pixel: Color = image.get_pixel(x, y)
-            if pixel.r > 0.5 and pixel.b > 0.5 and pixel.g < 0.4:
+            if pixel.r > pixel.g + MARKER_DOMINANCE and pixel.b > pixel.g + MARKER_DOMINANCE:
                 return true
     return false
 

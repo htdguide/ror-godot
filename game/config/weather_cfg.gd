@@ -15,6 +15,10 @@ extends RefCounted
 
 const PRESETS: Dictionary = {
     "noon_clear": {
+        # Lit by a physical sky rather than a flat colour, so surfaces have something to
+        # reflect and shadows are filled by sky light instead of a constant.
+        "physical_sky": true,
+        "sky_energy": 1.0,
         "sun_euler_deg": Vector3(-65.0, -35.0, 0.0),
         "sun_energy": 1.0,
         "sun_color": Color(1.0, 0.97, 0.92),
@@ -31,6 +35,8 @@ const PRESETS: Dictionary = {
         "bg_color": Color(0.0, 0.0, 0.0),
     },
     "golden_dusk": {
+        "physical_sky": true,
+        "sky_energy": 1.0,
         "sun_euler_deg": Vector3(-8.0, -110.0, 0.0),
         "sun_energy": 1.4,
         "sun_color": Color(1.0, 0.72, 0.45),
