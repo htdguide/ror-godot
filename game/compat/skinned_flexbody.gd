@@ -58,13 +58,33 @@ func build(
     return ""
 
 
-## Writes one pose: the skinning matrix per bone, and the CPU reference per vertex.
-func set_pose(nodes: PackedVector3Array) -> void:
+## Writes one pose. With an actor frame, bone transforms are expressed in actor-local
+## space and the frame itself goes on the instance, so rigid motion of the whole vehicle
+## lives in the instance transform where the renderer can see it. Without one, bones are
+## written in world space and the vehicle has no orientation of its own.
+func set_pose(nodes: PackedVector3Array, actor: Transform3D = Transform3D.IDENTITY) -> void:
+    var to_local: Transform3D = actor.affine_inverse()
     var frames: Array[Transform3D] = FlexbodyBinder.bone_transforms(nodes, triads)
     for bone: int in frames.size():
         RenderingServer.skeleton_bone_set_transform(
-            skeleton_rid, bone, frames[bone] * bind_inverse[bone]
+            skeleton_rid, bone, to_local * frames[bone] * bind_inverse[bone]
         )
+    if mesh_instance != null:
+        mesh_instance.transform = actor
+
+
+## The actor-local bone transforms for a pose, without writing them. Used to check that
+## rigid motion leaves them untouched, which is the property that keeps motion vectors
+## meaningful.
+func local_bone_transforms(
+    nodes: PackedVector3Array, actor: Transform3D
+) -> Array[Transform3D]:
+    var to_local: Transform3D = actor.affine_inverse()
+    var out: Array[Transform3D] = []
+    var frames: Array[Transform3D] = FlexbodyBinder.bone_transforms(nodes, triads)
+    for bone: int in frames.size():
+        out.append(to_local * frames[bone] * bind_inverse[bone])
+    return out
 
 
 ## Replaces the reference stream, so the error shader compares against this pose.

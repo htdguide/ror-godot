@@ -33,11 +33,16 @@ var managed_materials: Dictionary = {}
 ## side, mesh, material}. The rim is an external mesh posed by the axle nodes; the tyre is
 ## swept procedurally, which is why it needs the radii and ray count rather than a file.
 var wheels: Array[Dictionary] = []
+## Reference nodes for the actor's own frame: {centre, dir, roll}. Upstream uses these to
+## place the camera; the bridge uses them to give the vehicle an orientation, which it
+## otherwise does not have.
+var camera_nodes: Dictionary = {}
 var sections_seen: Dictionary = {}
 var sections_parsed: Dictionary = {}
 var errors: PackedStringArray = PackedStringArray()
 
 var _node_id_to_index: Dictionary = {}
+var _camera_ids: PackedStringArray = PackedStringArray()
 var _section: String = ""
 
 
@@ -66,7 +71,22 @@ func parse_text(text: String) -> String:
         _parse_row(line)
     if nodes.is_empty():
         return "no nodes found; is '%s' a vehicle file?" % name
+    _resolve_deferred()
     return ""
+
+
+## Sections that name nodes may appear before the nodes section itself, so their
+## references are resolved once the whole file has been read.
+func _resolve_deferred() -> void:
+    if _camera_ids.size() < 3:
+        return
+    var centre: int = _node_index(_camera_ids[0])
+    var dir: int = _node_index(_camera_ids[1])
+    var roll: int = _node_index(_camera_ids[2])
+    if centre < 0 or dir < 0 or roll < 0:
+        errors.append("cameras references unknown node: %s" % ", ".join(_camera_ids))
+        return
+    camera_nodes = {"centre": centre, "dir": dir, "roll": roll}
 
 
 ## Share of content lines that landed in a section this parser understands.
@@ -128,6 +148,8 @@ func _parse_row(line: String) -> void:
             _parse_managed_material(line)
         "meshwheels2", "meshwheels":
             _parse_mesh_wheel(line)
+        "cameras":
+            _parse_cameras(line)
         _:
             return
     sections_parsed[_section] = int(sections_parsed.get(_section, 0)) + 1
@@ -180,6 +202,19 @@ func _parse_texcoord(line: String) -> void:
         return
     texcoord_nodes.append(node)
     texcoords.append(Vector2(fields[1].to_float(), fields[2].to_float()))
+
+
+## Rows are "centre_node, direction_node, roll_node". Only the first is kept: it is the
+## actor's main camera, and one frame per actor is what the bridge needs.
+func _parse_cameras(line: String) -> void:
+    if not _camera_ids.is_empty():
+        return
+    var fields: PackedStringArray = _fields(line)
+    if fields.size() < 3:
+        return
+    # Resolution is deferred: a cameras section may appear before the nodes it names, as
+    # it does in upstream's own DAF semi, and resolving eagerly rejects a valid file.
+    _camera_ids = PackedStringArray([fields[0], fields[1], fields[2]])
 
 
 ## Rows are "tire_radius, rim_radius, width, rays, node1, node2, snode, braked, propulsed,
