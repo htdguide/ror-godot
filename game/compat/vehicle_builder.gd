@@ -60,6 +60,7 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         built += 1
 
     var wheels_built: int = 0
+    var wheel_nodes: Array[Node3D] = []
     for index: int in truck.wheels.size():
         var wheel: Dictionary = truck.wheels[index]
         var node: Node3D = _build_wheel(
@@ -72,6 +73,7 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         # with a generated one, and anything that finds nodes by name stops working.
         node.name = "Wheel_%d_%s" % [index, wheel["side"]]
         root.add_child(node)
+        wheel_nodes.append(node)
         wheels_built += 1
 
     return {
@@ -81,7 +83,11 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         # How a rig-space point becomes a point in the vehicle's local space. Declared so
         # checks can place rig coordinates without knowing how the frame is wired.
         "rig_to_local": render_frame.affine_inverse(),
+        # Where the frame's origin was when the vehicle was built, so a later pose can
+        # tell the rig's own motion apart from where a caller has placed the vehicle.
+        "frame_origin": render_frame.origin,
         "parts": parts,
+        "wheel_nodes": wheel_nodes,
         "wheels": wheels_built,
         "truck": truck,
         "built": built,
@@ -94,9 +100,21 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
 ## bones. This is the per-frame entry point the solver will call.
 static func apply_pose(built: Dictionary, truck: TruckParser, nodes: PackedVector3Array) -> void:
     var actor: Transform3D = ActorFrame.of(nodes, truck.camera_nodes)
-    (built["root"] as Node3D).transform = actor
+    var root: Node3D = built["root"] as Node3D
+    # Keep whatever the caller did to place the vehicle for a camera, and change only the
+    # part of the transform the rig owns.
+    var placement: Vector3 = root.transform.origin - built["frame_origin"] as Vector3
+    root.transform = Transform3D(actor.basis, actor.origin + placement)
+    built["frame_origin"] = actor.origin
+
     for part: SkinnedFlexbody in built["parts"] as Array[SkinnedFlexbody]:
         part.set_pose(nodes, actor, false)
+
+    # Wheels follow their own axle nodes, so suspension travel moves them.
+    var to_local: Transform3D = actor.affine_inverse()
+    var wheel_nodes: Array[Node3D] = built["wheel_nodes"] as Array[Node3D]
+    for i: int in mini(wheel_nodes.size(), truck.wheels.size()):
+        wheel_nodes[i].transform = to_local * WheelBuilder.rim_transform(nodes, truck.wheels[i])
 
 
 ## One flexbody, bound to its locator triads and skinned.
