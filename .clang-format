@@ -1,0 +1,11 @@
+# C++ formatting for the GDExtension. Matches godot-cpp so that our code and the
+# bindings read the same way.
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+AllowShortFunctionsOnASingleLine: Empty
+BreakBeforeBraces: Attach
+PointerAlignment: Left
+SortIncludes: true

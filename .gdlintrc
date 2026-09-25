@@ -1,0 +1,18 @@
+# gdlint configuration. Install with: pipx install "gdtoolkit==4.*"
+#
+# The caps here mirror the standards gates, which run with no external dependency. If
+# the two ever disagree, the gates win: they are what the suite enforces.
+max-file-lines: 400
+max-line-length: 100
+function-arguments-number: 4
+max-public-methods: 20
+class-definitions-order:
+  - tools
+  - classnames
+  - signals
+  - enums
+  - consts
+  - exports
+  - pub-vars
+  - prv-vars
+  - onreadys

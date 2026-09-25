@@ -1,0 +1,22 @@
+# Formatting is never a review topic: it is applied by a hook and re-checked by a gate,
+# so a bypassed hook still fails.
+#
+# Install with: pipx install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/Scony/godot-gdscript-toolkit
+    rev: 4.3.2
+    hooks:
+      - id: gdlint
+      - id: gdformat
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v18.1.8
+    hooks:
+      - id: clang-format
+        types_or: [c++, c]
+  - repo: local
+    hooks:
+      - id: standards-gates
+        name: standards gates (no GPU)
+        entry: bash -c 'for g in file_size typing layering scene_purity no_global_random gate_metadata docs_health; do tools/gate.sh "$g" >/dev/null || exit 1; done'
+        language: system
+        pass_filenames: false

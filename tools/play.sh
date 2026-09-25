@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Hands the machine to a human: opens a real window and lets the user drive.
+#
+#   tools/play.sh                        default preset, windowed
+#   tools/play.sh --shot diag_grid_wide  start from a named camera preset
+#   tools/play.sh --weather golden_dusk  any weather or time-of-day preset
+#
+# The window is tracked while it lives and the tracking file is removed on exit, so a
+# session can never be forgotten: tools/windows.sh list always tells the truth.
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+GAME_DIR="$REPO_ROOT/game"
+GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
+RESOLUTION="${RESOLUTION:-1600x900}"
+TRACK_DIR="$REPO_ROOT/artifacts/windows"
+
+mkdir -p "$TRACK_DIR"
+track_file="$TRACK_DIR/play-$$.json"
+cleanup() {
+    rm -f "$track_file"
+    # Never leave the engine running if this script dies.
+    [[ -n "${engine_pid:-}" ]] && kill "$engine_pid" 2>/dev/null
+}
+trap cleanup EXIT INT TERM
+
+printf '{"pid": %d, "purpose": "human session", "started": "%s", "args": "%s"}\n' \
+    "$$" "$(date -u +%FT%TZ)" "$*" > "$track_file"
+
+echo "play.sh: opening a window. Close it to end the session."
+"$GODOT" --path "$GAME_DIR" --resolution "$RESOLUTION" -- --play "$@" &
+engine_pid=$!
+wait "$engine_pid"
