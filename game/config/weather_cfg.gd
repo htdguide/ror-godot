@@ -19,10 +19,13 @@ const PRESETS: Dictionary = {
         # reflect and shadows are filled by sky light instead of a constant.
         "physical_sky": true,
         "sky_energy": 1.0,
-        "sun_euler_deg": Vector3(-65.0, -35.0, 0.0),
-        "sun_energy": 1.0,
+        "sun_euler_deg": Vector3(-55.0, -125.0, 0.0),
+        # A clear midday sun is bright, and the sky fills the shadows on its own. With a
+        # physical sky the ambient term is the sky's own irradiance rather than a flat
+        # colour, so it runs at full strength instead of being dialled down.
+        "sun_energy": 3.0,
         "sun_color": Color(1.0, 0.97, 0.92),
-        "ambient_energy": 0.35,
+        "ambient_energy": 1.0,
         "bg_color": Color(0.42, 0.55, 0.72),
     },
     # A black, unlit environment. Measurement gates encode numbers into pixels, so any
@@ -38,9 +41,9 @@ const PRESETS: Dictionary = {
         "physical_sky": true,
         "sky_energy": 1.0,
         "sun_euler_deg": Vector3(-8.0, -110.0, 0.0),
-        "sun_energy": 1.4,
+        "sun_energy": 2.2,
         "sun_color": Color(1.0, 0.72, 0.45),
-        "ambient_energy": 0.18,
+        "ambient_energy": 1.0,
         "bg_color": Color(0.26, 0.24, 0.32),
     },
 }

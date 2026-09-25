@@ -287,8 +287,10 @@ static func _material_for(
     textures: Dictionary
 ) -> StandardMaterial3D:
     var material: StandardMaterial3D = StandardMaterial3D.new()
-    material.albedo_color = Color(0.7, 0.7, 0.72)
     var declared: Dictionary = truck.managed_materials.get(material_name, {}) as Dictionary
+    var classified: Dictionary = MaterialClass.classify(material_name, declared)
+    MaterialClass.apply(material, classified["class"] as String)
+    material.albedo_color = Color(0.7, 0.7, 0.72)
     if declared.is_empty():
         return material
 
@@ -298,34 +300,64 @@ static func _material_for(
         if albedo != null:
             material.albedo_texture = albedo
             material.albedo_color = Color.WHITE
-    # A specular map is a real roughness source. Inverted, because specular intensity and
-    # roughness are opposites, and read from the red channel since these maps are grey.
+    # A specular map is authored data, so it is used where the mod supplies one and the
+    # class default stands in where it does not.
     if files.size() > 2:
-        var spec: Texture2D = _texture(mod_dir.path_join(files[2]), dds_reader, textures)
-        if spec != null:
-            material.roughness_texture = spec
+        var roughness: Texture2D = _roughness_texture(
+            mod_dir.path_join(files[2]), dds_reader, textures
+        )
+        if roughness != null:
+            material.roughness_texture = roughness
             material.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
             material.roughness = 1.0
-    if (declared["effect"] as String).contains("transparent"):
-        material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-        material.cull_mode = BaseMaterial3D.CULL_DISABLED
     return material
+
+
+## What class a material would be given, without building anything. For gates and tools.
+static func classify_materials(truck: TruckParser) -> Dictionary:
+    var out: Dictionary = {}
+    for material_name: String in truck.managed_materials.keys():
+        out[material_name] = MaterialClass.classify(
+            material_name, truck.managed_materials[material_name] as Dictionary
+        )
+    return out
+
+
+## A roughness map derived from a legacy specular map, cached like any other texture.
+static func _roughness_texture(
+    path: String, dds_reader: RefCounted, cache: Dictionary
+) -> Texture2D:
+    var key: String = path + "#roughness"
+    if cache.has(key):
+        return cache[key] as Texture2D
+    var source: Image = _image(path, dds_reader)
+    if source == null:
+        cache[key] = null
+        return null
+    var image: Image = MaterialClass.roughness_from_specular(source)
+    image.generate_mipmaps()
+    var texture: ImageTexture = ImageTexture.create_from_image(image)
+    cache[key] = texture
+    return texture
+
+
+## Decodes a DDS to an Image, without building a texture from it.
+static func _image(path: String, dds_reader: RefCounted) -> Image:
+    if not FileAccess.file_exists(path):
+        return null
+    var result: Dictionary = dds_reader.read_file(path)
+    if (result.get("error", "") as String) != "":
+        return null
+    return Image.create_from_data(
+        int(result["width"]), int(result["height"]), false,
+        int(result["format"]) as Image.Format, result["data"] as PackedByteArray
+    )
 
 
 static func _texture(path: String, dds_reader: RefCounted, cache: Dictionary) -> Texture2D:
     if cache.has(path):
         return cache[path] as Texture2D
-    if not FileAccess.file_exists(path):
-        cache[path] = null
-        return null
-    var result: Dictionary = dds_reader.read_file(path)
-    if (result.get("error", "") as String) != "":
-        cache[path] = null
-        return null
-    var image: Image = Image.create_from_data(
-        int(result["width"]), int(result["height"]), false,
-        int(result["format"]) as Image.Format, result["data"] as PackedByteArray
-    )
+    var image: Image = _image(path, dds_reader)
     if image == null:
         cache[path] = null
         return null
