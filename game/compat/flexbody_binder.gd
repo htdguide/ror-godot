@@ -14,7 +14,15 @@ extends RefCounted
 ## (ref, nx, ny) triples is the bone count a skinned vehicle needs, which is the figure
 ## ADR 0002 left open.
 
-const DEGENERATE_EPSILON: float = 0.0001
+## Upstream requires the third node to be within 45 degrees of orthogonal to ref->nx:
+## |dot| <= sqrt(2)/2. This is not a detail. A merely non-collinear third node produces a
+## sliver frame whose inverse is enormous, and the bind coordinates computed through it
+## explode, which collapses the mesh the moment it is skinned.
+const ORTHOGONALITY_LIMIT: float = 0.70710678
+## Upstream falls back to node 0 when nothing satisfies the criterion. Counted rather
+## than hidden, because a mesh needing the fallback often is a mesh bound to the wrong
+## node set.
+const FALLBACK_NODE: int = 0
 
 
 ## Rig-space transform for one flexbody entry.
@@ -57,20 +65,71 @@ static func bind_stats(
     }
 
 
+## Full binding for a placed mesh: which triad each vertex belongs to, the triads
+## themselves, and each vertex's bind-space coordinates. This is what the skinning path
+## needs; bind_stats above only counts.
+static func bind(
+    nodes: PackedVector3Array, forset: PackedInt32Array, vertices: PackedVector3Array
+) -> Dictionary:
+    var triads: Array[Vector3i] = []
+    var triad_index: Dictionary = {}
+    var bone_of_vertex: PackedInt32Array = PackedInt32Array()
+    var coords: PackedVector3Array = PackedVector3Array()
+    bone_of_vertex.resize(vertices.size())
+    coords.resize(vertices.size())
+
+    for i: int in vertices.size():
+        var triad: Vector3i = _triad_for(nodes, forset, vertices[i])
+        if triad.x < 0:
+            bone_of_vertex[i] = 0
+            coords[i] = Vector3.ZERO
+            continue
+        var key: String = "%d_%d_%d" % [triad.x, triad.y, triad.z]
+        if not triad_index.has(key):
+            triad_index[key] = triads.size()
+            triads.append(triad)
+        bone_of_vertex[i] = triad_index[key] as int
+        coords[i] = FlexReference.triad_transform(
+            nodes, triad.x, triad.y, triad.z, Vector3.ZERO
+        ).affine_inverse() * vertices[i]
+
+    return {"triads": triads, "bone_of_vertex": bone_of_vertex, "coords": coords}
+
+
+## Bone transforms for a pose: one per triad, in the same order as `triads`.
+static func bone_transforms(
+    nodes: PackedVector3Array, triads: Array[Vector3i]
+) -> Array[Transform3D]:
+    var out: Array[Transform3D] = []
+    for triad: Vector3i in triads:
+        out.append(FlexReference.triad_transform(nodes, triad.x, triad.y, triad.z, Vector3.ZERO))
+    return out
+
+
+## CPU reference positions for a pose, the way FlexBody computes them.
+static func reference_positions(
+    nodes: PackedVector3Array, binding: Dictionary, triads: Array[Vector3i]
+) -> PackedVector3Array:
+    var coords: PackedVector3Array = binding["coords"] as PackedVector3Array
+    var bone_of_vertex: PackedInt32Array = binding["bone_of_vertex"] as PackedInt32Array
+    var frames: Array[Transform3D] = bone_transforms(nodes, triads)
+    var out: PackedVector3Array = PackedVector3Array()
+    out.resize(coords.size())
+    for i: int in coords.size():
+        out[i] = frames[bone_of_vertex[i]] * coords[i]
+    return out
+
+
 static func _triad_for(
     nodes: PackedVector3Array, forset: PackedInt32Array, vertex: Vector3
 ) -> Vector3i:
-    var ref: int = _nearest(nodes, forset, vertex, -1, -1, Vector3.ZERO)
+    var ref: int = _nearest(nodes, forset, vertex, -1, -1)
     if ref < 0:
         return Vector3i(-1, -1, -1)
-    var nx: int = _nearest(nodes, forset, vertex, ref, -1, Vector3.ZERO)
+    var nx: int = _nearest(nodes, forset, vertex, ref, -1)
     if nx < 0:
         return Vector3i(-1, -1, -1)
-    # ny must not be collinear with ref->nx, or the triad frame has no normal.
-    var axis: Vector3 = (nodes[nx] - nodes[ref]).normalized()
-    var ny: int = _nearest(nodes, forset, vertex, ref, nx, axis)
-    if ny < 0:
-        return Vector3i(-1, -1, -1)
+    var ny: int = _nearest_orthogonal(nodes, forset, vertex, ref, nx)
     return Vector3i(ref, nx, ny)
 
 
@@ -79,20 +138,37 @@ static func _nearest(
     forset: PackedInt32Array,
     vertex: Vector3,
     exclude_a: int,
-    exclude_b: int,
-    reject_axis: Vector3
+    exclude_b: int
 ) -> int:
     var best: int = -1
     var best_distance: float = INF
     for node: int in forset:
         if node == exclude_a or node == exclude_b:
             continue
-        if reject_axis != Vector3.ZERO and exclude_a >= 0:
-            var along: Vector3 = (nodes[node] - nodes[exclude_a]).normalized()
-            if absf(along.cross(reject_axis).length()) < DEGENERATE_EPSILON:
-                continue
         var distance: float = nodes[node].distance_squared_to(vertex)
         if distance < best_distance:
             best_distance = distance
             best = node
     return best
+
+
+## The nearest node whose direction from ref is within 45 degrees of orthogonal to
+## ref->nx, which is what keeps the triad frame well conditioned.
+static func _nearest_orthogonal(
+    nodes: PackedVector3Array, forset: PackedInt32Array, vertex: Vector3, ref: int, nx: int
+) -> int:
+    var vx: Vector3 = (nodes[nx] - nodes[ref]).normalized()
+    var best: int = -1
+    var best_distance: float = INF
+    for node: int in forset:
+        if node == ref or node == nx:
+            continue
+        var distance: float = nodes[node].distance_squared_to(vertex)
+        if distance >= best_distance:
+            continue
+        var vt: Vector3 = (nodes[node] - nodes[ref]).normalized()
+        if absf(vx.dot(vt)) > ORTHOGONALITY_LIMIT:
+            continue
+        best_distance = distance
+        best = node
+    return FALLBACK_NODE if best < 0 else best
