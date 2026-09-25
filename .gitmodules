@@ -4,3 +4,7 @@
 [submodule "vendor/rigs-of-rods-recipe"]
 	path = vendor/rigs-of-rods-recipe
 	url = https://github.com/htdguide/rigs-of-rods-recipe.git
+[submodule "vendor/godot-cpp"]
+	path = vendor/godot-cpp
+	url = https://github.com/godotengine/godot-cpp.git
+	branch = 4.5

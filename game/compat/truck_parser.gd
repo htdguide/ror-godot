@@ -1,0 +1,176 @@
+class_name TruckParser
+extends RefCounted
+## Reads the Rigs of Rods vehicle format well enough to measure and render a real rig.
+##
+## Not the production parser: the plan keeps upstream's own RigDef parser, wrapped in the
+## GDExtension, because fifteen years of tolerance for malformed files lives in it. This
+## reads the structural sections so real vehicle data can be loaded, measured and
+## rendered before the C++ side exists, and so the eventual C++ path has something to be
+## checked against.
+##
+## Sections that are not understood are counted rather than skipped silently, so the
+## parser can report how much of a file it actually accounted for.
+
+const COMMENT_PREFIXES: Array[String] = [";", "//"]
+
+var name: String = ""
+var nodes: PackedVector3Array = PackedVector3Array()
+var node_ids: PackedStringArray = PackedStringArray()
+var beams: PackedInt32Array = PackedInt32Array()
+var cab_triangles: PackedInt32Array = PackedInt32Array()
+var texcoord_nodes: PackedInt32Array = PackedInt32Array()
+var texcoords: PackedVector2Array = PackedVector2Array()
+var submesh_count: int = 0
+var sections_seen: Dictionary = {}
+var sections_parsed: Dictionary = {}
+var errors: PackedStringArray = PackedStringArray()
+
+var _node_id_to_index: Dictionary = {}
+var _section: String = ""
+
+
+func parse_file(path: String) -> String:
+    var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+    if file == null:
+        return "cannot open '%s': %s" % [path, error_string(FileAccess.get_open_error())]
+    var text: String = file.get_as_text()
+    file.close()
+    return parse_text(text)
+
+
+func parse_text(text: String) -> String:
+    var started: bool = false
+    for raw: String in text.split("\n"):
+        var line: String = _strip(raw)
+        if line.is_empty():
+            continue
+        # The first content line is the vehicle name, before any section keyword.
+        if not started:
+            name = line
+            started = true
+            continue
+        if _begin_section(line):
+            continue
+        _parse_row(line)
+    if nodes.is_empty():
+        return "no nodes found; is '%s' a vehicle file?" % name
+    return ""
+
+
+## Share of content lines that landed in a section this parser understands.
+func coverage() -> float:
+    var parsed: int = 0
+    var seen: int = 0
+    for key: String in sections_seen.keys():
+        seen += int(sections_seen[key])
+        parsed += int(sections_parsed.get(key, 0))
+    if seen == 0:
+        return 0.0
+    return float(parsed) / float(seen)
+
+
+func bounds() -> AABB:
+    if nodes.is_empty():
+        return AABB()
+    var box: AABB = AABB(nodes[0], Vector3.ZERO)
+    for node: Vector3 in nodes:
+        box = box.expand(node)
+    return box
+
+
+func _strip(raw: String) -> String:
+    var line: String = raw.strip_edges()
+    for prefix: String in COMMENT_PREFIXES:
+        var at: int = line.find(prefix)
+        if at == 0:
+            return ""
+        if at > 0:
+            line = line.substr(0, at).strip_edges()
+    return line
+
+
+## A section keyword is a bare word on its own line; anything with separators is data.
+func _begin_section(line: String) -> bool:
+    if line.contains(",") or line.contains(" ") or line.contains("\t"):
+        return false
+    _section = line.to_lower()
+    if _section == "submesh":
+        submesh_count += 1
+    return true
+
+
+func _parse_row(line: String) -> void:
+    sections_seen[_section] = int(sections_seen.get(_section, 0)) + 1
+    match _section:
+        "nodes", "nodes2":
+            _parse_node(line)
+        "beams":
+            _parse_beam(line)
+        "texcoords":
+            _parse_texcoord(line)
+        "cab":
+            _parse_cab(line)
+        _:
+            return
+    sections_parsed[_section] = int(sections_parsed.get(_section, 0)) + 1
+
+
+func _fields(line: String) -> PackedStringArray:
+    var normalised: String = line.replace("\t", ",").replace(" ", ",")
+    var out: PackedStringArray = PackedStringArray()
+    for field: String in normalised.split(","):
+        var trimmed: String = field.strip_edges()
+        if not trimmed.is_empty():
+            out.append(trimmed)
+    return out
+
+
+func _parse_node(line: String) -> void:
+    var fields: PackedStringArray = _fields(line)
+    if fields.size() < 4:
+        errors.append("node row with %d fields: %s" % [fields.size(), line])
+        return
+    _node_id_to_index[fields[0]] = nodes.size()
+    node_ids.append(fields[0])
+    nodes.append(Vector3(fields[1].to_float(), fields[2].to_float(), fields[3].to_float()))
+
+
+func _node_index(id: String) -> int:
+    return int(_node_id_to_index.get(id, -1))
+
+
+func _parse_beam(line: String) -> void:
+    var fields: PackedStringArray = _fields(line)
+    if fields.size() < 2:
+        return
+    var a: int = _node_index(fields[0])
+    var b: int = _node_index(fields[1])
+    if a < 0 or b < 0:
+        errors.append("beam references unknown node: %s" % line)
+        return
+    beams.append(a)
+    beams.append(b)
+
+
+func _parse_texcoord(line: String) -> void:
+    var fields: PackedStringArray = _fields(line)
+    if fields.size() < 3:
+        return
+    var node: int = _node_index(fields[0])
+    if node < 0:
+        errors.append("texcoord references unknown node: %s" % line)
+        return
+    texcoord_nodes.append(node)
+    texcoords.append(Vector2(fields[1].to_float(), fields[2].to_float()))
+
+
+func _parse_cab(line: String) -> void:
+    var fields: PackedStringArray = _fields(line)
+    if fields.size() < 3:
+        return
+    for i: int in 3:
+        var node: int = _node_index(fields[i])
+        if node < 0:
+            errors.append("cab references unknown node: %s" % line)
+            return
+        cab_triangles.append(node)

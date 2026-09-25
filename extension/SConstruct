@@ -1,0 +1,20 @@
+#!/usr/bin/env python
+# Build for the Rigs of Rods bridge GDExtension.
+#
+#   cd extension && scons target=template_debug
+#
+# godot-cpp is pinned at branch 4.5 while the engine is 4.7: GDExtension is forward
+# compatible, so building against the older API and declaring it as the compatibility
+# minimum is what keeps the binary loadable on both.
+
+env = SConscript("../vendor/godot-cpp/SConstruct")
+
+env.Append(CPPPATH=["src/"])
+sources = Glob("src/*.cpp")
+
+library = env.SharedLibrary(
+    "../game/bin/librorbridge{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
+    source=sources,
+)
+
+Default(library)

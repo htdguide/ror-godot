@@ -32,6 +32,24 @@ has no corresponding record under `LICENSES/`.
   solver from OGRE.
 - Cost if dropped: none technically; it is documentation.
 
+### godot-cpp
+- Source: https://github.com/godotengine/godot-cpp
+- Location: `vendor/godot-cpp` (git submodule, branch 4.5)
+- Licence: MIT
+- Why: the official GDExtension C++ bindings. Required by the chosen approach of wrapping
+  the existing Rigs of Rods solver rather than reimplementing it.
+- Note: pinned at 4.5 while the engine is 4.7. GDExtension is forward compatible, so
+  building against the older API and declaring it as the compatibility minimum keeps the
+  binary loadable on both, which is what the upstream project recommends.
+
+### Rigs of Rods content pack
+- Source: https://github.com/RigsOfRods/content (submodule of the Rigs of Rods repository)
+- Location: `vendor/rigs-of-rods/content`
+- Licence: see that repository's LICENSE
+- Why: supplies real vehicles and a terrain from upstream, so gates can be checked
+  against upstream's own published data instead of expectations written here. Both of its
+  vehicles use the `submesh` path, which is how ADR 0003 came to be written.
+
 ### Terrain3D
 - Source: https://github.com/TokisanGames/Terrain3D (Godot asset library #3892)
 - Location: `addons/terrain_3d` (not yet installed)
