@@ -17,6 +17,11 @@ var name: String = ""
 var nodes: PackedVector3Array = PackedVector3Array()
 var node_ids: PackedStringArray = PackedStringArray()
 var beams: PackedInt32Array = PackedInt32Array()
+## Per-beam spring and damping, as set by the set_beam_defaults directives in force where
+## each beam was declared. Using one global default instead makes a real rig explode: the
+## files are written against the values they declare.
+var beam_spring: PackedFloat32Array = PackedFloat32Array()
+var beam_damp: PackedFloat32Array = PackedFloat32Array()
 var cab_triangles: PackedInt32Array = PackedInt32Array()
 var texcoord_nodes: PackedInt32Array = PackedInt32Array()
 var texcoords: PackedVector2Array = PackedVector2Array()
@@ -37,12 +42,18 @@ var wheels: Array[Dictionary] = []
 ## place the camera; the bridge uses them to give the vehicle an orientation, which it
 ## otherwise does not have.
 var camera_nodes: Dictionary = {}
+## Minimum node mass in kilograms, from the minimass section. Upstream uses it as a floor
+## when distributing a vehicle's mass over its nodes.
+var minimass_kg: float = 0.0
 var sections_seen: Dictionary = {}
 var sections_parsed: Dictionary = {}
 var errors: PackedStringArray = PackedStringArray()
 
 var _node_id_to_index: Dictionary = {}
 var _camera_ids: PackedStringArray = PackedStringArray()
+## Upstream's defaults from SimConstants, in force until a directive changes them.
+var _beam_spring: float = 9000000.0
+var _beam_damp: float = 12000.0
 var _section: String = ""
 
 
@@ -122,8 +133,12 @@ func _strip(raw: String) -> String:
 
 
 ## A section keyword is a bare word on its own line; anything with separators is data.
+## A lone number is data too: sections like minimass hold a single value on its own line,
+## and reading that as a section name silently loses the value and every line after it.
 func _begin_section(line: String) -> bool:
     if line.contains(",") or line.contains(" ") or line.contains("\t"):
+        return false
+    if line.is_valid_float() or line.is_valid_int():
         return false
     _section = line.to_lower()
     if _section == "submesh":
@@ -150,6 +165,8 @@ func _parse_row(line: String) -> void:
             _parse_mesh_wheel(line)
         "cameras":
             _parse_cameras(line)
+        "minimass":
+            _parse_minimass(line)
         _:
             return
     sections_parsed[_section] = int(sections_parsed.get(_section, 0)) + 1
@@ -180,6 +197,9 @@ func _node_index(id: String) -> int:
 
 
 func _parse_beam(line: String) -> void:
+    if line.begins_with("set_beam_defaults"):
+        _parse_beam_defaults(line)
+        return
     var fields: PackedStringArray = _fields(line)
     if fields.size() < 2:
         return
@@ -190,6 +210,17 @@ func _parse_beam(line: String) -> void:
         return
     beams.append(a)
     beams.append(b)
+    beam_spring.append(_beam_spring)
+    beam_damp.append(_beam_damp)
+
+
+## "set_beam_defaults spring, damp, ...". A negative value means "keep upstream's default".
+func _parse_beam_defaults(line: String) -> void:
+    var fields: PackedStringArray = _fields(line.substr("set_beam_defaults".length()))
+    if fields.size() >= 1 and fields[0].to_float() >= 0.0:
+        _beam_spring = fields[0].to_float()
+    if fields.size() >= 2 and fields[1].to_float() >= 0.0:
+        _beam_damp = fields[1].to_float()
 
 
 func _parse_texcoord(line: String) -> void:
@@ -202,6 +233,12 @@ func _parse_texcoord(line: String) -> void:
         return
     texcoord_nodes.append(node)
     texcoords.append(Vector2(fields[1].to_float(), fields[2].to_float()))
+
+
+func _parse_minimass(line: String) -> void:
+    var fields: PackedStringArray = _fields(line)
+    if fields.size() >= 1:
+        minimass_kg = fields[0].to_float()
 
 
 ## Rows are "centre_node, direction_node, roll_node". Only the first is kept: it is the

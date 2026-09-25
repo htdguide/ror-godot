@@ -33,6 +33,9 @@ public:
     int add_beam(int node_a, int node_b, float rest_length, float spring, float damping);
 
     void set_gravity(const godot::Vector3 &gravity);
+    // A flat hard ground at `height`. Upstream's contact law, not a penalty spring: see
+    // the implementation for why that distinction decides whether a rig is stable.
+    void set_ground(float height, bool enabled);
     void set_node_immovable(int node, bool immovable);
     void set_node_position(int node, const godot::Vector3 &position);
     void set_node_velocity(int node, const godot::Vector3 &velocity);
@@ -69,9 +72,12 @@ private:
     std::vector<Node> m_nodes;
     std::vector<Beam> m_beams;
     godot::Vector3 m_gravity = godot::Vector3(0.0f, -9.81f, 0.0f);
+    float m_ground_height = 0.0f;
+    bool m_ground_enabled = false;
 
     void integrate(float dt);
     void accumulate_beam_forces();
+    void apply_ground_contact(float dt);
 };
 
 } // namespace rorgd

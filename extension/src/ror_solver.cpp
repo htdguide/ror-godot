@@ -11,6 +11,7 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("add_beam", "node_a", "node_b", "rest_length", "spring", "damping"),
                          &RorSolver::add_beam);
     ClassDB::bind_method(D_METHOD("set_gravity", "gravity"), &RorSolver::set_gravity);
+    ClassDB::bind_method(D_METHOD("set_ground", "height", "enabled"), &RorSolver::set_ground);
     ClassDB::bind_method(D_METHOD("set_node_immovable", "node", "immovable"),
                          &RorSolver::set_node_immovable);
     ClassDB::bind_method(D_METHOD("set_node_position", "node", "position"),
@@ -55,6 +56,11 @@ void RorSolver::set_gravity(const Vector3 &gravity) {
     m_gravity = gravity;
 }
 
+void RorSolver::set_ground(float height, bool enabled) {
+    m_ground_height = height;
+    m_ground_enabled = enabled;
+}
+
 void RorSolver::set_node_immovable(int node, bool immovable) {
     if (node >= 0 && node < static_cast<int>(m_nodes.size())) {
         m_nodes[node].immovable = immovable;
@@ -77,6 +83,8 @@ void RorSolver::step(float dt, int substeps) {
     for (int i = 0; i < substeps; ++i) {
         integrate(dt);
         accumulate_beam_forces();
+        // Last, because the contact law works on the node's fully accumulated force.
+        apply_ground_contact(dt);
     }
 }
 
@@ -111,6 +119,40 @@ void RorSolver::accumulate_beam_forces() {
         const Vector3 force = direction * magnitude;
         a.forces += force;
         b.forces -= force;
+    }
+}
+
+// Upstream's contact law, and the reason it is not a penalty spring: a spring stiff
+// enough to hold a vehicle up would need a timestep far below 0.5 ms to stay stable. This
+// instead removes the force pushing a node into the ground and adds exactly the impulse
+// needed to stop its approach within one step, which is what lets an explicit integrator
+// sit on hard ground at 2 kHz.
+//
+// Friction and the fluid ground models are not here yet; this is a hard, frictionless
+// plane.
+void RorSolver::apply_ground_contact(float dt) {
+    if (!m_ground_enabled || dt <= 0.0f) {
+        return;
+    }
+    const Vector3 normal(0.0f, 1.0f, 0.0f);
+    for (Node &node : m_nodes) {
+        if (node.immovable) {
+            continue;
+        }
+        const float penetration = m_ground_height - static_cast<float>(node.position.y);
+        if (penetration < 0.0f) {
+            continue;
+        }
+        // Remove whatever is still pushing the node further into the ground.
+        const float normal_force = static_cast<float>(node.forces.dot(normal));
+        if (normal_force < 0.0f) {
+            node.forces -= normal * normal_force;
+        }
+        // Stop the approach within a step, and correct the depth already accumulated.
+        const float approach = static_cast<float>(node.velocity.dot(normal));
+        if (approach < 0.0f) {
+            node.forces -= normal * (0.8f * approach - 0.2f * penetration / dt) * node.mass / dt;
+        }
     }
 }
 
