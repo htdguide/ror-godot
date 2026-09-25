@@ -79,6 +79,31 @@ otherwise score as perfect.
 Not yet verified: that motion vectors follow from Godot's previous-bone-pose path. That is
 M3's `mv_correctness` gate, and until it passes the claim stays an expectation.
 
+## Open: applying the actor frame in the render path
+
+The frame itself is verified. `actor_frame_rigid_motion` shows rigid vehicle motion
+appearing in the frame while actor-local bone transforms stay put to within 4e-6, against
+a deformation response five orders of magnitude larger.
+
+Wiring it into the render path is a separate matter and is **not done**. Putting the frame
+on the vehicle root while expressing bones and wheel placements in actor-local space
+should be a no-op by construction — `T * (T^-1 * v)` is `v` — and it is not: the body and
+the wheels separate by roughly half a metre, consistently, while both are individually
+correct when the frame is identity.
+
+Rather than ship a transform that is half understood, the render path stays in rig space
+and the frame is computed but unused there. Two things are known and worth writing down
+for whoever picks this up:
+
+- With `ActorFrame.of()` forced to identity, the full vehicle renders correctly: body,
+  wheels in their arches, everything. So the skinning path and the wheel path are each
+  right on their own.
+- The frame's own orientation convention was wrong once already and is now fixed:
+  upstream's `cameras` section names a centre, a node *behind* it and a node to its
+  *left*, so the roll node must be negated to give Godot's +X. Taking it directly leaves a
+  right-handed basis rotated half a turn, and the vehicle renders upside down — which is
+  what it did.
+
 ## Still to build
 
 The actor-local reference frame. Upstream sets the scene node's position and never its

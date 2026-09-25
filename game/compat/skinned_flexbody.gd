@@ -20,6 +20,8 @@ var binding: Dictionary = {}
 var bind_inverse: Array[Transform3D] = []
 var vertex_count: int = 0
 
+var _uvs: PackedVector2Array = PackedVector2Array()
+
 
 ## `vertices` are the mesh's placed rest positions in rig space.
 func build(
@@ -28,7 +30,8 @@ func build(
     forset: PackedInt32Array,
     vertices: PackedVector3Array,
     indices: PackedInt32Array,
-    material: Material
+    material: Material,
+    uvs: PackedVector2Array = PackedVector2Array()
 ) -> String:
     vertex_count = vertices.size()
     binding = FlexbodyBinder.bind(nodes, forset, vertices)
@@ -38,6 +41,7 @@ func build(
     for frame: Transform3D in FlexbodyBinder.bone_transforms(nodes, triads):
         bind_inverse.append(frame.affine_inverse())
 
+    _uvs = uvs
     mesh = ArrayMesh.new()
     _add_surface(vertices, indices, vertices)
 
@@ -62,14 +66,20 @@ func build(
 ## space and the frame itself goes on the instance, so rigid motion of the whole vehicle
 ## lives in the instance transform where the renderer can see it. Without one, bones are
 ## written in world space and the vehicle has no orientation of its own.
-func set_pose(nodes: PackedVector3Array, actor: Transform3D = Transform3D.IDENTITY) -> void:
+func set_pose(
+    nodes: PackedVector3Array,
+    actor: Transform3D = Transform3D.IDENTITY,
+    apply_to_instance: bool = true
+) -> void:
     var to_local: Transform3D = actor.affine_inverse()
     var frames: Array[Transform3D] = FlexbodyBinder.bone_transforms(nodes, triads)
     for bone: int in frames.size():
         RenderingServer.skeleton_bone_set_transform(
             skeleton_rid, bone, to_local * frames[bone] * bind_inverse[bone]
         )
-    if mesh_instance != null:
+    # A part inside a vehicle leaves the frame to the vehicle root, or it would be
+    # applied twice. A standalone part carries it itself.
+    if apply_to_instance and mesh_instance != null:
         mesh_instance.transform = actor
 
 
@@ -122,6 +132,8 @@ func _add_surface(
     var arrays: Array = []
     arrays.resize(Mesh.ARRAY_MAX)
     arrays[Mesh.ARRAY_VERTEX] = vertices
+    if _uvs.size() == vertices.size():
+        arrays[Mesh.ARRAY_TEX_UV] = _uvs
     arrays[Mesh.ARRAY_BONES] = bones
     arrays[Mesh.ARRAY_WEIGHTS] = weights
     arrays[Mesh.ARRAY_CUSTOM0] = custom

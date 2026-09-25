@@ -21,6 +21,13 @@ const MAX_TRACK_M: float = 2.4
 ## Share of the frame the vehicle must occupy. Low enough to survive reframing, high
 ## enough that an empty frame or a vehicle collapsed to a speck cannot pass.
 const MIN_COVERAGE: float = 0.05
+## Height above the ground to stand the vehicle at, in metres.
+const GROUND_CLEARANCE_M: float = 0.05
+## Measured coverage as a share of the vehicle's projected screen area. Coverage alone
+## cannot tell a whole vehicle from four wheels and a shadow: when the body silently
+## stopped rendering, coverage stayed at 62% and the gate passed. Comparing against what
+## the geometry should cover catches that.
+const MIN_PROJECTED_FILL: float = 0.35
 
 
 static func meta() -> Dictionary:
@@ -74,10 +81,19 @@ func run(harness: Node) -> Dictionary:
         return fail(wheel_check["error"] as String)
 
     var vehicle: Node3D = result["root"] as Node3D
-    # The rig is authored around its own origin, so centre it on the camera's subject.
-    vehicle.position = -_centre_of(vehicle)
     harness.world.add_child(vehicle)
+    # Translate for the camera without touching the vehicle's own frame: overwriting the
+    # root's position would discard the actor transform the bones are expressed against,
+    # and the vehicle would sink through the floor while still reporting fine.
+    var bounds: AABB = _world_bounds(vehicle)
+    vehicle.position += Vector3(
+        -bounds.get_center().x,
+        -bounds.position.y + GROUND_CLEARANCE_M,
+        -bounds.get_center().z
+    )
 
+    var probe_truck: TruckParser = TruckParser.new()
+    probe_truck.parse_file(mod_dir.path_join(TRUCK))
     var shot: Dictionary = await harness.capture_shot("vehicle", "static", 12)
     if shot["error"] != "":
         return fail(shot["error"] as String)
@@ -87,6 +103,15 @@ func run(harness: Node) -> Dictionary:
             "vehicle covers %.2f%% of the frame, under %.0f%%; artifact: %s"
             % [coverage * 100.0, MIN_COVERAGE * 100.0, shot["png"]],
             coverage
+        )
+    var fill: float = _projected_fill(harness, vehicle, coverage)
+    if fill < MIN_PROJECTED_FILL:
+        return fail(
+            "vehicle covers %.1f%% of the frame but its geometry projects to %.1f%%"
+            % [coverage * 100.0, coverage * 100.0 / maxf(fill, 0.0001)]
+            + " (fill %.2f, need %.2f): most of it is not being drawn. Artifact: %s"
+            % [fill, MIN_PROJECTED_FILL, shot["png"]],
+            fill
         )
     return ok(
         "%d flexbodies, %d wheels (%.2f m wheelbase, %.2f m track), %d textures, %.0f%% coverage: %s"
@@ -127,16 +152,26 @@ func _check_wheel_geometry(vehicle: Node3D) -> Dictionary:
     return {"error": "", "wheelbase": wheelbase, "track": track}
 
 
-func _centre_of(vehicle: Node3D) -> Vector3:
-    var total: Vector3 = Vector3.ZERO
-    var count: int = 0
-    for child: Node in vehicle.get_children():
-        var mesh_instance: MeshInstance3D = child as MeshInstance3D
-        if mesh_instance == null:
+## World bounds of everything the vehicle draws.
+func _world_bounds(vehicle: Node3D) -> AABB:
+    var bounds: AABB = AABB()
+    var started: bool = false
+    for node: Node in _all_descendants(vehicle):
+        var mesh_instance: MeshInstance3D = node as MeshInstance3D
+        if mesh_instance == null or mesh_instance.mesh == null:
             continue
-        total += mesh_instance.position
-        count += 1
-    return Vector3.ZERO if count == 0 else total / float(count)
+        var world: AABB = mesh_instance.global_transform * mesh_instance.mesh.get_aabb()
+        bounds = world if not started else bounds.merge(world)
+        started = true
+    return bounds
+
+
+func _all_descendants(node: Node) -> Array[Node]:
+    var out: Array[Node] = []
+    for child: Node in node.get_children():
+        out.append(child)
+        out.append_array(_all_descendants(child))
+    return out
 
 
 ## Share of sampled pixels that differ from the empty-scene background. The ground plane
@@ -159,3 +194,26 @@ func _coverage(png_path: String) -> float:
             elif _colour_distance(pixel, sky) > 0.35 and pixel.r > 0.05:
                 differing += 1
     return float(differing) / float(maxi(sampled, 1))
+
+
+## Measured coverage divided by the share of the frame the vehicle's bounds project to.
+## A value near 1 means what is on screen matches what should be; a low value means most
+## of the geometry is not being drawn, whatever the raw coverage says.
+func _projected_fill(harness: Node, vehicle: Node3D, coverage: float) -> float:
+    var camera: Camera3D = harness.camera
+    var bounds: AABB = _world_bounds(vehicle)
+    var min_screen: Vector2 = Vector2(INF, INF)
+    var max_screen: Vector2 = Vector2(-INF, -INF)
+    for corner: int in 8:
+        var point: Vector3 = bounds.get_endpoint(corner)
+        if camera.is_position_behind(point):
+            return 1.0  # Partly behind the camera: the estimate would be meaningless.
+        var screen: Vector2 = camera.unproject_position(point)
+        min_screen = min_screen.min(screen)
+        max_screen = max_screen.max(screen)
+    var viewport: Vector2 = harness.get_viewport().get_visible_rect().size
+    var area: float = (
+        (max_screen.x - min_screen.x) * (max_screen.y - min_screen.y)
+        / maxf(viewport.x * viewport.y, 1.0)
+    )
+    return 1.0 if area <= 0.0 else coverage / area

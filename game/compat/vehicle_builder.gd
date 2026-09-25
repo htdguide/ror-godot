@@ -26,6 +26,16 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
 
     var root: Node3D = Node3D.new()
     root.name = "Vehicle"
+    # The actor frame is computed and reported, but not yet applied to the render path.
+    # Applying it — frame on the root, bones and wheels in actor-local space — should be a
+    # no-op by construction, since T * (T^-1 * v) is v. It is not: the body and wheels
+    # separate by about half a metre. The algebra is verified by actor_frame_rigid_motion
+    # and the render is verified with the frame at identity, so rather than ship a
+    # transform that is half understood, the render stays in rig space until the
+    # discrepancy is explained. See docs/architecture/bridge.md.
+    var actor: Transform3D = ActorFrame.of(truck.nodes, truck.camera_nodes)
+    var render_frame: Transform3D = Transform3D.IDENTITY
+    var parts: Array[SkinnedFlexbody] = []
     var textures: Dictionary = {}
     var built: int = 0
     var skipped: PackedStringArray = PackedStringArray()
@@ -39,13 +49,13 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         if (result.get("error", "") as String) != "":
             skipped.append("%s (%s)" % [entry["mesh"], result["error"]])
             continue
-        var node: MeshInstance3D = _build_flexbody(
-            result, truck, entry, mod_dir, dds_reader, textures
+        var part: SkinnedFlexbody = _build_skinned_flexbody(
+            root, result, truck, entry, render_frame, mod_dir, dds_reader, textures
         )
-        if node == null:
+        if part == null:
             skipped.append("%s (no geometry)" % entry["mesh"])
             continue
-        root.add_child(node)
+        parts.append(part)
         built += 1
 
     var wheels_built: int = 0
@@ -64,12 +74,69 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
     return {
         "error": "",
         "root": root,
+        "actor": actor,
+        "parts": parts,
         "wheels": wheels_built,
         "truck": truck,
         "built": built,
         "skipped": skipped,
         "textures": textures.size(),
     }
+
+
+## Drives the whole vehicle to a node pose: the frame on the root, deformation in the
+## bones. This is the per-frame entry point the solver will call.
+static func apply_pose(built: Dictionary, truck: TruckParser, nodes: PackedVector3Array) -> void:
+    var actor: Transform3D = ActorFrame.of(nodes, truck.camera_nodes)
+    (built["root"] as Node3D).transform = actor
+    for part: SkinnedFlexbody in built["parts"] as Array[SkinnedFlexbody]:
+        part.set_pose(nodes, actor, false)
+
+
+## One flexbody, bound to its locator triads and skinned.
+static func _build_skinned_flexbody(
+    root: Node3D,
+    result: Dictionary,
+    truck: TruckParser,
+    entry: Dictionary,
+    actor: Transform3D,
+    mod_dir: String,
+    dds_reader: RefCounted,
+    textures: Dictionary
+) -> SkinnedFlexbody:
+    var placement: Transform3D = FlexbodyBinder.placement(truck.nodes, entry)
+    var vertices: PackedVector3Array = PackedVector3Array()
+    var indices: PackedInt32Array = PackedInt32Array()
+    var uvs: PackedVector2Array = PackedVector2Array()
+    var material: Material = null
+    for submesh: Dictionary in result["submeshes"] as Array:
+        var positions: PackedVector3Array = submesh["positions"] as PackedVector3Array
+        if positions.is_empty():
+            continue
+        var offset: int = vertices.size()
+        for vertex: Vector3 in positions:
+            vertices.append(placement * vertex)
+        for index: int in submesh["indices"] as PackedInt32Array:
+            indices.append(index + offset)
+        var submesh_uvs: PackedVector2Array = submesh["uvs"] as PackedVector2Array
+        for i: int in positions.size():
+            uvs.append(submesh_uvs[i] if i < submesh_uvs.size() else Vector2.ZERO)
+        if material == null:
+            material = _material_for(
+                submesh["material"] as String, truck, mod_dir, dds_reader, textures
+            )
+    if vertices.is_empty():
+        return null
+
+    var part: SkinnedFlexbody = SkinnedFlexbody.new()
+    var error: String = part.build(
+        root, truck.nodes, entry["forset"] as PackedInt32Array, vertices, indices, material, uvs
+    )
+    if error != "":
+        return null
+    part.mesh_instance.name = (entry["mesh"] as String).get_basename()
+    part.set_pose(truck.nodes, actor, false)
+    return part
 
 
 ## A wheel is a rim mesh posed by the axle nodes plus a tyre swept around them.

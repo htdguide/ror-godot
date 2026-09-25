@@ -26,8 +26,12 @@ static func of(nodes: PackedVector3Array, camera_nodes: Dictionary) -> Transform
     # Gram-Schmidt: keep the direction node's axis exactly, take the roll node only for
     # the plane it defines. A frame built by normalising three node deltas directly would
     # inherit the rig's shear, and the whole point of this frame is that it has none.
+    # Upstream's cameras section names a centre, a node behind it, and a node to its
+    # left. Godot's +Z points backwards and +X points right, so the direction node gives
+    # +Z directly while the roll node must be negated: taking it as +X leaves a
+    # right-handed basis that is rotated half a turn, and the vehicle renders upside down.
     var z: Vector3 = forward.normalized()
-    var x: Vector3 = (side - z * side.dot(z)).normalized()
+    var x: Vector3 = -(side - z * side.dot(z)).normalized()
     if x.length_squared() == 0.0:
         return Transform3D(Basis.IDENTITY, origin)
     return Transform3D(Basis(x, z.cross(x), z), origin)
