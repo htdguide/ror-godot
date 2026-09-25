@@ -20,6 +20,34 @@ const RIM_SPRING_FALLBACK: float = 4000000.0
 const RIM_DAMP_FALLBACK: float = 150.0
 
 
+## Parses a `meshwheels2` row: "tire_radius, rim_radius, width, rays, node1, node2, snode,
+## braked, propulsed, arm, mass, spring, damping, side, meshname, material". Lives here
+## rather than in the parser because the tread generated below is the only thing that
+## reads most of these fields.
+static func parse_row(fields: PackedStringArray, id_to_index: Dictionary) -> Dictionary:
+    if fields.size() < 16:
+        return {"error": "row has %d fields, expected at least 16" % fields.size()}
+    var node1: int = int(id_to_index.get(fields[4], -1))
+    var node2: int = int(id_to_index.get(fields[5], -1))
+    if node1 < 0 or node2 < 0:
+        return {"error": "row references an unknown node"}
+    return {
+        "error": "",
+        "tire_radius": fields[0].to_float(),
+        "rim_radius": fields[1].to_float(),
+        "width": fields[2].to_float(),
+        "rays": fields[3].to_int(),
+        "node1": node1,
+        "node2": node2,
+        "mass": fields[10].to_float(),
+        "spring": fields[11].to_float(),
+        "damping": fields[12].to_float(),
+        "side": fields[13].to_lower(),
+        "mesh": fields[14],
+        "material": fields[15],
+    }
+
+
 ## Adds every wheel's tread to the rig. Returns {"nodes": int, "beams": int}.
 static func generate(truck: TruckParser) -> Dictionary:
     var nodes_before: int = truck.nodes.size()

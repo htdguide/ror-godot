@@ -30,6 +30,10 @@ var submesh_count: int = 0
 ## forset: PackedInt32Array}. A flexbody binds an external OGRE mesh to a subset of the
 ## rig's nodes, which is the path ADR 0002 covers.
 var flexbodies: Array[Dictionary] = []
+## One entry per prop: the flexbody head plus, for a dashboard, its steering wheel. A prop
+## is rigid — it rides its node triad rather than being skinned to a node set — and it is
+## where a cab's dashboard, steering wheel and seatbelts live.
+var props: Array[Dictionary] = []
 ## name -> {effect, textures: PackedStringArray}. The legacy material declaration, which
 ## carries more than it is usually credited with: an explicit transparency effect, and a
 ## specular map that is a real roughness source rather than a guess from diffuse luma.
@@ -202,6 +206,8 @@ func _parse_row(line: String) -> void:
             _parse_cab(line)
         "flexbodies":
             _parse_flexbody(line)
+        "props":
+            _parse_prop(line)
         "managedmaterials":
             _parse_managed_material(line)
         "meshwheels2", "meshwheels":
@@ -311,34 +317,15 @@ func _parse_cameras(line: String) -> void:
     _camera_ids = PackedStringArray([fields[0], fields[1], fields[2]])
 
 
-## Rows are "tire_radius, rim_radius, width, rays, node1, node2, snode, braked, propulsed,
-## arm, mass, spring, damping, side, meshname material".
 func _parse_mesh_wheel(line: String) -> void:
     if line.begins_with("set_"):
         return  # Inline defaults directives, not wheel rows.
-    var fields: PackedStringArray = _fields(line)
-    if fields.size() < 16:
-        errors.append("meshwheel row with %d fields: %s" % [fields.size(), line])
+    var row: Dictionary = WheelRig.parse_row(_fields(line), _node_id_to_index)
+    if (row["error"] as String) != "":
+        errors.append("meshwheel %s: %s" % [row["error"], line])
         return
-    var node1: int = _node_index(fields[4])
-    var node2: int = _node_index(fields[5])
-    if node1 < 0 or node2 < 0:
-        errors.append("meshwheel references unknown node: %s" % line)
-        return
-    wheels.append({
-        "tire_radius": fields[0].to_float(),
-        "rim_radius": fields[1].to_float(),
-        "width": fields[2].to_float(),
-        "rays": fields[3].to_int(),
-        "mass": fields[10].to_float(),
-        "spring": fields[11].to_float(),
-        "damping": fields[12].to_float(),
-        "node1": node1,
-        "node2": node2,
-        "side": fields[13].to_lower(),
-        "mesh": fields[14],
-        "material": fields[15],
-    })
+    row.erase("error")
+    wheels.append(row)
 
 
 ## Rows are "name effect texture...". A "-" stands for an absent texture.
@@ -366,25 +353,22 @@ func _parse_flexbody(line: String) -> void:
             line.substr("forset".length()), _node_id_to_index
         )
         return
-    var fields: PackedStringArray = _fields(line)
-    if fields.size() < 10:
-        errors.append("flexbody row with %d fields: %s" % [fields.size(), line])
+    var row: Dictionary = PlacementRows.head(_fields(line), _node_id_to_index)
+    if (row["error"] as String) != "":
+        errors.append("flexbody %s: %s" % [row["error"], line])
         return
-    var ref: int = _node_index(fields[0])
-    var nx: int = _node_index(fields[1])
-    var ny: int = _node_index(fields[2])
-    if ref < 0 or nx < 0 or ny < 0:
-        errors.append("flexbody references unknown node: %s" % line)
+    row.erase("error")
+    row["forset"] = PackedInt32Array()
+    flexbodies.append(row)
+
+
+func _parse_prop(line: String) -> void:
+    var row: Dictionary = PlacementRows.prop(_fields(line), _node_id_to_index)
+    if (row["error"] as String) != "":
+        errors.append("prop %s: %s" % [row["error"], line])
         return
-    flexbodies.append({
-        "ref": ref,
-        "nx": nx,
-        "ny": ny,
-        "offset": Vector3(fields[3].to_float(), fields[4].to_float(), fields[5].to_float()),
-        "rot_deg": Vector3(fields[6].to_float(), fields[7].to_float(), fields[8].to_float()),
-        "mesh": fields[9],
-        "forset": PackedInt32Array(),
-    })
+    row.erase("error")
+    props.append(row)
 
 
 func _parse_cab(line: String) -> void:

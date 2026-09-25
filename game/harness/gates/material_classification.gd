@@ -54,7 +54,7 @@ func run(_harness: Node) -> Dictionary:
     if truck.managed_materials.is_empty():
         return fail("%s declares no managedmaterials" % TRUCK)
 
-    var classified: Dictionary = VehicleBuilder.classify_materials(truck)
+    var classified: Dictionary = MeshAssembler.classify_materials(truck)
     var wrong: PackedStringArray = PackedStringArray()
     for material_name: String in EXPECTED.keys():
         if not classified.has(material_name):
