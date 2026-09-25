@@ -16,8 +16,12 @@ extends RefCounted
 ##   emission     float, for lamps and gauges
 
 const CLASSES: Dictionary = {
+    # Tempered from clearcoat 0.8 / roughness 0.25, which made body panels behave like
+    # mirrors: from any angle facing the sky they showed a blurred reflection of the
+    # world and read as half transparent, with the vehicle's own roll bar appearing
+    # through its bed side. A twenty-year-old truck is not a show car.
     "car_paint": {
-        "metallic": 0.0, "roughness": 0.25, "clearcoat": 0.8, "sheen": 0.0,
+        "metallic": 0.0, "roughness": 0.45, "clearcoat": 0.25, "sheen": 0.0,
         "transmission": false, "emission": 0.0,
     },
     "chrome": {
@@ -87,5 +91,8 @@ const NAME_HINTS: Array = [
 ## Roughness is derived from a specular map as 1 - specular, then pulled toward the middle
 ## of this range: a legacy specular map is an artist's intensity mask rather than a
 ## measured reflectance, so taking it literally produces mirrors and chalk.
-const SPEC_ROUGHNESS_MIN: float = 0.15
+## The floor matters more than the ceiling: a legacy specular map is an artist's mask,
+## and a bright one taken literally drives roughness to zero and turns a panel into a
+## mirror of the sky.
+const SPEC_ROUGHNESS_MIN: float = 0.35
 const SPEC_ROUGHNESS_MAX: float = 0.95
