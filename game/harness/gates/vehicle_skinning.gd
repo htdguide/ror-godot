@@ -47,6 +47,9 @@ func run(harness: Node) -> Dictionary:
     var err: String = harness.setup_for(PRESET)
     if err != "":
         return fail(err)
+    # This gate reads numbers back out of pixels, so nothing else may write to the frame:
+    # linear tonemapping, black background, no ground.
+    harness.use_measurement_environment()
 
     var truck: TruckParser = TruckParser.new()
     var parse_error: String = truck.parse_file(mod_dir.path_join(TRUCK))

@@ -216,6 +216,30 @@ func _run_gate(name: String) -> void:
     _quit(EXIT_OK if row["pass"] else EXIT_FAIL)
 
 
+## Puts the world into a state where numbers encoded into pixels survive to the capture:
+## linear tonemapping, a black background and no ambient light.
+##
+## Both parts matter. A tonemapper desaturates and lifts, so a value written into one
+## channel is not the value read back. And a lit background puts bright pixels all over
+## the frame, which a threshold test counts as though they were geometry — the sky alone
+## produced nearly two hundred thousand false positives before this existed.
+func use_measurement_environment() -> void:
+    var holder: WorldEnvironment = world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
+    if holder == null or holder.environment == null:
+        return
+    var environment: Environment = holder.environment
+    environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+    environment.tonemap_exposure = 1.0
+    environment.background_mode = Environment.BG_COLOR
+    environment.background_color = Color.BLACK
+    environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+    environment.ambient_light_color = Color.BLACK
+    environment.ambient_light_energy = 0.0
+    var ground: MeshInstance3D = world.get_node_or_null(^"Ground") as MeshInstance3D
+    if ground != null:
+        ground.visible = false
+
+
 ## Builds the world a gate asked for. Gates never construct scenes themselves.
 func setup_for(shot: String) -> String:
     var err: String = _resolve_preset(shot)

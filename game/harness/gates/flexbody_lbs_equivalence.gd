@@ -52,6 +52,9 @@ func run(harness: Node) -> Dictionary:
     var err: String = harness.setup_for(PRESET)
     if err != "":
         return fail(err)
+    # This gate reads numbers back out of pixels, so nothing else may write to the frame:
+    # linear tonemapping, black background, no ground.
+    harness.use_measurement_environment()
 
     var lattice: FlexLattice = FlexLattice.new()
     lattice.build(harness.rng)
