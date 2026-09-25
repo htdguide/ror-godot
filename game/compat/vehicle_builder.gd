@@ -154,6 +154,7 @@ static func _build_skinned_flexbody(
     var vertices: PackedVector3Array = PackedVector3Array()
     var indices: PackedInt32Array = PackedInt32Array()
     var uvs: PackedVector2Array = PackedVector2Array()
+    var normals: PackedVector3Array = PackedVector3Array()
     var material: Material = null
     for submesh: Dictionary in result["submeshes"] as Array:
         var positions: PackedVector3Array = submesh["positions"] as PackedVector3Array
@@ -165,8 +166,16 @@ static func _build_skinned_flexbody(
         for index: int in submesh["indices"] as PackedInt32Array:
             indices.append(index + offset)
         var submesh_uvs: PackedVector2Array = submesh["uvs"] as PackedVector2Array
+        var submesh_normals: PackedVector3Array = submesh["normals"] as PackedVector3Array
         for i: int in positions.size():
             uvs.append(submesh_uvs[i] if i < submesh_uvs.size() else Vector2.ZERO)
+            # A locator placement is a rotation, so the basis carries normals correctly
+            # without the inverse transpose a scaled or sheared one would need.
+            normals.append(
+                (placement.basis * submesh_normals[i]).normalized()
+                if i < submesh_normals.size()
+                else Vector3.UP
+            )
         if material == null:
             material = _material_for(
                 submesh["material"] as String, truck, mod_dir, dds_reader, textures
@@ -176,7 +185,14 @@ static func _build_skinned_flexbody(
 
     var part: SkinnedFlexbody = SkinnedFlexbody.new()
     var error: String = part.build(
-        root, truck.nodes, entry["forset"] as PackedInt32Array, vertices, indices, material, uvs
+        root,
+        truck.nodes,
+        entry["forset"] as PackedInt32Array,
+        vertices,
+        indices,
+        material,
+        uvs,
+        normals
     )
     if error != "":
         return null
@@ -262,32 +278,9 @@ static func _build_flexbody(
     dds_reader: RefCounted,
     textures: Dictionary
 ) -> MeshInstance3D:
-    var mesh: ArrayMesh = ArrayMesh.new()
-    var surfaces: int = 0
-    for submesh: Dictionary in result["submeshes"] as Array:
-        var positions: PackedVector3Array = submesh["positions"] as PackedVector3Array
-        var indices: PackedInt32Array = submesh["indices"] as PackedInt32Array
-        if positions.is_empty() or indices.is_empty():
-            continue
-        var arrays: Array = []
-        arrays.resize(Mesh.ARRAY_MAX)
-        arrays[Mesh.ARRAY_VERTEX] = positions
-        var normals: PackedVector3Array = submesh["normals"] as PackedVector3Array
-        if normals.size() == positions.size():
-            arrays[Mesh.ARRAY_NORMAL] = normals
-        var uvs: PackedVector2Array = submesh["uvs"] as PackedVector2Array
-        if uvs.size() == positions.size():
-            arrays[Mesh.ARRAY_TEX_UV] = uvs
-        arrays[Mesh.ARRAY_INDEX] = indices
-        mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-        mesh.surface_set_material(
-            surfaces,
-            _material_for(submesh["material"] as String, truck, mod_dir, dds_reader, textures)
-        )
-        surfaces += 1
-    if surfaces == 0:
+    var mesh: ArrayMesh = _mesh_from(result, truck, mod_dir, dds_reader, textures)
+    if mesh == null:
         return null
-
     var node: MeshInstance3D = MeshInstance3D.new()
     node.name = (entry["mesh"] as String).get_basename()
     node.mesh = mesh

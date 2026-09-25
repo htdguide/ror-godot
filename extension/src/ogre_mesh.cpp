@@ -212,10 +212,23 @@ bool OgreMeshReader::read_submesh(Cursor &c, int64_t end, Array &submeshes) {
                 indices_32bit ? static_cast<int32_t>(c.u32()) : static_cast<int32_t>(c.u16());
     }
 
-    // OGRE winds its front faces clockwise; Godot expects counter-clockwise. Without
-    // reversing each triangle every surface faces away from the viewer: it is culled from
-    // the front and drawn from behind, so a vehicle can be seen through from outside
-    // while its interior faces are visible, and tail lights only appear from behind.
+    // Every triangle is reversed, and the vertex normals are left exactly as authored.
+    // That pairing is not obvious and was got wrong twice, so it is worth the words.
+    //
+    // Measured in the file, index order and the authored normals agree on 99-100% of
+    // triangles (tools/facing_probe.gd), which reads as "the file is already
+    // counter-clockwise, do not touch it". On screen the opposite holds: loaded in file
+    // order the vehicle is culled from outside and drawn from inside. Something between
+    // here and the drawn pixel mirrors the geometry; it has not been isolated, and a
+    // negative-determinant basis somewhere in the pose path is the first place to look.
+    //
+    // The temptation is then to negate the normals too, to keep them agreeing with the
+    // winding. Do not: the gate body_blocks_sun measures the vehicle 2.13x brighter lit
+    // from the camera's side than from behind with the normals as authored, and 0.73x --
+    // brighter from behind, which is the sun appearing to shine through the bodywork --
+    // with them negated. Whatever mirrors the triangles evidently leaves the normals
+    // alone, so this must too.
+
     for (int64_t i = 0; i + 2 < indices.size(); i += 3) {
         const int32_t swap = indices[i + 1];
         indices[i + 1] = indices[i + 2];

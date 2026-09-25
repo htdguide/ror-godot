@@ -24,6 +24,7 @@ var vertex_count: int = 0
 var rest_vertices: PackedVector3Array = PackedVector3Array()
 
 var _uvs: PackedVector2Array = PackedVector2Array()
+var _normals: PackedVector3Array = PackedVector3Array()
 
 
 ## `vertices` are the mesh's placed rest positions in rig space.
@@ -34,7 +35,8 @@ func build(
     vertices: PackedVector3Array,
     indices: PackedInt32Array,
     material: Material,
-    uvs: PackedVector2Array = PackedVector2Array()
+    uvs: PackedVector2Array = PackedVector2Array(),
+    normals: PackedVector3Array = PackedVector3Array()
 ) -> String:
     vertex_count = vertices.size()
     rest_vertices = vertices
@@ -46,6 +48,7 @@ func build(
         bind_inverse.append(frame.affine_inverse())
 
     _uvs = uvs
+    _normals = normals
     mesh = ArrayMesh.new()
     _add_surface(vertices, indices, vertices)
 
@@ -157,6 +160,12 @@ func _add_surface(
     var arrays: Array = []
     arrays.resize(Mesh.ARRAY_MAX)
     arrays[Mesh.ARRAY_VERTEX] = vertices
+    # Without normals a surface has no surface orientation to light, so it shades by
+    # whatever the shader's default normal happens to be: panels read flat, self-shadowing
+    # never happens, and from the side away from the sun the vehicle looks lit through.
+    # Godot skins these with the same bone transforms as the positions.
+    if _normals.size() == vertices.size():
+        arrays[Mesh.ARRAY_NORMAL] = _normals
     if _uvs.size() == vertices.size():
         arrays[Mesh.ARRAY_TEX_UV] = _uvs
     arrays[Mesh.ARRAY_BONES] = bones

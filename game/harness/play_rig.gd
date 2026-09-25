@@ -57,9 +57,10 @@ func _build_hud() -> Label:
 func _print_help() -> void:
     print(
         (
-            "PLAY  W A S D move, Q/E down/up, hold Shift to boost, hold right mouse to look\n"
+            "PLAY  click to look with the mouse, Esc to release it, Esc again to quit\n"
+            + "PLAY  W A S D move, Q/E down/up, hold Shift to boost\n"
             + "PLAY  F1 toggle HUD, F2 cycle weather, F3 toggle shadows, F4 toggle the sun\n"
-            + "PLAY  P save a screenshot to artifacts/human, Esc quit"
+            + "PLAY  P save a screenshot to artifacts/human"
         )
     )
 
@@ -98,11 +99,14 @@ func _move(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventMouseButton:
         var button: InputEventMouseButton = event as InputEventMouseButton
-        if button.button_index == MOUSE_BUTTON_RIGHT:
-            _looking = button.pressed
-            Input.mouse_mode = (
-                Input.MOUSE_MODE_CAPTURED if _looking else Input.MOUSE_MODE_VISIBLE
-            )
+        if not button.pressed:
+            return
+        # Click anywhere to take the mouse and look freely; Esc gives it back. Holding
+        # the right button still works for a quick glance without committing.
+        if button.button_index == MOUSE_BUTTON_LEFT:
+            _set_looking(true)
+        elif button.button_index == MOUSE_BUTTON_RIGHT:
+            _set_looking(not _looking)
     elif event is InputEventMouseMotion and _looking:
         var motion: InputEventMouseMotion = event as InputEventMouseMotion
         _yaw -= motion.relative.x * MOUSE_SENSITIVITY
@@ -131,7 +135,17 @@ func _on_key(keycode: Key) -> void:
         KEY_P:
             _screenshot()
         KEY_ESCAPE:
-            get_tree().quit(0)
+            # First Esc releases the mouse, so the window can be left without quitting.
+            # A second one quits.
+            if _looking:
+                _set_looking(false)
+            else:
+                get_tree().quit(0)
+
+
+func _set_looking(looking: bool) -> void:
+    _looking = looking
+    Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if looking else Input.MOUSE_MODE_VISIBLE
 
 
 func _cycle_weather() -> void:
@@ -186,6 +200,7 @@ func _hud_text() -> String:
             ),
             Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0,
             Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0,
-            "F1 hud  F2 weather  F3 shadows  F4 sun  P shot  Esc quit",
+            "click to look  WASD move  Q/E down/up  Shift boost  F1 hud  F2 weather"
+            + "  F3 shadows  F4 sun  P shot  Esc release/quit",
         ]
     )
