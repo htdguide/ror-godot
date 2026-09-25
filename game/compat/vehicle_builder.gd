@@ -77,6 +77,9 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         "error": "",
         "root": root,
         "actor": actor,
+        # How a rig-space point becomes a point in the vehicle's local space. Declared so
+        # checks can place rig coordinates without knowing how the frame is wired.
+        "rig_to_local": render_frame.affine_inverse(),
         "parts": parts,
         "wheels": wheels_built,
         "truck": truck,

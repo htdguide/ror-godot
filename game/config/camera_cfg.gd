@@ -55,6 +55,20 @@ const PRESETS: Dictionary = {
         # Empty stage: this framing has a vehicle as its subject.
         "props": false,
     },
+    # Straight down on the vehicle, so all four wheels project to separate points with
+    # nothing in front of them. Used by checks that sample rendered pixels at known
+    # positions, where an occluded sample would read as a missing part.
+    "diag_topdown": {
+        "pos": Vector3(0.0, 9.0, 0.0),
+        "look_at": Vector3(0.0, 0.0, 0.0),
+        "focal_mm": 35.0,
+        "f_stop": 8.0,
+        "shutter_s": 0.008,
+        "exposure": 1.0,
+        "scenario": "static",
+        "weather": "noon_clear",
+        "props": false,
+    },
     "diag_grid_wide": {
         "pos": Vector3(0.0, 24.0, 32.0),
         "look_at": Vector3(0.0, 0.0, 0.0),

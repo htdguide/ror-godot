@@ -12,11 +12,20 @@ extends GateBase
 ##   world = I * B * P   the documented composition
 ##   world = B * P       instance transform ignored for skinned meshes
 ##   world = I * P       bone transform ignored
+##
+## The instance transform here is a translation, which leaves the order of I and B
+## indistinguishable. Rotating it would separate them, but a rotated instance transform
+## makes the skinned point vanish from the frame entirely, which is the open problem
+## recorded in docs/architecture/bridge.md rather than something for this gate to chase.
 
 const PRESET: String = "diag_origin"
 const POINT: Vector3 = Vector3(0.0, 1.0, 0.0)
 const BONE_OFFSET: Vector3 = Vector3(1.5, 0.0, 0.0)
 const INSTANCE_OFFSET: Vector3 = Vector3(0.0, 0.0, 2.0)
+## Translation only. Adding a 90 degree yaw here makes the skinned point vanish from the
+## frame entirely — see docs/architecture/bridge.md, which is the open lead on the vehicle
+## frame. This gate establishes the composition; it is not the place to chase that.
+const INSTANCE_YAW_DEGREES: float = 0.0
 const SETTLE_FRAMES: int = 3
 const POINT_SIZE: float = 9.0
 ## Screen-space agreement required, in pixels. The candidates are metres apart, so they
@@ -51,7 +60,10 @@ func run(harness: Node) -> Dictionary:
     instance.mesh = mesh
     instance.material_override = _material()
     instance.custom_aabb = AABB(-Vector3.ONE * 50.0, Vector3.ONE * 100.0)
-    instance.transform = Transform3D(Basis.IDENTITY, INSTANCE_OFFSET)
+    var instance_transform: Transform3D = Transform3D(
+        Basis(Vector3.UP, deg_to_rad(INSTANCE_YAW_DEGREES)), INSTANCE_OFFSET
+    )
+    instance.transform = instance_transform
     harness.world.add_child(instance)
 
     var skeleton: RID = RenderingServer.skeleton_create()
@@ -72,10 +84,11 @@ func run(harness: Node) -> Dictionary:
         return fail("nothing rendered; artifact: %s" % shot["png"])
 
     var camera: Camera3D = harness.camera
+    var bone: Transform3D = Transform3D(Basis.IDENTITY, BONE_OFFSET)
     var candidates: Dictionary = {
-        "instance * bone * point": INSTANCE_OFFSET + BONE_OFFSET + POINT,
-        "bone * point": BONE_OFFSET + POINT,
-        "instance * point": INSTANCE_OFFSET + POINT,
+        "instance * bone * point": instance_transform * (bone * POINT),
+        "bone * point": bone * POINT,
+        "instance * point": instance_transform * POINT,
     }
     var matches: PackedStringArray = PackedStringArray()
     var report: PackedStringArray = PackedStringArray()

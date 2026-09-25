@@ -13,7 +13,11 @@ extends GateBase
 
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
-const PRESET: String = "hero_3q"
+const PRESET: String = "diag_topdown"
+## Radius, in pixels, searched around a projected position for the vehicle's own colour.
+## Generous enough to absorb projection rounding and a point's own size, far tighter than
+## the distances a misplaced part travels.
+const PIXEL_SEARCH_RADIUS: int = 14
 ## Millimetres for part vertices. Wheels are checked against their axle midpoint through
 ## the geometry that is actually drawn, and a rim mesh is not perfectly centred on its
 ## axle, so wheels get their own looser bound: this is about catching a part in the wrong
@@ -38,6 +42,156 @@ static func meta() -> Dictionary:
         "needs_gpu": true,
         "milestone": "M1",
     }
+
+
+## Paints the whole vehicle one unambiguous colour, so a sampled pixel answers "is the
+## vehicle here" without having to tell dark paint from a dark floor tile.
+const MARKER_COLOUR: Color = Color(1.0, 0.0, 1.0)
+
+
+func _paint(vehicle: Node3D, only_wheels: bool) -> void:
+    var shader: Shader = Shader.new()
+    shader.code = """
+shader_type spatial;
+render_mode unshaded, cull_disabled, shadows_disabled, fog_disabled;
+uniform vec3 marker = vec3(1.0, 0.0, 1.0);
+void fragment() { ALBEDO = marker; }
+"""
+    var material: ShaderMaterial = ShaderMaterial.new()
+    material.shader = shader
+    material.set_shader_parameter(
+        "marker", Vector3(MARKER_COLOUR.r, MARKER_COLOUR.g, MARKER_COLOUR.b)
+    )
+    for node: Node in _descendants(vehicle):
+        var mesh_instance: MeshInstance3D = node as MeshInstance3D
+        if mesh_instance == null:
+            continue
+        var is_wheel: bool = _under_wheel(mesh_instance)
+        mesh_instance.visible = is_wheel or not only_wheels
+        mesh_instance.material_override = material
+
+
+func _under_wheel(node: Node) -> bool:
+    var walk: Node = node
+    while walk != null:
+        if str(walk.name).begins_with("Wheel_"):
+            return true
+        walk = walk.get_parent()
+    return false
+
+
+func _descendants(node: Node) -> Array[Node]:
+    var out: Array[Node] = []
+    for child: Node in node.get_children():
+        out.append(child)
+        out.append_array(_descendants(child))
+    return out
+
+
+## Projects each wheel's axle midpoint and requires the vehicle to be rendered there.
+func _check_rendered_positions(
+    harness: Node,
+    vehicle: Node3D,
+    truck: TruckParser,
+    rig_to_local: Transform3D,
+    parts: Array[SkinnedFlexbody]
+) -> String:
+    _paint(vehicle, true)
+    # Centre the wheels under the camera. The transform checks above deliberately place
+    # the vehicle somewhere arbitrary to prove they do not depend on it; this pass reads
+    # pixels, so anything outside the frame would read as a missing part.
+    var centre: Vector3 = Vector3.ZERO
+    var count: int = 0
+    for wheel: Dictionary in truck.wheels:
+        centre += (
+            truck.nodes[wheel["node1"] as int] + truck.nodes[wheel["node2"] as int]
+        ) * 0.5
+        count += 1
+    if count > 0:
+        centre /= float(count)
+        vehicle.position -= vehicle.global_transform * (rig_to_local * centre)
+
+    var shot: Dictionary = await harness.capture_shot("vehicle_assembly", "static", 4)
+    if shot["error"] != "":
+        return shot["error"] as String
+    var image: Image = Image.load_from_file(shot["png"] as String)
+    if image == null:
+        return "cannot read %s" % shot["png"]
+
+    var camera: Camera3D = harness.camera
+    var missing: PackedStringArray = PackedStringArray()
+    var index: int = 0
+    for child: Node in vehicle.get_children():
+        if not str(child.name).begins_with("Wheel_"):
+            continue
+        var wheel: Dictionary = truck.wheels[index]
+        index += 1
+        var axle_mid: Vector3 = (
+            truck.nodes[wheel["node1"] as int] + truck.nodes[wheel["node2"] as int]
+        ) * 0.5
+        # Rig coordinates into the world, through the mapping the builder declares.
+        var world: Vector3 = vehicle.global_transform * (rig_to_local * axle_mid)
+        if camera.is_position_behind(world):
+            continue
+        if not _marker_near(image, camera.unproject_position(world)):
+            missing.append("%s at %s" % [child.name, world])
+    if missing.size() > 0:
+        return (
+            "no vehicle rendered where the rig puts %d of %d wheels (%s); artifact: %s"
+            % [missing.size(), index, ", ".join(missing), shot["png"]]
+        )
+
+    # Same question of the body. Checking only the wheels would miss the case where the
+    # wheels are right and the body is somewhere else, which looks identical in a still.
+    _paint(vehicle, false)
+    for node: Node in _descendants(vehicle):
+        var mesh_instance: MeshInstance3D = node as MeshInstance3D
+        if mesh_instance != null:
+            mesh_instance.visible = not _under_wheel(mesh_instance)
+    var body_shot: Dictionary = await harness.capture_shot("vehicle_assembly_body", "static", 4)
+    if body_shot["error"] != "":
+        return body_shot["error"] as String
+    var body_image: Image = Image.load_from_file(body_shot["png"] as String)
+    if body_image == null:
+        return "cannot read %s" % body_shot["png"]
+
+    var body_missing: int = 0
+    var body_checked: int = 0
+    var first_missing: String = ""
+    for part: SkinnedFlexbody in parts:
+        var step: int = maxi(part.vertex_count / 8, 1)
+        for i: int in range(0, part.vertex_count, step):
+            var world: Vector3 = vehicle.global_transform * (
+                rig_to_local * part.rest_vertices[i]
+            )
+            if camera.is_position_behind(world):
+                continue
+            body_checked += 1
+            if not _marker_near(body_image, camera.unproject_position(world)):
+                body_missing += 1
+                if first_missing == "":
+                    first_missing = "%s vertex %d at %s" % [part.mesh_instance.name, i, world]
+    if body_missing > 0:
+        return (
+            "no vehicle rendered where the rig puts %d of %d sampled body vertices"
+            % [body_missing, body_checked]
+            + " (first: %s); artifact: %s" % [first_missing, body_shot["png"]]
+        )
+    return ""
+
+
+func _marker_near(image: Image, at: Vector2) -> bool:
+    var size: Vector2i = image.get_size()
+    for dy: int in range(-PIXEL_SEARCH_RADIUS, PIXEL_SEARCH_RADIUS + 1):
+        for dx: int in range(-PIXEL_SEARCH_RADIUS, PIXEL_SEARCH_RADIUS + 1):
+            var x: int = int(at.x) + dx
+            var y: int = int(at.y) + dy
+            if x < 0 or y < 0 or x >= size.x or y >= size.y:
+                continue
+            var pixel: Color = image.get_pixel(x, y)
+            if pixel.r > 0.5 and pixel.b > 0.5 and pixel.g < 0.4:
+                return true
+    return false
 
 
 func run(harness: Node) -> Dictionary:
@@ -105,6 +259,15 @@ func run(harness: Node) -> Dictionary:
             if error_mm > worst_wheel_mm:
                 worst_wheel_mm = error_mm
                 worst_wheel_what = "%s/%s" % [child.name, mesh_instance.name]
+
+    # Everything above compares transforms against transforms, which cannot catch the
+    # renderer disagreeing with that model. This reads the rendered image: each wheel's
+    # axle midpoint is projected to screen, and the vehicle's own colour must be there.
+    var pixel_check: String = await _check_rendered_positions(
+        harness, vehicle, truck, result["rig_to_local"] as Transform3D, parts
+    )
+    if pixel_check != "":
+        return fail(pixel_check)
 
     if worst_wheel_mm > WHEEL_TOLERANCE_MM:
         return fail(
