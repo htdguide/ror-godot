@@ -1,5 +1,6 @@
 #include "register_types.h"
 
+#include "ogre_mesh.h"
 #include "ror_flex.h"
 
 #include <gdextension_interface.h>
@@ -14,6 +15,7 @@ void initialize_rorbridge_module(ModuleInitializationLevel p_level) {
         return;
     }
     GDREGISTER_CLASS(rorgd::RorFlex);
+    GDREGISTER_CLASS(rorgd::OgreMeshReader);
 }
 
 void uninitialize_rorbridge_module(ModuleInitializationLevel p_level) {
