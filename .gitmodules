@@ -1,3 +1,6 @@
 [submodule "vendor/rigs-of-rods"]
 	path = vendor/rigs-of-rods
 	url = https://github.com/RigsOfRods/rigs-of-rods.git
+[submodule "vendor/rigs-of-rods-recipe"]
+	path = vendor/rigs-of-rods-recipe
+	url = https://github.com/htdguide/rigs-of-rods-recipe.git

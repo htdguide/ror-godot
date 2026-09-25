@@ -20,6 +20,18 @@ has no corresponding record under `LICENSES/`.
 - Consequence: this project links GPL-3.0 code and is therefore GPL-3.0-or-later itself. Every
   dependency added from here on must be GPL-3.0-compatible.
 
+### Rigs of Rods recipe
+- Source: https://github.com/htdguide/rigs-of-rods-recipe
+- Location: `vendor/rigs-of-rods-recipe` (git submodule, shallow)
+- Licence: see the upstream repository; used as reference documentation only, never
+  linked or shipped.
+- Why: 342 markdown twins of the Rigs of Rods sources, explaining each file in prose and
+  pseudocode, with a SYSTEM-REQUIREMENTS document naming the external seams (renderer,
+  GUI, audio, scripting, sockets) and the 2 kHz soft-body floor. The flex and physics
+  directories alone carry 35 twins, which is exactly the map needed to separate the
+  solver from OGRE.
+- Cost if dropped: none technically; it is documentation.
+
 ### Terrain3D
 - Source: https://github.com/TokisanGames/Terrain3D (Godot asset library #3892)
 - Location: `addons/terrain_3d` (not yet installed)

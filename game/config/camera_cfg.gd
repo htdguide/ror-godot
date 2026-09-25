@@ -30,6 +30,17 @@ const PRESETS: Dictionary = {
         "scenario": "static",
         "weather": "noon_clear",
     },
+    # Frames the spike lattice, which spans roughly 9.6 x 4.8 x 8.0 metres.
+    "diag_lattice": {
+        "pos": Vector3(13.0, 9.0, 16.0),
+        "look_at": Vector3(4.8, 2.4, 4.0),
+        "focal_mm": 40.0,
+        "f_stop": 11.0,
+        "shutter_s": 0.008,
+        "exposure": 1.0,
+        "scenario": "static",
+        "weather": "spike_black",
+    },
     "diag_grid_wide": {
         "pos": Vector3(0.0, 24.0, 32.0),
         "look_at": Vector3(0.0, 0.0, 0.0),

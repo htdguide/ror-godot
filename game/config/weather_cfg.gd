@@ -21,6 +21,15 @@ const PRESETS: Dictionary = {
         "ambient_energy": 0.35,
         "bg_color": Color(0.42, 0.55, 0.72),
     },
+    # A black, unlit environment. Measurement gates encode numbers into pixels, so any
+    # ambient contribution would be added to the value being read back.
+    "spike_black": {
+        "sun_euler_deg": Vector3(-90.0, 0.0, 0.0),
+        "sun_energy": 0.0,
+        "sun_color": Color(0.0, 0.0, 0.0),
+        "ambient_energy": 0.0,
+        "bg_color": Color(0.0, 0.0, 0.0),
+    },
     "golden_dusk": {
         "sun_euler_deg": Vector3(-8.0, -110.0, 0.0),
         "sun_energy": 1.4,
