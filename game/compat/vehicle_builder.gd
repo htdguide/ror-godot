@@ -71,6 +71,8 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         root.add_child(node)
         prop_nodes.append(node)
 
+    var lamps: Array[Node3D] = FlareBuilder.build(root, truck, render_frame)
+
     var wheels_built: int = 0
     var wheel_nodes: Array[Node3D] = []
     for index: int in truck.wheels.size():
@@ -101,6 +103,8 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         "parts": parts,
         "wheel_nodes": wheel_nodes,
         "prop_nodes": prop_nodes,
+        "lamps": lamps,
+        "flares": lamps.size(),
         "props": prop_nodes.size(),
         "wheels": wheels_built,
         "truck": truck,
@@ -163,6 +167,8 @@ static func apply_pose(
     var prop_nodes: Array[Node3D] = built["prop_nodes"] as Array[Node3D]
     for i: int in mini(prop_nodes.size(), truck.props.size()):
         prop_nodes[i].transform = to_local * FlexbodyBinder.placement(nodes, truck.props[i])
+
+    FlareBuilder.apply_pose(built["lamps"] as Array[Node3D], truck, nodes, actor)
 
     # Wheels follow their own axle nodes, so suspension travel moves them.
     var wheel_nodes: Array[Node3D] = built["wheel_nodes"] as Array[Node3D]

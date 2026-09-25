@@ -66,6 +66,8 @@ var drivetrain: Dictionary = DriveRows.empty()
 ## One entry per `hydros` row: {beam: int, factor: float}. `beam` indexes `beams`, so the
 ## solver can find the beam a steering ram actuates without re-deriving it.
 var hydros: Array[Dictionary] = []
+## One entry per `flares` row: the vehicle's lamps. See FlareRows.
+var flares: Array[Dictionary] = []
 ## One entry per beam that has a travel limit rather than being a plain spring: shocks, ropes
 ## and support beams. {beam, bound, short_bound, long_bound, bound_spring, bound_damp,
 ## precompression}. Without these a shock is a soft spring with no bump stop, so a suspension
@@ -214,6 +216,8 @@ func _parse_row(line: String) -> void:
             _cameras.read_cinecam(TruckLexer.fields(line))
         "axles", "interaxles":
             has_axles = true
+        "flares", "flares2":
+            _parse_flare(line)
         _:
             if DriveRows.handles(_section):
                 var error: String = DriveRows.read(_section, TruckLexer.fields(line), drivetrain)
@@ -296,17 +300,14 @@ func _parse_mesh_wheel(line: String) -> void:
     wheels.append(row)
 
 
-## Rows are "name effect texture...". A "-" stands for an absent texture.
 func _parse_managed_material(line: String) -> void:
-    var fields: PackedStringArray = TruckLexer.fields(line)
-    if fields.size() < 3:
-        errors.append("managedmaterial row with %d fields: %s" % [fields.size(), line])
+    var row: Dictionary = MaterialRows.row(TruckLexer.fields(line))
+    if (row["error"] as String) != "":
+        errors.append("managedmaterial %s: %s" % [row["error"], line])
         return
-    var textures: PackedStringArray = PackedStringArray()
-    for i: int in range(2, fields.size()):
-        if fields[i] != "-":
-            textures.append(fields[i])
-    managed_materials[fields[0]] = {"effect": fields[1], "textures": textures}
+    managed_materials[row["name"] as String] = {
+        "effect": row["effect"], "textures": row["textures"]
+    }
 
 
 ## Rows are "ref,x,y, offsetx,offsety,offsetz, rotx,roty,rotz, mesh", each optionally
@@ -379,6 +380,15 @@ func _joint_length(fields: PackedStringArray) -> float:
     if a < 0 or b < 0:
         return 0.0
     return nodes[a].distance_to(nodes[b])
+
+
+func _parse_flare(line: String) -> void:
+    var row: Dictionary = FlareRows.row(TruckLexer.fields(line), _node_id_to_index)
+    if (row["error"] as String) != "":
+        errors.append("flare %s: %s" % [row["error"], line])
+        return
+    row.erase("error")
+    flares.append(row)
 
 
 func _parse_cab(line: String) -> void:

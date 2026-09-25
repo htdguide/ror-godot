@@ -19,6 +19,7 @@ var _brake: float = 0.0
 var _substep_remainder: float = 0.0
 var _solver_usec: int = 0
 var _selector: int = 1
+var _lit: bool = false
 
 
 ## Returns "" on success. `built` is a VehicleBuilder result.
@@ -79,6 +80,10 @@ func on_key(keycode: Key) -> bool:
             else:
                 solver.start_engine()
             print("DRIVE  engine %s" % ("running" if solver.engine_running() else "off"))
+        KEY_L:
+            _lit = not _lit
+            FlareBuilder.set_lit(_built["lamps"] as Array[Node3D], truck, _lit)
+            print("DRIVE  lights %s" % ("on" if _lit else "off"))
         KEY_BACKSPACE:
             _respawn()
         _:
@@ -100,8 +105,11 @@ func hud_line() -> String:
             solver.road_speed() * 3.6,
             solver.engine_torque(),
         ]
-        + "throttle %.2f  brake %.2f  steer %+.2f  solver %.2f ms"
-        % [_throttle, _brake, solver.steer_state(), float(_solver_usec) / 1000.0]
+        + "throttle %.2f  brake %.2f  steer %+.2f  lights %s  solver %.2f ms"
+        % [
+            _throttle, _brake, solver.steer_state(), "on" if _lit else "off",
+            float(_solver_usec) / 1000.0,
+        ]
     )
 
 

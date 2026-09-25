@@ -33,6 +33,6 @@ const CHASE_SMOOTHING: float = 0.15
 ## The keys the driver uses. Named so the help text and the handling cannot disagree.
 const HELP: String = (
     "DRIVE  Up throttle, Down brake, Left/Right steer, Space handbrake\n"
-    + "DRIVE  R reverse, N neutral, G drive, I ignition, Backspace respawn\n"
+    + "DRIVE  R reverse, N neutral, G drive, I ignition, L lights, Backspace respawn\n"
     + "DRIVE  F5 chase camera, F6 free camera"
 )
