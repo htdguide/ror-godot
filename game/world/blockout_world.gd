@@ -19,14 +19,17 @@ const CHECKER_CELLS: int = 16
 const SHADOW_MAX_DISTANCE: float = 120.0
 
 
-static func build(weather: Dictionary) -> Node3D:
+static func build(weather: Dictionary, include_props: bool = true) -> Node3D:
     var root: Node3D = Node3D.new()
     root.name = "BlockoutWorld"
     root.add_child(_build_environment(weather))
     root.add_child(_build_sun(weather))
     root.add_child(_build_ground())
-    for node: Node3D in _build_props():
-        root.add_child(node)
+    # A shot with a subject of its own wants an empty stage: the scale props are there to
+    # give an empty frame something to measure, not to share the frame with a vehicle.
+    if include_props:
+        for node: Node3D in _build_props():
+            root.add_child(node)
     return root
 
 

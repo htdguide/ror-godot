@@ -25,6 +25,10 @@ var submesh_count: int = 0
 ## forset: PackedInt32Array}. A flexbody binds an external OGRE mesh to a subset of the
 ## rig's nodes, which is the path ADR 0002 covers.
 var flexbodies: Array[Dictionary] = []
+## name -> {effect, textures: PackedStringArray}. The legacy material declaration, which
+## carries more than it is usually credited with: an explicit transparency effect, and a
+## specular map that is a real roughness source rather than a guess from diffuse luma.
+var managed_materials: Dictionary = {}
 var sections_seen: Dictionary = {}
 var sections_parsed: Dictionary = {}
 var errors: PackedStringArray = PackedStringArray()
@@ -116,6 +120,8 @@ func _parse_row(line: String) -> void:
             _parse_cab(line)
         "flexbodies":
             _parse_flexbody(line)
+        "managedmaterials":
+            _parse_managed_material(line)
         _:
             return
     sections_parsed[_section] = int(sections_parsed.get(_section, 0)) + 1
@@ -168,6 +174,19 @@ func _parse_texcoord(line: String) -> void:
         return
     texcoord_nodes.append(node)
     texcoords.append(Vector2(fields[1].to_float(), fields[2].to_float()))
+
+
+## Rows are "name effect texture...". A "-" stands for an absent texture.
+func _parse_managed_material(line: String) -> void:
+    var fields: PackedStringArray = _fields(line)
+    if fields.size() < 3:
+        errors.append("managedmaterial row with %d fields: %s" % [fields.size(), line])
+        return
+    var textures: PackedStringArray = PackedStringArray()
+    for i: int in range(2, fields.size()):
+        if fields[i] != "-":
+            textures.append(fields[i])
+    managed_materials[fields[0]] = {"effect": fields[1], "textures": textures}
 
 
 ## Rows are "ref,x,y, offsetx,offsety,offsetz, rotx,roty,rotz, mesh", each optionally

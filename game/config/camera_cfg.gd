@@ -41,6 +41,20 @@ const PRESETS: Dictionary = {
         "scenario": "static",
         "weather": "spike_black",
     },
+    # Three-quarter front view of the hero vehicle, the framing that shows body, glass
+    # and wheel arch in one image.
+    "hero_3q": {
+        "pos": Vector3(4.2, 1.9, 4.6),
+        "look_at": Vector3(0.0, 0.9, 0.0),
+        "focal_mm": 50.0,
+        "f_stop": 5.6,
+        "shutter_s": 0.008,
+        "exposure": 1.0,
+        "scenario": "static",
+        "weather": "noon_clear",
+        # Empty stage: this framing has a vehicle as its subject.
+        "props": false,
+    },
     "diag_grid_wide": {
         "pos": Vector3(0.0, 24.0, 32.0),
         "look_at": Vector3(0.0, 0.0, 0.0),

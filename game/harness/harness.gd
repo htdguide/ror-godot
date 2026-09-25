@@ -62,7 +62,9 @@ func _build_world(scenario: String, weather: String) -> String:
         return "unknown scenario '%s'; known: %s" % [scenario, Scenarios.names()]
     if not WeatherCfg.has(weather):
         return "unknown weather preset '%s'" % weather
-    world = BlockoutWorld.build(WeatherCfg.get_preset(weather))
+    world = BlockoutWorld.build(
+        WeatherCfg.get_preset(weather), bool(preset.get("props", true))
+    )
     _main.add_child(world)
     camera = _build_camera(preset)
     world.add_child(camera)
