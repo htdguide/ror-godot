@@ -1,0 +1,3 @@
+[submodule "vendor/rigs-of-rods"]
+	path = vendor/rigs-of-rods
+	url = https://github.com/RigsOfRods/rigs-of-rods.git

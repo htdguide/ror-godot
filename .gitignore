@@ -1,0 +1,29 @@
+# Godot
+.godot/
+*.translation
+export_presets.cfg
+.import/
+
+# Build output
+build/
+bin/
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.pdb
+.sconsign.dblite
+.scons_cache/
+
+# Harness artifacts: disposable and bounded (see docs/guides/harness.md)
+artifacts/
+
+# macOS
+.DS_Store
+._*
+
+# Editors
+.vscode/
+.idea/
+*.swp
