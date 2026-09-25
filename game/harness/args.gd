@@ -13,7 +13,7 @@ const KNOWN_VALUE_KEYS: Array[String] = [
 ]
 
 const KNOWN_FLAGS: Array[String] = [
-    "deterministic", "play", "update-golden", "list", "hud", "verbose",
+    "deterministic", "play", "update-golden", "list", "hud", "verbose", "terrain",
 ]
 
 var values: Dictionary = {}

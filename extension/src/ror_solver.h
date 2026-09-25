@@ -2,6 +2,7 @@
 
 #include "ror_drivetrain.h"
 #include "ror_ground.h"
+#include "ror_heightfield.h"
 #include "ror_node.h"
 #include "ror_steering.h"
 #include "ror_wheels.h"
@@ -47,6 +48,17 @@ public:
     // A flat hard ground at `height`. Upstream's contact law, not a penalty spring: see
     // ror_ground.h for why that distinction decides whether a rig is stable.
     void set_ground(float height, bool enabled);
+    // Stands the rig on a grid of heights instead of a flat plane. `heights` is row-major,
+    // `depth` rows of `width`, sampled every `spacing` metres from `origin`. Returns false if
+    // the dimensions do not match the data. Clearing it returns the rig to the flat plane.
+    bool set_heightfield(const godot::PackedFloat32Array &heights, int width, int depth,
+                         const godot::Vector3 &origin, float spacing);
+    void clear_heightfield();
+    // Ground height and surface normal where the solver believes they are. The terrain that
+    // is drawn and the terrain that is collided against have to agree, and this is the side
+    // of that comparison the solver owns.
+    float ground_height_at(const godot::Vector3 &position) const;
+    godot::Vector3 ground_normal_at(const godot::Vector3 &position) const;
     // The friction surface. Defaults to upstream's `concrete`.
     void set_ground_friction(float adhesion_velocity, float static_friction, float sliding_friction,
                              float hydrodynamic_friction, float stribeck_velocity, float strength);
@@ -135,6 +147,7 @@ private:
     RorDrivetrain m_drivetrain;
     RorSteering m_steering;
     RorGroundModel m_ground_model;
+    RorHeightfield m_heightfield;
     godot::Vector3 m_gravity = godot::Vector3(0.0f, -9.81f, 0.0f);
     float m_ground_height = 0.0f;
     bool m_ground_enabled = false;

@@ -36,6 +36,20 @@ func setup(built: Dictionary) -> String:
     return ""
 
 
+## Stands the rig on a terrain instead of the flat plane. Returns "" on success.
+func use_terrain(data: Object) -> String:
+    var applied: String = TerrainHeightfield.apply(
+        solver, data, TerrainCfg.ORIGIN, TerrainCfg.MAP_SIZE, TerrainCfg.MAP_SIZE,
+        TerrainCfg.VERTEX_SPACING
+    )
+    if applied != "":
+        return applied
+    # Put the rig down on the surface rather than where the flat plane used to be, or it
+    # spawns inside a hillside and is fired out of it.
+    _respawn()
+    return ""
+
+
 func step(delta: float) -> void:
     _read_controls(delta)
     # Substeps follow wall-clock time rather than a fixed count per frame, so the rig
@@ -145,7 +159,9 @@ func _respawn() -> void:
     var lowest: float = INF
     for node: Vector3 in truck.nodes:
         lowest = minf(lowest, node.y)
-    var lift: Vector3 = Vector3(0.0, DriveCfg.SPAWN_HEIGHT_M - lowest, 0.0)
+    # On terrain the spawn height is relative to the ground under the rig, not to zero.
+    var ground: float = solver.ground_height_at(Vector3.ZERO)
+    var lift: Vector3 = Vector3(0.0, ground + DriveCfg.SPAWN_HEIGHT_M - lowest, 0.0)
     for i: int in truck.nodes.size():
         solver.set_node_position(i, truck.nodes[i] + lift)
         solver.set_node_velocity(i, Vector3.ZERO)

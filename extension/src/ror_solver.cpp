@@ -247,20 +247,49 @@ void RorSolver::apply_bound_law(const RorBeam &beam, float extension, float &spr
     }
 }
 
+bool RorSolver::set_heightfield(const PackedFloat32Array &heights, int width, int depth,
+                                const Vector3 &origin, float spacing) {
+    return m_heightfield.set_field(heights, width, depth, origin, spacing);
+}
+
+void RorSolver::clear_heightfield() {
+    m_heightfield.clear();
+}
+
+float RorSolver::ground_height_at(const Vector3 &position) const {
+    if (!m_heightfield.enabled()) {
+        return m_ground_height;
+    }
+    return m_heightfield.height_at(position);
+}
+
+Vector3 RorSolver::ground_normal_at(const Vector3 &position) const {
+    if (!m_heightfield.enabled()) {
+        return Vector3(0.0f, 1.0f, 0.0f);
+    }
+    return m_heightfield.normal_at(position);
+}
+
 void RorSolver::apply_ground_contact(float dt) {
     if (!m_ground_enabled || dt <= 0.0f) {
         return;
     }
-    const Vector3 normal(0.0f, 1.0f, 0.0f);
+    const bool sloped = m_heightfield.enabled();
+    const Vector3 flat_normal(0.0f, 1.0f, 0.0f);
     for (RorNode &node : m_nodes) {
         if (node.immovable) {
             continue;
         }
-        const float penetration = m_ground_height - static_cast<float>(node.position.y);
+        const float ground = sloped ? m_heightfield.height_at(node.position) : m_ground_height;
+        const float penetration = ground - static_cast<float>(node.position.y);
         if (penetration < 0.0f) {
             continue;
         }
         node.ground_contact = true;
+        // On a slope the reaction has to resolve along the surface, not along the world's
+        // vertical: a hill the rig cannot climb and a hill it slides down are both what
+        // happens when contact is resolved straight up.
+        const Vector3 normal = sloped ? m_heightfield.normal_at(node.position) : flat_normal;
         node.forces += ground_contact_force(node, normal, penetration, dt, m_ground_model);
     }
 }

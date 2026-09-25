@@ -203,6 +203,11 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_ground_friction", "adhesion_velocity", "static_friction",
                                   "sliding_friction", "hydrodynamic_friction", "stribeck_velocity", "strength"),
                          &RorSolver::set_ground_friction);
+    ClassDB::bind_method(D_METHOD("set_heightfield", "heights", "width", "depth", "origin", "spacing"),
+                         &RorSolver::set_heightfield);
+    ClassDB::bind_method(D_METHOD("clear_heightfield"), &RorSolver::clear_heightfield);
+    ClassDB::bind_method(D_METHOD("ground_height_at", "position"), &RorSolver::ground_height_at);
+    ClassDB::bind_method(D_METHOD("ground_normal_at", "position"), &RorSolver::ground_normal_at);
     ClassDB::bind_method(D_METHOD("set_air_drag", "coefficient", "enabled"), &RorSolver::set_air_drag);
     ClassDB::bind_method(D_METHOD("set_node_immovable", "node", "immovable"), &RorSolver::set_node_immovable);
     ClassDB::bind_method(D_METHOD("set_node_position", "node", "position"), &RorSolver::set_node_position);

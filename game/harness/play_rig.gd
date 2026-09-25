@@ -27,6 +27,8 @@ var _frames: int = 0
 var _shots: int = 0
 var _drive: PlayDrive = null
 var _chasing: bool = false
+var _terrain: Node3D = null
+var _terrain_pending: bool = false
 
 
 ## `vehicle` is a VehicleBuilder result, or empty when no vehicle was loaded. With one, the
@@ -48,7 +50,42 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
         else:
             _drive = drive
             _chasing = true
+    _build_terrain()
     _print_help()
+
+
+## Adds the valley, when this session asked for one and Terrain3D is installed. It cannot be
+## populated yet: a Terrain3D has no data until it has been inside a World3D for a frame.
+func _build_terrain() -> void:
+    if not Harness.args.has_flag("terrain"):
+        return
+    _terrain = ValleyTerrain.create()
+    if _terrain == null:
+        printerr("PLAY  --terrain asked for, but Terrain3D is not installed."
+            + " Run tools/build_terrain3d.sh")
+        return
+    _world.add_child(_terrain)
+    _terrain_pending = true
+
+
+func _populate_terrain() -> void:
+    _terrain_pending = false
+    var error: String = ValleyTerrain.populate(_terrain)
+    if error != "":
+        printerr("PLAY  the terrain could not be built: " + error)
+        return
+    # The flat plane would otherwise sit inside the valley floor and the rig would rest on
+    # whichever happened to be higher.
+    var ground: MeshInstance3D = _world.get_node_or_null(^"Ground") as MeshInstance3D
+    if ground != null:
+        ground.visible = false
+    if _drive == null:
+        return
+    error = _drive.use_terrain(_terrain.get("data"))
+    if error != "":
+        printerr("PLAY  the solver could not take the terrain: " + error)
+        return
+    print("PLAY  driving on the valley")
 
 
 func _build_hud() -> Label:
@@ -80,6 +117,8 @@ func _print_help() -> void:
 
 
 func _process(delta: float) -> void:
+    if _terrain_pending and _frames > 1:
+        _populate_terrain()
     if _drive != null:
         _drive.step(delta)
         if _chasing:
