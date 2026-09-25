@@ -79,30 +79,45 @@ otherwise score as perfect.
 Not yet verified: that motion vectors follow from Godot's previous-bone-pose path. That is
 M3's `mv_correctness` gate, and until it passes the claim stays an expectation.
 
+## Transform composition, measured
+
+For a `MeshInstance3D` with a skeleton attached through
+`RenderingServer.instance_attach_skeleton`, the engine composes:
+
+    world = instance_global_transform * bone_transform * vertex
+
+This is measured, not assumed. `skinning_transform_semantics` renders one vertex with one
+bone and one instance transform, and compares the rendered pixel against each candidate
+composition: the documented one lands within 1 pixel, while "instance ignored" and "bone
+ignored" are 319 and 227 pixels away. It was written because inference from assembled
+vehicle renders produced a contradiction, and guessing at engine semantics from a complex
+scene is how a wrong convention gets baked in permanently.
+
+Also verified by readback: `SkinnedFlexbody.set_pose` writes exactly `T^-1 * F_current *
+F_bind^-1`, confirmed against `RenderingServer.skeleton_bone_get_transform`.
+
 ## Open: applying the actor frame in the render path
 
-The frame itself is verified. `actor_frame_rigid_motion` shows rigid vehicle motion
-appearing in the frame while actor-local bone transforms stay put to within 4e-6, against
-a deformation response five orders of magnitude larger.
+The frame's own algebra is verified by `actor_frame_rigid_motion`: rigid vehicle motion
+appears in the frame while actor-local bone transforms stay put to within 4e-6, against a
+deformation response five orders of magnitude larger.
 
-Wiring it into the render path is a separate matter and is **not done**. Putting the frame
-on the vehicle root while expressing bones and wheel placements in actor-local space
-should be a no-op by construction — `T * (T^-1 * v)` is `v` — and it is not: the body and
-the wheels separate by roughly half a metre, consistently, while both are individually
-correct when the frame is identity.
+Wiring it into the render path is still **not done**. An earlier attempt produced a
+vehicle whose body and wheels sat about half a metre apart. With the composition and the
+bone writes since measured and both correct, that failure is most likely a transient state
+during editing — the root left at identity while wheel placements still carried `T^-1` —
+rather than anything about the engine. It could not be reproduced in the current tree.
 
-Rather than ship a transform that is half understood, the render path stays in rig space
-and the frame is computed but unused there. Two things are known and worth writing down
-for whoever picks this up:
+That is a reason to redo the wiring as one atomic change, with a gate that checks assembly
+numerically: body and wheel world positions must agree with the rig positions they came
+from, to a tolerance in millimetres. The eye cannot tell a correctly assembled truck from
+one whose parts share a consistent error, which is exactly what a whole-vehicle transform
+mistake looks like.
 
-- With `ActorFrame.of()` forced to identity, the full vehicle renders correctly: body,
-  wheels in their arches, everything. So the skinning path and the wheel path are each
-  right on their own.
-- The frame's own orientation convention was wrong once already and is now fixed:
-  upstream's `cameras` section names a centre, a node *behind* it and a node to its
-  *left*, so the roll node must be negated to give Godot's +X. Taking it directly leaves a
-  right-handed basis rotated half a turn, and the vehicle renders upside down — which is
-  what it did.
+The frame's orientation convention was wrong once and is fixed: upstream's `cameras`
+section names a centre, a node *behind* it and a node to its *left*, so the roll node must
+be negated to give Godot's +X. Taking it directly leaves a right-handed basis rotated half
+a turn, and the vehicle renders upside down — which it did.
 
 ## Still to build
 
