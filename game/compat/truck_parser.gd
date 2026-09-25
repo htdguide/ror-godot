@@ -21,6 +21,10 @@ var cab_triangles: PackedInt32Array = PackedInt32Array()
 var texcoord_nodes: PackedInt32Array = PackedInt32Array()
 var texcoords: PackedVector2Array = PackedVector2Array()
 var submesh_count: int = 0
+## One entry per flexbody: {ref, nx, ny, offset: Vector3, rot_deg: Vector3, mesh: String,
+## forset: PackedInt32Array}. A flexbody binds an external OGRE mesh to a subset of the
+## rig's nodes, which is the path ADR 0002 covers.
+var flexbodies: Array[Dictionary] = []
 var sections_seen: Dictionary = {}
 var sections_parsed: Dictionary = {}
 var errors: PackedStringArray = PackedStringArray()
@@ -110,6 +114,8 @@ func _parse_row(line: String) -> void:
             _parse_texcoord(line)
         "cab":
             _parse_cab(line)
+        "flexbodies":
+            _parse_flexbody(line)
         _:
             return
     sections_parsed[_section] = int(sections_parsed.get(_section, 0)) + 1
@@ -162,6 +168,59 @@ func _parse_texcoord(line: String) -> void:
         return
     texcoord_nodes.append(node)
     texcoords.append(Vector2(fields[1].to_float(), fields[2].to_float()))
+
+
+## Rows are "ref,x,y, offsetx,offsety,offsetz, rotx,roty,rotz, mesh", each optionally
+## followed by "forset <ranges>" lines naming the nodes the mesh may bind to.
+func _parse_flexbody(line: String) -> void:
+    if line.begins_with("forset"):
+        if flexbodies.is_empty():
+            errors.append("forset before any flexbody: %s" % line)
+            return
+        var last: Dictionary = flexbodies[flexbodies.size() - 1]
+        last["forset"] = _parse_forset(line.substr("forset".length()))
+        return
+    var fields: PackedStringArray = _fields(line)
+    if fields.size() < 10:
+        errors.append("flexbody row with %d fields: %s" % [fields.size(), line])
+        return
+    var ref: int = _node_index(fields[0])
+    var nx: int = _node_index(fields[1])
+    var ny: int = _node_index(fields[2])
+    if ref < 0 or nx < 0 or ny < 0:
+        errors.append("flexbody references unknown node: %s" % line)
+        return
+    flexbodies.append({
+        "ref": ref,
+        "nx": nx,
+        "ny": ny,
+        "offset": Vector3(fields[3].to_float(), fields[4].to_float(), fields[5].to_float()),
+        "rot_deg": Vector3(fields[6].to_float(), fields[7].to_float(), fields[8].to_float()),
+        "mesh": fields[9],
+        "forset": PackedInt32Array(),
+    })
+
+
+## "0-91", "0,5,7-9": ranges are inclusive and refer to node ids, not indices.
+func _parse_forset(spec: String) -> PackedInt32Array:
+    var out: PackedInt32Array = PackedInt32Array()
+    for part: String in spec.replace(" ", ",").split(","):
+        var token: String = part.strip_edges()
+        if token.is_empty():
+            continue
+        var dash: int = token.find("-", 1)
+        if dash > 0:
+            var first: int = _node_index(token.substr(0, dash))
+            var last: int = _node_index(token.substr(dash + 1))
+            if first < 0 or last < 0:
+                continue
+            for i: int in range(first, last + 1):
+                out.append(i)
+        else:
+            var single: int = _node_index(token)
+            if single >= 0:
+                out.append(single)
+    return out
 
 
 func _parse_cab(line: String) -> void:
