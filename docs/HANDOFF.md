@@ -12,48 +12,66 @@ Read `docs/PLAN.md` first — it is the approved plan and it is authoritative. T
 
 ## Where things stand
 
-HEAD is `d34619e`. `./tools/gate.sh --all` is green across 34 gates; run it before you start so
-you know that is still true. The hero asset is an unmodified community mod at
+HEAD is `581f8b8`. `./tools/gate.sh --all` is green across 40 gates; run it before you start
+so you know that is still true. The hero asset is an unmodified community mod at
 `assets/mods/ChevyS1023` (`S10offroad.truck`), loaded through the compatibility shim with no
 conversion step.
 
 Working today: OGRE `.mesh` reading, DDS textures, PBR materials derived from
 `managedmaterials`, flexbodies skinned to solver nodes through `RenderingServer` skeletons,
-rigid props, generated wheel tread, and a symplectic-Euler node/beam solver in a C++
-GDExtension. The truck loads, renders, skins, deforms, settles on its tyres and keeps its
-doors on.
+rigid props, generated wheel tread, and a node/beam solver in a C++ GDExtension that the
+truck actually drives on. `tools/play.sh --truck` opens a window and hands over the
+controls: throttle, brakes, steering, gears, a chase camera and a HUD.
 
-Not working yet: nothing drives. The solver never runs in the interactive window, there is no
-engine, no wheel torque, no steering actuation, and no terrain beyond an infinite checkerboard
-ground plane.
+The solver has the force sources a driven rig needs, each a port of upstream's own law and
+each in its own file: ground contact with static and Stribeck friction (`ror_ground`), wheel
+torque and braking (`ror_wheels`), engine, gearbox and clutch (`ror_drivetrain`), steering
+through hydro rest length (`ror_steering`), per-node air drag, and travel bounds for shocks,
+ropes and support beams.
+
+**The 2 kHz gap is closed.** The rig settles at upstream's own rate and diverges at 1.5 kHz;
+`game/tools/stability_probe.gd` measures it by sweeping. Neither suspect named in the last
+handoff was the cause. Node masses did most of it (10 kHz to 3 kHz): the hero truck states a
+weight on all 250 of its nodes and they were all being floored to minimass. Applying
+`set_beam_defaults_scale` did the rest (3 kHz to 2 kHz). Air drag changed the stability floor
+not at all, though it halves the residual ringing.
+
+Terrain3D is adopted, pinned at `v1.0.2-stable`, built by `tools/build_terrain3d.sh` and
+proven to load on Godot 4.7. There is no terrain yet — only an infinite checkerboard ground
+plane.
 
 ## What to do next
 
-**1. Make it drive.** This is M1's human gate and it blocks judging anything visual, because
-everything visual gets judged in motion. Needed:
+**1. Build the terrain.** Terrain3D is installed but nothing uses it. A bare `Terrain3D` node
+has a null `data` and a null collision object until its data directory is set, so start
+there. Then `tools/import_dem.gd` (DEM to height/control/colour images through
+`Terrain3DData.import_images`), collision mode `Disabled`, and
+`res://compat/terrain3d_collision_bridge.gd` wrapping `get_height` / `get_normal` behind the
+height-query interface the solver's ground contact needs — bulk region access, not per-wheel
+scalar calls. `ror_ground` already takes a surface normal per node, so a sloped terrain needs
+no new force law, only a real height and normal to hand it. Valley One's layout is in
+PLAN §0.5.
 
-- Step the solver per frame in `game/harness/play_rig.gd`, driving the mesh through
-  `VehicleBuilder.apply_pose`.
-- Torque on the propelled wheels' tread nodes, brakes, and steering from the `hydros` factor.
-  `hydros` and `commands2` are parsed as plain beams today — structurally correct, functionally
-  inert, so the steering rams hold the rack but do not steer it.
-- Controls and a HUD readout in the play window.
-
-**2. Close the 2 kHz gap.** The hero rig needs 10 kHz to stay stable; at 2 kHz it goes NaN,
-and upstream runs 2 kHz. The suspects, in order: node mass is the minimass floor everywhere
-instead of being derived from beam volume; there is no air drag; and shocks, ropes, supports
-and command beams are modelled as plain springs rather than with their own force laws and
-travel bounds. Until this closes every gate pays five times the substeps it should.
-
-**3. Terrain.** Terrain3D (asset library #3892, MIT) is approved in the plan but not installed.
-Ask the user before pulling it in — the approval-before-adoption rule in `docs/PLAN.md` §0 is
-procedural and applies even to things the plan already names.
-
-**4. M2 leftovers.** Per-actor `ReflectionProbe`, a ground material worth looking at, and the
+**2. M2 leftovers.** Per-actor `ReflectionProbe`, a ground material worth looking at, and the
 eight money shots under the weather presets.
 
-**5. Small and visible.** The `flares` section (12 entries on the hero truck) is unparsed, so
+**3. Small and visible.** The `flares` section (12 entries on the hero truck) is unparsed, so
 headlights and tail lights are texture only with no actual lamps.
+
+**4. Fidelity gaps that are named rather than forgotten.**
+
+- The hero truck declares a `fusedrag` section. Upstream gives such a rig a single fuselage
+  drag vector instead of the per-node drag it currently gets.
+- `contacters` (79 rows) is unparsed, so every node collides with the ground rather than the
+  ones the file nominates.
+- Differentials are not modelled. The hero rig's are all split, and a split differential
+  chain reduces to the division `ror_wheels` already does, so this is invisible on this rig
+  and wrong on one with locked or open diffs.
+- `commands2` beams hold the doors but are not key-driven, so the doors do not open.
+- Beam deformation and breaking are not implemented.
+- Traction control and ABS are not implemented; neither is declared by the hero rig. At full
+  throttle it breaks traction and the wheels run away, which is what a 4WD truck with 11 kNm
+  at the wheels does on concrete, but with no drag or TC to bound it the spin is unphysical.
 
 ## How to work here
 
@@ -89,6 +107,22 @@ gates need a real window, and `tools/gate.sh` refuses to run while one is open.
 
 ## Facts that cost time to establish — do not re-derive them
 
+- **Read the file before believing anything about a rig.** The hero truck states its own node
+  masses, its own torque curve by name, its own wheel drive flags and its own beam scale. Four
+  separate faults this session were the parser ignoring something the file said, not the
+  physics being wrong. `game/tools/rig_report.gd` prints what a file actually declares.
+- **Axle nodes must be ordered so the first has the smaller z**, which upstream does at spawn
+  and files do not. Stated outer-node-first on both sides — as the hero truck does — the axis
+  vector points outward on one side of the rig and inward on the other, so the same torque
+  drives the left wheels forward and the right wheels backward. It cost 4.70 m of travel with
+  3.41 m of it sideways; ordered, the same run does 105 m straight.
+- **A directive keyword has to end at a separator.** `set_beam_defaults_scale` begins with
+  `set_beam_defaults`, and matched on the prefix it was read as one, with `_scale` as its
+  first argument — which parses as a spring of 0 N/m.
+- **A lone bare word is not always a section header.** The hero truck's `torquecurve` body is
+  the single word `gas`, naming one of upstream's predefined models; `author`, `fileinfo` and
+  `guid` are keywords belonging to no section at all. Its `guid` line, read as a `globals`
+  row, parsed as a cargo mass of 4.1e147 kg.
 - **Winding.** The OGRE reader reverses every triangle and leaves the vertex normals exactly as
   authored. Measured in the file, index order and the authored normals agree on 99–100% of
   triangles, which reads as "do not touch it" — but in file order the vehicle is culled from
