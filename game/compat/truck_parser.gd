@@ -219,7 +219,9 @@ func _parse_row(line: String) -> void:
         "cinecam":
             _parse_cinecam(line)
         _:
-            return
+            if not BeamRows.handles(_section):
+                return
+            _parse_joint(line)
     sections_parsed[_section] = int(sections_parsed.get(_section, 0)) + 1
 
 
@@ -272,15 +274,12 @@ func _parse_beam_defaults(line: String) -> void:
 
 
 func _parse_texcoord(line: String) -> void:
-    var fields: PackedStringArray = _fields(line)
-    if fields.size() < 3:
+    var row: Dictionary = CabRows.texcoord(_fields(line), _node_id_to_index)
+    if (row["error"] as String) != "":
+        errors.append("texcoord %s: %s" % [row["error"], line])
         return
-    var node: int = _node_index(fields[0])
-    if node < 0:
-        errors.append("texcoord references unknown node: %s" % line)
-        return
-    texcoord_nodes.append(node)
-    texcoords.append(Vector2(fields[1].to_float(), fields[2].to_float()))
+    texcoord_nodes.append(row["node"] as int)
+    texcoords.append(row["uv"] as Vector2)
 
 
 ## "x, y, z, node1..node8, spring, damp" — only the position is needed here.
@@ -371,13 +370,25 @@ func _parse_prop(line: String) -> void:
     props.append(row)
 
 
-func _parse_cab(line: String) -> void:
-    var fields: PackedStringArray = _fields(line)
-    if fields.size() < 3:
+## Sections that declare a beam without being called `beams`.
+func _parse_joint(line: String) -> void:
+    if not BeamRows.handles(_section):
         return
-    for i: int in 3:
-        var node: int = _node_index(fields[i])
-        if node < 0:
-            errors.append("cab references unknown node: %s" % line)
-            return
-        cab_triangles.append(node)
+    var row: Dictionary = BeamRows.joint(
+        _section, _fields(line), _node_id_to_index, _beam_spring, _beam_damp
+    )
+    if (row["error"] as String) != "":
+        errors.append("%s %s: %s" % [_section, row["error"], line])
+        return
+    beams.append(row["a"] as int)
+    beams.append(row["b"] as int)
+    beam_spring.append(row["spring"] as float)
+    beam_damp.append(row["damp"] as float)
+
+
+func _parse_cab(line: String) -> void:
+    var row: Dictionary = CabRows.triangle(_fields(line), _node_id_to_index)
+    if (row["error"] as String) != "":
+        errors.append("cab %s: %s" % [row["error"], line])
+        return
+    cab_triangles.append_array(row["nodes"] as PackedInt32Array)
