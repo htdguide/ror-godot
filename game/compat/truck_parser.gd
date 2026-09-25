@@ -93,6 +93,8 @@ func parse_text(text: String) -> String:
     if nodes.is_empty():
         return "no nodes found; is '%s' a vehicle file?" % name
     _resolve_deferred()
+    # A wheel states axle nodes and a radius; the tread it stands on follows from those.
+    WheelRig.generate(self)
     return ""
 
 
@@ -328,6 +330,9 @@ func _parse_mesh_wheel(line: String) -> void:
         "rim_radius": fields[1].to_float(),
         "width": fields[2].to_float(),
         "rays": fields[3].to_int(),
+        "mass": fields[10].to_float(),
+        "spring": fields[11].to_float(),
+        "damping": fields[12].to_float(),
         "node1": node1,
         "node2": node2,
         "side": fields[13].to_lower(),

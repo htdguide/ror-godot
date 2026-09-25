@@ -1,0 +1,104 @@
+class_name WheelRig
+extends RefCounted
+## Generates the tread nodes and beams a wheel section only implies.
+##
+## A `meshwheels2` row names two axle nodes and a tyre radius; the nodes the tyre actually
+## stands on are generated from that, not written in the file. Without them the lowest
+## node of the whole vehicle is an axle, ground contact happens there, and the vehicle is
+## drawn sunk into the ground by the tyre radius — measured at 0.34 m on the hero truck.
+##
+## Follows upstream's `BuildWheelObjectAndNodes` + `BuildWheelBeams`: 2·rays nodes per
+## wheel, laid as a zig-zag alternating between the two axle planes, and 8·rays beams.
+##
+## Generated nodes are appended after the file's own, so every index the file stated —
+## beams, flexbody forsets, cameras, cab triangles — keeps its meaning.
+
+## Upstream's rim beams for meshwheels2 come from the beam defaults rather than the
+## wheel's own spring, which is the tyre's. Falling back to the tyre value makes the rim
+## as soft as the sidewall and the wheel folds up under load.
+const RIM_SPRING_FALLBACK: float = 4000000.0
+const RIM_DAMP_FALLBACK: float = 150.0
+
+
+## Adds every wheel's tread to the rig. Returns {"nodes": int, "beams": int}.
+static func generate(truck: TruckParser) -> Dictionary:
+    var nodes_before: int = truck.nodes.size()
+    var beams_before: int = truck.beams.size() / 2
+    for wheel: Dictionary in truck.wheels:
+        _generate_one(truck, wheel)
+    return {
+        "nodes": truck.nodes.size() - nodes_before,
+        "beams": truck.beams.size() / 2 - beams_before,
+    }
+
+
+static func _generate_one(truck: TruckParser, wheel: Dictionary) -> void:
+    var rays: int = wheel["rays"] as int
+    if rays < 3:
+        return
+    var axis_a: int = wheel["node1"] as int
+    var axis_b: int = wheel["node2"] as int
+    var origin_a: Vector3 = truck.nodes[axis_a]
+    var origin_b: Vector3 = truck.nodes[axis_b]
+    var axis: Vector3 = origin_b - origin_a
+    if axis.length_squared() == 0.0:
+        return
+    axis = axis.normalized()
+
+    # Upstream steps the ray by half a ray's angle each time, so the outer and inner
+    # treads interleave rather than sitting in pairs. The zig-zag is what gives the
+    # sidewall its diagonal bracing.
+    var step: float = -TAU / float(2 * rays)
+    var ray: Vector3 = _perpendicular(axis) * (wheel["tire_radius"] as float)
+    var outer: PackedInt32Array = PackedInt32Array()
+    var inner: PackedInt32Array = PackedInt32Array()
+    for i: int in rays:
+        outer.append(_add_node(truck, origin_a + ray))
+        ray = ray.rotated(axis, step)
+        inner.append(_add_node(truck, origin_b + ray))
+        ray = ray.rotated(axis, step)
+
+    var tyre_spring: float = wheel["spring"] as float
+    var tyre_damp: float = wheel["damping"] as float
+    var rim_spring: float = RIM_SPRING_FALLBACK
+    var rim_damp: float = RIM_DAMP_FALLBACK
+    for i: int in rays:
+        var o: int = outer[i]
+        var n: int = inner[i]
+        var next_o: int = outer[(i + 1) % rays]
+        var next_n: int = inner[(i + 1) % rays]
+        # Tyre: each tread node braced to both axle nodes, so load crosses the sidewall.
+        _add_beam(truck, axis_a, o, tyre_spring, tyre_damp)
+        _add_beam(truck, axis_b, n, tyre_spring, tyre_damp)
+        _add_beam(truck, axis_b, o, tyre_spring, tyre_damp)
+        _add_beam(truck, axis_a, n, tyre_spring, tyre_damp)
+        # Rim: the tread ring's own hoop and diagonal stiffness.
+        _add_beam(truck, o, n, rim_spring, rim_damp)
+        _add_beam(truck, o, next_o, rim_spring, rim_damp)
+        _add_beam(truck, n, next_n, rim_spring, rim_damp)
+        _add_beam(truck, n, next_o, rim_spring, rim_damp)
+
+
+static func _add_node(truck: TruckParser, position: Vector3) -> int:
+    var index: int = truck.nodes.size()
+    truck.nodes.append(position)
+    # Generated nodes carry an id no file can state, so a later reference to a numeric id
+    # can never resolve to one of these by accident.
+    truck.node_ids.append("@wheel%d" % index)
+    return index
+
+
+static func _add_beam(
+    truck: TruckParser, a: int, b: int, spring: float, damp: float
+) -> void:
+    truck.beams.append(a)
+    truck.beams.append(b)
+    truck.beam_spring.append(spring)
+    truck.beam_damp.append(damp)
+
+
+## Any unit vector at right angles to `axis`. Which one does not matter: it only sets
+## where ray zero lands on a circle that is about to be walked all the way round.
+static func _perpendicular(axis: Vector3) -> Vector3:
+    var seed: Vector3 = Vector3.UP if absf(axis.dot(Vector3.UP)) < 0.9 else Vector3.RIGHT
+    return axis.cross(seed).normalized()
