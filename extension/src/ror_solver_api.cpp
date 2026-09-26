@@ -208,6 +208,9 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("clear_heightfield"), &RorSolver::clear_heightfield);
     ClassDB::bind_method(D_METHOD("ground_height_at", "position"), &RorSolver::ground_height_at);
     ClassDB::bind_method(D_METHOD("ground_normal_at", "position"), &RorSolver::ground_normal_at);
+    ClassDB::bind_method(D_METHOD("ground_contact_probe", "velocity", "forces", "mass",
+                                  "friction_coef", "normal", "penetration", "dt"),
+                         &RorSolver::ground_contact_probe);
     ClassDB::bind_method(D_METHOD("set_air_drag", "coefficient", "enabled"), &RorSolver::set_air_drag);
     ClassDB::bind_method(D_METHOD("set_node_immovable", "node", "immovable"), &RorSolver::set_node_immovable);
     ClassDB::bind_method(D_METHOD("set_node_position", "node", "position"), &RorSolver::set_node_position);
@@ -221,6 +224,7 @@ void RorSolver::_bind_methods() {
                          &RorSolver::set_beam_bounds);
     ClassDB::bind_method(D_METHOD("get_beam_rest_length", "beam"), &RorSolver::get_beam_rest_length);
     ClassDB::bind_method(D_METHOD("get_beam_reference_length", "beam"), &RorSolver::get_beam_reference_length);
+    ClassDB::bind_method(D_METHOD("get_beam_length", "beam"), &RorSolver::get_beam_length);
 
     ClassDB::bind_method(D_METHOD("add_wheel", "axis_a", "axis_b", "first_tread", "tread_count", "arm_node",
                                   "radius", "drive", "brake"),

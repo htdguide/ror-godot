@@ -1,5 +1,7 @@
 #include "ror_solver.h"
 
+#include "ror_approx.h"
+
 #include <cmath>
 
 using namespace godot;
@@ -135,6 +137,19 @@ float RorSolver::get_beam_reference_length(int beam) const {
     return m_beams[beam].reference_length;
 }
 
+float RorSolver::get_beam_length(int beam) const {
+    if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
+        return 0.0f;
+    }
+    const Vector3 separation =
+            m_nodes[m_beams[beam].a].position - m_nodes[m_beams[beam].b].position;
+    const float squared = static_cast<float>(separation.length_squared());
+    if (squared <= 0.0f) {
+        return 0.0f;
+    }
+    return squared * fast_invSqrt(squared);
+}
+
 // Upstream's order, and each step is one whole pass of it. The drivetrain runs at the
 // same rate as the rest: its clutch couples an engine of 0.12 kg m2 to the road through a
 // stiff spring, and at frame rate that system does not integrate.
@@ -175,7 +190,9 @@ void RorSolver::apply_air_drag() {
         return;
     }
     for (RorNode &node : m_nodes) {
-        const float speed = static_cast<float>(node.velocity.length());
+        // Upstream's approximate square root, not an exact one: a rig's aerodynamic damping
+        // is computed from an approximate speed. See ror_approx.h.
+        const float speed = approx_sqrt(static_cast<float>(node.velocity.length_squared()));
         if (speed <= 0.0f) {
             continue;
         }
@@ -188,20 +205,25 @@ void RorSolver::accumulate_beam_forces() {
         RorNode &a = m_nodes[beam.a];
         RorNode &b = m_nodes[beam.b];
         const Vector3 separation = a.position - b.position;
-        const float length = static_cast<float>(separation.length());
-        if (length <= 0.0f) {
+        const float squared = static_cast<float>(separation.length_squared());
+        if (squared <= 0.0f) {
             continue;
         }
-        const Vector3 direction = separation / length;
+        // Upstream divides every beam length by the Quake reciprocal square root, accurate to
+        // about 0.2%, and never computes an exact length at all. Every force in a Rigs of Rods
+        // rig carries that, so computing it exactly here would be a different simulation.
+        const float inverted_length = fast_invSqrt(squared);
+        const float length = squared * inverted_length;
         // Positive when stretched, negative when compressed.
         const float extension = length - beam.rest_length;
         // Rate of stretch along the beam, which is what the damper resists.
-        const float closing_speed = (a.velocity - b.velocity).dot(direction);
+        const float closing_speed =
+                static_cast<float>((a.velocity - b.velocity).dot(separation)) * inverted_length;
         float spring = beam.spring;
         float damping = beam.damping;
         apply_bound_law(beam, extension, spring, damping);
         const float magnitude = -spring * extension - damping * closing_speed;
-        const Vector3 force = direction * magnitude;
+        const Vector3 force = separation * (magnitude * inverted_length);
         a.forces += force;
         b.forces -= force;
     }
@@ -268,6 +290,17 @@ Vector3 RorSolver::ground_normal_at(const Vector3 &position) const {
         return Vector3(0.0f, 1.0f, 0.0f);
     }
     return m_heightfield.normal_at(position);
+}
+
+Vector3 RorSolver::ground_contact_probe(const Vector3 &velocity, const Vector3 &forces, float mass,
+                                        float friction_coef, const Vector3 &normal,
+                                        float penetration, float dt) const {
+    RorNode node;
+    node.velocity = velocity;
+    node.forces = forces;
+    node.mass = mass;
+    node.friction_coef = friction_coef;
+    return ground_contact_force(node, normal, penetration, dt, m_ground_model);
 }
 
 void RorSolver::apply_ground_contact(float dt) {
@@ -351,8 +384,17 @@ float RorSolver::total_energy() const {
         energy += -node.mass * static_cast<float>(m_gravity.dot(node.position));
     }
     for (const RorBeam &beam : m_beams) {
-        const float length =
-                static_cast<float>((m_nodes[beam.a].position - m_nodes[beam.b].position).length());
+        // Measured the way the force law measures it, with upstream's approximate reciprocal
+        // square root. An energy function has to be the potential of the force law it
+        // accompanies: computing the extension exactly here reports the rig as storing energy
+        // at exactly the point the forces call it relaxed, which reads as a rig gaining 6% of
+        // its energy from nowhere and staying there at every substep rate.
+        const Vector3 separation = m_nodes[beam.a].position - m_nodes[beam.b].position;
+        const float squared = static_cast<float>(separation.length_squared());
+        if (squared <= 0.0f) {
+            continue;
+        }
+        const float length = squared * fast_invSqrt(squared);
         const float extension = length - beam.rest_length;
         energy += 0.5f * beam.spring * extension * extension;
     }

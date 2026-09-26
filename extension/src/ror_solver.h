@@ -59,6 +59,12 @@ public:
     // of that comparison the solver owns.
     float ground_height_at(const godot::Vector3 &position) const;
     godot::Vector3 ground_normal_at(const godot::Vector3 &position) const;
+    // Runs the ground contact law once on a node described entirely by its arguments, and
+    // returns the force it produces. Nothing is stored and no node is touched: this exists so
+    // the law can be compared against Rigs of Rods' own, case by case, without a rig.
+    godot::Vector3 ground_contact_probe(const godot::Vector3 &velocity, const godot::Vector3 &forces,
+                                        float mass, float friction_coef, const godot::Vector3 &normal,
+                                        float penetration, float dt) const;
     // The friction surface. Defaults to upstream's `concrete`.
     void set_ground_friction(float adhesion_velocity, float static_friction, float sliding_friction,
                              float hydrodynamic_friction, float stribeck_velocity, float strength);
@@ -81,6 +87,10 @@ public:
                          float bound_spring, float bound_damp, float precompression);
     float get_beam_rest_length(int beam) const;
     float get_beam_reference_length(int beam) const;
+    // The beam's length as the force law measures it — with upstream's approximate reciprocal
+    // square root, not exactly. Exposed so a check of the force law can be made at the
+    // extension the law was actually applied to, rather than at the one the caller intended.
+    float get_beam_length(int beam) const;
 
     // --- Wheels -----------------------------------------------------------------
     // `first_tread` and `tread_count` name the generated tread nodes, which alternate

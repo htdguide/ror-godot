@@ -45,3 +45,8 @@ game/addons/
 # often unstated licensing, and this project has no right to redistribute it. Mods are
 # fetched or copied in locally; gates skip cleanly when one is absent.
 assets/mods/
+
+# The upstream parity oracle: Rigs of Rods' own physics, extracted from the pinned submodule
+# and compiled on its own by tools/build_parity.sh. Generated, never committed, for the same
+# reason the addon is — a copy in the tree could drift from the upstream it claims to be.
+build/

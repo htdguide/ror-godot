@@ -1,5 +1,7 @@
 #include "ror_ground.h"
 
+#include "ror_approx.h"
+
 #include <cmath>
 
 using namespace godot;
@@ -40,7 +42,11 @@ Vector3 ground_contact_force(const RorNode &node, const Vector3 &normal, float p
         static_cast<float>(tangential_force.length_squared()) <= static_limit * static_limit) {
         // Static friction. The tangential force is removed rather than opposed, with a
         // little smoothing so the integrator is not handed a discontinuity at zero slip.
-        const float friction = -static_limit * (1.0f - std::exp(-slip_speed / model.adhesion_velocity));
+        // Upstream's approximation, not std::exp: see ror_approx.h. This subtraction cancels
+        // most of the exponential, so the difference between the two is tens of percent of
+        // the friction holding a stationary vehicle in place.
+        const float friction =
+                -static_limit * (1.0f - approx_exp(-slip_speed / model.adhesion_velocity));
         return normal * reaction + slip * friction - tangential_force;
     }
 
@@ -49,7 +55,7 @@ Vector3 ground_contact_force(const RorNode &node, const Vector3 &normal, float p
     const float decay =
             model.sliding_friction +
             (model.static_friction - model.sliding_friction) *
-                    std::exp(-std::pow(slip_speed / model.stribeck_velocity, model.alpha));
+                    approx_exp(-approx_pow(slip_speed / model.stribeck_velocity, model.alpha));
     const float friction = -(decay + std::fmin(model.hydrodynamic_friction * slip_speed, 5.0f)) * grip;
     return normal * reaction + slip * friction;
 }
