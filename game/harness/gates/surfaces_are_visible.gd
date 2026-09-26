@@ -22,6 +22,15 @@ const PALE_LANE: String = "sand"
 const MIN_LUMA_GAP: float = 0.05
 ## And no lane may come out black, which is what an unlit or untextured terrain looks like.
 const MIN_LUMA: float = 0.01
+## Local contrast at driving height, as the mean absolute difference between neighbouring
+## pixels relative to the local level. This is the quantity a driver reads speed from: motion
+## is perceived from detail moving across the retina, and ground with none of it slides past
+## invisibly however fast the vehicle is going. A flat-tinted plane reads near zero.
+const MIN_LOCAL_CONTRAST: float = 0.02
+## Where the camera sits for that measurement: a driver's eye height, looking along the valley
+## at the ground ahead, which is the view the complaint was about.
+const EYE_HEIGHT_M: float = 1.6
+const LOOK_AHEAD_M: float = 18.0
 
 
 static func meta() -> Dictionary:
@@ -95,11 +104,52 @@ func run(harness: Node) -> Dictionary:
             + " %.4f): the surface lanes are not visible. See %s" % [gap, shot["png"]],
             gap
         )
-    return ok(
-        "the lanes render from %.3f to %.3f luminance, a gap of %.3f across the valley: %s"
-        % [lowest, highest, gap, shot["png"]],
-        gap
+    # The other half of the complaint: the lanes were distinguishable and still gave the eye
+    # nothing to track, so a vehicle on them felt stationary.
+    var eye: Vector3 = Vector3(0.0, CAMERA_HEIGHT_M * 0.0 + EYE_HEIGHT_M, 0.0)
+    harness.camera.look_at_from_position(
+        eye, eye + Vector3(LOOK_AHEAD_M, -EYE_HEIGHT_M * 0.55, 0.0), Vector3.UP
     )
+    var close: Dictionary = await harness.capture_shot("surfaces/close", "static", CONVERGE)
+    if (close["error"] as String) != "":
+        return fail(close["error"] as String)
+    var detail: float = _local_contrast(Image.load_from_file(close["png"] as String))
+    if detail < MIN_LOCAL_CONTRAST:
+        return fail(
+            "the ground has a local contrast of %.4f at driving height, under %.4f: there is"
+            % [detail, MIN_LOCAL_CONTRAST]
+            + " nothing on it for the eye to track, so motion over it is not visible. See %s"
+            % close["png"],
+            detail
+        )
+    return ok(
+        "the lanes render from %.3f to %.3f luminance, a gap of %.3f across the valley, with"
+        % [lowest, highest, gap]
+        + " a local contrast of %.4f at driving height: %s" % [detail, close["png"]],
+        detail
+    )
+
+
+## Mean absolute difference between neighbouring pixels, relative to the local level.
+##
+## Relative, because a dark surface and a bright one should be held to the same standard: what
+## matters for perceiving motion is how much the ground varies against its own brightness, not
+## how many absolute units it varies by.
+func _local_contrast(image: Image) -> float:
+    if image == null:
+        return 0.0
+    var total: float = 0.0
+    var count: int = 0
+    # The lower half of the frame, which is the ground rather than the sky.
+    for y: int in range(image.get_height() / 2, image.get_height() - 1, 2):
+        for x: int in range(0, image.get_width() - 1, 2):
+            var here: float = image.get_pixel(x, y).get_luminance()
+            var right: float = image.get_pixel(x + 1, y).get_luminance()
+            var below: float = image.get_pixel(x, y + 1).get_luminance()
+            var level: float = maxf(here, 0.01)
+            total += (absf(right - here) + absf(below - here)) / (2.0 * level)
+            count += 1
+    return total / float(maxi(count, 1))
 
 
 ## Mean luminance of each row, over a band of columns through the middle of the frame.

@@ -23,25 +23,22 @@ static func create() -> Node3D:
     return terrain
 
 
-## Makes the surface tints visible.
+## Turns off the debug views, now that there are real textures to draw.
 ##
-## With no texture assets loaded Terrain3D has no albedo to shade with at all: measured, the
-## terrain renders pure black with both of these off. Its checkered pattern is the placeholder
-## it draws instead, and that is what a driver saw where the surface lanes should have been.
+## With no texture assets Terrain3D has no albedo to shade with at all — measured, the terrain
+## renders pure black with both of these off — and the checkered pattern is the placeholder it
+## draws instead. That was what a driver saw where the surface lanes should have been, and
+## `show_colormap` stood in for it until the textures existed.
 ##
-## `show_colormap` is the view that draws the colour map itself, which is where the lane tints
-## live, and it is what makes them visible — turning the checker off alone changes nothing,
-## because the colour map view takes precedence over it either way.
-##
-## This is a debug view standing in for a material, and it goes when the Terrain3D shader
-## override and real ground textures land in M2. Until then it is the only thing telling a
-## driver which surface they are on, which a test track needs more than scenery does.
+## Now they do, so both go off: a flat tint tells a driver which surface they are on but gives
+## the eye nothing to track, and a ground with no detail in it reads as stationary however
+## fast the vehicle is going.
 static func _show_surfaces(terrain: Node3D) -> void:
     var material: Object = terrain.get("material")
     if material == null:
         return
     material.set("show_checkered", false)
-    material.set("show_colormap", true)
+    material.set("show_colormap", false)
 
 
 ## Generates the heightmap and imports it. Call after the node has been in the tree a frame.
@@ -62,6 +59,9 @@ static func populate(terrain: Node3D) -> String:
     if data == null:
         return "the terrain has no data object after a frame in the tree"
     terrain.set("collision_mode", TerrainCfg.COLLISION_DISABLED)
+    var assets: Object = SurfaceTextures.build()
+    if assets != null:
+        terrain.set("assets", assets)
     _show_surfaces(terrain)
 
     var size: int = TerrainCfg.MAP_SIZE
@@ -78,4 +78,25 @@ static func populate(terrain: Node3D) -> String:
     data.call("import_images", [height, null, colour], TerrainCfg.ORIGIN, 0.0, 1.0)
     if int(data.call("get_region_count")) == 0:
         return "importing the heightmap produced no regions"
+    _paint_surfaces(terrain, data)
     return ""
+
+
+## Writes which texture each part of the terrain uses, lane by lane.
+##
+## The control map is what selects a texture per texel, and it is written through Terrain3D's
+## own setter rather than by packing its bit layout here: the packing is an internal detail of
+## a pinned dependency and hand-writing it would break silently on an upgrade.
+static func _paint_surfaces(terrain: Node3D, data: Object) -> void:
+    var size: int = TerrainCfg.MAP_SIZE
+    var spacing: float = TerrainCfg.VERTEX_SPACING
+    for x: int in size:
+        var world_x: float = TerrainCfg.ORIGIN.x + float(x) * spacing
+        for z: int in size:
+            data.call(
+                "set_control_base_id",
+                Vector3(world_x, 0.0, TerrainCfg.ORIGIN.z + float(z) * spacing),
+                TerrainCfg.surface_at(x, z)
+            )
+    data.call("update_maps")
+    terrain.set("data_directory", terrain.get("data_directory"))
