@@ -40,39 +40,31 @@ static func read(
     }
 
 
-## The surfaces under a terrain, as one byte per cell on the same grid as the heights.
+## Hands a grid read by `read` to the solver, with the surfaces that go with it. Returns "" on
+## success.
 ##
-## Generated from the same function that tinted the terrain, so what a driver sees and what
-## the tyres grip on come from one place. When real elevation data replaces the generator this
-## becomes a read of Terrain3D's own control map instead.
-static func surfaces(origin: Vector3, width: int, depth: int, spacing: float) -> PackedByteArray:
-    var out: PackedByteArray = PackedByteArray()
-    out.resize(width * depth)
-    for z: int in depth:
-        var row: int = z * width
-        for x: int in width:
-            # The grid index, not the world position: the surface map is authored on the same
-            # lattice the heightmap was.
-            out[row + x] = TerrainCfg.surface_at(x, z)
-    return out
-
-
-## Reads the terrain and hands it to the solver in one step. Returns "" on success.
-static func apply(solver: RefCounted, data: Object, origin: Vector3, width: int, depth: int,
-        spacing: float) -> String:
-    if data == null:
-        return "the terrain has no data object: it has not finished entering the tree"
-    var field: Dictionary = read(data, origin, width, depth, spacing)
+## The surface map arrives as data rather than being generated here. Which surface is where is a
+## property of the world, and the world builds the map already to tint the terrain with: a
+## second copy computed in the bridge would be a second thing to keep in agreement, and at 4.2 M
+## cells it also cost 7 s of every run.
+static func apply(
+    solver: RefCounted, field: Dictionary, surfaces: PackedByteArray
+) -> String:
+    var width: int = field["width"] as int
+    var depth: int = field["depth"] as int
     var accepted: bool = solver.set_heightfield(
         field["heights"] as PackedFloat32Array,
-        field["width"] as int,
-        field["depth"] as int,
+        width,
+        depth,
         field["origin"] as Vector3,
         field["spacing"] as float
     )
     if not accepted:
-        return "the solver rejected a %dx%d heightfield at %.2f m spacing" % [width, depth, spacing]
+        return "the solver rejected a %dx%d heightfield at %.2f m spacing" % [
+            width, depth, field["spacing"] as float]
     GroundModels.apply(solver)
-    if not solver.set_surface_map(surfaces(origin, width, depth, spacing), width, depth):
+    if surfaces.size() != width * depth:
+        return "the surface map is %d cells for a %dx%d grid" % [surfaces.size(), width, depth]
+    if not solver.set_surface_map(surfaces, width, depth):
         return "the solver rejected a %dx%d surface map" % [width, depth]
     return ""

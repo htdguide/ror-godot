@@ -12,10 +12,11 @@ Read `docs/PLAN.md` first — it is the approved plan and it is authoritative. T
 
 ## Where things stand
 
-HEAD is `6a8913f`. `./tools/gate.sh --all` is green across 44 gates; run it before you start
-so you know that is still true. The hero asset is an unmodified community mod at
-`assets/mods/ChevyS1023` (`S10offroad.truck`), loaded through the compatibility shim with no
-conversion step.
+The last commit is `feat(world): the valley has the features the shot list names`.
+`./tools/gate.sh --all` is green across 54 gates in about 60 s of gate time; run it before you
+start so you know that is still true. The hero asset is an unmodified
+community mod at `assets/mods/ChevyS1023` (`S10offroad.truck`), loaded through the compatibility
+shim with no conversion step.
 
 **It drives.** `tools/play.sh --truck` opens a window on the valley and hands over the
 controls: throttle, brakes, steering, gears, ignition, lights, respawn, chase camera and a
@@ -29,40 +30,50 @@ shocks, ropes and support beams, and a heightfield so it stands on terrain rathe
 `game/tools/stability_probe.gd` measures it by sweeping. Node masses did most of it (10 kHz to
 3 kHz) and `set_beam_defaults_scale` the rest. Air drag was not a factor either way.
 
-**Terrain3D is in and used.** Pinned at `v1.0.2-stable`, built by `tools/build_terrain3d.sh`
-— a fresh checkout has no terrain until that is run, and the terrain gates skip cleanly.
-There is a generated valley, collision mode `Disabled`, and the solver collides against the
-same surface the renderer draws, checked to 0.0 mm.
+**Valley One is the 2 km valley the plan asks for, with its features in it.** See
+`docs/architecture/valley.md`: a layout file of metres, a pure shape function, a water-cut file
+and a builder. It has the test track it always had — nine surface lanes, level, with the tunnel
+on it — plus a lake, a river that crosses the floor at a ford and drains into it, a washout, an
+off-camber rock shelf, and a switchback road benched into the north wall that climbs 108 m to a
+ridge at 6% with a 9.5% worst hairpin. Generating it is 22 s of GDScript, so it is cached under
+`user://` and a load is checked against the shape function rather than trusted: warm is 2.5 s.
+
+**Grip is a property of the ground.** All nine of upstream's ground models are implemented and
+checked against its own `ground_models.cfg`, and the terrain lays them down per lane, so ice is
+ice and sand is sand rather than everything being `concrete` at 1.2.
+
+**The suspension travels.** It was welded at 6 mm; the `beams` section's options were being read
+as data and two of them are load paths. It now settles 90 to 99 mm per wheel, which is what a
+lifted truck does.
 
 Also working: OGRE `.mesh` reading, DDS textures, PBR materials from `managedmaterials`,
 flexbodies skinned to solver nodes, rigid props, generated wheel tread that now spins,
-flares as real lamps, and a reflection probe per actor.
+flares as real lamps, a reflection probe per actor, a tunnel that is a lighting rig, generated
+per-surface ground textures with detiling, and recovery from a roll.
 
 ## What to do next
 
-**1. Valley One v2 content.** The valley is a generated shape with no materials, no
-vegetation and no features. Six of the eight money shots name content that does not exist —
-a conifer stand, a river, a tunnel, a rock traverse, a lake — so the shot list is blocked on
-this rather than on the shots. PLAN §0.5 stages it; §0.6 names the seams:
-`tools/import_dem.gd` for real elevation data, `res://shaders/terrain3d_override.gdshader`
-for the material, `Terrain3DInstancer` for vegetation. Anything third-party needs its own ask.
+**1. Water surfaces, then vegetation.** The valley's shape has a lake basin, a river bed and a
+ford, and `ValleyLayout` declares the water levels for all three (`LAKE_WATER_Y_M`,
+`RIVER_WATER_DEPTH_M`) — but nothing draws water yet, so `ford_crossing` and `lake_dusk` are
+still shots of a dry hole. PLAN §0.5 stages a reflective, refractive, depth-faded plane here and
+replaces its surface generation at M8 behind the same interface. Then vegetation: the conifer
+stand for `valley_vista` and `switchback_backlit`, through `Terrain3DInstancer`, generated rather
+than sourced unless a third-party kit is worth its own ask. The PBR ground material
+(`res://shaders/terrain3d_override.gdshader`) is the third of the three M2 content seams.
 
-**2. The drivability scenarios.** PLAN M1 acceptance 7 wants `switchback_climb`,
-`ford_crossing` and `rut_traverse` completing without the actor falling through, getting
-stuck or exploding. The rig drives and the terrain queries work, so these are now writable.
+**2. The money shots are now unblocked, and named anchors exist.** `ValleyLayout.ANCHORS` holds
+`ridge_vista`, `switchback`, `ford`, `lake`, `ruts` and `rock_traverse`; nothing consumes them
+yet. Wiring the eight shots to anchors gives the before-image the whole project is measured
+against, which PLAN M1 asks for as visual verification.
 
-**3. What the first human session found.** One fixed, three measured and open. These are the
-most valuable items in this list: they are things every gate passed through.
+**3. The drivability scenarios.** PLAN M1 acceptance 7 wants `switchback_climb`, `ford_crossing`
+and `rut_traverse` completing without the actor falling through, getting stuck or exploding. All
+three features now exist and `road_is_drivable` says the road is within the rig's traction, so
+what remains is driving them: `harness/scenarios.gd` still has only `static`.
 
-- **Steering was inverted.** Fixed, and `rig_steers` now checks which way the driver actually
-  gets rather than only that the rig turns the way its wheels point. The convention — positive
-  intent means left — lives in `DriveCfg.steer_command` and nowhere else.
-- **The suspension is welded.** Static deflection is 6, 7, -3 and -4 mm per wheel; a real
-  truck settles 30 to 80 mm. The rear axle is located by beams at 5,015,000 N/m, which is
-  what the file states once `set_beam_defaults_scale` is applied, so the rates are right and
-  something about the load path is not. Look at the axle-to-frame links and the shocks
-  (`95-12`, `97-4`, shocks `95-29`, `97-21`) rather than the axle-internal beams, which are
-  meant to be stiff. `game/tools/ringing_probe.gd` prints them ranked by force carried.
+**4. What the human sessions found and nobody has closed.**
+
 - **The tyres ring.** Improved by the parity work, not yet resolved. The worst tread node was
   1.646 m/s at 248 Hz; using upstream's approximate maths took it to 0.492 m/s at the same
   2 kHz, and the worst body node from 0.156 to 0.066 m/s. Its frequency matches the rim hoop
@@ -72,14 +83,12 @@ most valuable items in this list: they are things every gate passed through.
   - Known parity gap that has not been tried yet: upstream gives a meshwheels2 wheel's
     `axis1-outer` and `axis2-inner` tyre beams SHOCK1 bounds with a 0.66 shortbound and a 0.15
     max extension. The bounded beam laws exist now; the wheel rig does not use them.
-- **It rolls over easily.** Not the mass distribution: the centre of mass is 0.762 m above the
-  contact patch over a 1.80 m track, a 1.18 g static rollover threshold, which is better than
-  a real lifted S10. The likelier cause is that every surface is upstream's `concrete` ground
-  model, so the tyres grip at 1.2 right up to the point the vehicle tips instead of sliding
-  first. Terrain ground models are unimplemented; `RorSolver.set_ground_friction` takes them
-  and nothing calls it with anything but the default.
+- **It rolls over more easily than the numbers say it should.** The centre of mass is 0.762 m
+  above the contact patch over a 1.80 m track, a 1.18 g static rollover threshold, better than a
+  real lifted S10. Every surface being `concrete` was the suspected cause and that is now fixed,
+  so this wants re-measuring on gravel and sand before anything else is changed.
 
-**4. Fidelity gaps that are named rather than forgotten.**
+**5. Fidelity gaps that are named rather than forgotten.**
 
 - The hero truck declares a `fusedrag` section. Upstream gives such a rig a single fuselage
   drag vector instead of the per-node drag it currently gets.
@@ -96,6 +105,8 @@ most valuable items in this list: they are things every gate passed through.
   spin is unphysical.
 - Flares are placed and lit but not animated: indicators do not blink, brake lights do not
   follow the pedal, and reversing lights do not follow the gear.
+- The tunnel is a lighting rig with no collision: the solver collides against the terrain and
+  nothing else, so a vehicle drives through its walls.
 
 ## Checking against Rigs of Rods itself
 
@@ -199,6 +210,31 @@ gates need a real window, and `tools/gate.sh` refuses to run while one is open.
   and on this wheel it runs along the stalk rather than the face, so flipping the sign trades
   one fault for the other. 121 = 180 − 59: the 180 is this project's prop chain differing from
   upstream's by a handedness, the sign is the stalk. `game/tools/prop_axis_probe.gd` measures it.
+- **A surface map is stored row by row, z outer and x inner**, because that is the order the
+  solver reads a heightfield in. Stored the other way round it is transposed, and a transposed
+  map is not obviously wrong: the right surfaces appear, in the wrong places, and the first
+  symptom was the terrain drawing sand where the solver gripped concrete.
+- **A gate that measures the wrong quantity passes on the fault it was written for.** The first
+  version of `valley_has_its_features` measured how deep the lake's water was, which is mostly
+  the valley floor descending under a flat water level: it passed with the basin set to half a
+  metre. It measures the basin's carve against the floor now, and the negative control is the
+  layout constant set to 0.5.
+- **A contour road cannot be declared as a table of heights.** Give each control point a height
+  and the road floats: the wall it is benched into is 3.9 m high where the table said 30 m. The
+  road's height is read from the wall at the nearest point of its own centre line instead, so
+  cut and fill are bounded by construction — 1.20 m measured — and the grade becomes a property
+  of the path, which a gate can then measure.
+- **A valley wall wants a constant slope where a road is benched into it, not a quadratic
+  curve.** A quadratic wall is gentle at the toe and near-vertical at the top, so the contours a
+  switchback road follows are 100 m apart at the bottom and 10 m apart at the top and the legs
+  collide before reaching the ridge.
+- **Feature bounds have to be derived from the feature, not written down.** The road corridor was
+  clipped to a hand-written band of z and the apron lost 2.5 m of its width as soon as a control
+  point moved; the band comes from the control points now.
+- **Generating 4.2 M cells of terrain in GDScript costs 22 s, and it is the suite's runtime.**
+  Measure with `tools/terrain_cost_probe.gd` before growing a map. The cache in
+  `world/valley_cache.gd` is what makes the size affordable, and it verifies itself against the
+  shape function on load because a cache is otherwise a golden artifact.
 - **Every gate in the suite can be green while something is visibly broken.** Missing vertex
   normals, tyres buried 0.34 m in the ground, and a door hanging a metre off its hinges all
   passed every check that existed at the time, because each measured nodes and the nodes were

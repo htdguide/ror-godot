@@ -70,9 +70,7 @@ func run(harness: Node) -> Dictionary:
     var solver: RefCounted = ClassDB.instantiate("RorSolver") as RefCounted
     if solver == null:
         return fail("RorSolver is not registered: the GDExtension did not load")
-    var applied: String = TerrainHeightfield.apply(
-        solver, data, TerrainCfg.ORIGIN, size, size, spacing
-    )
+    var applied: String = ValleyTerrain.give_to_solver(solver, data)
     if applied != "":
         return fail(applied)
 
@@ -146,7 +144,7 @@ func _check_surfaces(data: Object, solver: RefCounted) -> String:
         # The middle of the first patch of terrain carrying this surface.
         var found: bool = false
         for z: int in range(2, size - 2, 3):
-            if TerrainCfg.surface_at(size / 2, z) != index:
+            if ValleyShape.surface_at(size / 2, z) != index:
                 continue
             found = true
             var position: Vector3 = Vector3(

@@ -73,10 +73,7 @@ func run(harness: Node) -> Dictionary:
         return fail(rig["error"] as String)
     var truck: TruckParser = rig["truck"] as TruckParser
     var solver: RefCounted = rig["solver"] as RefCounted
-    var applied: String = TerrainHeightfield.apply(
-        solver, data, TerrainCfg.ORIGIN, TerrainCfg.MAP_SIZE, TerrainCfg.MAP_SIZE,
-        TerrainCfg.VERTEX_SPACING
-    )
+    var applied: String = ValleyTerrain.give_to_solver(solver, data)
     if applied != "":
         return fail(applied)
     solver.set_ground(0.0, true)

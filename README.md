@@ -10,11 +10,17 @@ The approved plan is in [docs/PLAN.md](docs/PLAN.md). Read it before touching an
 
 ## Status
 
-Repository scaffolding only. No code yet. The first code commit is the CLI harness (M0 in the plan),
-which must land before any rendering work.
+M1 in progress: the hero truck loads from an unmodified community mod, renders, and drives on Valley
+One — a 2 km generated valley with a lake, a ford, a washout, a rock shelf and a switchback
+road. The softbody solver is Rigs of Rods' own laws, checked against upstream's source where a function can be
+extracted. `./tools/gate.sh --all` runs the suite; `tools/play.sh --truck` opens a window and hands
+over the controls. See [docs/HANDOFF.md](docs/HANDOFF.md) for where to pick up.
 
 ## Layout
 
+    extension/             the GDExtension: Rigs of Rods' solver, decoupled from OGRE
+    game/                  the Godot project: harness, gates, compatibility shim, world
+    tools/                 CLI entry points; tools/gate.sh is the only way gates are run
     vendor/rigs-of-rods/   upstream Rigs of Rods, shallow submodule, read-only to us
     docs/                  documentation tree; see docs/README.md
     LICENSES/              one licence record per third-party asset or addon

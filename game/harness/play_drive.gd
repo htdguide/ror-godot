@@ -39,10 +39,7 @@ func setup(built: Dictionary) -> String:
 
 ## Stands the rig on a terrain instead of the flat plane. Returns "" on success.
 func use_terrain(data: Object) -> String:
-    var applied: String = TerrainHeightfield.apply(
-        solver, data, TerrainCfg.ORIGIN, TerrainCfg.MAP_SIZE, TerrainCfg.MAP_SIZE,
-        TerrainCfg.VERTEX_SPACING
-    )
+    var applied: String = ValleyTerrain.give_to_solver(solver, data)
     if applied != "":
         return applied
     # Put the rig down on the surface rather than where the flat plane used to be, or it
