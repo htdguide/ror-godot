@@ -51,12 +51,39 @@ void RorSolver::set_ground(float height, bool enabled) {
 
 void RorSolver::set_ground_friction(float adhesion_velocity, float static_friction, float sliding_friction,
                                     float hydrodynamic_friction, float stribeck_velocity, float strength) {
-    m_ground_model.adhesion_velocity = adhesion_velocity;
-    m_ground_model.static_friction = static_friction;
-    m_ground_model.sliding_friction = sliding_friction;
-    m_ground_model.hydrodynamic_friction = hydrodynamic_friction;
-    m_ground_model.stribeck_velocity = stribeck_velocity;
-    m_ground_model.strength = strength;
+    set_ground_model(0, adhesion_velocity, static_friction, sliding_friction, hydrodynamic_friction,
+                     stribeck_velocity, m_ground_models[0].alpha, strength);
+}
+
+void RorSolver::set_ground_model(int index, float adhesion_velocity, float static_friction,
+                                 float sliding_friction, float hydrodynamic_friction,
+                                 float stribeck_velocity, float alpha, float strength) {
+    if (index < 0) {
+        return;
+    }
+    if (index >= static_cast<int>(m_ground_models.size())) {
+        m_ground_models.resize(static_cast<size_t>(index) + 1);
+    }
+    RorGroundModel &model = m_ground_models[static_cast<size_t>(index)];
+    model.adhesion_velocity = adhesion_velocity;
+    model.static_friction = static_friction;
+    model.sliding_friction = sliding_friction;
+    model.hydrodynamic_friction = hydrodynamic_friction;
+    model.stribeck_velocity = stribeck_velocity;
+    model.alpha = alpha;
+    model.strength = strength;
+}
+
+bool RorSolver::set_surface_map(const PackedByteArray &surfaces, int width, int depth) {
+    return m_heightfield.set_surfaces(surfaces, width, depth);
+}
+
+int RorSolver::ground_model_count() const {
+    return static_cast<int>(m_ground_models.size());
+}
+
+int RorSolver::surface_at(const Vector3 &position) const {
+    return m_heightfield.surface_at(position);
 }
 
 void RorSolver::set_air_drag(float coefficient, bool enabled) {
@@ -300,7 +327,8 @@ Vector3 RorSolver::ground_contact_probe(const Vector3 &velocity, const Vector3 &
     node.forces = forces;
     node.mass = mass;
     node.friction_coef = friction_coef;
-    return ground_contact_force(node, normal, penetration, dt, m_ground_model);
+    // Model 0: the parity comparison is against upstream's default surface.
+    return ground_contact_force(node, normal, penetration, dt, m_ground_models[0]);
 }
 
 void RorSolver::apply_ground_contact(float dt) {
@@ -323,7 +351,17 @@ void RorSolver::apply_ground_contact(float dt) {
         // vertical: a hill the rig cannot climb and a hill it slides down are both what
         // happens when contact is resolved straight up.
         const Vector3 normal = sloped ? m_heightfield.normal_at(node.position) : flat_normal;
-        node.forces += ground_contact_force(node, normal, penetration, dt, m_ground_model);
+        // Which surface this node is standing on. Per node rather than per rig, so a vehicle
+        // straddling the edge of a sand patch has two wheels gripping and two not, which is
+        // the whole reason a surface is a map and not a setting.
+        size_t model = 0;
+        if (m_heightfield.has_surfaces()) {
+            const int index = m_heightfield.surface_at(node.position);
+            if (index >= 0 && index < static_cast<int>(m_ground_models.size())) {
+                model = static_cast<size_t>(index);
+            }
+        }
+        node.forces += ground_contact_force(node, normal, penetration, dt, m_ground_models[model]);
     }
 }
 

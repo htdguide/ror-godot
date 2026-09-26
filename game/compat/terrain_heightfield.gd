@@ -40,6 +40,23 @@ static func read(
     }
 
 
+## The surfaces under a terrain, as one byte per cell on the same grid as the heights.
+##
+## Generated from the same function that tinted the terrain, so what a driver sees and what
+## the tyres grip on come from one place. When real elevation data replaces the generator this
+## becomes a read of Terrain3D's own control map instead.
+static func surfaces(origin: Vector3, width: int, depth: int, spacing: float) -> PackedByteArray:
+    var out: PackedByteArray = PackedByteArray()
+    out.resize(width * depth)
+    for z: int in depth:
+        var row: int = z * width
+        for x: int in width:
+            # The grid index, not the world position: the surface map is authored on the same
+            # lattice the heightmap was.
+            out[row + x] = TerrainCfg.surface_at(x, z)
+    return out
+
+
 ## Reads the terrain and hands it to the solver in one step. Returns "" on success.
 static func apply(solver: RefCounted, data: Object, origin: Vector3, width: int, depth: int,
         spacing: float) -> String:
@@ -55,4 +72,7 @@ static func apply(solver: RefCounted, data: Object, origin: Vector3, width: int,
     )
     if not accepted:
         return "the solver rejected a %dx%d heightfield at %.2f m spacing" % [width, depth, spacing]
+    GroundModels.apply(solver)
+    if not solver.set_surface_map(surfaces(origin, width, depth, spacing), width, depth):
+        return "the solver rejected a %dx%d surface map" % [width, depth]
     return ""

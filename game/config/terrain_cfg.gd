@@ -29,6 +29,50 @@ const FLOOR_WIDTH: float = 0.35
 const RIPPLE_HEIGHT_M: float = 1.2
 const RIPPLE_WAVELENGTH_M: float = 90.0
 
+## The valley floor is laid out as lanes, one surface each, running the length of the valley.
+## Driving along a lane stays on one surface; driving across them crosses every surface in
+## turn, which is the case that matters — a rig with two wheels on asphalt and two on sand.
+##
+## The floor is 2 * FLOOR_WIDTH of the map wide, which at 512 m is 179 m, so nine lanes come
+## out at about 20 m each: wide enough to put a whole truck on one and still have room to turn.
+const LANE_SURFACES: Array[String] = [
+    "asphalt", "concrete", "gravel", "rock", "sand", "grass", "snow", "ice", "metal",
+]
+## What the walls either side of the floor are made of.
+const WALL_SURFACE: String = "rock"
+
+## Roughly what each surface looks like, for the terrain's colour map. Not a material — the
+## PBR ground work is M2 — but enough that a driver can see which lane they are on, which
+## matters more for a test track than for scenery.
+const SURFACE_COLOURS: Dictionary = {
+    "asphalt": Color(0.20, 0.20, 0.22),
+    "concrete": Color(0.58, 0.57, 0.54),
+    "gravel": Color(0.45, 0.42, 0.38),
+    "rock": Color(0.38, 0.35, 0.32),
+    "sand": Color(0.76, 0.68, 0.47),
+    "grass": Color(0.30, 0.42, 0.20),
+    "snow": Color(0.92, 0.93, 0.95),
+    "ice": Color(0.70, 0.82, 0.88),
+    "metal": Color(0.50, 0.52, 0.56),
+}
+
+
+## Which surface is at a point on the terrain grid, as an index into GroundModels.ORDER.
+static func surface_at(_x: int, z: int) -> int:
+    var across: float = absf(float(z) / float(MAP_SIZE) - 0.5) * 2.0
+    if across > FLOOR_WIDTH:
+        return GroundModels.index_of(WALL_SURFACE)
+    # Position across the floor, 0 at one edge and 1 at the other. `across` is the *doubled*
+    # distance from the centre line, so the floor spans half of FLOOR_WIDTH either side of it
+    # and the divisor here is FLOOR_WIDTH, not half of it. Halving it too mapped the floor
+    # onto the middle of the lane range and four of the nine surfaces were never laid at all.
+    var along_floor: float = (float(z) / float(MAP_SIZE) - 0.5) / FLOOR_WIDTH + 0.5
+    var lane: int = clampi(
+        int(along_floor * float(LANE_SURFACES.size())), 0, LANE_SURFACES.size() - 1
+    )
+    return GroundModels.index_of(LANE_SURFACES[lane])
+
+
 ## Collision is Terrain3D's mode 0. Rigs of Rods' own collision stays authoritative and Godot
 ## physics never touches the terrain: the solver is handed the heights and resolves contact
 ## itself, which is the whole premise of the integration.

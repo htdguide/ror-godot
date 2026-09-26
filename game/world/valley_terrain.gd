@@ -44,11 +44,16 @@ static func populate(terrain: Node3D) -> String:
 
     var size: int = TerrainCfg.MAP_SIZE
     var height: Image = Image.create_empty(size, size, false, Image.FORMAT_RF)
+    var colour: Image = Image.create_empty(size, size, false, Image.FORMAT_RGBA8)
     for x: int in size:
         for z: int in size:
             height.set_pixel(x, z, Color(TerrainCfg.height_at(x, z), 0.0, 0.0))
-    # import_images takes [height, control, colour]; the last two are left to their defaults.
-    data.call("import_images", [height, null, null], TerrainCfg.ORIGIN, 0.0, 1.0)
+            var surface: String = GroundModels.name_of(TerrainCfg.surface_at(x, z))
+            var tint: Color = TerrainCfg.SURFACE_COLOURS.get(surface, Color.GRAY) as Color
+            # Terrain3D's colour map carries roughness in its alpha channel.
+            colour.set_pixel(x, z, Color(tint.r, tint.g, tint.b, 0.6))
+    # import_images takes [height, control, colour]; the control map is left to its default.
+    data.call("import_images", [height, null, colour], TerrainCfg.ORIGIN, 0.0, 1.0)
     if int(data.call("get_region_count")) == 0:
         return "importing the heightmap produced no regions"
     return ""

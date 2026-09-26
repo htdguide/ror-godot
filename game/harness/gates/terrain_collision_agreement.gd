@@ -121,8 +121,56 @@ func run(harness: Node) -> Dictionary:
             ],
             worst
         )
+    var surfaces: String = _check_surfaces(data, solver)
+    if surfaces != "":
+        return fail(surfaces)
     return ok(
-        "%d samples off the grid over %.1f m of relief: worst disagreement %.1f mm at %v"
-        % [SAMPLES, relief, worst * 1000.0, worst_at],
+        "%d samples off the grid over %.1f m of relief: worst disagreement %.1f mm at %v;"
+        % [SAMPLES, relief, worst * 1000.0, worst_at]
+        + " every surface lane grips as it is tinted",
         worst
     )
+
+
+## The surface the solver grips on is the surface the terrain is tinted with.
+##
+## Height agreement alone would pass a world whose sand is drawn in one place and gripped in
+## another: the map that carries the surfaces is separate from the one that carries the
+## heights, and only shares its origin and spacing by construction. Terrain3D's own colour map
+## is the outside side of this comparison, being what the renderer shows.
+func _check_surfaces(data: Object, solver: RefCounted) -> String:
+    var size: int = TerrainCfg.MAP_SIZE
+    var spacing: float = TerrainCfg.VERTEX_SPACING
+    for index: int in GroundModels.ORDER.size():
+        var name: String = GroundModels.ORDER[index]
+        # The middle of the first patch of terrain carrying this surface.
+        var found: bool = false
+        for z: int in range(2, size - 2, 3):
+            if TerrainCfg.surface_at(size / 2, z) != index:
+                continue
+            found = true
+            var position: Vector3 = Vector3(
+                TerrainCfg.ORIGIN.x + float(size / 2) * spacing,
+                0.0,
+                TerrainCfg.ORIGIN.z + float(z) * spacing
+            )
+            var gripped: int = solver.surface_at(position)
+            if gripped != index:
+                return (
+                    "at %v the terrain is %s but the solver grips on %s"
+                    % [position, name, GroundModels.name_of(gripped)]
+                )
+            var drawn: Color = data.call("get_color", position) as Color
+            var expected: Color = TerrainCfg.SURFACE_COLOURS.get(name, Color.GRAY) as Color
+            # Terrain3D stores the colour map at a lower resolution than the heightmap and
+            # filters it, so this is a family resemblance rather than an equality.
+            if Vector3(drawn.r - expected.r, drawn.g - expected.g, drawn.b - expected.b).length() > 0.25:
+                return (
+                    "at %v the solver grips on %s but the terrain is tinted %v, not %v"
+                    % [position, name, Vector3(drawn.r, drawn.g, drawn.b),
+                       Vector3(expected.r, expected.g, expected.b)]
+                )
+            break
+        if not found:
+            return "no part of the terrain uses the %s surface" % name
+    return ""

@@ -8,6 +8,7 @@
 #include "ror_wheels.h"
 
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
 #include <godot_cpp/variant/vector3.hpp>
@@ -68,6 +69,17 @@ public:
     // The friction surface. Defaults to upstream's `concrete`.
     void set_ground_friction(float adhesion_velocity, float static_friction, float sliding_friction,
                              float hydrodynamic_friction, float stribeck_velocity, float strength);
+    // Defines the ground model at `index`, for a world with more than one surface. Index 0 is
+    // the one `set_ground_friction` sets and the one used where no surface map says otherwise.
+    void set_ground_model(int index, float adhesion_velocity, float static_friction,
+                          float sliding_friction, float hydrodynamic_friction,
+                          float stribeck_velocity, float alpha, float strength);
+    // Which model applies where, on the same grid as the heightfield.
+    bool set_surface_map(const godot::PackedByteArray &surfaces, int width, int depth);
+    int ground_model_count() const;
+    // The model a node standing here would be gripped by. For checking that a track's
+    // surfaces are where they are drawn.
+    int surface_at(const godot::Vector3 &position) const;
     // Per-node viscous drag against still air, upstream's turbulent model. Its random
     // turbulence term is deliberately left out: this project's gates may not depend on
     // unseeded randomness.
@@ -156,7 +168,8 @@ private:
     RorWheelSet m_wheels;
     RorDrivetrain m_drivetrain;
     RorSteering m_steering;
-    RorGroundModel m_ground_model;
+    // Index 0 always exists and is upstream's `concrete`.
+    std::vector<RorGroundModel> m_ground_models{RorGroundModel()};
     RorHeightfield m_heightfield;
     godot::Vector3 m_gravity = godot::Vector3(0.0f, -9.81f, 0.0f);
     float m_ground_height = 0.0f;

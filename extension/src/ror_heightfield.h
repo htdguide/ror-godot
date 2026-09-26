@@ -1,5 +1,6 @@
 #pragma once
 
+#include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
@@ -36,10 +37,20 @@ public:
     // straight up is the wrong answer.
     godot::Vector3 normal_at(const godot::Vector3 &position) const;
 
+    // Which ground model applies where, on the same grid as the heights. One byte per cell,
+    // an index into the solver's models — so a rig can drive from asphalt onto sand and the
+    // grip changes under the wheels that have crossed, not under all of them at once.
+    bool set_surfaces(const godot::PackedByteArray &surfaces, int width, int depth);
+    bool has_surfaces() const { return !m_surfaces.empty(); }
+    // Nearest cell, not interpolated: a surface is a discrete thing and blending sand with
+    // asphalt would produce a grip that exists nowhere on the map.
+    int surface_at(const godot::Vector3 &position) const;
+
 private:
     float sample(int x, int z) const;
 
     std::vector<float> m_heights;
+    std::vector<uint8_t> m_surfaces;
     int m_width = 0;
     int m_depth = 0;
     godot::Vector3 m_origin;

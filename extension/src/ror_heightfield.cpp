@@ -26,8 +26,35 @@ bool RorHeightfield::set_field(const PackedFloat32Array &heights, int width, int
     return true;
 }
 
+bool RorHeightfield::set_surfaces(const PackedByteArray &surfaces, int width, int depth) {
+    // Must match the height grid exactly: they are looked up by the same cell arithmetic, and
+    // a mismatch would put the grip somewhere other than the ground it belongs to.
+    if (width != m_width || depth != m_depth ||
+        surfaces.size() != static_cast<int64_t>(width) * static_cast<int64_t>(depth)) {
+        m_surfaces.clear();
+        return false;
+    }
+    m_surfaces.resize(static_cast<size_t>(width) * static_cast<size_t>(depth));
+    for (int64_t i = 0; i < surfaces.size(); ++i) {
+        m_surfaces[static_cast<size_t>(i)] = surfaces[i];
+    }
+    return true;
+}
+
+int RorHeightfield::surface_at(const Vector3 &position) const {
+    if (m_surfaces.empty()) {
+        return 0;
+    }
+    const float u = (static_cast<float>(position.x) - static_cast<float>(m_origin.x)) / m_spacing;
+    const float v = (static_cast<float>(position.z) - static_cast<float>(m_origin.z)) / m_spacing;
+    const int x = std::max(0, std::min(static_cast<int>(std::floor(u + 0.5f)), m_width - 1));
+    const int z = std::max(0, std::min(static_cast<int>(std::floor(v + 0.5f)), m_depth - 1));
+    return m_surfaces[static_cast<size_t>(z) * static_cast<size_t>(m_width) + static_cast<size_t>(x)];
+}
+
 void RorHeightfield::clear() {
     m_heights.clear();
+    m_surfaces.clear();
     m_width = 0;
     m_depth = 0;
     m_enabled = false;
