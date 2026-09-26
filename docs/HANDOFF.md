@@ -58,6 +58,13 @@ declared, which is the third version and the first correct one — see
 checked against its own `ground_models.cfg`, and the terrain lays them down per lane, so ice is
 ice and sand is sand rather than everything being `concrete` at 1.2.
 
+**Beams bend and break.** Reported in a session as the truck being "too stiff and not bending as
+it is supposed to", and the cause was that `set_beam_defaults`' deform and break fields were
+parsed as nothing: every beam in the project was a perfect spring. Upstream's plasticity is ported
+now — past its yield a beam's *rest length* moves, so the shape it returns to is the shape it was
+bent into — and the hero truck crashes properly: driven into a wall at 32 m/s it bends 276 beams,
+worst by 204 mm, and breaks 51 of 1,995. At 2.4 m/s it bends none.
+
 **The suspension travels.** It was welded at 6 mm; the `beams` section's options were being read
 as data and two of them are load paths. It now settles 90 to 99 mm per wheel, which is what a
 lifted truck does.
@@ -142,7 +149,6 @@ what remains is driving them: `harness/scenarios.gd` still has only `static`.
   chain reduces to the division `ror_wheels` already does, so this is invisible on this rig
   and wrong on one with locked or open diffs.
 - `commands2` beams hold the doors but are not key-driven, so the doors do not open.
-- Beam deformation and breaking are not implemented.
 - Traction control and ABS are not implemented; neither is declared by the hero rig. At full
   throttle it breaks traction and the wheels run away, which is what a 4WD truck with 11 kNm
   at the wheels does on concrete, but with no aerodynamic drag on the body to bound it the

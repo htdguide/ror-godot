@@ -98,6 +98,9 @@ static func plain(
         "b": b,
         "spring": defaults.spring(),
         "damp": defaults.damp(),
+        "deform": defaults.deform(),
+        "strength": defaults.breaking_strength(),
+        "plastic_coef": defaults.plastic_coef(),
         "factor": 0.0,
         "bound": bound,
         "short_bound": 0.0,
@@ -151,6 +154,12 @@ static func joint(
         "b": b,
         "spring": spring,
         "damp": damp,
+        # What it takes to bend this beam and what it takes to break it. A beam that states its
+        # own rates still takes the file's deform and break figures: upstream's `beams` section
+        # has no per-beam yield, only the defaults in force where the row was written.
+        "deform": defaults.deform(),
+        "strength": defaults.breaking_strength(),
+        "plastic_coef": defaults.plastic_coef(),
         "factor": factor,
         "bound": int(BOUND_TYPE.get(section, BOUND_NORMAL)),
         "short_bound": 0.0,

@@ -28,12 +28,21 @@ var cargo_share_nodes: PackedInt32Array = PackedInt32Array()
 ## The index the generated wheel tread begins at: every node from here on is a tyre node,
 ## and tyre nodes are exempt from the rig's mass distribution and its minimass floor.
 var generated_from: int = -1
-var beams: PackedInt32Array = PackedInt32Array()
-## Per-beam spring and damping, as set by the set_beam_defaults directives in force where
-## each beam was declared. Using one global default instead makes a real rig explode: the
-## files are written against the values they declare.
-var beam_spring: PackedFloat32Array = PackedFloat32Array()
-var beam_damp: PackedFloat32Array = PackedFloat32Array()
+## The beams, their rates and their limits. See `BeamTable`; these read through to it so that
+## every caller can still ask a parsed truck for `beams` and `beam_spring` directly.
+var beam_table: BeamTable = BeamTable.new()
+var beams: PackedInt32Array:
+    get: return beam_table.beams
+var beam_spring: PackedFloat32Array:
+    get: return beam_table.spring
+var beam_damp: PackedFloat32Array:
+    get: return beam_table.damp
+var beam_deform: PackedFloat32Array:
+    get: return beam_table.deform
+var beam_strength: PackedFloat32Array:
+    get: return beam_table.strength
+var beam_plastic: PackedFloat32Array:
+    get: return beam_table.plastic
 var cab_triangles: PackedInt32Array = PackedInt32Array()
 var texcoord_nodes: PackedInt32Array = PackedInt32Array()
 var texcoords: PackedVector2Array = PackedVector2Array()
@@ -68,11 +77,8 @@ var drivetrain: Dictionary = DriveRows.empty()
 var hydros: Array[Dictionary] = []
 ## One entry per `flares` row: the vehicle's lamps. See FlareRows.
 var flares: Array[Dictionary] = []
-## One entry per beam that has a travel limit rather than being a plain spring: shocks, ropes
-## and support beams. {beam, bound, short_bound, long_bound, bound_spring, bound_damp,
-## precompression}. Without these a shock is a soft spring with no bump stop, so a suspension
-## travels through its own limits and a door damper never resists.
-var bounded_beams: Array[Dictionary] = []
+var bounded_beams: Array[Dictionary]:
+    get: return beam_table.bounded
 ## Whether the rig declares an `axles` section. Upstream doubles a rig's drive torque when
 ## it does, for backwards compatibility, so it changes how hard the rig pulls.
 var has_axles: bool = false
@@ -256,26 +262,7 @@ func _parse_beam(line: String) -> void:
     if (row["error"] as String) != "":
         errors.append("beam %s: %s" % [row["error"], line])
         return
-    _record_beam(row)
-
-
-## Appends a beam and, when it is not an ordinary spring, what it does outside its travel.
-func _record_beam(row: Dictionary) -> void:
-    var beam: int = beams.size() / 2
-    if (row["bound"] as int) != BeamRows.BOUND_NORMAL:
-        bounded_beams.append({
-            "beam": beam,
-            "bound": row["bound"],
-            "short_bound": row["short_bound"],
-            "long_bound": row["long_bound"],
-            "bound_spring": row["bound_spring"],
-            "bound_damp": row["bound_damp"],
-            "precompression": row["precompression"],
-        })
-    beams.append(row["a"] as int)
-    beams.append(row["b"] as int)
-    beam_spring.append(row["spring"] as float)
-    beam_damp.append(row["damp"] as float)
+    beam_table.record(row)
 
 
 func _parse_texcoord(line: String) -> void:
@@ -367,7 +354,7 @@ func _parse_joint(line: String) -> void:
         return
     if _section == "hydros" and (row["factor"] as float) != 0.0:
         hydros.append({"beam": beams.size() / 2, "factor": row["factor"] as float})
-    _record_beam(row)
+    beam_table.record(row)
 
 
 ## The rest length of the beam a row declares, for the rows that state their travel in metres

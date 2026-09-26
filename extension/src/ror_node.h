@@ -23,6 +23,11 @@ struct RorNode {
     // Set by ground contact each step, read by the wheels to tell a driven tread node
     // that is on the ground from one that is in the air.
     bool ground_contact = false;
+    // Part of a collision triangle, and how many unbroken beams still hold it. Upstream refuses
+    // to break the last beams holding a cab node, because a hole in the collision mesh is worse
+    // than a beam that should have snapped.
+    bool cab_node = false;
+    int active_beams = 0;
 };
 
 // How a beam behaves outside the travel it was given. Upstream's `bounded` field.
@@ -60,6 +65,23 @@ struct RorBeam {
     // defaults where the shock was declared, not the shock's soft rates.
     float bound_spring = 0.0f;
     float bound_damp = 0.0f;
+
+    // What it takes to bend this beam, and what it takes to break it. Upstream's
+    // `default_deform` becomes the stress either side of which the beam yields, and
+    // `default_break` its strength. Past the yield the beam's *rest length* changes — which is
+    // what makes a bend permanent rather than a spring the rig returns from.
+    float max_pos_stress = 0.0f;
+    float max_neg_stress = 0.0f;
+    // The smaller of the two yield stresses and the strength: the cheap test that decides
+    // whether any of the deformation arithmetic is worth doing at all, which matters at 2 kHz.
+    float minmax_stress = 0.0f;
+    float strength = 0.0f;
+    // How much of the elastic travel is kept when the beam yields. Upstream's default is zero.
+    float plastic_coef = 0.0f;
+    // Only ordinary structural beams deform. A shock, a rope, a support beam and a hydro have
+    // their own laws and upstream exempts them.
+    bool deformable = false;
+    bool broken = false;
 };
 
 using NodeArray = std::vector<RorNode>;

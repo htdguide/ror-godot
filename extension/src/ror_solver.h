@@ -107,6 +107,19 @@ public:
     // Gives a beam a travel range and what happens outside it. `bound_type` is a BeamBound.
     // `precompression` scales the beam's rest and reference length, which is how a shock is
     // installed already under load. See ror_node.h for what each bound type means.
+    // What a beam yields at and what it breaks at, from the file's own `set_beam_defaults`.
+    // A strength of zero leaves the beam unbreakable and undeformable, which is what every
+    // beam was before this existed.
+    void set_beam_limits(int beam, float deform, float strength, float plastic_coef);
+    // Whether a beam has broken, and what its rest length is now: a bent beam's rest length is
+    // how the bend is recorded.
+    bool beam_broken(int beam) const;
+    float beam_strength(int beam) const;
+    int broken_beam_count() const;
+    // Marks a node as part of a collision triangle, which upstream protects from losing its
+    // last beams.
+    void set_node_cab(int node, bool is_cab);
+
     void set_beam_bounds(int beam, int bound_type, float short_bound, float long_bound,
                          float bound_spring, float bound_damp, float precompression);
     float get_beam_rest_length(int beam) const;

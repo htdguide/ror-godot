@@ -18,11 +18,22 @@ extends RefCounted
 ## Upstream's SimConstants defaults, in force until a directive changes them.
 const DEFAULT_SPRING: float = 9000000.0
 const DEFAULT_DAMP: float = 12000.0
+## What a beam yields at and what it breaks at, also from SimConstants. A beam that reaches its
+## deform stress bends permanently; one that reaches its strength snaps.
+const DEFAULT_DEFORM: float = 400000.0
+const DEFAULT_BREAK: float = 1000000.0
+## How much of the elastic travel a yielding beam keeps. Upstream's default is none.
+const DEFAULT_PLASTIC_COEF: float = 0.0
 
 var _spring: float = DEFAULT_SPRING
 var _damp: float = DEFAULT_DAMP
+var _deform: float = DEFAULT_DEFORM
+var _break: float = DEFAULT_BREAK
+var _plastic_coef: float = DEFAULT_PLASTIC_COEF
 var _spring_scale: float = 1.0
 var _damp_scale: float = 1.0
+var _deform_scale: float = 1.0
+var _break_scale: float = 1.0
 
 
 ## "set_beam_defaults spring, damp, deform, break, diameter, material, plastic_coef".
@@ -32,6 +43,15 @@ func read_defaults(fields: PackedStringArray) -> void:
         _spring = fields[0].to_float() if fields[0].to_float() >= 0.0 else DEFAULT_SPRING
     if fields.size() >= 2:
         _damp = fields[1].to_float() if fields[1].to_float() >= 0.0 else DEFAULT_DAMP
+    if fields.size() >= 3:
+        _deform = fields[2].to_float() if fields[2].to_float() >= 0.0 else DEFAULT_DEFORM
+    if fields.size() >= 4:
+        _break = fields[3].to_float() if fields[3].to_float() >= 0.0 else DEFAULT_BREAK
+    # Fields 5 and 6 are the beam's diameter and material, which are for the renderer upstream
+    # does not have here. Field 7 is the plastic coefficient.
+    if fields.size() >= 7:
+        var stated: float = fields[6].to_float()
+        _plastic_coef = stated if stated >= 0.0 else DEFAULT_PLASTIC_COEF
 
 
 ## "set_beam_defaults_scale spring, damp, deform, break".
@@ -40,6 +60,10 @@ func read_scale(fields: PackedStringArray) -> void:
         _spring_scale = fields[0].to_float()
     if fields.size() >= 2:
         _damp_scale = fields[1].to_float()
+    if fields.size() >= 3:
+        _deform_scale = fields[2].to_float()
+    if fields.size() >= 4:
+        _break_scale = fields[3].to_float()
 
 
 ## The spring a beam takes when it states none of its own.
@@ -49,6 +73,21 @@ func spring() -> float:
 
 func damp() -> float:
     return _damp * _damp_scale
+
+
+## The stress a beam yields at, and the stress it breaks at, both scaled the way the springs are.
+## The hero truck's own scale is `0.85, 0.25, 0.75, 0.80`, so its structure bends at three
+## quarters of the stated figure and breaks at four fifths of it.
+func deform() -> float:
+    return _deform * _deform_scale
+
+
+func breaking_strength() -> float:
+    return _break * _break_scale
+
+
+func plastic_coef() -> float:
+    return _plastic_coef
 
 
 ## The stated rates, without the scale.

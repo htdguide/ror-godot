@@ -1,5 +1,7 @@
 #include "ror_solver.h"
 
+#include "ror_deform.h"
+
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
 
@@ -40,6 +42,10 @@ int RorSolver::add_beam(int node_a, int node_b, float rest_length, float spring,
     beam.spring = spring;
     beam.damping = damping;
     m_beams.push_back(beam);
+    // Upstream's break rule counts how many unbroken beams still hold a node, so the count is
+    // kept as beams are added rather than searched for when one is about to break.
+    m_nodes[static_cast<size_t>(node_a)].active_beams += 1;
+    m_nodes[static_cast<size_t>(node_b)].active_beams += 1;
     return static_cast<int>(m_beams.size()) - 1;
 }
 
@@ -235,7 +241,10 @@ void RorSolver::apply_air_drag() {
 }
 
 void RorSolver::accumulate_beam_forces() {
-    for (const RorBeam &beam : m_beams) {
+    for (RorBeam &beam : m_beams) {
+        if (beam.broken) {
+            continue;
+        }
         RorNode &a = m_nodes[beam.a];
         RorNode &b = m_nodes[beam.b];
         const Vector3 separation = a.position - b.position;
@@ -248,7 +257,7 @@ void RorSolver::accumulate_beam_forces() {
         // rig carries that, so computing it exactly here would be a different simulation.
         const float inverted_length = fast_invSqrt(squared);
         const float length = squared * inverted_length;
-        // Positive when stretched, negative when compressed.
+        // Positive when stretched, negative when compressed. Upstream's `difftoBeamL`.
         const float extension = length - beam.rest_length;
         // Rate of stretch along the beam, which is what the damper resists.
         const float closing_speed =
@@ -256,11 +265,61 @@ void RorSolver::accumulate_beam_forces() {
         float spring = beam.spring;
         float damping = beam.damping;
         apply_bound_law(beam, extension, spring, damping);
-        const float magnitude = -spring * extension - damping * closing_speed;
-        const Vector3 force = separation * (magnitude * inverted_length);
+        float stress = -spring * extension - damping * closing_speed;
+        stress = apply_beam_deformation(beam, extension, spring, stress, m_nodes);
+        if (beam.broken) {
+            continue;
+        }
+        const Vector3 force = separation * (stress * inverted_length);
         a.forces += force;
         b.forces -= force;
     }
+}
+
+void RorSolver::set_beam_limits(int beam, float deform, float strength, float plastic_coef) {
+    if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
+        return;
+    }
+    RorBeam &target = m_beams[static_cast<size_t>(beam)];
+    target.max_pos_stress = deform;
+    target.max_neg_stress = -deform;
+    target.minmax_stress = deform;
+    target.strength = strength;
+    target.plastic_coef = plastic_coef;
+    // Only ordinary structural beams deform; shocks, ropes and support beams have their own
+    // laws and upstream exempts them.
+    target.deformable = target.bound == BeamBound::NORMAL;
+}
+
+bool RorSolver::beam_broken(int beam) const {
+    if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
+        return false;
+    }
+    return m_beams[static_cast<size_t>(beam)].broken;
+}
+
+float RorSolver::beam_strength(int beam) const {
+    if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
+        return 0.0f;
+    }
+    return m_beams[static_cast<size_t>(beam)].strength;
+}
+
+int RorSolver::broken_beam_count() const {
+    int count = 0;
+    for (const RorBeam &beam : m_beams) {
+        if (beam.broken) {
+            count += 1;
+        }
+    }
+    return count;
+}
+
+void RorSolver::set_node_cab(int node, bool is_cab) {
+    if (node < 0 || node >= static_cast<int>(m_nodes.size())) {
+        return;
+    }
+    m_nodes[static_cast<size_t>(node)].cab_node = is_cab;
 }
 
 // What a beam does outside the travel it was given. Upstream's `CalcBeams` branches, and the

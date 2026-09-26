@@ -50,6 +50,17 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
         )
         var damp: float = truck.beam_damp[beam] if beam < truck.beam_damp.size() else DEFAULT_DAMP
         solver.add_beam(truck.beams[i], truck.beams[i + 1], 0.0, spring, damp)
+        # What bends it and what breaks it, from the defaults in force where the row was written.
+        if beam < truck.beam_deform.size():
+            solver.set_beam_limits(
+                beam, truck.beam_deform[beam], truck.beam_strength[beam],
+                truck.beam_plastic[beam]
+            )
+
+    # Which nodes a collision triangle is built on: upstream will not break the last beams
+    # holding one, because a hole in the cab is worse than a beam that should have snapped.
+    for node: int in truck.cab_triangles:
+        solver.set_node_cab(node, true)
 
     _add_bounds(solver, truck)
     _add_wheels(solver, truck)
