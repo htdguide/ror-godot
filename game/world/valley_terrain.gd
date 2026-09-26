@@ -41,6 +41,12 @@ static func _show_surfaces(terrain: Node3D) -> void:
     material.set("show_colormap", false)
 
 
+## Terrain3D reads a texel's roughness from the colour map's alpha channel, so this is the
+## roughness the whole terrain is drawn with — not the per-surface values in `SurfaceCfg`, which
+## reach the texture assets and, measured, do not reach the picture.
+const COLOUR_MAP_ROUGHNESS: float = 0.6
+
+
 ## The surface map of the valley that was built last, one cell per byte.
 ##
 ## The solver needs the same surfaces the renderer is painted with, and generating them is a
@@ -118,7 +124,7 @@ static func populate(terrain: Node3D) -> String:
     for name: String in GroundModels.ORDER:
         var tint: Color = TerrainCfg.SURFACE_COLOURS.get(name, Color.GRAY) as Color
         # Terrain3D's colour map carries roughness in its alpha channel.
-        tints.append(Color(tint.r, tint.g, tint.b, 0.6))
+        tints.append(Color(tint.r, tint.g, tint.b, COLOUR_MAP_ROUGHNESS))
     # The surface map is stored row by row — z outer, x inner — because that is the order the
     # solver reads a heightfield in, and the two are indexed by the same arithmetic. Stored the
     # other way round the whole map is transposed, which reads as the right surfaces in the

@@ -73,12 +73,28 @@ per-surface ground textures with detiling, and recovery from a roll.
 `docs/architecture/valley.md`); what is left of PLAN §0.5's M2 staging is the PBR ground material
 through `res://shaders/terrain3d_override.gdshader`, and vegetation tiers 2 and 3.
 
-**1b. The valley is too dark to judge.** Four of the seven views in
-`tools/valley_shots.sh` are nearly black on the shaded side. The sky *does* light the terrain —
-measured by rendering the set with the sun turned off, which comes out dim blue rather than black
-— so this is the tonemap and exposure pair (AgX at 0.7) crushing it, which is M2b's subject. It
-is worth settling before the money shots are framed, because every shot of a valley has a shaded
-wall in it.
+**1b. Why the valley reads dark — measured, and partly still open.** Two gates now hold what was
+established. `daylight_shadows_are_readable` puts a mid-grey quad in the noon light and reads it
+twice: sunlit 0.378 against sky-lit 0.119 scene-referred, which displays as 0.307 and 0.069, so
+the pipeline does keep a sky-lit surface readable and the grading is not the fault. The same gate
+records that the scene's sun-to-sky balance is about 3:1 where clear-sky daylight is nearer 14:1
+— the sky is roughly three times too strong relative to the sun — which belongs with M2's HDRI
+sky rather than with a knob here.
+
+`terrain_takes_the_light` compares the ground with a Lambertian patch laid on it, switching the
+sun off in the same frame: the sun multiplies the patch by 2.63 and the terrain by 3.19, 21%
+apart, which means **the terrain takes a smaller share of its light from the sky than anything
+standing on it does**. That is the part that is still open, and it is the reason a shaded wall
+reads darker than a truck parked against it.
+
+While chasing it, something worth knowing surfaced: **Terrain3D is drawing the ground from the
+colour map and the heightmap, and the texture assets attached to it reach nothing.** Darkening a
+surface's albedo texture to a third, setting its `albedo_color` to white, and taking the normal
+map's depth to zero each changed the render by nothing at all, to four decimal places. The
+surface textures are generated, attached (nine of them, with the right names and images) and
+apparently unused; what is visible as "surface" is the per-texel tint in the colour map. Both this
+and the ambient share are the M2 ground material's to settle, since that replaces Terrain3D's
+shading with `res://shaders/terrain3d_override.gdshader`, which this project owns.
 
 **2. The money shots are now unblocked, and named anchors exist.** `ValleyLayout.ANCHORS` holds
 `ridge_vista`, `switchback`, `ford`, `lake`, `ruts` and `rock_traverse`; nothing consumes them
