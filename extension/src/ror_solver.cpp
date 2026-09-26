@@ -1,5 +1,8 @@
 #include "ror_solver.h"
 
+#include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/transform3d.hpp>
+
 #include "ror_approx.h"
 
 #include <cmath>
@@ -181,6 +184,10 @@ float RorSolver::get_beam_length(int beam) const {
 // same rate as the rest: its clutch couples an engine of 0.12 kg m2 to the road through a
 // stiff spring, and at frame rate that system does not integrate.
 void RorSolver::step(float dt, int substeps) {
+    // The obstacles near the rig, found once per call rather than per substep: they never move,
+    // the rig moves centimetres inside one call, and testing every box against every node at
+    // 2 kHz would cost more than the simulation it is protecting.
+    select_nearby_obstacles();
     for (int i = 0; i < substeps; ++i) {
         integrate(dt);
         apply_air_drag();
@@ -301,6 +308,34 @@ bool RorSolver::set_heightfield(const PackedFloat32Array &heights, int width, in
     return m_heightfield.set_field(heights, width, depth, origin, spacing);
 }
 
+int RorSolver::add_obstacle_box(const Transform3D &transform, const Vector3 &half_extents,
+                                int surface) {
+    return m_obstacles.add_box(transform, half_extents, surface);
+}
+
+void RorSolver::clear_obstacles() {
+    m_obstacles.clear();
+}
+
+Dictionary RorSolver::obstacle_contact(const Vector3 &position) {
+    Dictionary out;
+    const Vector3 margin(0.001f, 0.001f, 0.001f);
+    m_obstacles.select(position - margin, position + margin);
+    float penetration = 0.0f;
+    Vector3 normal;
+    int surface = 0;
+    const bool hit = m_obstacles.contact(position, penetration, normal, surface);
+    out["hit"] = hit;
+    out["penetration"] = penetration;
+    out["normal"] = normal;
+    out["surface"] = surface;
+    return out;
+}
+
+int RorSolver::obstacle_count() const {
+    return static_cast<int>(m_obstacles.count());
+}
+
 void RorSolver::clear_heightfield() {
     m_heightfield.clear();
 }
@@ -329,6 +364,26 @@ Vector3 RorSolver::ground_contact_probe(const Vector3 &velocity, const Vector3 &
     node.friction_coef = friction_coef;
     // Model 0: the parity comparison is against upstream's default surface.
     return ground_contact_force(node, normal, penetration, dt, m_ground_models[0]);
+}
+
+// The world bounds of the rig, grown by the distance it could travel inside one call, handed to
+// the obstacle list as its broad phase.
+void RorSolver::select_nearby_obstacles() {
+    if (m_obstacles.count() == 0) {
+        return;
+    }
+    Vector3 min(1e30f, 1e30f, 1e30f);
+    Vector3 max(-1e30f, -1e30f, -1e30f);
+    for (const RorNode &node : m_nodes) {
+        min.x = std::min(min.x, node.position.x);
+        min.y = std::min(min.y, node.position.y);
+        min.z = std::min(min.z, node.position.z);
+        max.x = std::max(max.x, node.position.x);
+        max.y = std::max(max.y, node.position.y);
+        max.z = std::max(max.z, node.position.z);
+    }
+    const Vector3 margin(OBSTACLE_MARGIN_M, OBSTACLE_MARGIN_M, OBSTACLE_MARGIN_M);
+    m_obstacles.select(min - margin, max + margin);
 }
 
 void RorSolver::apply_ground_contact(float dt) {
@@ -360,6 +415,31 @@ void RorSolver::apply_ground_contact(float dt) {
             if (index >= 0 && index < static_cast<int>(m_ground_models.size())) {
                 model = static_cast<size_t>(index);
             }
+        }
+        node.forces += ground_contact_force(node, normal, penetration, dt, m_ground_models[model]);
+    }
+    apply_obstacle_contact(dt);
+}
+
+// The same law again, against the static boxes: a ramp's face, a wall, the top of a kerb.
+void RorSolver::apply_obstacle_contact(float dt) {
+    if (m_obstacles.selected() == 0) {
+        return;
+    }
+    for (RorNode &node : m_nodes) {
+        if (node.immovable) {
+            continue;
+        }
+        float penetration = 0.0f;
+        Vector3 normal;
+        int surface = 0;
+        if (!m_obstacles.contact(node.position, penetration, normal, surface)) {
+            continue;
+        }
+        node.ground_contact = true;
+        size_t model = 0;
+        if (surface >= 0 && surface < static_cast<int>(m_ground_models.size())) {
+            model = static_cast<size_t>(surface);
         }
         node.forces += ground_contact_force(node, normal, penetration, dt, m_ground_models[model]);
     }

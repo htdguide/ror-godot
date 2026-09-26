@@ -19,10 +19,13 @@ extends RefCounted
 ## truth. Set `VALLEY_NO_CACHE=1` to skip it entirely.
 
 const SURFACE_FILE: String = "surfaces.bin"
-## The files whose contents decide what the valley is. A change to any of them is a new valley.
+## The files whose contents decide what a world is. A change to any of them is a new world.
 const SOURCES: Array[String] = [
     "res://world/valley_one_layout.gd",
     "res://world/valley_shape.gd",
+    "res://world/valley_water_cut.gd",
+    "res://world/park_shape.gd",
+    "res://config/park_cfg.gd",
     "res://config/terrain_cfg.gd",
 ]
 ## How many cells of a loaded cache are checked against the live shape function.
@@ -38,8 +41,11 @@ static func disabled() -> bool:
 
 ## Where this valley's cache lives. The key is a hash of the shape's sources, so a layout edit
 ## lands in a different directory rather than being loaded over.
-static func directory() -> String:
-    return OS.get_user_data_dir().path_join("cache").path_join("valley_%s" % key())
+static func directory(shape: Object = null) -> String:
+    var name: String = "valley"
+    if shape != null and shape is Script:
+        name = (shape as Script).resource_path.get_file().get_basename()
+    return OS.get_user_data_dir().path_join("cache").path_join("%s_%s" % [name, key()])
 
 
 ## A short hash of every file that decides the shape. Returns "unhashable" when a source cannot
@@ -71,7 +77,8 @@ static func is_populated(path: String) -> bool:
 
 ## Checks a loaded terrain against the live shape function, at cells spread over the whole map.
 ## Returns "" when they agree and the disagreement when they do not.
-static func verify(data: Object) -> String:
+static func verify(data: Object, shape: Object = null) -> String:
+    var live_shape: Object = shape if shape != null else ValleyShape
     var size: int = TerrainCfg.MAP_SIZE
     var spacing: float = TerrainCfg.VERTEX_SPACING
     var rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -83,7 +90,7 @@ static func verify(data: Object) -> String:
         var cached: float = data.call(
             "get_height", Vector3(world.x, 0.0, world.y)
         ) as float
-        var live: float = ValleyShape.height_at(x_index, z_index)
+        var live: float = live_shape.call("height_at", x_index, z_index)
         if not is_finite(cached) or absf(cached - live) > VERIFY_TOLERANCE_M:
             return (
                 "the cached terrain is %.4f m at %v where the shape says %.4f m"

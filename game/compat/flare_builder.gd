@@ -37,6 +37,13 @@ const SPOT_RANGE_M: float = 45.0
 const SPOT_ENERGY: float = 6.0
 
 
+## How hard the pedal has to be pressed before the brake lights come on, and how fast an
+## indicator blinks. Upstream's own blink delay is per flare and in milliseconds; this is the
+## default it uses when a row does not say.
+const BRAKE_THRESHOLD: float = 0.08
+const BLINK_PERIOD_S: float = 0.8
+
+
 ## Builds every lamp under `root`, in the space `render_frame` maps rig coordinates into.
 ## Returns the lamp holders, one per flare, in file order.
 static func build(root: Node3D, truck: TruckParser, render_frame: Transform3D) -> Array[Node3D]:
@@ -65,23 +72,62 @@ static func apply_pose(
         lamps[i].transform = to_local * _placement(nodes, truck.flares[i])
 
 
-## Turns the lamps on or off. The lens stays visible either way; what changes is whether it
-## is emitting and whether anything is being lit by it.
+## Turns every lamp on or off together. Kept for the checks that only care whether a lamp can
+## light at all; a driven vehicle uses `apply_state`.
 static func set_lit(lamps: Array[Node3D], truck: TruckParser, lit: bool) -> void:
     for i: int in mini(lamps.size(), truck.flares.size()):
-        for child: Node in lamps[i].get_children():
-            var light: Light3D = child as Light3D
-            if light != null:
-                light.visible = lit
-                continue
-            var lens: MeshInstance3D = child as MeshInstance3D
-            if lens == null:
-                continue
-            var material: StandardMaterial3D = lens.material_override as StandardMaterial3D
-            if material != null:
-                material.emission_energy_multiplier = (
-                    LENS_EMISSION_ON if lit else LENS_EMISSION_OFF
-                )
+        _set_lamp(lamps[i], lit)
+
+
+## Lights each lamp by what the vehicle is doing: headlights with the switch, brake lights with
+## the pedal, reversing lights with the gear, indicators with the stalk and the clock.
+##
+## `state` is {"headlights", "brake", "reverse", "left", "right", "seconds"}. The types are
+## upstream's own letters, read by `FlareRows`; what is on when is this project's reading of them,
+## and it is here rather than in the parser because it is a rule about driving rather than about
+## the file format.
+static func apply_state(lamps: Array[Node3D], truck: TruckParser, state: Dictionary) -> void:
+    var headlights: bool = bool(state.get("headlights", false))
+    var braking: bool = float(state.get("brake", 0.0)) > BRAKE_THRESHOLD
+    var reversing: bool = bool(state.get("reverse", false))
+    var seconds: float = float(state.get("seconds", 0.0))
+    var blink: bool = fmod(seconds, BLINK_PERIOD_S) < BLINK_PERIOD_S * 0.5
+    for i: int in mini(lamps.size(), truck.flares.size()):
+        var type: String = truck.flares[i]["type"] as String
+        var lit: bool = false
+        match type:
+            FlareRows.HEADLIGHT, FlareRows.HIGH_BEAM, FlareRows.FOG_LIGHT, FlareRows.TAIL_LIGHT, \
+            FlareRows.SIDELIGHT, FlareRows.DASHBOARD:
+                lit = headlights
+            FlareRows.BRAKE_LIGHT:
+                # A tail light that also brakes: on with the switch, brighter on the pedal. With
+                # one emission level to give it, the pedal wins.
+                lit = braking or headlights
+            FlareRows.REVERSE_LIGHT:
+                lit = reversing
+            FlareRows.BLINKER_LEFT:
+                lit = bool(state.get("left", false)) and blink
+            FlareRows.BLINKER_RIGHT:
+                lit = bool(state.get("right", false)) and blink
+            _:
+                lit = false
+        _set_lamp(lamps[i], lit)
+
+
+static func _set_lamp(lamp: Node3D, lit: bool) -> void:
+    for child: Node in lamp.get_children():
+        var light: Light3D = child as Light3D
+        if light != null:
+            light.visible = lit
+            continue
+        var lens: MeshInstance3D = child as MeshInstance3D
+        if lens == null:
+            continue
+        var material: StandardMaterial3D = lens.material_override as StandardMaterial3D
+        if material != null:
+            material.emission_energy_multiplier = (
+                LENS_EMISSION_ON if lit else LENS_EMISSION_OFF
+            )
 
 
 ## The lamp's frame: at its offset from the node triad, facing along the triad's normal.

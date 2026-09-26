@@ -54,8 +54,12 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
     _print_help()
 
 
-## Adds the valley, when this session asked for one and Terrain3D is installed. It cannot be
+## Adds the world, when this session asked for one and Terrain3D is installed. It cannot be
 ## populated yet: a Terrain3D has no data until it has been inside a World3D for a frame.
+##
+## Which world: the flat test park by default, and Valley One under `--valley`. The park is where
+## a person goes to try something — ramps, rocks, surfaces and walls within a few seconds of each
+## other — and the valley is the showcase the plan is measured in.
 func _build_terrain() -> void:
     if not Harness.args.has_flag("terrain"):
         return
@@ -70,15 +74,36 @@ func _build_terrain() -> void:
 
 func _populate_terrain() -> void:
     _terrain_pending = false
-    var error: String = ValleyTerrain.populate(_terrain)
+    var valley: bool = Harness.args.has_flag("valley")
+    var shape: Object = ValleyShape if valley else ParkShape
+    var error: String = ValleyTerrain.populate(_terrain, shape)
     if error != "":
         printerr("PLAY  the terrain could not be built: " + error)
         return
-    # The flat plane would otherwise sit inside the valley floor and the rig would rest on
+    # The flat plane would otherwise sit inside the generated ground and the rig would rest on
     # whichever happened to be higher.
     var ground: MeshInstance3D = _world.get_node_or_null(^"Ground") as MeshInstance3D
     if ground != null:
         ground.visible = false
+    if valley:
+        _build_valley()
+    else:
+        _world.add_child(ParkProps.build())
+    if _drive == null:
+        return
+    error = _drive.use_terrain(_terrain.get("data"))
+    if error != "":
+        printerr("PLAY  the solver could not take the terrain: " + error)
+        return
+    if not valley:
+        var props: int = ParkProps.apply_to_solver(_drive.solver)
+        print("PLAY  driving in the test park: %d props are solid" % props)
+        return
+    print("PLAY  driving on the valley")
+
+
+## The valley's own furniture: the tunnel, the water and the forest.
+func _build_valley() -> void:
     _world.add_child(Tunnel.build())
     var water: Node3D = ValleyWater.build()
     if water != null:
@@ -86,13 +111,6 @@ func _populate_terrain() -> void:
     var vegetation: Node3D = ValleyVegetation.build()
     if vegetation != null:
         _world.add_child(vegetation)
-    if _drive == null:
-        return
-    error = _drive.use_terrain(_terrain.get("data"))
-    if error != "":
-        printerr("PLAY  the solver could not take the terrain: " + error)
-        return
-    print("PLAY  driving on the valley")
 
 
 func _build_hud() -> Label:

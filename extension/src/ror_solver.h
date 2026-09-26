@@ -3,6 +3,7 @@
 #include "ror_drivetrain.h"
 #include "ror_ground.h"
 #include "ror_heightfield.h"
+#include "ror_obstacles.h"
 #include "ror_node.h"
 #include "ror_steering.h"
 #include "ror_wheels.h"
@@ -55,6 +56,17 @@ public:
     bool set_heightfield(const godot::PackedFloat32Array &heights, int width, int depth,
                          const godot::Vector3 &origin, float spacing);
     void clear_heightfield();
+
+    // Static boxes: ramps, walls, kerbs, rocks. Contacted with the same ground law as the
+    // terrain, because a rig hitting a wall and a rig landing on a slope are the same physics.
+    int add_obstacle_box(const godot::Transform3D &transform, const godot::Vector3 &half_extents,
+                         int surface);
+    void clear_obstacles();
+    int obstacle_count() const;
+    // What a point is inside, for a gate or a probe to ask: {"hit", "penetration", "normal",
+    // "surface"}. Selects around the point first, so it answers about the whole park rather than
+    // about whatever the rig happened to be near.
+    godot::Dictionary obstacle_contact(const godot::Vector3 &position);
     // Ground height and surface normal where the solver believes they are. The terrain that
     // is drawn and the terrain that is collided against have to agree, and this is the side
     // of that comparison the solver owns.
@@ -171,6 +183,10 @@ private:
     // Index 0 always exists and is upstream's `concrete`.
     std::vector<RorGroundModel> m_ground_models{RorGroundModel()};
     RorHeightfield m_heightfield;
+    RorObstacles m_obstacles;
+    // How far outside the rig's own bounds an obstacle still counts as near, in metres: one
+    // call's travel at any speed the solver is stable at, plus a truck's length.
+    static constexpr float OBSTACLE_MARGIN_M = 8.0f;
     godot::Vector3 m_gravity = godot::Vector3(0.0f, -9.81f, 0.0f);
     float m_ground_height = 0.0f;
     bool m_ground_enabled = false;
@@ -183,6 +199,8 @@ private:
     static void apply_bound_law(const RorBeam &beam, float extension, float &spring, float &damping);
     void accumulate_beam_forces();
     void apply_ground_contact(float dt);
+    void apply_obstacle_contact(float dt);
+    void select_nearby_obstacles();
 };
 
 } // namespace rorgd

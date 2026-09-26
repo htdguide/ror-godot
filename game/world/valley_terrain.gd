@@ -1,6 +1,10 @@
 class_name ValleyTerrain
 extends RefCounted
-## Builds the drivable valley: a Terrain3D with a generated heightmap and its collision off.
+## Builds a drivable world: a Terrain3D with a generated heightmap and its collision off.
+##
+## Which world is a parameter. `ValleyShape` is Valley One, the showcase the plan is measured in;
+## `ParkShape` is the flat test park. Both are two static functions of a grid cell — a height and a
+## surface — and everything downstream of here takes either without knowing which it has.
 ##
 ## Two things here are not obvious and both cost a probe to establish.
 ##
@@ -54,6 +58,9 @@ const COLOUR_MAP_ROUGHNESS: float = 0.6
 ## collision bridge is handed it, instead of both computing it from the same function and
 ## hoping they agree.
 static var _surfaces: PackedByteArray = PackedByteArray()
+## The shape the terrain was last built from. The surface map and the cache key both depend on it,
+## so it is remembered rather than passed to everything that needs it.
+static var _shape: Object = ValleyShape
 
 
 ## The surface map of the terrain built last. Built on demand if the terrain was not built in
@@ -67,7 +74,7 @@ static func surface_map() -> PackedByteArray:
     for z: int in size:
         var row: int = z * size
         for x: int in size:
-            out[row + x] = ValleyShape.surface_at(x, z)
+            out[row + x] = _shape.call("surface_at", x, z)
     _surfaces = out
     return _surfaces
 
@@ -88,9 +95,19 @@ static func give_to_solver(solver: RefCounted, data: Object) -> String:
     return TerrainHeightfield.apply(solver, field, surface_map())
 
 
-## Generates the heightmap and imports it, or loads the cached valley when there is one. Call
-## after the node has been in the tree a frame. Returns "" on success.
-static func populate(terrain: Node3D) -> String:
+## The shape the terrain is currently built from.
+static func shape() -> Object:
+    return _shape
+
+
+## Generates the heightmap and imports it, or loads the cached world when there is one. Call after
+## the node has been in the tree a frame. `shape` is `ValleyShape` or `ParkShape`; leaving it null
+## keeps whichever was used last, which is the valley until something asks for otherwise.
+## Returns "" on success.
+static func populate(terrain: Node3D, with_shape: Object = null) -> String:
+    if with_shape != null and with_shape != _shape:
+        _shape = with_shape
+        _surfaces = PackedByteArray()
     if terrain == null:
         return "Terrain3D is not installed: run tools/build_terrain3d.sh"
     if not terrain.is_inside_tree():
@@ -99,7 +116,7 @@ static func populate(terrain: Node3D) -> String:
     terrain.set("vertex_spacing", TerrainCfg.VERTEX_SPACING)
     # Terrain3D persists its regions in its data directory and loads them when the directory is
     # set, so this both names where the cache goes and loads it if it is already there.
-    var directory: String = ValleyCache.directory()
+    var directory: String = ValleyCache.directory(_shape)
     DirAccess.make_dir_recursive_absolute(directory)
     terrain.set("data_directory", directory)
     var data: Object = terrain.get("data")
@@ -132,8 +149,8 @@ static func populate(terrain: Node3D) -> String:
     for z: int in size:
         var row: int = z * size
         for x: int in size:
-            height.set_pixel(x, z, Color(ValleyShape.height_at(x, z), 0.0, 0.0))
-            var surface: int = ValleyShape.surface_at(x, z)
+            height.set_pixel(x, z, Color(_shape.call("height_at", x, z), 0.0, 0.0))
+            var surface: int = _shape.call("surface_at", x, z)
             surfaces[row + x] = surface
             colour.set_pixel(x, z, tints[surface])
     # import_images takes [height, control, colour]; the control map is left to its default.
@@ -163,7 +180,7 @@ static func _load_cached(data: Object, directory: String) -> bool:
     var surfaces: PackedByteArray = ValleyCache.read_surfaces(directory)
     if surfaces.is_empty():
         return false
-    var disagreement: String = ValleyCache.verify(data)
+    var disagreement: String = ValleyCache.verify(data, _shape)
     if disagreement != "":
         push_warning("the cached valley was discarded: %s" % disagreement)
         ValleyCache.discard(directory)

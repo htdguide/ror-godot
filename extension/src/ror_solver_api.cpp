@@ -206,6 +206,12 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_heightfield", "heights", "width", "depth", "origin", "spacing"),
                          &RorSolver::set_heightfield);
     ClassDB::bind_method(D_METHOD("clear_heightfield"), &RorSolver::clear_heightfield);
+    ClassDB::bind_method(D_METHOD("add_obstacle_box", "transform", "half_extents", "surface"),
+                         &RorSolver::add_obstacle_box);
+    ClassDB::bind_method(D_METHOD("clear_obstacles"), &RorSolver::clear_obstacles);
+    ClassDB::bind_method(D_METHOD("obstacle_count"), &RorSolver::obstacle_count);
+    ClassDB::bind_method(D_METHOD("obstacle_contact", "position"),
+                         &RorSolver::obstacle_contact);
     ClassDB::bind_method(D_METHOD("ground_height_at", "position"), &RorSolver::ground_height_at);
     ClassDB::bind_method(D_METHOD("ground_normal_at", "position"), &RorSolver::ground_normal_at);
     ClassDB::bind_method(D_METHOD("ground_contact_probe", "velocity", "forces", "mass",

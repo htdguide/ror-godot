@@ -14,6 +14,7 @@ const KNOWN_VALUE_KEYS: Array[String] = [
 
 const KNOWN_FLAGS: Array[String] = [
     "deterministic", "play", "update-golden", "list", "chain", "hud", "verbose", "terrain",
+    "valley",
 ]
 
 var values: Dictionary = {}

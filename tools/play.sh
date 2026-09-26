@@ -4,8 +4,9 @@
 #   tools/play.sh                        default preset, windowed
 #   tools/play.sh --shot diag_grid_wide  start from a named camera preset
 #   tools/play.sh --weather golden_dusk  any weather or time-of-day preset
-#   tools/play.sh --truck                the hero vehicle, on the valley, to drive
-#   tools/play.sh --truck --no-terrain   the same vehicle on the flat plane
+#   tools/play.sh --truck                the hero vehicle in the test park, to drive
+#   tools/play.sh --truck --valley       the same vehicle on Valley One instead
+#   tools/play.sh --truck --no-terrain   the same vehicle on a bare flat plane
 #
 # The window is tracked while it lives and the tracking file is removed on exit, so a
 # session can never be forgotten: tools/windows.sh list always tells the truth.
@@ -27,7 +28,8 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # --truck is shorthand: loading the hero vehicle is the common reason to open a window, and
-# a vehicle with nowhere to drive is not much of a session, so it brings the valley with it.
+# a vehicle with nowhere to drive is not much of a session, so it brings a world with it. The
+# test park is that world by default; --valley asks for Valley One.
 args=("$@")
 want_terrain=0
 for i in "${!args[@]}"; do
