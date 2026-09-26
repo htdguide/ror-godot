@@ -160,8 +160,31 @@ lake), `water_is_drawn` (the lake renders and fades with depth rather than being
 `vegetation_obeys_its_rules` (every plant on the ground, off the road, out of the water, and a
 stand that is denser than the valley around it),
 `valley_photoset` (every named place has a world in frame), `terrain_collision_agreement` (the
-solver and the renderer agree about the ground), `rig_settles_on_terrain` and
-`surfaces_are_visible`.
+solver and the renderer agree about the ground), `rig_settles_on_terrain`,
+`surfaces_are_visible`, and the three drivability scenarios — `ford_crossing`, `rut_traverse`
+and `switchback_climb` — which drive the features rather than measuring them.
+
+## Driving it
+
+    harness/drive_route.gd     the driver: steer at the next waypoint, hold a speed, change gear
+    harness/drive_scenario.gd  terrain, rig, spawn, handover
+    world/valley_routes.gd     the three routes, derived from the layout
+
+PLAN M1 acceptance 7 asks for three scenarios completed without the actor falling through the
+terrain, getting stuck or exploding, with solver energy bounded. Those are four different failures
+and the driver watches for all four, reporting numbers rather than a verdict: each gate decides
+what its own route was supposed to do.
+
+Two details are load-bearing. The fall-through check measures the rig against the terrain the
+*renderer* draws, not against the heightfield the solver was handed — asking the solver whether
+its own ground is where it thinks it is cannot fail, and a heightfield handed over five metres low
+was driven quite happily until the check was changed. The same check looks for the rig floating
+above that ground, held for a couple of seconds so that a wheel lifting over a crest does not
+count.
+
+The spawn heading is measured rather than assumed: the rig is placed at two known headings, its
+own heading is read back, and the placement angle that points it along the route is solved from
+those. A guess at the convention sent it 431 m down the valley away from its first waypoint.
 
 ## Still to come
 
