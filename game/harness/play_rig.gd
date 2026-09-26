@@ -83,6 +83,9 @@ func _populate_terrain() -> void:
     var water: Node3D = ValleyWater.build()
     if water != null:
         _world.add_child(water)
+    var vegetation: Node3D = ValleyVegetation.build()
+    if vegetation != null:
+        _world.add_child(vegetation)
     if _drive == null:
         return
     error = _drive.use_terrain(_terrain.get("data"))

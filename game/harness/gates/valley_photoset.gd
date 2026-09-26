@@ -70,6 +70,9 @@ func run(harness: Node) -> Dictionary:
     var water: Node3D = ValleyWater.build()
     if water != null:
         harness.world.add_child(water)
+    var vegetation: Node3D = ValleyVegetation.build()
+    if vegetation != null:
+        harness.world.add_child(vegetation)
 
     var reported: PackedStringArray = PackedStringArray()
     var darkest: float = INF

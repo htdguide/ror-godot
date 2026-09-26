@@ -164,6 +164,22 @@ const ROCK_BUMP_M: float = 0.35
 const ROCK_BUMP_WAVELENGTH_M: float = 11.0
 const ROCK_SURFACE: String = "rock"
 
+## --- The conifer stand ------------------------------------------------------------------------
+##
+## Two of the money shots are lit through trees — `valley_vista` has the sun behind the stand and
+## `switchback_backlit` shoots the climbing road through it — so the stand is placed where the
+## road and the ridge camera can both see it: the north wall, above and along the switchbacks.
+##
+## The rest of the valley's trees are scattered by the rules in `VegetationCfg`; this is the one
+## place that is a *stand*, dense enough to break the sun into shafts.
+const STAND_WEST_M: float = -120.0
+const STAND_EAST_M: float = 340.0
+const STAND_NEAR_Z_M: float = -200.0
+const STAND_FAR_Z_M: float = -560.0
+## How far into the stand the density ramps up from the scattered background, so it has an edge
+## rather than a boundary.
+const STAND_EDGE_M: float = 40.0
+
 ## --- What the walls and the ridge are made of -----------------------------------------------
 
 const WALL_SURFACE: String = "rock"

@@ -80,6 +80,32 @@ as soon as the ripples move, because the ground is what hides the water.
 Refraction and reflection are M6's work; this surface is the staged one PLAN §0.5 asks for, and
 M8 replaces its generation behind the same interface.
 
+## What grows on it
+
+    world/valley_vegetation.gd   conifers and shrubs: meshes, placement, multimeshes
+    config/vegetation_cfg.gd     species, density, and the rules about where anything may grow
+
+Placement is a pure function of position. Each cell of a 6 m grid is hashed, and the hash decides
+whether something grows there, which species, how big and which way it faces — no random number
+generator and no stored list, so the valley grows the same forest on any machine and a gate can
+check a plant by recomputing it rather than by trusting a record of what was planted.
+
+The rules are applied where a plant *stands*, not at the centre of its cell. The jitter that keeps
+a forest from reading as a lattice is up to half a cell, which is enough to put a tree inside the
+road clearance it was checked as being outside of — measured, and it is what
+`vegetation_obeys_its_rules` caught first.
+
+**This does not use `Terrain3DInstancer`, which PLAN §0.6 named for scattering.** The instancer
+stores instances inside Terrain3D's region files, which are what `ValleyCache` keeps between runs:
+the forest would become cached data rather than a consequence of the layout, and the cache's
+verification only samples heights. It also wants a `PackedScene` per species, which means assets
+on disk, where the CLI-only rule prefers generated. One multimesh per species, built from the
+placement function, keeps a single source of truth and costs one draw call each.
+
+The conifer stand is a feature with a place in the layout, because two money shots are lit through
+it: `valley_vista` has the sun behind it and `switchback_backlit` shoots the climbing road through
+it. Measured, it holds 143 conifers a hectare against 8.4 in the rest of the plantable valley.
+
 ## The cache, and why it is allowed to exist
 
 Generating the valley is 4.2 M cells of GDScript: about 10 s of heights, 7 s of surfaces and 2 s
@@ -131,14 +157,16 @@ The gates that hold it: `valley_has_its_features` (each feature exists at a size
 photographing), `road_is_drivable` (the road is continuous, wide enough, and no steeper than the
 rig's traction), `water_runs_downhill` (the river descends, stays in its channel and meets the
 lake), `water_is_drawn` (the lake renders and fades with depth rather than being a flat slab),
+`vegetation_obeys_its_rules` (every plant on the ground, off the road, out of the water, and a
+stand that is denser than the valley around it),
 `valley_photoset` (every named place has a world in frame), `terrain_collision_agreement` (the
 solver and the renderer agree about the ground), `rig_settles_on_terrain` and
 `surfaces_are_visible`.
 
 ## Still to come
 
-Vegetation through `Terrain3DInstancer` and the PBR ground material via
-`res://shaders/terrain3d_override.gdshader` — the rest of the M2 staging in PLAN §0.5. The
+The PBR ground material via `res://shaders/terrain3d_override.gdshader`, and vegetation tiers 2
+and 3 — the rest of the M2 staging in PLAN §0.5. The
 valley's shaded walls currently render near-black under `noon_clear`: the sky does light them,
 measured with the sun turned off, but AgX at the project's exposure crushes what it gives them.
 That is the tonemap and exposure work in M2b rather than a terrain fault, and it is why four of

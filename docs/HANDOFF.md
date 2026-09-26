@@ -12,8 +12,8 @@ Read `docs/PLAN.md` first — it is the approved plan and it is authoritative. T
 
 ## Where things stand
 
-The last commit is `feat(world): water in the valley, and a sheet to look at it with`.
-`./tools/gate.sh --all` is green across 58 gates in about 50 s of gate time; run it before you
+The last commit is `feat(world): a forest on the valley walls`.
+`./tools/gate.sh --all` is green across 59 gates in about 55 s of gate time; run it before you
 start so you know that is still true. It walks the gate graph — a gate may declare the gates its
 own claim contains, so a passing gate reports those as `IMPLIED` rather than running them, and a
 failing one is chased downward until the lowest failing gate names the level the fault is at.
@@ -44,6 +44,11 @@ off-camber rock shelf, and a switchback road benched into the north wall that cl
 ridge at 6% with a 9.5% worst hairpin. Generating it is 22 s of GDScript, so it is cached under
 `user://` and a load is checked against the shape function rather than trusted: warm is 2.5 s.
 
+**The valley has a forest.** Conifers and shrubs, generated rather than sourced, placed by a pure
+function of position — a hash per cell, no RNG and no stored list — with a stand on the north wall
+where `valley_vista` and `switchback_backlit` are framed. 5,149 conifers and 15,043 shrubs, one
+multimesh each.
+
 **The water is in.** A lake at the low end, a river that crosses the floor at a ford and drains
 into it, depth-faded and rippled. Its surface is derived from the valley floor rather than
 declared, which is the third version and the first correct one — see
@@ -64,11 +69,9 @@ per-surface ground textures with detiling, and recovery from a roll.
 
 ## What to do next
 
-**1. Vegetation, then the ground material.** The water is in (see
-`docs/architecture/valley.md`); what is left of PLAN §0.5's M2 staging is the conifer stand for
-`valley_vista` and `switchback_backlit`, through `Terrain3DInstancer`, generated rather than
-sourced unless a third-party kit is worth its own ask — and the PBR ground material through
-`res://shaders/terrain3d_override.gdshader`.
+**1. The ground material.** Water and vegetation tier 1 are in (see
+`docs/architecture/valley.md`); what is left of PLAN §0.5's M2 staging is the PBR ground material
+through `res://shaders/terrain3d_override.gdshader`, and vegetation tiers 2 and 3.
 
 **1b. The valley is too dark to judge.** Four of the seven views in
 `tools/valley_shots.sh` are nearly black on the shaded side. The sky *does* light the terrain —
