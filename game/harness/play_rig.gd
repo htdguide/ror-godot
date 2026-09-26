@@ -79,6 +79,7 @@ func _populate_terrain() -> void:
     var ground: MeshInstance3D = _world.get_node_or_null(^"Ground") as MeshInstance3D
     if ground != null:
         ground.visible = false
+    _world.add_child(Tunnel.build())
     if _drive == null:
         return
     error = _drive.use_terrain(_terrain.get("data"))
