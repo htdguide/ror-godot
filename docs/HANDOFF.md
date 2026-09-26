@@ -51,7 +51,35 @@ for the material, `Terrain3DInstancer` for vegetation. Anything third-party need
 `ford_crossing` and `rut_traverse` completing without the actor falling through, getting
 stuck or exploding. The rig drives and the terrain queries work, so these are now writable.
 
-**3. Fidelity gaps that are named rather than forgotten.**
+**3. What the first human session found.** One fixed, three measured and open. These are the
+most valuable items in this list: they are things every gate passed through.
+
+- **Steering was inverted.** Fixed, and `rig_steers` now checks which way the driver actually
+  gets rather than only that the rig turns the way its wheels point. The convention — positive
+  intent means left — lives in `DriveCfg.steer_command` and nowhere else.
+- **The suspension is welded.** Static deflection is 6, 7, -3 and -4 mm per wheel; a real
+  truck settles 30 to 80 mm. The rear axle is located by beams at 5,015,000 N/m, which is
+  what the file states once `set_beam_defaults_scale` is applied, so the rates are right and
+  something about the load path is not. Look at the axle-to-frame links and the shocks
+  (`95-12`, `97-4`, shocks `95-29`, `97-21`) rather than the axle-internal beams, which are
+  meant to be stiff. `game/tools/ringing_probe.gd` prints them ranked by force carried.
+- **The tyres ring.** The worst tread node sits at 1.646 m/s and 248 Hz at 2 kHz, against
+  0.117 m/s at 8 kHz — 14 times worse for four times the timestep, so this is a mode near the
+  integrator's stability edge, not physical ringing. Its frequency matches the rim hoop beams:
+  3.4 MN/m on a 2.03 kg node is 206 Hz with a damping ratio of 0.7%. Note the tension with the
+  2 kHz result: the rig is *stable* at 2 kHz and not *quiet* there. Do not fix this by raising
+  the rate without saying so.
+  - Known parity gap that has not been tried yet: upstream gives a meshwheels2 wheel's
+    `axis1-outer` and `axis2-inner` tyre beams SHOCK1 bounds with a 0.66 shortbound and a 0.15
+    max extension. The bounded beam laws exist now; the wheel rig does not use them.
+- **It rolls over easily.** Not the mass distribution: the centre of mass is 0.762 m above the
+  contact patch over a 1.80 m track, a 1.18 g static rollover threshold, which is better than
+  a real lifted S10. The likelier cause is that every surface is upstream's `concrete` ground
+  model, so the tyres grip at 1.2 right up to the point the vehicle tips instead of sliding
+  first. Terrain ground models are unimplemented; `RorSolver.set_ground_friction` takes them
+  and nothing calls it with anything but the default.
+
+**4. Fidelity gaps that are named rather than forgotten.**
 
 - The hero truck declares a `fusedrag` section. Upstream gives such a rig a single fuselage
   drag vector instead of the per-node drag it currently gets.
