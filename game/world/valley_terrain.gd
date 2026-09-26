@@ -23,6 +23,27 @@ static func create() -> Node3D:
     return terrain
 
 
+## Makes the surface tints visible.
+##
+## With no texture assets loaded Terrain3D has no albedo to shade with at all: measured, the
+## terrain renders pure black with both of these off. Its checkered pattern is the placeholder
+## it draws instead, and that is what a driver saw where the surface lanes should have been.
+##
+## `show_colormap` is the view that draws the colour map itself, which is where the lane tints
+## live, and it is what makes them visible — turning the checker off alone changes nothing,
+## because the colour map view takes precedence over it either way.
+##
+## This is a debug view standing in for a material, and it goes when the Terrain3D shader
+## override and real ground textures land in M2. Until then it is the only thing telling a
+## driver which surface they are on, which a test track needs more than scenery does.
+static func _show_surfaces(terrain: Node3D) -> void:
+    var material: Object = terrain.get("material")
+    if material == null:
+        return
+    material.set("show_checkered", false)
+    material.set("show_colormap", true)
+
+
 ## Generates the heightmap and imports it. Call after the node has been in the tree a frame.
 ## Returns "" on success.
 static func populate(terrain: Node3D) -> String:
@@ -41,6 +62,7 @@ static func populate(terrain: Node3D) -> String:
     if data == null:
         return "the terrain has no data object after a frame in the tree"
     terrain.set("collision_mode", TerrainCfg.COLLISION_DISABLED)
+    _show_surfaces(terrain)
 
     var size: int = TerrainCfg.MAP_SIZE
     var height: Image = Image.create_empty(size, size, false, Image.FORMAT_RF)

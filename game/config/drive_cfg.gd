@@ -15,6 +15,9 @@ const MAX_SUBSTEPS_PER_FRAME: int = 400
 ## How far above the ground the rig starts, so it drops onto its springs rather than
 ## starting inside them.
 const SPAWN_HEIGHT_M: float = 0.05
+## And how far above it a recovered rig is set down. Higher than a spawn, because a recovery
+## happens wherever the vehicle rolled and the ground there may be uneven.
+const RECOVER_CLEARANCE_M: float = 0.4
 
 ## Which way the driver's steering input goes.
 ##
@@ -47,7 +50,8 @@ const CHASE_SMOOTHING: float = 0.15
 ## The keys the driver uses. Named so the help text and the handling cannot disagree.
 const HELP: String = (
     "DRIVE  Up throttle, Down brake, Left/Right steer, Space handbrake\n"
-    + "DRIVE  R reverse, N neutral, G drive, I ignition, L lights, Backspace respawn\n"
+    + "DRIVE  R reverse, N neutral, G drive, I ignition, L lights\n"
+    + "DRIVE  Enter recover upright where you are, Backspace respawn at the start\n"
     + "DRIVE  F5 chase camera, F6 free camera"
 )
 

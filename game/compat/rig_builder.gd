@@ -73,6 +73,42 @@ static func from_file(mod_dir: String, truck_file: String, drop_height_m: float 
 
 
 ## Travel limits, before anything reads a beam's length: pre-compression changes it.
+## Sets a rig down at `origin`, upright, facing `heading` radians, at rest and undeformed.
+##
+## Rebuilt from the rest shape rather than moved from wherever it was: a soft-body vehicle
+## that has been rolled is bent, and turning the wreck the right way up leaves it a wreck.
+## Every actuated beam goes back to its reference length too, or a rig recovered mid-turn
+## keeps the steering lock that was baked into its rams.
+static func place(
+    solver: RefCounted, truck: TruckParser, origin: Vector3, heading: float, clearance: float
+) -> void:
+    var upright: Basis = Basis(Vector3.UP, heading)
+    var lowest: float = INF
+    for node: Vector3 in truck.nodes:
+        lowest = minf(lowest, (upright * node).y)
+    var ground: float = solver.ground_height_at(origin)
+    for i: int in truck.nodes.size():
+        var placed: Vector3 = upright * truck.nodes[i]
+        solver.set_node_position(
+            i,
+            Vector3(
+                origin.x + placed.x,
+                ground + clearance + placed.y - lowest,
+                origin.z + placed.z
+            )
+        )
+        solver.set_node_velocity(i, Vector3.ZERO)
+    for beam: int in solver.beam_count():
+        solver.set_beam_rest_length(beam, solver.get_beam_reference_length(beam))
+    solver.set_steer_command(0.0)
+
+
+## Which way a rig is facing, in radians about the vertical, from its own frame.
+static func heading_of(positions: PackedVector3Array, camera_nodes: Dictionary) -> float:
+    var forward: Vector3 = -ActorFrame.of(positions, camera_nodes).basis.z
+    return atan2(forward.x, forward.z)
+
+
 static func _add_bounds(solver: RefCounted, truck: TruckParser) -> void:
     for entry: Dictionary in truck.bounded_beams:
         solver.set_beam_bounds(

@@ -86,6 +86,8 @@ func on_key(keycode: Key) -> bool:
             print("DRIVE  lights %s" % ("on" if _lit else "off"))
         KEY_BACKSPACE:
             _respawn()
+        KEY_ENTER:
+            _recover()
         _:
             return false
     return true
@@ -161,21 +163,32 @@ func _gear_name() -> String:
     return "%d" % gear
 
 
-## Puts the rig back where it started, upright and at rest. The one control a person always
-## wants after rolling a truck onto its roof.
+## Sets the rig upright where it is, keeping the heading it was travelling on.
+##
+## What a person wants after rolling a truck is to carry on from there, not to be sent back to
+## the start — a recovery, not a respawn. The rig is rebuilt from its rest shape rather than
+## being rotated in place: a rolled soft-body vehicle is deformed, and turning the wreck the
+## right way up leaves it a wreck. Upstream's reset does the same.
+func _recover() -> void:
+    var positions: PackedVector3Array = solver.get_positions()
+    var origin: Vector3 = ActorFrame.of(positions, truck.camera_nodes).origin
+    # Keep where it is and which way it was facing; discard the roll and pitch that put it
+    # on its roof.
+    RigBuilder.place(
+        solver,
+        truck,
+        origin,
+        RigBuilder.heading_of(positions, truck.camera_nodes),
+        DriveCfg.RECOVER_CLEARANCE_M
+    )
+    solver.start_engine()
+    _apply_pose()
+    print("DRIVE  recovered")
+
+
+## Puts the rig back where it started, upright and at rest.
 func _respawn() -> void:
-    var lowest: float = INF
-    for node: Vector3 in truck.nodes:
-        lowest = minf(lowest, node.y)
-    # On terrain the spawn height is relative to the ground under the rig, not to zero.
-    var ground: float = solver.ground_height_at(Vector3.ZERO)
-    var lift: Vector3 = Vector3(0.0, ground + DriveCfg.SPAWN_HEIGHT_M - lowest, 0.0)
-    for i: int in truck.nodes.size():
-        solver.set_node_position(i, truck.nodes[i] + lift)
-        solver.set_node_velocity(i, Vector3.ZERO)
-    for beam: int in solver.beam_count():
-        solver.set_beam_rest_length(beam, solver.get_beam_reference_length(beam))
-    solver.set_steer_command(0.0)
+    RigBuilder.place(solver, truck, Vector3.ZERO, 0.0, DriveCfg.SPAWN_HEIGHT_M)
     _lit = false
     solver.start_engine()
     _apply_pose()
