@@ -132,7 +132,7 @@ func _read_controls(delta: float) -> void:
     solver.set_throttle(_throttle)
     solver.set_brake(_brake)
     solver.set_parking_brake(Input.is_key_pressed(KEY_SPACE))
-    solver.set_steer_command(steer)
+    solver.set_steer_command(DriveCfg.steer_command(steer))
 
 
 func _apply_pose() -> void:
@@ -176,6 +176,7 @@ func _respawn() -> void:
     for beam: int in solver.beam_count():
         solver.set_beam_rest_length(beam, solver.get_beam_reference_length(beam))
     solver.set_steer_command(0.0)
+    _lit = false
     solver.start_engine()
     _apply_pose()
     print("DRIVE  respawned")

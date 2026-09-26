@@ -16,6 +16,20 @@ const MAX_SUBSTEPS_PER_FRAME: int = 400
 ## starting inside them.
 const SPAWN_HEIGHT_M: float = 0.05
 
+## Which way the driver's steering input goes.
+##
+## The solver's hydro law is upstream's and says nothing about which way is left: it shortens
+## and lengthens the rams a rig's own file asks it to, and where that points the wheels
+## depends on the handedness of the space the rig is described in. Measured on the hero truck,
+## a positive command steers it to its own right, which is the third place this project's rig
+## space has turned out to differ from upstream's by a handedness — after the steering wheel's
+## 121 degree rake and the flare normals.
+##
+## So the project states its own convention — a positive intent means left — and converts
+## once, here. Everything that steers goes through this, so the play window and the gates
+## cannot disagree about it, which is how an inverted control reached a human session.
+const STEER_INTENT_TO_COMMAND: float = -1.0
+
 ## How hard the driver's controls ramp. The steering ramp itself is upstream's and lives in
 ## the solver; these are the pedals, which upstream takes from an analogue axis.
 const THROTTLE_RATE: float = 4.0
@@ -36,3 +50,8 @@ const HELP: String = (
     + "DRIVE  R reverse, N neutral, G drive, I ignition, L lights, Backspace respawn\n"
     + "DRIVE  F5 chase camera, F6 free camera"
 )
+
+
+## Turns "positive means left" driver intent into the command the solver takes.
+static func steer_command(intent: float) -> float:
+    return intent * STEER_INTENT_TO_COMMAND

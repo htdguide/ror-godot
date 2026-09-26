@@ -62,6 +62,27 @@ func _initialize() -> void:
             lightest = i
     print("mass: %.1f kg total over %d nodes; heaviest node %d at %.1f kg, lightest %d at %.2f kg"
         % [total, masses.size(), heaviest, masses[heaviest], lightest, masses[lightest]])
+
+    # Centre of mass, and where it sits relative to the wheels. A vehicle's resistance to
+    # rolling over is set by how high this is against how far apart the tyres are, so the two
+    # together are the number to compare with a real S10 rather than the mass alone.
+    var centre: Vector3 = Vector3.ZERO
+    for i: int in masses.size():
+        centre += truck.nodes[i] * masses[i] / total
+    var lowest_y: float = INF
+    var track: float = 0.0
+    var axle_y: float = 0.0
+    for wheel: Dictionary in truck.wheels:
+        var a: Vector3 = truck.nodes[wheel["node1"] as int]
+        var b: Vector3 = truck.nodes[wheel["node2"] as int]
+        axle_y += (a.y + b.y) * 0.5 / float(truck.wheels.size())
+        lowest_y = minf(lowest_y, (a.y + b.y) * 0.5 - (wheel["tire_radius"] as float))
+        track = maxf(track, absf(a.z - b.z) + absf(a.z + b.z))
+    var height: float = centre.y - lowest_y
+    print("centre of mass: (%.3f, %.3f, %.3f) rig space, %.3f m above the tyre contact patch"
+        % [centre.x, centre.y, centre.z, height])
+    print("  track %.2f m, so the static rollover threshold is %.2f g"
+        % [track, track * 0.5 / maxf(height, 0.001)])
     print("unparsed sections: %s" % _unparsed(truck))
     quit(0)
 

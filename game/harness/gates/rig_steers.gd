@@ -13,6 +13,16 @@ extends GateBase
 ## read as a plain beam holds the steering rack rigid, and a rig that cannot steer looks
 ## exactly like a rig whose steering is merely slow.
 ##
+## It also checks which way round the controls are. Hub angle agreeing with yaw rate only
+## proves the rig turns the way its wheels point; it says nothing about whether the driver
+## asking for left gets left, and a sign at the input layer is invisible to every measurement
+## that stays inside the vehicle. That one reached a human session, which is exactly the kind
+## of finding this gate existed to make unnecessary.
+##
+## Left is defined in the vehicle's own frame, not the world's: the actor frame's +X is the
+## vehicle's right, so a left turn moves it toward its own -X. That needs no convention about
+## which way the world is wound.
+##
 ## The hub angle is the angle *between the two axles*, not either axle's heading in the
 ## world. Measured against the world, a rig in a turn shows its whole body's yaw on both
 ## axles at once: the first version of this gate reported a 64 degree steering lock for what
@@ -32,6 +42,9 @@ const MEASURE_SECONDS: float = 1.5
 const THROTTLE: float = 0.18
 ## The steered hubs must turn by at least this much, or the rams are holding the rack.
 const MIN_HUB_ANGLE_DEG: float = 2.0
+## How far the rig must move sideways, in its own frame, for the turn direction to be read
+## off with confidence rather than off noise.
+const MIN_LATERAL_M: float = 0.5
 ## Measured turn radius against the Ackermann radius for the measured hub angle.
 const RADIUS_TOLERANCE: float = 0.35
 ## Held straight, the heading must stay put. A soft-body rig wanders a little.
@@ -96,6 +109,25 @@ func run(_harness: Node) -> Dictionary:
             )
         # Hub angle and heading change must agree in sign, or the rig is turning the other
         # way from the way its wheels point.
+        # Which way the driver actually gets. Positive command means left, and left is the
+        # vehicle's own -X.
+        var lateral: float = turn["lateral_m"] as float
+        if absf(lateral) < MIN_LATERAL_M:
+            return fail(
+                "at %+.0f lock the rig moved only %.2f m sideways in its own frame: too"
+                % [command, lateral]
+                + " little to tell which way it turned",
+                lateral
+            )
+        var went_left: bool = lateral < 0.0
+        var asked_left: bool = command > 0.0
+        if went_left != asked_left:
+            return fail(
+                "a %+.0f steer command asks for %s and the rig went %s: the controls are"
+                % [command, "left" if asked_left else "right", "left" if went_left else "right"]
+                + " inverted",
+                lateral
+            )
         if signf(hub_deg) != signf(yaw_deg):
             return fail(
                 "at %+.0f lock the hubs turned %+.2f deg but the heading moved %+.2f deg:"
@@ -150,7 +182,9 @@ func _run_turn(mod_dir: String, command: float) -> Dictionary:
     solver.start_engine()
     solver.set_gear_selector(1)
     solver.set_throttle(THROTTLE)
-    solver.set_steer_command(command)
+    # Through the same conversion the driver's controls use, so this measures what a person
+    # pressing the key actually gets.
+    solver.set_steer_command(DriveCfg.steer_command(command))
     for _i: int in int(ENTRY_SECONDS * 60.0):
         solver.step(dt, chunk)
     if not is_finite(solver.get_node_position(0).length()):
@@ -168,12 +202,16 @@ func _run_turn(mod_dir: String, command: float) -> Dictionary:
     var exit: Transform3D = ActorFrame.of(solver.get_positions(), truck.camera_nodes)
 
     var yaw: float = _heading_change(entry, exit)
+    # Sideways travel in the frame the rig was in when the measurement started: negative is
+    # toward its own left.
+    var travel: Vector3 = exit.origin - entry.origin
     return {
         "error": "",
         "hub_deg": rad_to_deg(hub),
         "yaw_deg": rad_to_deg(yaw),
         "radius": path / absf(yaw) if absf(yaw) > 0.0001 else INF,
         "wheelbase": wheelbase,
+        "lateral_m": travel.dot(entry.basis.x),
     }
 
 
