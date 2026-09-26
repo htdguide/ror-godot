@@ -30,6 +30,8 @@ static func meta() -> Dictionary:
     return {
         "name": "valley_photoset",
         "proves": "every named place in the valley renders a frame with ground in it, and the set of them is captured for a human session",
+        # seven rendered frames of a built Terrain3D valley.
+        "builds_on": ["smoke", "terrain3d_available"],
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
             "%d views, each brighter than %.2f luma with at least %.0f%% of the frame not sky"

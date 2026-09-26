@@ -28,6 +28,9 @@ static func meta() -> Dictionary:
     return {
         "name": "vehicle_photoset",
         "proves": "the vehicle is present and drawn from every side, including its interior",
+        # photographing the vehicle from eight sides builds it and draws it, which is what
+        # vehicle_renders proves.
+        "builds_on": ["vehicle_renders"],
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": "each of the %d views covers at least %.0f%% of its frame" % [
             Photoset.VIEWS.size(), MIN_COVERAGE * 100.0

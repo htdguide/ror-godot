@@ -37,6 +37,8 @@ static func meta() -> Dictionary:
     return {
         "name": "surfaces_are_visible",
         "proves": "the terrain draws its surface lanes, so a driver can see which surface they are on",
+        # the lanes are read from captured frames of a built Terrain3D valley.
+        "builds_on": ["smoke", "terrain3d_available"],
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
             "%s and %s differ in rendered luminance by at least %.2f, and neither is black"

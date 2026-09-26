@@ -34,6 +34,8 @@ static func meta() -> Dictionary:
     return {
         "name": "suspension_travels",
         "proves": "the frame settles onto its suspension under its own weight, by a realistic amount, evenly across each axle",
+        # the travel is measured on the same settle, at the same rate, for longer.
+        "builds_on": ["solver_settles_vehicle"],
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
             "every wheel settles %.0f to %.0f mm; left and right of an axle within %.0f mm"

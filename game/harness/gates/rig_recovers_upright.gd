@@ -45,6 +45,8 @@ static func meta() -> Dictionary:
     return {
         "name": "rig_recovers_upright",
         "proves": "a rolled vehicle can be recovered onto its wheels where it lies, undeformed and facing the way it was",
+        # recovering a rolled rig settles it again, at the same rate and for longer.
+        "builds_on": ["solver_settles_vehicle"],
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
             "after recovery the vehicle's up axis is within %.2f of vertical, it is within"

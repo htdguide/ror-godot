@@ -39,6 +39,8 @@ static func meta() -> Dictionary:
     return {
         "name": "water_is_drawn",
         "proves": "the lake renders as water and fades with depth, rather than being absent or a flat slab",
+        # the lake is rendered over a built Terrain3D valley and captured twice.
+        "builds_on": ["smoke", "terrain3d_available"],
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
             "at least %.0f%% of the frame changes when the water is hidden, and the water hides"

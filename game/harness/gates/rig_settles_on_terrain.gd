@@ -31,6 +31,9 @@ static func meta() -> Dictionary:
     return {
         "name": "rig_settles_on_terrain",
         "proves": "the rig lands on sloped terrain with every wheel at the height of the ground beneath it, not through it and not above it",
+        # the rig settles on a built Terrain3D valley at the same rate and for longer than the flat-
+        # ground settle.
+        "builds_on": ["solver_settles_vehicle", "terrain3d_available"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": (
             "each axle within %.2f m of a tyre radius above the terrain under it; the"

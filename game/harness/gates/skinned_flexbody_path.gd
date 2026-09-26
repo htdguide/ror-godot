@@ -26,6 +26,8 @@ static func meta() -> Dictionary:
     return {
         "name": "skinned_flexbody_path",
         "proves": "SkinnedFlexbody applies its bone transforms when its parent carries a frame",
+        # applying bone transforms under a parent frame is the composition that gate characterises.
+        "builds_on": ["skinning_transform_semantics"],
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": "geometry renders within %.0f px of its rig position, not its parent's frame" % MATCH_TOLERANCE_PX,
         "why": (

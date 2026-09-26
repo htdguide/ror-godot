@@ -13,8 +13,13 @@ Read `docs/PLAN.md` first — it is the approved plan and it is authoritative. T
 ## Where things stand
 
 The last commit is `feat(world): water in the valley, and a sheet to look at it with`.
-`./tools/gate.sh --all` is green across 57 gates in about 55 s of gate time; run it before you
-start so you know that is still true. `tools/valley_shots.sh` renders the seven named places in
+`./tools/gate.sh --all` is green across 58 gates in about 50 s of gate time; run it before you
+start so you know that is still true. It walks the gate graph — a gate may declare the gates its
+own claim contains, so a passing gate reports those as `IMPLIED` rather than running them, and a
+failing one is chased downward until the lowest failing gate names the level the fault is at.
+`--all --every` ignores the graph and runs everything, which is what a release run uses;
+`tools/gate.sh --why <gate>` asks the "is it this, or something under it?" question directly.
+See `docs/guides/harness.md`. `tools/valley_shots.sh` renders the seven named places in
 the valley as one sheet, which is what a session looking at the scene is run from. The hero asset is an unmodified
 community mod at `assets/mods/ChevyS1023` (`S10offroad.truck`), loaded through the compatibility
 shim with no conversion step.
@@ -146,6 +151,11 @@ What this can and cannot do:
   emergent behaviour like the suspension travelling 6 mm.
 
 ## How to work here
+
+**A gate that is implied is not a gate that passed.** The graph's edges are claims about claims
+and nothing can check them: write one only when the higher gate's procedure genuinely contains the
+lower one's, and run `--all --every` before believing a green suite over a change that touched the
+chain.
 
 **Gates are the only sense of sight, so they have to be honest.** Every gate declares metadata
 (`name`, `proves`, `oracle`, `threshold`, `why`, `budget_s`, `needs_gpu`, `milestone`) and the

@@ -38,6 +38,8 @@ static func meta() -> Dictionary:
     return {
         "name": "tunnel_lighting_changes",
         "proves": "the tunnel blocks the sun and its lamps light what is inside, so driving through it is a real lighting transition",
+        # the lighting transition is measured on the hero vehicle, built and drawn.
+        "builds_on": ["vehicle_renders"],
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
             "inside is at least %.0f%% darker than outside with the lamps off; the lamps"

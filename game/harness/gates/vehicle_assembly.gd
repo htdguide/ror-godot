@@ -41,6 +41,8 @@ static func meta() -> Dictionary:
     return {
         "name": "vehicle_assembly",
         "proves": "every rendered part sits where the vehicle's own rig places it",
+        # comparing where parts sit needs the parts built from the mod and in the scene.
+        "builds_on": ["vehicle_renders"],
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": "part offsets within %.1f mm, wheel geometry within %.0f mm of its axle" % [TOLERANCE_MM, WHEEL_TOLERANCE_MM],
         "why": (

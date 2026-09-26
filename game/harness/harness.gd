@@ -41,6 +41,10 @@ func begin(main: Node) -> void:
         _print_inventory()
         _quit(EXIT_OK)
         return
+    if args.has_flag("chain"):
+        _print_chain()
+        _quit(EXIT_OK)
+        return
     _apply_determinism()
     if args.values.has("gate"):
         _run_gate(args.get_string("gate", ""))
@@ -299,6 +303,19 @@ func setup_for(shot: String) -> String:
 
 ## --------------------------------------------------------------------------------
 ## Plumbing
+
+
+## The gate graph, for the runner to schedule from: which gates build on which, and what tier
+## that puts each one in. Printed rather than computed in the runner because the edges are
+## declared in the gates themselves and nothing outside the engine can read them.
+func _print_chain() -> void:
+    var graph: Dictionary = GateChain.load_graph()
+    print("HARNESS_CHAIN " + JSON.stringify({
+        "gates": graph,
+        "order": GateChain.order(graph),
+        "roots": GateChain.roots(graph),
+        "problems": GateChain.problems(graph),
+    }))
 
 
 func _print_inventory() -> void:

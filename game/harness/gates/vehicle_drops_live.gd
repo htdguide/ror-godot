@@ -25,6 +25,8 @@ static func meta() -> Dictionary:
     return {
         "name": "vehicle_drops_live",
         "proves": "solver, bridge and renderer run together: a dropped vehicle falls, lands and is drawn doing it",
+        # a dropped vehicle that is drawn falling has been built from its own mod and rendered.
+        "builds_on": ["vehicle_renders"],
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
             "vehicle descends at least %.1f m, ends within %.2f m of the ground, stays finite"

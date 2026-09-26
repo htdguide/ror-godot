@@ -34,6 +34,9 @@ static func meta() -> Dictionary:
     return {
         "name": "flexbody_lbs_equivalence",
         "proves": "Godot GPU skinning reproduces FlexBody deformation within the error threshold across extreme poses",
+        # comparing skinned output against the reference requires the skinned path to apply its bone
+        # transforms at all.
+        "builds_on": ["skinned_flexbody_path"],
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": "max vertex error < %.1f mm in every pose" % THRESHOLD_MM,
         "why": (

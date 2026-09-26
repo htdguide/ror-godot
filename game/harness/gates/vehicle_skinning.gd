@@ -27,6 +27,8 @@ static func meta() -> Dictionary:
     return {
         "name": "vehicle_skinning",
         "proves": "GPU skinning reproduces FlexBody deformation on a real vehicle mesh within the error threshold",
+        # the same skinning comparison, run on a real vehicle mesh instead of a synthetic one.
+        "builds_on": ["flexbody_lbs_equivalence"],
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": "max vertex error < %.1f mm in every pose" % THRESHOLD_MM,
         "why": (

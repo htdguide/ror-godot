@@ -9,7 +9,10 @@ measures, compares, and decides. It is the first commit for that reason.
 ## Running things
 
     tools/gate.sh --list              gates, camera presets and scenarios
-    tools/gate.sh --all               every gate, as a table, non-zero exit on failure
+    tools/gate.sh --chain             the gate graph: what each gate builds on
+    tools/gate.sh --all               the suite, highest tier first, as a table
+    tools/gate.sh --all --every       the suite with the graph ignored: every gate runs
+    tools/gate.sh --why vehicle_renders   one gate, then everything under it if it failed
     tools/gate.sh smoke               one gate
     tools/gate.sh smoke --weather golden_dusk
     tools/gate.sh --shot diag_origin  capture one ad-hoc frame
@@ -20,6 +23,39 @@ under any weather preset without a second scene.
 
 Environment overrides: `GODOT`, `RESOLUTION`, `FIXED_FPS`, `QUIT_AFTER`, `KEEP_RUNS`,
 and `MOVIE=1` with `MOVIE_NAME=<name>` to record the run.
+
+## The gate graph
+
+Gates are not a flat list. A gate may declare `builds_on`: the gates whose claims its own claim
+contains. An edge means two things, and both have to be true before it is written.
+
+**Passing implies.** Running this gate exercises everything the named gate exercises, at least as
+hard. A vehicle photographed from eight sides has rendered a frame, so there is no need to also
+prove that a cube renders.
+
+**Failing localises.** If this gate fails, the named gates are where to look next. The runner
+walks down them until one fails too, and the lowest failing gate is the level the fault is at:
+everything above it failed because of it, everything below it passed, so the fault is in what that
+gate alone exercises.
+
+    tools/gate.sh --chain                    what builds on what
+    tools/gate.sh --all                      skips what a passing gate implies
+    tools/gate.sh --why wheels_roll_on_screen   walks the chain under one gate
+
+`--all` walks the suite highest tier first. A gate covered by one that has already passed is
+reported as `IMPLIED` and not run — never as passed, because it was not. When a run fails, the
+localisation lines at the end name, for each failure, the lowest failing gate under it.
+
+**The edges are claims about claims, and nothing can check them automatically.** That is why
+`--all --every` exists and is what a release run uses: it ignores the graph entirely, and it is the
+only thing that catches an edge that was never true. The `gate_chain` gate checks what can be
+checked — every edge names a real gate, nothing builds on itself, there are no cycles — and reports
+how much of the suite the graph is allowed to imply, so that exposure is a number rather than a
+feeling.
+
+Write an edge only when the higher gate's procedure genuinely contains the lower one's: same
+subject, same or harder conditions, same or tighter threshold. "It feels related" is not an edge.
+When in doubt, leave the gate a leaf; a leaf always runs.
 
 ## Why a window opens
 
@@ -92,7 +128,7 @@ gate that omits it — and it exists so that a failure is actionable and so the 
 report its own debt.
 
 Required: `name`, `proves`, `oracle`, `threshold`, `why`, `budget_s`, `needs_gpu`,
-`milestone`.
+`milestone`. Optional: `builds_on`, the gates this one covers — see the gate graph above.
 
 `oracle` is one of `external` (a third-party reference: Khronos sample renders, a
 Blender Cycles render, published transfer values, a physical formula), `computed` (a

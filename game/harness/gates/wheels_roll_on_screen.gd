@@ -31,6 +31,9 @@ static func meta() -> Dictionary:
     return {
         "name": "wheels_roll_on_screen",
         "proves": "the drawn wheels turn with the vehicle's motion: the contact patch is the slowest part of the tyre and the top the fastest",
+        # the drawn wheels are posed through the same apply_pose path, once per frame, for a whole
+        # revolution.
+        "builds_on": ["vehicle_deforms"],
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": (
             "wheels turn at least %.0f revolution; drawn speed at the contact patch under"

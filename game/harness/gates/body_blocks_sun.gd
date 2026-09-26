@@ -37,6 +37,8 @@ static func meta() -> Dictionary:
     return {
         "name": "body_blocks_sun",
         "proves": "the bodywork occludes and responds to the sun rather than passing it through",
+        # measuring how the bodywork takes the sun needs the bodywork built and drawn.
+        "builds_on": ["vehicle_renders"],
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": (
             "the vehicle is at least %.2fx brighter lit from the camera's side than lit"

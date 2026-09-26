@@ -28,6 +28,9 @@ static func meta() -> Dictionary:
     return {
         "name": "terrain_collision_agreement",
         "proves": "the height the solver collides against and the height Terrain3D draws agree across the terrain, between grid vertices as well as on them",
+        # the comparison is against Terrain3D's own height query, which has to be there to be
+        # compared with.
+        "builds_on": ["terrain3d_available"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": (
             "%d samples off the grid within %.1f mm; terrain relief at least %.0f m"

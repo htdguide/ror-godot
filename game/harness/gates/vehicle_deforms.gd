@@ -21,6 +21,9 @@ static func meta() -> Dictionary:
     return {
         "name": "vehicle_deforms",
         "proves": "apply_pose drives every part and wheel from node positions, and only the nodes that moved",
+        # posing every part from node positions and checking where each lands is the assembly check
+        # with the vehicle moving.
+        "builds_on": ["vehicle_assembly"],
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": (
             "lifted wheels move %.2f m within %.3f m; unlifted wheels move under %.3f m"

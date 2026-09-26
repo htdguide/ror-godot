@@ -2,8 +2,15 @@
 # Gate runner. The only way gates are invoked.
 #
 #   tools/gate.sh --list                 list gates, camera presets and scenarios
+#   tools/gate.sh --chain                print the gate graph: what builds on what
 #   tools/gate.sh <gate> [extra args]    run one gate
-#   tools/gate.sh --all [extra args]     run every gate, print a table, non-zero on failure
+#   tools/gate.sh --all [extra args]     run the suite highest tier first, skipping what a
+#                                        passing gate implies; non-zero on failure
+#   tools/gate.sh --all --every          run every gate, ignoring the graph. What a release
+#                                        run uses: it is the only thing that catches an edge
+#                                        that was never true
+#   tools/gate.sh --why <gate>           run one gate and, if it fails, walk down everything it
+#                                        builds on until the lowest failing gate is found
 #   tools/gate.sh --shot <preset>        capture one ad-hoc frame
 #
 # Extra arguments pass through to the harness, so any gate runs under any weather:
@@ -97,10 +104,181 @@ result_field() {
     python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get(sys.argv[2], ""))' "$1" "$2"
 }
 
+
+# --------------------------------------------------------------------------------
+# Scheduling from the gate graph.
+#
+# A gate may declare the gates whose claims its own claim contains (`builds_on`). Two things
+# follow, and the suite uses both: a passing gate implies everything under it, so that a run does
+# not re-prove that a cube renders after a whole vehicle has; and a failing gate is a reason to
+# run what is under it, until the lowest failing gate says which level the fault is at.
+#
+# The graph is a set of claims about claims that nothing can check automatically, so `--every`
+# ignores it and runs everything. An implied gate is reported as implied and never as passed.
+
+CHAIN_FILE=""
+RESULTS_FILE=""
+IMPLIED_FILE=""
+
+cleanup_plan() {
+    [[ -n "$CHAIN_FILE" ]] && rm -f "$CHAIN_FILE"
+    [[ -n "$RESULTS_FILE" ]] && rm -f "$RESULTS_FILE"
+    [[ -n "$IMPLIED_FILE" ]] && rm -f "$IMPLIED_FILE"
+    return 0
+}
+
+load_chain() {
+    CHAIN_FILE="$(mktemp)"
+    run_engine --chain 2>/dev/null | grep 'HARNESS_CHAIN ' | tail -1 > "$CHAIN_FILE"
+    if [[ ! -s "$CHAIN_FILE" ]]; then
+        echo "gate.sh: the engine printed no gate graph" >&2
+        exit 3
+    fi
+}
+
+plan() {
+    python3 "$REPO_ROOT/tools/gate_plan.py" "$@" --chain "$CHAIN_FILE"
+}
+
+# Runs one gate and leaves its verdict in VERDICT, ELAPSED and DETAIL.
+VERDICT=""
+ELAPSED=""
+DETAIL=""
+run_one() {
+    local gate="$1"
+    shift
+    local output line json
+    output="$(run_engine --gate "$gate" "$@" 2>&1)"
+    line="$(printf '%s\n' "$output" | grep 'HARNESS_GATE_RESULT ' | tail -1)"
+    if [[ -z "$line" ]]; then
+        VERDICT=FAIL
+        ELAPSED="-"
+        DETAIL="no result line; engine output below"
+        printf '%s\n' "$output" | tail -25 >&2
+        return
+    fi
+    json="${line#*HARNESS_GATE_RESULT }"
+    if [[ "$(result_field "$json" pass)" == "True" ]]; then VERDICT=PASS; else VERDICT=FAIL; fi
+    ELAPSED="$(result_field "$json" elapsed_s)s"
+    DETAIL="$(result_field "$json" detail)"
+}
+
+table_header() {
+    printf '%-26s %-7s %-8s %s\n' GATE RESULT ELAPSED DETAIL
+    printf '%-26s %-7s %-8s %s\n' "--------------------------" "-------" "--------" "------"
+}
+
+run_suite() {
+    local every="$1"
+    shift
+    load_chain
+    RESULTS_FILE="$(mktemp)"
+    IMPLIED_FILE="$(mktemp)"
+    local failed=0 ran=0 implied=0
+    table_header
+    while read -r gate; do
+        local implier=""
+        if [[ "$every" -eq 0 ]]; then
+            implier="$(grep -F "	$gate	" "$IMPLIED_FILE" 2>/dev/null | head -1 | cut -f3)"
+        fi
+        if [[ -n "$implier" ]]; then
+            printf '%-26s %-7s %-8s %s\n' "$gate" IMPLIED "-" "implied by $implier, which passed"
+            printf '%s\t%s\n' "$gate" "IMPLIED" >> "$RESULTS_FILE"
+            implied=$((implied + 1))
+            continue
+        fi
+        run_one "$gate" "$@"
+        ran=$((ran + 1))
+        printf '%-26s %-7s %-8s %s\n' "$gate" "$VERDICT" "$ELAPSED" "$DETAIL"
+        printf '%s\t%s\n' "$gate" "$VERDICT" >> "$RESULTS_FILE"
+        if [[ "$VERDICT" == "PASS" ]]; then
+            if [[ "$every" -eq 0 ]]; then
+                while read -r covered; do
+                    [[ -n "$covered" ]] || continue
+                    printf '\t%s\t%s\n' "$covered" "$gate" >> "$IMPLIED_FILE"
+                done < <(plan implied "$gate")
+            fi
+        else
+            failed=1
+        fi
+    done < <(plan order)
+    archive_history
+    prune_artifacts
+    if [[ $failed -eq 0 ]]; then
+        printf '%d gates run, %d implied by a higher gate; all passed' "$ran" "$implied"
+        if [[ $implied -gt 0 ]]; then
+            printf ' (run --all --every to check the implied ones)'
+        fi
+        printf '\n'
+        cleanup_plan
+        return 0
+    fi
+    echo "FAILURES present" >&2
+    report_localization
+    cleanup_plan
+    return 1
+}
+
+# Where the fault is, rather than everything downstream of it: for each failing gate, the lowest
+# gate under it that also failed.
+report_localization() {
+    local lines
+    lines="$(plan localize --results "$RESULTS_FILE")"
+    [[ -n "$lines" ]] || return 0
+    echo "" >&2
+    echo "where the fault is:" >&2
+    printf '%s\n' "$lines" | while IFS=$'\t' read -r top lowest note; do
+        if [[ "$top" == "$lowest" ]]; then
+            echo "  $top failed and nothing it builds on did: the fault is at its own level" >&2
+        else
+            echo "  $top failed because $lowest failed under it ($note)" >&2
+        fi
+    done
+}
+
+# One gate, and the chain under it when it fails. This is the question "is it this gate, or
+# something it is built on?" asked directly.
+run_why() {
+    local gate="$1"
+    shift
+    load_chain
+    RESULTS_FILE="$(mktemp)"
+    table_header
+    run_one "$gate" "$@"
+    printf '%-26s %-7s %-8s %s\n' "$gate" "$VERDICT" "$ELAPSED" "$DETAIL"
+    printf '%s\t%s\n' "$gate" "$VERDICT" >> "$RESULTS_FILE"
+    if [[ "$VERDICT" == "PASS" ]]; then
+        archive_history
+        prune_artifacts
+        echo "$gate passed; nothing under it needed running"
+        cleanup_plan
+        return 0
+    fi
+    local walked=0
+    while read -r covered; do
+        [[ -n "$covered" ]] || continue
+        walked=$((walked + 1))
+        run_one "$covered" "$@"
+        printf '%-26s %-7s %-8s %s\n' "$covered" "$VERDICT" "$ELAPSED" "$DETAIL"
+        printf '%s\t%s\n' "$covered" "$VERDICT" >> "$RESULTS_FILE"
+    done < <(plan closure "$gate")
+    archive_history
+    prune_artifacts
+    if [[ $walked -eq 0 ]]; then
+        echo "" >&2
+        echo "$gate builds on nothing: the fault is at its own level" >&2
+    else
+        report_localization
+    fi
+    cleanup_plan
+    return 1
+}
+
 # A window left open from an earlier run holds the GPU and skews this run's timings.
 "$REPO_ROOT/tools/windows.sh" check || exit 3
 
 close_strays() {
+    cleanup_plan
     # Belt and braces: --quit-after bounds a hung gate, but a crashed engine can still
     # leave a window behind, and the next run's measurements would inherit it.
     "$REPO_ROOT/tools/windows.sh" kill >/dev/null 2>&1
@@ -119,33 +297,28 @@ case "${1:-}" in
         ;;
     --all)
         shift
-        failed=0
-        printf '%-26s %-6s %-8s %s\n' GATE RESULT ELAPSED DETAIL
-        printf '%-26s %-6s %-8s %s\n' "--------------------------" "------" "--------" "------"
-        while read -r gate; do
-            output="$(run_engine --gate "$gate" "$@" 2>&1)"
-            line="$(printf '%s\n' "$output" | grep 'HARNESS_GATE_RESULT ' | tail -1)"
-            if [[ -z "$line" ]]; then
-                printf '%-26s %-6s %-8s %s\n' "$gate" FAIL - "no result line; engine output below"
-                printf '%s\n' "$output" | tail -25 >&2
-                failed=1
-                continue
-            fi
-            json="${line#*HARNESS_GATE_RESULT }"
-            verdict="$(result_field "$json" pass)"
-            elapsed="$(result_field "$json" elapsed_s)"
-            detail="$(result_field "$json" detail)"
-            if [[ "$verdict" == "True" ]]; then
-                printf '%-26s %-6s %-8s %s\n' "$gate" PASS "${elapsed}s" "$detail"
-            else
-                printf '%-26s %-6s %-8s %s\n' "$gate" FAIL "${elapsed}s" "$detail"
-                failed=1
-            fi
-        done < <(list_gates)
-        archive_history
-        prune_artifacts
-        [[ $failed -eq 0 ]] && echo "all gates passed" || echo "FAILURES present" >&2
-        exit "$failed"
+        every=0
+        extra=()
+        for arg in "$@"; do
+            if [[ "$arg" == "--every" ]]; then every=1; else extra+=("$arg"); fi
+        done
+        run_suite "$every" ${extra[@]+"${extra[@]}"}
+        exit "$?"
+        ;;
+    --chain)
+        load_chain
+        python3 "$REPO_ROOT/tools/gate_plan.py" order --chain "$CHAIN_FILE" | while read -r gate; do
+            deps="$(plan implied "$gate" | tr '\n' ' ')"
+            printf '%-30s %s\n' "$gate" "${deps:-(builds on nothing)}"
+        done
+        ;;
+    --why)
+        shift
+        [[ -n "${1:-}" ]] || { echo "gate.sh: --why needs a gate name" >&2; exit 2; }
+        why_gate="$1"
+        shift
+        run_why "$why_gate" "$@"
+        exit "$?"
         ;;
     "")
         echo "gate.sh: expected a gate name, --all, --list or --shot. Known gates:" >&2

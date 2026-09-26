@@ -55,6 +55,8 @@ static func meta() -> Dictionary:
     return {
         "name": "rig_steers",
         "proves": "the steering rams turn the hubs and the rig follows the circle that hub angle implies",
+        # the steering measurement drives the rig straight before it turns it.
+        "builds_on": ["rig_drives_forward"],
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": (
             "hubs turn at least %.0f deg; measured turn radius within %.0f%% of L/tan(hub"

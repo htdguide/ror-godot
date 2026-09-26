@@ -16,6 +16,10 @@ extends RefCounted
 ##   budget_s     float, runtime budget in seconds
 ##   needs_gpu    bool, whether it renders
 ##   milestone    String, owning milestone
+##
+## Optional:
+##   builds_on    Array[String], the gates whose claims this gate's claim contains. See
+##                `GateChain` for what an edge means and what the runner does with it.
 
 const ORACLE_EXTERNAL: String = "external"
 const ORACLE_COMPUTED: String = "computed"
@@ -65,4 +69,10 @@ static func validate_meta(meta_dict: Dictionary) -> String:
         return "oracle '%s' is not one of %s" % [oracle, VALID_ORACLES]
     if float(meta_dict["budget_s"]) <= 0.0:
         return "budget_s must be positive"
+    if meta_dict.has("builds_on"):
+        if not (meta_dict["builds_on"] is Array):
+            return "builds_on must be an array of gate names"
+        for edge: Variant in meta_dict["builds_on"] as Array:
+            if not (edge is String) or (edge as String).strip_edges().is_empty():
+                return "builds_on must hold gate names"
     return ""

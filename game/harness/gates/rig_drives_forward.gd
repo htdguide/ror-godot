@@ -38,6 +38,8 @@ static func meta() -> Dictionary:
     return {
         "name": "rig_drives_forward",
         "proves": "the rig accelerates under its own engine, travels along its own forward axis, and rolls rather than slides",
+        # driving five seconds at 2 kHz after settling is the settle plus motion.
+        "builds_on": ["solver_settles_vehicle"],
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": (
             "travels at least %.0f m; distance at least %.0f%% of the arc the tyres turned"

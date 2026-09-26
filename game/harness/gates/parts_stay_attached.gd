@@ -30,6 +30,8 @@ static func meta() -> Dictionary:
     return {
         "name": "parts_stay_attached",
         "proves": "every flexbody stays with the vehicle when it settles under its own weight",
+        # the parts are checked on the same drop and settle, at the same rate.
+        "builds_on": ["solver_settles_vehicle"],
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": "no part's nodes move over %.2f m in the vehicle's frame" % MAX_TRAVEL_M,
         "why": (

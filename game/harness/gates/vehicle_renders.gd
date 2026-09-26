@@ -44,6 +44,9 @@ static func meta() -> Dictionary:
     return {
         "name": "vehicle_renders",
         "proves": "an unmodified community vehicle loads and renders from its own meshes and textures",
+        # rendering a vehicle from its own meshes is the harness rendering and capturing, and is
+        # every mesh in the mod read into geometry.
+        "builds_on": ["smoke", "ogre_mesh_read"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": (
             "%d+ flexbodies, %d+ wheels, %d+ textures, vehicle covers %.0f%% of frame"
