@@ -69,6 +69,16 @@ per-surface ground textures with detiling, and recovery from a roll.
 
 ## What to do next
 
+**0. What a session opens now.** `tools/play.sh --truck` opens the flat test park, not the
+valley: a straight road with eight surface patches let into it, a washboard, ruts, dips, a ramp
+yard, a rock garden, a crash yard and an ice skid pad, all within a few seconds of each other.
+Valley One is `--valley`. The cab works: `F7` is the driver's seat, the steering wheel turns by
+the ratio the mod's own file declares, the dials read the drivetrain, the lamps light by what the
+vehicle is doing, and `M` opens a panel for weather, gravity, the sun, fog and exposure. What is
+*not* there yet is beam deformation and breaking, so the crash yard tests the rig's elastic
+response and the contact law against a vertical face, and nothing bends permanently. That is the
+next thing worth building if crashing is the point.
+
 **1. The ground material.** Water and vegetation tier 1 are in (see
 `docs/architecture/valley.md`); what is left of PLAN §0.5's M2 staging is the PBR ground material
 through `res://shaders/terrain3d_override.gdshader`, and vegetation tiers 2 and 3.

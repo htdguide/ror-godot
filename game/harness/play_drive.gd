@@ -6,6 +6,9 @@ extends RefCounted
 ## Everything a person needs in order to say whether the thing drives right, and nothing
 ## else. The controls are read here, the solver is stepped here, and the pose is pushed to
 ## the renderer here, so there is one place to look when the window and the gates disagree.
+##
+## The cab is driven from the same place: the steering wheel turns, the gauges read the
+## drivetrain, and the lamps light by what the vehicle is doing rather than all together.
 
 
 var solver: RefCounted
@@ -20,6 +23,10 @@ var _substep_remainder: float = 0.0
 var _solver_usec: int = 0
 var _selector: int = 1
 var _lit: bool = false
+var _left_indicator: bool = false
+var _right_indicator: bool = false
+var _seconds: float = 0.0
+var _cockpit: Node3D
 
 
 ## Returns "" on success. `built` is a VehicleBuilder result.
@@ -33,8 +40,15 @@ func setup(built: Dictionary) -> String:
     solver.set_ground(0.0, true)
     solver.start_engine()
     solver.set_gear_selector(_selector)
+    _cockpit = Cockpit.build(built["root"] as Node3D, truck, built)
     _apply_pose()
     return ""
+
+
+## The driver's eye in the vehicle's own local frame, for a camera to sit at. The cinecam is in
+## rig space, and the vehicle is drawn in its own, so the frame it was built with converts.
+func eye() -> Vector3:
+    return (_built["rig_to_local"] as Transform3D) * Cockpit.eye_position(truck)
 
 
 ## Stands the rig on a terrain instead of the flat plane. Returns "" on success.
@@ -49,6 +63,7 @@ func use_terrain(data: Object) -> String:
 
 
 func step(delta: float) -> void:
+    _seconds += delta
     _read_controls(delta)
     # Substeps follow wall-clock time rather than a fixed count per frame, so the rig
     # drives at the same speed whatever the window is managing.
@@ -61,6 +76,7 @@ func step(delta: float) -> void:
     solver.step(1.0 / DriveCfg.SUBSTEP_HZ, substeps)
     _solver_usec = Time.get_ticks_usec() - began
     _apply_pose()
+    _apply_cabin()
 
 
 func on_key(keycode: Key) -> bool:
@@ -79,8 +95,19 @@ func on_key(keycode: Key) -> bool:
             print("DRIVE  engine %s" % ("running" if solver.engine_running() else "off"))
         KEY_L:
             _lit = not _lit
-            FlareBuilder.set_lit(_built["lamps"] as Array[Node3D], truck, _lit)
             print("DRIVE  lights %s" % ("on" if _lit else "off"))
+        KEY_Z:
+            _left_indicator = not _left_indicator
+            _right_indicator = false
+            print("DRIVE  left indicator %s" % ("on" if _left_indicator else "off"))
+        KEY_C:
+            _right_indicator = not _right_indicator
+            _left_indicator = false
+            print("DRIVE  right indicator %s" % ("on" if _right_indicator else "off"))
+        KEY_X:
+            _left_indicator = false
+            _right_indicator = false
+            print("DRIVE  indicators off")
         KEY_BACKSPACE:
             _respawn()
         KEY_ENTER:
@@ -190,3 +217,18 @@ func _respawn() -> void:
     solver.start_engine()
     _apply_pose()
     print("DRIVE  respawned")
+
+
+## The parts of the vehicle that are driven rather than posed: the lamps, the steering wheel and
+## the instruments. Updated per frame from the state the controls left behind.
+func _apply_cabin() -> void:
+    FlareBuilder.apply_state(_built["lamps"] as Array[Node3D], truck, {
+        "headlights": _lit,
+        "brake": _brake,
+        "reverse": _selector < 0,
+        "left": _left_indicator,
+        "right": _right_indicator,
+        "seconds": _seconds,
+    })
+    Cockpit.turn_wheel(_built, truck, solver.steer_state())
+    Cockpit.update(_cockpit, solver.engine_rpm(), solver.road_speed(), _lit)

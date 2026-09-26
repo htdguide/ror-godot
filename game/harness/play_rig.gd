@@ -7,10 +7,6 @@ extends Node
 ## effect so that "this effect is wrong" can be told apart from "this scene is wrong"
 ## without a rebuild.
 
-const MOVE_SPEED: float = 8.0
-const BOOST_MULTIPLIER: float = 4.0
-const MOUSE_SENSITIVITY: float = 0.0025
-const PITCH_LIMIT: float = 1.5
 const HUD_MARGIN: int = 12
 const HUD_FONT_SIZE: int = 15
 const HUD_REFRESH_FRAMES: int = 10
@@ -26,7 +22,8 @@ var _pitch: float = 0.0
 var _frames: int = 0
 var _shots: int = 0
 var _drive: PlayDrive = null
-var _chasing: bool = false
+var _view: PlayCamera = PlayCamera.new()
+var _menu: PlayMenu
 var _terrain: Node3D = null
 var _terrain_pending: bool = false
 
@@ -35,6 +32,7 @@ var _terrain_pending: bool = false
 ## solver runs and the window is a driving session rather than a camera fly-through.
 func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary = {}) -> void:
     _camera = camera
+    _view.setup(camera)
     _world = world
     _yaw = camera.rotation.y
     _pitch = camera.rotation.x
@@ -49,7 +47,8 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
             printerr("PLAY  the vehicle cannot be driven: " + error)
         else:
             _drive = drive
-            _chasing = true
+            _view.set_mode(PlayCamera.Mode.CHASE)
+    _menu = _build_menu(weather)
     _build_terrain()
     _print_help()
 
@@ -134,6 +133,7 @@ func _print_help() -> void:
             "PLAY  click to look with the mouse, Esc to release it, Esc again to quit\n"
             + "PLAY  W A S D move, Q/E down/up, hold Shift to boost\n"
             + "PLAY  F1 toggle HUD, F2 cycle weather, F3 toggle shadows, F4 toggle the sun\n"
+            + "PLAY  M open the environment panel: weather, gravity, sun, fog\n"
             + "PLAY  P save a screenshot to artifacts/human"
         )
     )
@@ -146,53 +146,12 @@ func _process(delta: float) -> void:
         _populate_terrain()
     if _drive != null:
         _drive.step(delta)
-        if _chasing:
-            _chase(delta)
-    _move(delta)
+        _view.follow(_drive, delta)
+    if _view.mode == PlayCamera.Mode.FREE:
+        _view.fly(delta)
     _frames += 1
     if _hud.visible and _frames % HUD_REFRESH_FRAMES == 0:
         _hud.text = _hud_text()
-
-
-## Rides behind the vehicle in its own frame, lagging so that a turn is visible as a turn.
-## Godot's +Z points backwards, which is also where the actor frame's +Z points, so the
-## offset is behind the vehicle without a sign flip.
-func _chase(delta: float) -> void:
-    var frame: Transform3D = _drive.frame
-    var wanted: Vector3 = frame * DriveCfg.CHASE_OFFSET
-    var aim: Vector3 = frame * DriveCfg.CHASE_AIM
-    var smoothing: float = clampf(DriveCfg.CHASE_SMOOTHING * delta * 60.0, 0.0, 1.0)
-    var position: Vector3 = _camera.position.lerp(wanted, smoothing)
-    if position.distance_to(aim) < 0.01:
-        return
-    _camera.look_at_from_position(position, aim, Vector3.UP)
-    _yaw = _camera.rotation.y
-    _pitch = _camera.rotation.x
-
-
-## WASD and Q/E only: the arrow keys belong to the driver once a vehicle is loaded, and
-## having them do two things at once is the sort of thing that makes a session report
-## "the steering is broken".
-func _move(delta: float) -> void:
-    var direction: Vector3 = Vector3.ZERO
-    if Input.is_key_pressed(KEY_D):
-        direction.x += 1.0
-    if Input.is_key_pressed(KEY_A):
-        direction.x -= 1.0
-    if Input.is_key_pressed(KEY_S):
-        direction.z += 1.0
-    if Input.is_key_pressed(KEY_W):
-        direction.z -= 1.0
-    if Input.is_key_pressed(KEY_E):
-        direction.y += 1.0
-    if Input.is_key_pressed(KEY_Q):
-        direction.y -= 1.0
-    if direction == Vector3.ZERO:
-        return
-    var speed: float = MOVE_SPEED
-    if Input.is_key_pressed(KEY_SHIFT):
-        speed *= BOOST_MULTIPLIER
-    _camera.translate(direction.normalized() * speed * delta)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -207,10 +166,7 @@ func _unhandled_input(event: InputEvent) -> void:
         elif button.button_index == MOUSE_BUTTON_RIGHT:
             _set_looking(not _looking)
     elif event is InputEventMouseMotion and _looking:
-        var motion: InputEventMouseMotion = event as InputEventMouseMotion
-        _yaw -= motion.relative.x * MOUSE_SENSITIVITY
-        _pitch = clampf(_pitch - motion.relative.y * MOUSE_SENSITIVITY, -PITCH_LIMIT, PITCH_LIMIT)
-        _camera.rotation = Vector3(_pitch, _yaw, 0.0)
+        _view.look((event as InputEventMouseMotion).relative)
     elif event is InputEventKey and (event as InputEventKey).pressed:
         _on_key((event as InputEventKey).keycode)
 
@@ -219,11 +175,18 @@ func _on_key(keycode: Key) -> void:
     if _drive != null and _drive.on_key(keycode):
         return
     match keycode:
+        KEY_M:
+            if _menu != null:
+                _menu.toggle()
+                print("PLAY  environment panel %s" % ("open" if _menu.is_open() else "closed"))
         KEY_F5:
-            _chasing = _drive != null
-            print("PLAY  chase camera %s" % ("on" if _chasing else "unavailable"))
+            _view.set_mode(PlayCamera.Mode.CHASE if _drive != null else PlayCamera.Mode.FREE)
+            print("PLAY  chase camera %s" % ("on" if _drive != null else "unavailable"))
+        KEY_F7:
+            _view.set_mode(PlayCamera.Mode.CAB if _drive != null else PlayCamera.Mode.FREE)
+            print("PLAY  driver's seat %s" % ("on" if _drive != null else "unavailable"))
         KEY_F6:
-            _chasing = false
+            _view.set_mode(PlayCamera.Mode.FREE)
             print("PLAY  free camera")
         KEY_F1:
             _hud.visible = not _hud.visible
@@ -257,7 +220,12 @@ func _set_looking(looking: bool) -> void:
 
 func _cycle_weather() -> void:
     _weather_index = (_weather_index + 1) % _weather_names.size()
-    var name: String = _weather_names[_weather_index]
+    _apply_weather(_weather_names[_weather_index])
+
+
+## Puts one weather preset on the live scene. Shared by F2 and by the environment panel, so the
+## two cannot drift into applying a preset differently.
+func _apply_weather(name: String) -> void:
     var preset: Dictionary = WeatherCfg.get_preset(name)
     var sun: DirectionalLight3D = _world.get_node_or_null(^"Sun") as DirectionalLight3D
     var env: WorldEnvironment = _world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
@@ -320,3 +288,21 @@ func _footer() -> String:
     if _drive == null:
         return keys
     return _drive.hud_line() + "\n" + keys + "  F5/F6 chase/free"
+
+
+## The environment panel, built once the vehicle exists so that gravity has a solver to go to.
+func _build_menu(weather: String) -> PlayMenu:
+    var holder: WorldEnvironment = _world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
+    if holder == null:
+        return null
+    var menu: PlayMenu = PlayMenu.new()
+    menu.name = "EnvironmentMenu"
+    add_child(menu)
+    menu.setup(
+        holder.environment,
+        _world.get_node_or_null(^"Sun") as DirectionalLight3D,
+        _drive,
+        weather,
+        func(name: String) -> void: _apply_weather(name)
+    )
+    return menu

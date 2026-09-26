@@ -17,16 +17,22 @@ extends RefCounted
 ## not drawn here, only rotated — see `turn_wheel`.
 
 ## Which prop is the dashboard, by what its mesh is called. The file names it; nothing else in a
-## rig is called that.
+## rig is called that. Used to find the steering wheel, which is a child of that prop.
 const DASHBOARD_MARK: String = "dashboard"
 
 
-## Builds the cluster under `vehicle_root` and returns it, or null when the rig has no dashboard
-## to mount it on.
+## Builds the cluster under `vehicle_root` and returns it, or null when the rig declares no cab to
+## put it in.
+##
+## Mounted on the vehicle rather than on the dashboard prop, and placed from the driver's eye. The
+## prop's own frame is the mod's — the hero truck turns its dashboard by -95, 0, 180 degrees — so
+## an offset in that frame is an offset in no particular direction, and the first version of this
+## put the dials in the driver's face. The eye is the rig's own cinecam, and the vehicle's local
+## frame has -Z ahead and +Y up, which is a frame a person can reason in.
 static func build(vehicle_root: Node3D, truck: TruckParser, built: Dictionary) -> Node3D:
-    var dash: Node3D = _dashboard_prop(truck, built)
-    if dash == null:
+    if truck.cinecams.is_empty():
         return null
+    var eye: Vector3 = (built["rig_to_local"] as Transform3D) * eye_position(truck)
     var cluster: Node3D = Node3D.new()
     cluster.name = "Cockpit"
     cluster.transform = Transform3D(
@@ -34,11 +40,11 @@ static func build(vehicle_root: Node3D, truck: TruckParser, built: Dictionary) -
             deg_to_rad(CockpitCfg.TILT_DEG.x), deg_to_rad(CockpitCfg.TILT_DEG.y),
             deg_to_rad(CockpitCfg.TILT_DEG.z)
         )),
-        CockpitCfg.OFFSET_M
+        eye + CockpitCfg.EYE_TO_DIALS_M
     )
     cluster.add_child(_dial("Tacho", -CockpitCfg.DIAL_SPACING_M * 0.5))
     cluster.add_child(_dial("Speedo", CockpitCfg.DIAL_SPACING_M * 0.5))
-    dash.add_child(cluster)
+    vehicle_root.add_child(cluster)
     return cluster
 
 

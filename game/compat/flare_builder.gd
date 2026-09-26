@@ -60,6 +60,9 @@ static func build(root: Node3D, truck: TruckParser, render_frame: Transform3D) -
         holder.transform = to_local * _placement(truck.nodes, flare)
         root.add_child(holder)
         lamps.append(holder)
+    # Built dark. A lamp's beam is a Light3D and a Light3D is visible the moment it exists, so a
+    # vehicle whose lights nobody has switched on would otherwise spawn with its headlights on.
+    set_lit(lamps, truck, false)
     return lamps
 
 

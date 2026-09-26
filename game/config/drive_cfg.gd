@@ -52,7 +52,7 @@ const HELP: String = (
     "DRIVE  Up throttle, Down brake, Left/Right steer, Space handbrake\n"
     + "DRIVE  R reverse, N neutral, G drive, I ignition, L lights\n"
     + "DRIVE  Enter recover upright where you are, Backspace respawn at the start\n"
-    + "DRIVE  F5 chase camera, F6 free camera"
+    + "DRIVE  F5 chase camera, F6 free camera, F7 driver's seat"
 )
 
 

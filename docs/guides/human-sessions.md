@@ -8,9 +8,14 @@ a person drives it, and no such milestone is closed by the agent.
 
 ## Running one
 
-    tools/play.sh
+    tools/play.sh --truck                 the test park, driving
+    tools/play.sh --truck --valley        Valley One instead
     tools/play.sh --shot diag_grid_wide
     tools/play.sh --weather golden_dusk
+
+In the park: `F5` chase camera, `F6` free camera, `F7` the driver's seat. `L` lights, `Z`/`C`
+indicators, `X` both off. `M` opens the environment panel — weather, gravity, sun, fog, exposure —
+which writes to the live scene and not to the project, so nothing has to be put back afterwards.
 
 The window is tracked while it lives and untracked when it closes, so
 `tools/windows.sh list` always tells the truth about what is open.
