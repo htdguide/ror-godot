@@ -50,6 +50,38 @@ static func surface_at_world(x: float, z: float) -> int:
     return GroundModels.index_of(ParkCfg.GROUND_SURFACE)
 
 
+## What colour the ground is drawn at a point.
+##
+## The test areas — the road, the patches let into it, the skid pad — are drawn as what they are.
+## Everything else is a dev grid: a measured pattern that tells a driver how far and how fast, and
+## tells anyone looking that this is a workshop floor rather than a place.
+static func tint_at(x: float, z: float) -> Color:
+    if _on_road(x, z) or Vector2(x, z).distance_to(ParkCfg.SKID_PAD_CENTRE) <= (
+        ParkCfg.SKID_PAD_RADIUS_M
+    ):
+        var surface: String = GroundModels.name_of(surface_at_world(x, z))
+        return TerrainCfg.SURFACE_COLOURS.get(surface, Color.GRAY) as Color
+    return _grid_tint(x, z)
+
+
+## The grid: a line every few metres, a brighter one every tenth, on a dark ground.
+static func _grid_tint(x: float, z: float) -> Color:
+    var spacing: float = ParkCfg.GRID_SPACING_M
+    var half_line: float = ParkCfg.GRID_LINE_M * 0.5
+    var along: float = absf(fposmod(x + spacing * 0.5, spacing) - spacing * 0.5)
+    var across: float = absf(fposmod(z + spacing * 0.5, spacing) - spacing * 0.5)
+    if along > half_line and across > half_line:
+        return ParkCfg.GRID_BASE
+    # Which line this is: every tenth gets the brighter colour, so the grid reads at a distance
+    # as well as under the wheels.
+    var major: bool = false
+    if along <= half_line:
+        major = major or int(round(x / spacing)) % ParkCfg.GRID_MAJOR_EVERY == 0
+    if across <= half_line:
+        major = major or int(round(z / spacing)) % ParkCfg.GRID_MAJOR_EVERY == 0
+    return ParkCfg.GRID_MAJOR if major else ParkCfg.GRID_LINE
+
+
 ## Whether a point is on the main straight.
 static func _on_road(x: float, z: float) -> bool:
     if x < ParkCfg.ROAD_WEST_M or x > ParkCfg.ROAD_EAST_M:

@@ -92,6 +92,13 @@ static func surface_at_world(x: float, z: float) -> int:
     return _ridge_index
 
 
+## What colour the ground is drawn at a point: the surface's own tint, which is what the terrain's
+## colour map carries. The park overrides this to draw a grid; the valley has nothing to add.
+static func tint_at(x: float, z: float) -> Color:
+    var surface: String = GroundModels.name_of(surface_at_world(x, z))
+    return TerrainCfg.SURFACE_COLOURS.get(surface, Color.GRAY) as Color
+
+
 ## The valley before any feature cut into it: the profile, the grade and the ripple. This is the
 ## datum a carve is measured against — the floor's ripple moves it by more than the ford is deep,
 ## so a depth taken against the ground a few metres away is not a depth.

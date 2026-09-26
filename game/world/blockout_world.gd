@@ -24,6 +24,9 @@ static func build(weather: Dictionary, include_props: bool = true) -> Node3D:
     root.name = "BlockoutWorld"
     root.add_child(_build_environment(weather))
     root.add_child(_build_sun(weather))
+    var fill: DirectionalLight3D = _build_fill(weather)
+    if fill != null:
+        root.add_child(fill)
     root.add_child(_build_ground())
     # A shot with a subject of its own wants an empty stage: the scale props are there to
     # give an empty frame something to measure, not to share the frame with a vehicle.
@@ -86,7 +89,48 @@ static func _build_sun(weather: Dictionary) -> DirectionalLight3D:
     sun.shadow_enabled = true
     sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
     sun.directional_shadow_max_distance = SHADOW_MAX_DISTANCE
+    # A sun with an angular size softens its own shadow with distance from the contact, which is
+    # what a shadow does; a point sun draws the same hard line a metre away and a hundred.
+    sun.light_angular_distance = float(
+        weather.get("sun_angular_deg", RenderCfg.SUN_ANGULAR_DEG)
+    )
+    # And the shadow is not a hole. Everything a session looks at lives on the side of the object
+    # the sun is not on, so a shadow that removes all the light removes the subject with it.
+    sun.shadow_opacity = float(weather.get("shadow_opacity", RenderCfg.SHADOW_OPACITY))
     return sun
+
+
+## The fill: a second directional light from the opposite side, casting nothing.
+##
+## Ambient light has no direction, so it lifts a shaded surface without telling you anything about
+## its shape. A fill does both — it is the oldest trick in lighting a subject, and the reason one
+## side of this scene read as black without it. It casts no shadow, so it costs a pass and nothing
+## else.
+static func _build_fill(weather: Dictionary) -> DirectionalLight3D:
+    var energy: float = float(weather.get("fill_energy", RenderCfg.FILL_ENERGY))
+    if energy <= 0.0:
+        return null
+    var fill: DirectionalLight3D = DirectionalLight3D.new()
+    fill.name = "Fill"
+    # Opposite the sun and lower, so it reaches the side the sun cannot.
+    var toward_sun: Vector3 = (weather.get("sun_from", Vector3.UP) as Vector3).normalized()
+    var toward_fill: Vector3 = Vector3(-toward_sun.x, maxf(toward_sun.y * 0.45, 0.2),
+        -toward_sun.z).normalized()
+    fill.look_at_from_position(Vector3.ZERO, -toward_fill, Vector3.UP)
+    fill.light_energy = energy
+    fill.light_color = weather.get("fill_colour", RenderCfg.FILL_COLOUR) as Color
+    # The fill casts shadows too, and that is not a luxury: a shadowless directional light shines
+    # straight through a roof, and `tunnel_lighting_changes` caught exactly that — with the fill
+    # unshadowed the tunnel's own lamps supplied a quarter of the light inside it instead of
+    # nearly half. It is a cheaper shadow than the sun's: half the range and softer.
+    fill.shadow_enabled = true
+    fill.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+    fill.directional_shadow_max_distance = SHADOW_MAX_DISTANCE * 0.5
+    fill.shadow_opacity = float(weather.get("shadow_opacity", RenderCfg.SHADOW_OPACITY))
+    fill.light_angular_distance = float(
+        weather.get("sun_angular_deg", RenderCfg.SUN_ANGULAR_DEG)
+    ) * 2.0
+    return fill
 
 
 static func _build_ground() -> MeshInstance3D:

@@ -19,8 +19,10 @@ const ROAD_HALF_WIDTH_M: float = 6.0
 const ROAD_WEST_M: float = -320.0
 const ROAD_EAST_M: float = 320.0
 const ROAD_SURFACE: String = "asphalt"
-## What the site is made of away from the road and the segments.
-const GROUND_SURFACE: String = "grass"
+## What the site is made of away from the road and the segments. Concrete rather than grass: a
+## workshop floor is what this is, and the surface's own texture tints what is drawn over it — on
+## grass the dev grid came out green and nearly black.
+const GROUND_SURFACE: String = "concrete"
 
 ## Small squares of other surfaces let into the road, so grip changes under a vehicle that is
 ## already moving. One per surface, in the order they are laid out west to east, each this long
@@ -123,6 +125,24 @@ const ANCHORS: Dictionary = {
     "crash_yard": {"position": Vector3(-30.0, 18.0, 80.0), "look_at": Vector3(40.0, 1.0, 125.0)},
     "skid_pad": {"position": Vector3(70.0, 22.0, -50.0), "look_at": Vector3(125.0, 0.0, -92.0)},
 }
+
+## --- The dev grid ------------------------------------------------------------------------------
+##
+## Everything that is not a test area is drawn as a measured grid rather than as ground. This is a
+## workshop: a grid says how far away something is and how fast you are crossing it, which is what
+## a person judging a suspension actually needs, and it says plainly that the surface is not
+## pretending to be a place.
+##
+## The test areas keep their own surfaces — the road, its patches, the skid pad — so the thing
+## being tested is the thing that is coloured.
+const GRID_BASE: Color = Color(0.30, 0.31, 0.33)
+const GRID_LINE: Color = Color(0.46, 0.49, 0.54)
+## Every tenth line is brighter, the way a drawing's major division is.
+const GRID_MAJOR: Color = Color(0.62, 0.70, 0.80)
+const GRID_SPACING_M: float = 5.0
+const GRID_MAJOR_EVERY: int = 10
+## How wide a line is. Wide enough to survive the colour map's own resolution at a distance.
+const GRID_LINE_M: float = 0.45
 
 ## --- How it is drawn ----------------------------------------------------------------------------
 

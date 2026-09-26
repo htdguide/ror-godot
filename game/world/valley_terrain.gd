@@ -137,11 +137,9 @@ static func populate(terrain: Node3D, with_shape: Object = null) -> String:
     # selects the texture in _paint_surfaces. Asking twice cost 8 s over a 4.2 M cell map.
     var surfaces: PackedByteArray = PackedByteArray()
     surfaces.resize(size * size)
-    var tints: Array[Color] = []
-    for name: String in GroundModels.ORDER:
-        var tint: Color = TerrainCfg.SURFACE_COLOURS.get(name, Color.GRAY) as Color
-        # Terrain3D's colour map carries roughness in its alpha channel.
-        tints.append(Color(tint.r, tint.g, tint.b, COLOUR_MAP_ROUGHNESS))
+    # The colour is asked of the shape rather than looked up from the surface, so that a world can
+    # draw something the surface map does not describe — the test park draws a dev grid on
+    # everything that is not a test area, while the surface under it stays what it is.
     # The surface map is stored row by row — z outer, x inner — because that is the order the
     # solver reads a heightfield in, and the two are indexed by the same arithmetic. Stored the
     # other way round the whole map is transposed, which reads as the right surfaces in the
@@ -152,7 +150,10 @@ static func populate(terrain: Node3D, with_shape: Object = null) -> String:
             height.set_pixel(x, z, Color(_shape.call("height_at", x, z), 0.0, 0.0))
             var surface: int = _shape.call("surface_at", x, z)
             surfaces[row + x] = surface
-            colour.set_pixel(x, z, tints[surface])
+            var world: Vector2 = ValleyShape.world_of(x, z)
+            var tint: Color = _shape.call("tint_at", world.x, world.y)
+            # Terrain3D's colour map carries roughness in its alpha channel.
+            colour.set_pixel(x, z, Color(tint.r, tint.g, tint.b, COLOUR_MAP_ROUGHNESS))
     # import_images takes [height, control, colour]; the control map is left to its default.
     data.call("import_images", [height, null, colour], TerrainCfg.ORIGIN, 0.0, 1.0)
     if int(data.call("get_region_count")) == 0:

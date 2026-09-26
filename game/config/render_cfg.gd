@@ -28,6 +28,21 @@ const AUTO_EXPOSURE: bool = false
 ## without this the sky washes out to grey and the ground blows out entirely.
 const EXPOSURE: float = 0.7
 
+## The sun's own angular size, in degrees, and what it does to a shadow's edge. The real sun is
+## 0.53 degrees across and gives an edge that is sharp at the contact and soft a few metres away.
+## Wider than life here, because this is a test park before it is a photograph and a hard edge on
+## a box makes the box harder to judge.
+const SUN_ANGULAR_DEG: float = 1.8
+## How dark a shadow is allowed to be, as Godot's shadow opacity. Not one: a shadow with nothing
+## in it is a hole, and everything a session is looking at — a ramp's face, a rock's shape, the
+## suspension's geometry — lives on the side of the object the sun is not on.
+const SHADOW_OPACITY: float = 0.72
+## A second directional light, from the opposite side and casting nothing, so the shaded side of
+## an object is lit by something with a direction rather than by flat ambient alone. This is the
+## fill of a three-point rig, and it is what stops one side of the valley reading as black.
+const FILL_ENERGY: float = 0.35
+const FILL_COLOUR: Color = Color(0.72, 0.80, 0.95)
+
 ## Sky-based image lighting. The radiance map is what gives metal something to reflect and
 ## shadowed surfaces something other than flat ambient.
 const SKY_RADIANCE_SIZE: int = Sky.RADIANCE_SIZE_256
