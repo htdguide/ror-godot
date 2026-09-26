@@ -63,12 +63,12 @@ most valuable items in this list: they are things every gate passed through.
   something about the load path is not. Look at the axle-to-frame links and the shocks
   (`95-12`, `97-4`, shocks `95-29`, `97-21`) rather than the axle-internal beams, which are
   meant to be stiff. `game/tools/ringing_probe.gd` prints them ranked by force carried.
-- **The tyres ring.** The worst tread node sits at 1.646 m/s and 248 Hz at 2 kHz, against
-  0.117 m/s at 8 kHz — 14 times worse for four times the timestep, so this is a mode near the
-  integrator's stability edge, not physical ringing. Its frequency matches the rim hoop beams:
-  3.4 MN/m on a 2.03 kg node is 206 Hz with a damping ratio of 0.7%. Note the tension with the
-  2 kHz result: the rig is *stable* at 2 kHz and not *quiet* there. Do not fix this by raising
-  the rate without saying so.
+- **The tyres ring.** Improved by the parity work, not yet resolved. The worst tread node was
+  1.646 m/s at 248 Hz; using upstream's approximate maths took it to 0.492 m/s at the same
+  2 kHz, and the worst body node from 0.156 to 0.066 m/s. Its frequency matches the rim hoop
+  beams: 3.4 MN/m on a 2.03 kg node is 206 Hz with a damping ratio of 0.7%. Note the tension
+  with the 2 kHz result: the rig is *stable* at 2 kHz and not *quiet* there. Do not fix this
+  by raising the rate without saying so.
   - Known parity gap that has not been tried yet: upstream gives a meshwheels2 wheel's
     `axis1-outer` and `axis2-inner` tyre beams SHOCK1 bounds with a 0.66 shortbound and a 0.15
     max extension. The bounded beam laws exist now; the wheel rig does not use them.
@@ -96,6 +96,33 @@ most valuable items in this list: they are things every gate passed through.
   spin is unphysical.
 - Flares are placed and lit but not animated: indicators do not blink, brake lights do not
   follow the pedal, and reversing lights do not follow the gear.
+
+## Checking against Rigs of Rods itself
+
+`tools/build_parity.sh` extracts a function from the pinned upstream submodule, compiles it
+on its own against a shim in `tools/parity/shim/`, and `upstream_contact_parity` compares it
+with ours case by case. Nothing is copied into the tree; a rename upstream fails extraction
+rather than comparing against a stale copy. Terrain never enters, because both sides are
+handed a surface normal and a penetration depth directly.
+
+**Upstream's physics is not exact arithmetic and must not be implemented as though it were.**
+`approx_exp` is three integer operations on a float's bit pattern; `fast_invSqrt` is the Quake
+reciprocal square root, and every beam length in a rig is divided by it. The errors are a
+systematic bias the force laws were tuned against for fifteen years. Implementing the same
+laws with `std::exp` measured 4.4% out on the force delivered to a node, and tens of percent
+on friction at low slip. `ror_approx.h` reproduces them bit for bit; use it wherever upstream
+uses them, and expect any closed-form oracle to need an allowance derived from that error.
+
+What this can and cannot do:
+
+- **Extractable now**: anything that is a whole function and does not reach into `Actor` —
+  `primitiveCollision` is done; `Differential::CalcAxleTorque` and `TorqueCurve::getEngineTorque`
+  are the obvious next ones, then `Engine::UpdateEngine` with `App::` and the sound macros
+  stubbed, which would check the whole drivetrain.
+- **Not extractable**: a whole rig stepping. That needs `Actor` plus `Terrain` plus
+  `GameContext` plus OGRE, which is the coupling M1 exists to break. So parity proves the
+  force *laws* match; it says nothing about integration order, per-substep sequencing, or
+  emergent behaviour like the suspension travelling 6 mm.
 
 ## How to work here
 
