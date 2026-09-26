@@ -12,9 +12,10 @@ Read `docs/PLAN.md` first — it is the approved plan and it is authoritative. T
 
 ## Where things stand
 
-The last commit is `feat(world): the valley has the features the shot list names`.
-`./tools/gate.sh --all` is green across 54 gates in about 60 s of gate time; run it before you
-start so you know that is still true. The hero asset is an unmodified
+The last commit is `feat(world): water in the valley, and a sheet to look at it with`.
+`./tools/gate.sh --all` is green across 57 gates in about 55 s of gate time; run it before you
+start so you know that is still true. `tools/valley_shots.sh` renders the seven named places in
+the valley as one sheet, which is what a session looking at the scene is run from. The hero asset is an unmodified
 community mod at `assets/mods/ChevyS1023` (`S10offroad.truck`), loaded through the compatibility
 shim with no conversion step.
 
@@ -38,6 +39,11 @@ off-camber rock shelf, and a switchback road benched into the north wall that cl
 ridge at 6% with a 9.5% worst hairpin. Generating it is 22 s of GDScript, so it is cached under
 `user://` and a load is checked against the shape function rather than trusted: warm is 2.5 s.
 
+**The water is in.** A lake at the low end, a river that crosses the floor at a ford and drains
+into it, depth-faded and rippled. Its surface is derived from the valley floor rather than
+declared, which is the third version and the first correct one — see
+`docs/architecture/valley.md`.
+
 **Grip is a property of the ground.** All nine of upstream's ground models are implemented and
 checked against its own `ground_models.cfg`, and the terrain lays them down per lane, so ice is
 ice and sand is sand rather than everything being `concrete` at 1.2.
@@ -53,14 +59,18 @@ per-surface ground textures with detiling, and recovery from a roll.
 
 ## What to do next
 
-**1. Water surfaces, then vegetation.** The valley's shape has a lake basin, a river bed and a
-ford, and `ValleyLayout` declares the water levels for all three (`LAKE_WATER_Y_M`,
-`RIVER_WATER_DEPTH_M`) — but nothing draws water yet, so `ford_crossing` and `lake_dusk` are
-still shots of a dry hole. PLAN §0.5 stages a reflective, refractive, depth-faded plane here and
-replaces its surface generation at M8 behind the same interface. Then vegetation: the conifer
-stand for `valley_vista` and `switchback_backlit`, through `Terrain3DInstancer`, generated rather
-than sourced unless a third-party kit is worth its own ask. The PBR ground material
-(`res://shaders/terrain3d_override.gdshader`) is the third of the three M2 content seams.
+**1. Vegetation, then the ground material.** The water is in (see
+`docs/architecture/valley.md`); what is left of PLAN §0.5's M2 staging is the conifer stand for
+`valley_vista` and `switchback_backlit`, through `Terrain3DInstancer`, generated rather than
+sourced unless a third-party kit is worth its own ask — and the PBR ground material through
+`res://shaders/terrain3d_override.gdshader`.
+
+**1b. The valley is too dark to judge.** Four of the seven views in
+`tools/valley_shots.sh` are nearly black on the shaded side. The sky *does* light the terrain —
+measured by rendering the set with the sun turned off, which comes out dim blue rather than black
+— so this is the tonemap and exposure pair (AgX at 0.7) crushing it, which is M2b's subject. It
+is worth settling before the money shots are framed, because every shot of a valley has a shaded
+wall in it.
 
 **2. The money shots are now unblocked, and named anchors exist.** `ValleyLayout.ANCHORS` holds
 `ridge_vista`, `switchback`, `ford`, `lake`, `ruts` and `rock_traverse`; nothing consumes them

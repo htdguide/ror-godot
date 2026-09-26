@@ -47,6 +47,39 @@ The numbers live in the layout file and are not restated here. What matters stru
   where the basin starts and the floor's ripple gives it a wobble rather than a drawn straight
   line. Water is flat; a river is not, so the river's surface follows its bed at a fixed depth.
 
+## The water
+
+    world/valley_water.gd   the lake, the crossing and the drain as meshes
+    config/water_cfg.gd     what water looks like
+    shaders/water.gdshader  depth fade and ripples
+
+The surfaces come from `ValleyWaterCut`, which also carved the bed, so the water and the ground
+under it cannot disagree about where the shoreline is.
+
+**The river's surface is derived, not declared.** It is the valley's own profile — without the
+ripple — less the ripple's amplitude and a freeboard, so it sits under the lowest the ground gets
+at every point and descends wherever the valley does. Two declared versions came before it and
+both were wrong in ways that read as reasonable numbers in a layout file. A constant-depth cut
+follows the floor down from the shoulder and back up, so the surface humps and the water runs
+uphill into the ford. Elevations interpolated between an inlet and a junction descend smoothly
+while the floor around them descends faster, so the river climbs out of its channel and lies in a
+sheet over the valley floor — which is what the ford's first rendering showed: a 44 m wide pane of
+water over dry ground. `water_runs_downhill` is the gate for both.
+
+The ford is a bar: a rise in the bed toward a surface that is still descending. Its depth is
+declared, the bed follows from it, and the river begins at zero depth at its inlet so that the
+mesh thins out instead of ending at a straight edge in the open.
+
+Two details of the meshes matter. The depth of the water under each vertex is baked into the mesh
+as vertex colour and the shader fades the surface out with it — as a *fraction* of the fade
+depth, because vertex colour is eight bits a channel and a depth baked in metres is clamped at one
+metre, which drew an 11 m lake as shallows. And the meshes extend past the shoreline, under the
+ground: trimming a water mesh to its own shoreline is the obvious thing to do and it shows an edge
+as soon as the ripples move, because the ground is what hides the water.
+
+Refraction and reflection are M6's work; this surface is the staged one PLAN §0.5 asks for, and
+M8 replaces its generation behind the same interface.
+
 ## The cache, and why it is allowed to exist
 
 Generating the valley is 4.2 M cells of GDScript: about 10 s of heights, 7 s of surfaces and 2 s
@@ -88,15 +121,28 @@ ford's depth against the floor beside it, where the shoreline lands, the shelf's
 second prints what a map of a given size costs to generate. A layout edit is reviewed by running
 the first one, because every number a layout change moves is a consequence rather than a setting.
 
+    tools/valley_shots.sh
+
+renders the seven named places and tiles them into `artifacts/valley-sheet.png`, which is what a
+human session is run from. The views are numbered so a person can point at one, and they are named
+after the anchors in the layout, so moving a feature moves the view that frames it.
+
 The gates that hold it: `valley_has_its_features` (each feature exists at a size worth
 photographing), `road_is_drivable` (the road is continuous, wide enough, and no steeper than the
-rig's traction), `terrain_collision_agreement` (the solver and the renderer agree about the
-ground), `rig_settles_on_terrain` and `surfaces_are_visible`.
+rig's traction), `water_runs_downhill` (the river descends, stays in its channel and meets the
+lake), `water_is_drawn` (the lake renders and fades with depth rather than being a flat slab),
+`valley_photoset` (every named place has a world in frame), `terrain_collision_agreement` (the
+solver and the renderer agree about the ground), `rig_settles_on_terrain` and
+`surfaces_are_visible`.
 
 ## Still to come
 
-Water surfaces for the lake and the river, vegetation through `Terrain3DInstancer`, and the PBR
-ground material via `res://shaders/terrain3d_override.gdshader` — the M2 staging in PLAN §0.5.
+Vegetation through `Terrain3DInstancer` and the PBR ground material via
+`res://shaders/terrain3d_override.gdshader` — the rest of the M2 staging in PLAN §0.5. The
+valley's shaded walls currently render near-black under `noon_clear`: the sky does light them,
+measured with the sun turned off, but AgX at the project's exposure crushes what it gives them.
+That is the tonemap and exposure work in M2b rather than a terrain fault, and it is why four of
+the seven views in the sheet are dark.
 Real elevation data replaces the generator through `tools/import_dem.gd` when it arrives; the
 seam is the same either way, because everything downstream reads heights from Terrain3D rather
 than from the generator.

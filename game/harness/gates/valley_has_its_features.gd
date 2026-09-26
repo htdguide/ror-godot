@@ -26,8 +26,11 @@ const MIN_LAKE_DEPTH_M: float = 6.0
 ## half a metre.
 const MIN_LAKE_BASIN_M: float = 4.0
 const MIN_RIVER_DEPTH_M: float = 2.0
-const MIN_FORD_DEPTH_M: float = 0.3
-const MAX_FORD_DEPTH_M: float = 0.9
+## The ford is a bar in the bed, and this is how far it has to stand above the channel either side
+## of it. How much water stands *over* the bar is a different claim, and `water_runs_downhill`
+## makes it: measuring the bar against the valley floor instead, as a first version of this gate
+## did, measures the channel's own depth and fails as soon as the river is regraded.
+const MIN_FORD_BAR_M: float = 0.4
 const MIN_WASHOUT_M: float = 0.2
 const MIN_SHELF_CROSSFALL: float = 0.06
 const MAX_SHELF_CROSSFALL: float = 0.25
@@ -44,8 +47,8 @@ static func meta() -> Dictionary:
         "proves": "the valley contains each feature the money shots name — lake, river, ford, washout, rock shelf, climbing road, ridge — at the size the plan asks for",
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
-            "lake at least %.0f m deep, river %.1f m, ford between %.1f and %.1f m,"
-            % [MIN_LAKE_DEPTH_M, MIN_RIVER_DEPTH_M, MIN_FORD_DEPTH_M, MAX_FORD_DEPTH_M]
+            "lake at least %.0f m deep, river %.1f m, a ford bar %.1f m above the channel,"
+            % [MIN_LAKE_DEPTH_M, MIN_RIVER_DEPTH_M, MIN_FORD_BAR_M]
             + " washout %.2f m, shelf crossfall %.0f%% to %.0f%%, road climb %.0f m,"
             % [MIN_WASHOUT_M, MIN_SHELF_CROSSFALL * 100.0, MAX_SHELF_CROSSFALL * 100.0,
                MIN_ROAD_CLIMB_M]
@@ -109,16 +112,20 @@ func _river() -> Dictionary:
     return _yes("river channel %.1f m" % deepest, deepest)
 
 
-## The ford: shallow enough to drive and deep enough to be water rather than a dip.
+## The ford: a bar across the channel where the driving line crosses it.
 func _ford() -> Dictionary:
     var cross_x: float = ValleyLayout.RIVER_CROSS_X_M
-    var depth: float = (
-        ValleyShape.floor_y_at(cross_x, 0.0) - ValleyShape.height_at_world(cross_x, 0.0)
+    var aside: float = ValleyLayout.FORD_HALF_WIDTH_M + ValleyLayout.FORD_RAMP_M + 5.0
+    var bar: float = ValleyShape.height_at_world(cross_x, 0.0)
+    var channel: float = minf(
+        ValleyShape.height_at_world(cross_x, aside),
+        ValleyShape.height_at_world(cross_x, -aside)
     )
-    if depth < MIN_FORD_DEPTH_M or depth > MAX_FORD_DEPTH_M:
-        return _no("the ford is %.2f m below the floor, outside %.1f to %.1f m" % [
-            depth, MIN_FORD_DEPTH_M, MAX_FORD_DEPTH_M], depth)
-    return _yes("ford %.2f m" % depth, depth)
+    var stands: float = bar - channel
+    if stands < MIN_FORD_BAR_M:
+        return _no("the ford's bar stands %.2f m above the channel beside it, under %.1f m" % [
+            stands, MIN_FORD_BAR_M], stands)
+    return _yes("ford bar %.2f m" % stands, stands)
 
 
 func _washout() -> Dictionary:

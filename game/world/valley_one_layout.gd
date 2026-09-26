@@ -87,19 +87,43 @@ const ROAD_SURFACE: String = "gravel"
 ## decoration: driving the length of the valley means driving through it. It then drains west
 ## along the floor's north edge into the lake at the low end.
 
+## The river enters over the south shoulder here and runs to the junction, where it turns west.
+const RIVER_INLET_Z_M: float = 130.0
 ## Where the crossing channel cuts the floor, and how wide it is.
 const RIVER_CROSS_X_M: float = -400.0
 const RIVER_CROSS_HALF_WIDTH_M: float = 22.0
-## How deep the channel is away from the ford.
-const RIVER_DEPTH_M: float = 2.6
-## The ford: the shallow band a vehicle crosses at, and how far the bed ramps up into it.
+
+## The river's surface is not declared as elevations: it is derived from the valley floor it runs
+## over, and the bed is derived from the surface.
+##
+## Two earlier versions did declare it, and both were wrong in ways that read as reasonable
+## numbers. A constant-depth cut follows the floor down from the shoulder and back up, so the
+## surface humps and the water runs uphill into the ford. Elevations interpolated between an
+## inlet and a junction descend smoothly while the floor around them descends *faster*, so the
+## river quietly climbs out of its channel and lies in a sheet across the valley floor — which is
+## what the ford's first rendering showed: a 44 m wide pane of water over dry ground.
+##
+## So the surface is the floor's own profile, less the ripple's amplitude and this freeboard. That
+## is below the lowest the ground gets at every point by construction, and it descends wherever
+## the valley does.
+const RIVER_FREEBOARD_M: float = 0.3
+## How deep the channel is under its surface, away from the ford.
+const RIVER_CHANNEL_DEPTH_M: float = 1.2
+## Over how much of its course the channel deepens from nothing at the inlet. The river begins at
+## zero depth so that its mesh thins out rather than ending at a straight edge in the open.
+const RIVER_HEAD_M: float = 25.0
+
+## The ford: the bar the driving line crosses, and how much water stands over it. 0.35 m is
+## wheel-deep on the hero truck and well under its 0.78 m body, so it is crossable and still
+## reads as water rather than as a damp patch.
 const FORD_HALF_WIDTH_M: float = 14.0
-const FORD_DEPTH_M: float = 0.7
+const FORD_DEPTH_M: float = 0.35
+## How far the bar ramps down into the channel either side of the driving line.
 const FORD_RAMP_M: float = 10.0
-## The drain, running west from the crossing to the lake along the floor's north edge.
+
+## The drain, running west from the junction to the lake along the floor's north edge.
 const DRAIN_Z_M: float = -70.0
 const DRAIN_HALF_WIDTH_M: float = 15.0
-const DRAIN_DEPTH_M: float = 2.2
 const RIVER_SURFACE: String = "sand"
 
 ## The lake fills the west end. Its shore ramps from here down to its floor.
@@ -112,9 +136,6 @@ const LAKE_DEPTH_M: float = 6.0
 ## valley floor's own height at the shore: the shoreline then lands exactly where the basin
 ## starts, and the floor's ripple gives it a wobble instead of a drawn straight line.
 const LAKE_WATER_Y_M: float = -10.2
-## The river is a stream rather than a body: its surface follows its bed at this depth, so the
-## ford is crossable by construction and the water pass has one number to build both from.
-const RIVER_WATER_DEPTH_M: float = 0.35
 
 ## --- The washout, and the rock traverse -----------------------------------------------------
 
@@ -155,17 +176,17 @@ const RIDGE_SURFACE: String = "grass"
 ## Each is {"position": Vector3, "look_at": Vector3}; y is metres above the terrain at that
 ## point, resolved by the caller, because the terrain's height is the shape's business.
 const ANCHORS: Dictionary = {
-    "spawn": {"position": Vector3(0.0, 2.0, 0.0), "look_at": Vector3(60.0, 1.0, 0.0)},
-    "ridge_vista": {
-        "position": Vector3(320.0, 12.0, -640.0), "look_at": Vector3(0.0, -6.0, 0.0),
+    "spawn": {"position": Vector3(60.0, 12.0, 40.0), "look_at": Vector3(0.0, 1.0, 0.0)},
+    "ford": {"position": Vector3(-330.0, 22.0, 80.0), "look_at": Vector3(-410.0, -4.0, -10.0)},
+    "lake": {"position": Vector3(-650.0, 55.0, 300.0), "look_at": Vector3(-880.0, -10.0, 0.0)},
+    "ruts": {"position": Vector3(420.0, 16.0, 70.0), "look_at": Vector3(540.0, 1.0, 0.0)},
+    "rock_traverse": {
+        "position": Vector3(700.0, 60.0, 380.0), "look_at": Vector3(860.0, 26.0, 200.0),
     },
     "switchback": {
-        "position": Vector3(80.0, 14.0, -300.0), "look_at": Vector3(-60.0, 8.0, -215.0),
+        "position": Vector3(120.0, 110.0, 380.0), "look_at": Vector3(-40.0, 45.0, -340.0),
     },
-    "ford": {"position": Vector3(-360.0, 4.0, 40.0), "look_at": Vector3(-400.0, 0.0, 0.0)},
-    "lake": {"position": Vector3(-700.0, 8.0, 120.0), "look_at": Vector3(-900.0, -9.0, 0.0)},
-    "ruts": {"position": Vector3(470.0, 3.0, 60.0), "look_at": Vector3(500.0, 1.0, 0.0)},
-    "rock_traverse": {
-        "position": Vector3(800.0, 22.0, 90.0), "look_at": Vector3(800.0, 26.0, 220.0),
+    "ridge_vista": {
+        "position": Vector3(300.0, 18.0, -680.0), "look_at": Vector3(-60.0, -6.0, 60.0),
     },
 }

@@ -84,26 +84,61 @@ func _road() -> void:
 
 func _water() -> void:
     var cross_x: float = ValleyLayout.RIVER_CROSS_X_M
-    # Against the floor at the same place rather than a neighbouring one: the ripple moves the
-    # floor by more than the ford is deep, so a bank sampled a few metres away is not a datum.
-    var ford_bed: float = ValleyShape.height_at_world(cross_x, 0.0)
-    var channel_bed: float = ValleyShape.height_at_world(cross_x, 60.0)
-    var floor_y: float = ValleyShape.floor_y_at(cross_x, 0.0)
-    print("ford: bed %.2f m under a floor of %.2f m, so carved %.2f m deep;" % [
-        ford_bed, floor_y, floor_y - ford_bed]
-        + " channel bed %.2f m, %.2f m deep; water over the ford %.2f m" % [
-            channel_bed, ValleyShape.floor_y_at(cross_x, 60.0) - channel_bed,
-            ValleyLayout.RIVER_WATER_DEPTH_M])
-    var deepest: float = INF
+    print("ford: %.2f m of water over a bar at %.2f m, in a floor of %.2f m" % [
+        ValleyWaterCut.ford_depth(),
+        ValleyShape.height_at_world(cross_x, 0.0),
+        ValleyShape.floor_y_at(cross_x, 0.0)])
+    # Along the river's whole course: the bed and the surface both have to descend, and the depth
+    # between them has to stay positive.
+    var previous_bed: float = INF
+    var previous_water: float = INF
+    var worst_rise: float = 0.0
+    var shallowest: float = INF
+    var deepest: float = 0.0
+    for step: int in 201:
+        var z: float = ValleyLayout.RIVER_INLET_Z_M - float(step)
+        var bed: float = ValleyShape.height_at_world(cross_x, z)
+        var water: float = ValleyWaterCut.river_water_y(cross_x, z)
+        if not is_finite(water):
+            continue
+        if is_finite(previous_water):
+            worst_rise = maxf(worst_rise, water - previous_water)
+        previous_bed = bed
+        previous_water = water
+        shallowest = minf(shallowest, water - bed)
+        deepest = maxf(deepest, water - bed)
+    print("crossing: water %.2f m to %.2f m, depth %.2f m to %.2f m, worst uphill %.3f m" % [
+        ValleyWaterCut.river_water_y(cross_x, ValleyLayout.RIVER_INLET_Z_M - 1.0),
+        ValleyWaterCut.river_water_y(cross_x, ValleyLayout.DRAIN_Z_M + 1.0),
+        shallowest, deepest, worst_rise])
+    worst_rise = 0.0
+    shallowest = INF
+    previous_water = INF
+    for step: int in 361:
+        var x: float = cross_x - float(step)
+        var water: float = ValleyWaterCut.river_water_y(x, ValleyLayout.DRAIN_Z_M)
+        if not is_finite(water):
+            continue
+        if is_finite(previous_water):
+            worst_rise = maxf(worst_rise, water - previous_water)
+        previous_water = water
+        shallowest = minf(shallowest, water - ValleyShape.height_at_world(x, ValleyLayout.DRAIN_Z_M))
+    print("drain: water down to %.2f m against a lake at %.2f m, shallowest %.2f m," % [
+        previous_water, ValleyShape.lake_water_y(), shallowest]
+        + " worst uphill %.3f m" % worst_rise)
+    var deepest_lake: float = INF
     var shore_at: float = 0.0
     for step: int in 260:
         var x: float = ValleyLayout.LAKE_SHORE_X_M + 20.0 - float(step)
         var bed: float = ValleyShape.height_at_world(x, 0.0)
-        deepest = minf(deepest, bed)
+        deepest_lake = minf(deepest_lake, bed)
         if bed <= ValleyShape.lake_water_y() and shore_at == 0.0:
             shore_at = x
     print("lake: water %.2f m, deepest bed %.2f m, so %.2f m deep; shoreline at x %.0f m" % [
-        ValleyShape.lake_water_y(), deepest, ValleyShape.lake_water_y() - deepest, shore_at])
+        ValleyShape.lake_water_y(), deepest_lake,
+        ValleyShape.lake_water_y() - deepest_lake, shore_at])
+    if previous_bed == INF:
+        print("  (no river bed was sampled)")
 
 
 func _features() -> void:

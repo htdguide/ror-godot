@@ -80,6 +80,9 @@ func _populate_terrain() -> void:
     if ground != null:
         ground.visible = false
     _world.add_child(Tunnel.build())
+    var water: Node3D = ValleyWater.build()
+    if water != null:
+        _world.add_child(water)
     if _drive == null:
         return
     error = _drive.use_terrain(_terrain.get("data"))
