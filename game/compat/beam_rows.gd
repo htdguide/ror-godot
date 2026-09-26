@@ -55,6 +55,59 @@ const SHOCK_PRECOMPRESSION_FIELD: int = 6
 const SHOCK_OPTIONS_FIELD: int = 7
 
 
+## Upstream's SUPPORT_BEAM_LIMIT_DEFAULT, for a support beam that states no break limit.
+const SUPPORT_BREAK_LIMIT_DEFAULT: float = 4.0
+## Where a plain `beams` row states its options and, for a support beam, its break limit.
+const BEAM_OPTIONS_FIELD: int = 2
+const BEAM_BREAK_LIMIT_FIELD: int = 3
+
+
+## A row of the `beams` section: "node1, node2, options, extension_break_limit".
+##
+## The options are not decoration. `r` makes the beam a rope, which carries tension and cannot
+## push; `s` makes it a support beam, which carries compression and cannot pull. Read as plain
+## beams they become rigid struts in both directions, and a suspension located by limiter
+## straps stops being a suspension: on the hero truck, two `ir` beams across the rear axle
+## resisted 225 kN each and the axle travelled 6 mm.
+static func plain(
+    fields: PackedStringArray, id_to_index: Dictionary, defaults: BeamDefaults
+) -> Dictionary:
+    if fields.size() < 2:
+        return {"error": "row has %d fields, expected at least 2" % fields.size()}
+    var a: int = int(id_to_index.get(fields[0], -1))
+    var b: int = int(id_to_index.get(fields[1], -1))
+    if a < 0 or b < 0:
+        return {"error": "row references an unknown node"}
+    var options: String = (
+        fields[BEAM_OPTIONS_FIELD] if fields.size() > BEAM_OPTIONS_FIELD else ""
+    )
+    var bound: int = BOUND_NORMAL
+    var long_bound: float = 0.0
+    if options.contains("r"):
+        bound = BOUND_ROPE
+    elif options.contains("s"):
+        bound = BOUND_SUPPORT
+        # A support beam breaks once stretched this many times its own length. Only the
+        # bound is carried here; breaking is not modelled yet.
+        long_bound = SUPPORT_BREAK_LIMIT_DEFAULT
+        if fields.size() > BEAM_BREAK_LIMIT_FIELD:
+            long_bound = maxf(fields[BEAM_BREAK_LIMIT_FIELD].to_float(), 0.0)
+    return {
+        "error": "",
+        "a": a,
+        "b": b,
+        "spring": defaults.spring(),
+        "damp": defaults.damp(),
+        "factor": 0.0,
+        "bound": bound,
+        "short_bound": 0.0,
+        "long_bound": long_bound,
+        "bound_spring": defaults.spring_unscaled(),
+        "bound_damp": defaults.damp_unscaled(),
+        "precompression": 1.0,
+    }
+
+
 static func handles(section: String) -> bool:
     return SPRING_FIELD.has(section) or BOUND_TYPE.has(section)
 

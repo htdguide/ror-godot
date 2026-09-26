@@ -250,18 +250,32 @@ func _node_index(id: String) -> int:
 
 
 func _parse_beam(line: String) -> void:
-    var fields: PackedStringArray = TruckLexer.fields(line)
-    if fields.size() < 2:
+    var row: Dictionary = BeamRows.plain(
+        TruckLexer.fields(line), _node_id_to_index, _beam_defaults
+    )
+    if (row["error"] as String) != "":
+        errors.append("beam %s: %s" % [row["error"], line])
         return
-    var a: int = _node_index(fields[0])
-    var b: int = _node_index(fields[1])
-    if a < 0 or b < 0:
-        errors.append("beam references unknown node: %s" % line)
-        return
-    beams.append(a)
-    beams.append(b)
-    beam_spring.append(_beam_defaults.spring())
-    beam_damp.append(_beam_defaults.damp())
+    _record_beam(row)
+
+
+## Appends a beam and, when it is not an ordinary spring, what it does outside its travel.
+func _record_beam(row: Dictionary) -> void:
+    var beam: int = beams.size() / 2
+    if (row["bound"] as int) != BeamRows.BOUND_NORMAL:
+        bounded_beams.append({
+            "beam": beam,
+            "bound": row["bound"],
+            "short_bound": row["short_bound"],
+            "long_bound": row["long_bound"],
+            "bound_spring": row["bound_spring"],
+            "bound_damp": row["bound_damp"],
+            "precompression": row["precompression"],
+        })
+    beams.append(row["a"] as int)
+    beams.append(row["b"] as int)
+    beam_spring.append(row["spring"] as float)
+    beam_damp.append(row["damp"] as float)
 
 
 func _parse_texcoord(line: String) -> void:
@@ -351,23 +365,9 @@ func _parse_joint(line: String) -> void:
     if (row["error"] as String) != "":
         errors.append("%s %s: %s" % [_section, row["error"], line])
         return
-    var beam: int = beams.size() / 2
     if _section == "hydros" and (row["factor"] as float) != 0.0:
-        hydros.append({"beam": beam, "factor": row["factor"] as float})
-    if (row["bound"] as int) != BeamRows.BOUND_NORMAL:
-        bounded_beams.append({
-            "beam": beam,
-            "bound": row["bound"],
-            "short_bound": row["short_bound"],
-            "long_bound": row["long_bound"],
-            "bound_spring": row["bound_spring"],
-            "bound_damp": row["bound_damp"],
-            "precompression": row["precompression"],
-        })
-    beams.append(row["a"] as int)
-    beams.append(row["b"] as int)
-    beam_spring.append(row["spring"] as float)
-    beam_damp.append(row["damp"] as float)
+        hydros.append({"beam": beams.size() / 2, "factor": row["factor"] as float})
+    _record_beam(row)
 
 
 ## The rest length of the beam a row declares, for the rows that state their travel in metres

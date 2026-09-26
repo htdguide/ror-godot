@@ -396,7 +396,18 @@ float RorSolver::total_energy() const {
         }
         const float length = squared * fast_invSqrt(squared);
         const float extension = length - beam.rest_length;
-        energy += 0.5f * beam.spring * extension * extension;
+        // Through the same bound law the forces go through, for the same reason the length is
+        // measured the same way: a slack rope and a lifted support beam exert nothing and so
+        // store nothing, and counting their full spring reported this rig as holding twelve
+        // times its own energy the moment its suspension was free enough to go slack.
+        //
+        // For a shock past its travel this is an approximation — the stiffness varies across
+        // the overshoot, so the true potential is the integral rather than this product — but
+        // it is right at zero and right inside the travel, which is where a settled rig sits.
+        float spring = beam.spring;
+        float damping = beam.damping;
+        apply_bound_law(beam, extension, spring, damping);
+        energy += 0.5f * spring * extension * extension;
     }
     return energy;
 }
