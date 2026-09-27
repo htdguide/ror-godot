@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ror_ground.h"
+
 #include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
@@ -50,5 +52,11 @@ private:
     std::vector<RorObstacleBox> m_boxes;
     std::vector<int> m_near;
 };
+
+// The ground contact law again, against the static boxes: a ramp's face, a wall, the top of a
+// kerb, a roadside pole. Separate from the solver because it is the same law applied to a
+// different set of surfaces, and because a file has a size cap.
+void apply_obstacle_forces(NodeArray &nodes, const RorObstacles &obstacles,
+                           const std::vector<RorGroundModel> &models, float dt);
 
 } // namespace rorgd

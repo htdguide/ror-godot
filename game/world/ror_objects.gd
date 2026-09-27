@@ -24,9 +24,9 @@ const MAX_OUTSIDE_M: float = 6000.0
 static func build(terrain: RorTerrain) -> Node3D:
     var root: Node3D = Node3D.new()
     root.name = "RorObjects"
-    var state: Dictionary = _state(terrain)
+    var caches: Dictionary = state(terrain)
     for placement: Dictionary in placements(terrain):
-        var node: Node3D = _place(terrain, placement, state)
+        var node: Node3D = _place(terrain, placement, caches)
         if node != null:
             root.add_child(node)
     return root
@@ -54,15 +54,17 @@ static func unbuilt(terrain: RorTerrain) -> Dictionary:
         grass += (parsed["grass"] as Array[Dictionary]).size()
         unread += (parsed["unread"] as PackedStringArray).size()
     var boxes: int = 0
-    var state: Dictionary = _state(terrain)
+    var caches: Dictionary = state(terrain)
     for placement: Dictionary in placements(terrain):
-        var definition: Dictionary = _definition(terrain, placement["name"] as String, state)
-        boxes += definition.get("boxes", 0) as int
+        var odef: Dictionary = definition(terrain, placement["name"] as String, caches)
+        boxes += odef.get("boxes", 0) as int
     return {"grass": grass, "collision_boxes": boxes, "unread_lines": unread}
 
 
-## The caches one build shares: definitions, meshes and the directory's materials.
-static func _state(terrain: RorTerrain) -> Dictionary:
+## The caches one build shares: definitions, meshes and the directory's materials. Shared with
+## whatever else has to follow the same chain — the collision builder walks it too, and parsing
+## a hundred poles twice is a hundred parses too many.
+static func state(terrain: RorTerrain) -> Dictionary:
     return {
         "definitions": {},
         "meshes": {},
@@ -76,15 +78,15 @@ static func _state(terrain: RorTerrain) -> Dictionary:
 ## One placed object, or null when its definition or meshes cannot be read.
 static func _place(terrain: RorTerrain, placement: Dictionary, state: Dictionary) -> Node3D:
     var name: String = placement["name"] as String
-    var definition: Dictionary = _definition(terrain, name, state)
-    if (definition.get("error", "") as String) != "":
+    var odef: Dictionary = definition(terrain, name, state)
+    if (odef.get("error", "") as String) != "":
         return null
     var node: Node3D = Node3D.new()
     node.name = name
-    node.transform = _transform(placement, definition["scale"] as Vector3)
+    node.transform = transform_of(placement, odef["scale"] as Vector3)
     var drawn: int = 0
-    for mesh_file: String in definition["meshes"] as PackedStringArray:
-        var mesh: ArrayMesh = _mesh(terrain, mesh_file, state)
+    for mesh_file: String in odef["meshes"] as PackedStringArray:
+        var mesh: ArrayMesh = mesh_of(terrain, mesh_file, state)
         if mesh == null:
             continue
         var instance: MeshInstance3D = MeshInstance3D.new()
@@ -110,7 +112,7 @@ static func _place(terrain: RorTerrain, placement: Dictionary, state: Dictionary
 ## The scale is a local scale, as a scene node's is: applied in the object's own axes before the
 ## rotation, not to the world box it ends up occupying. It only shows on an object scaled
 ## unevenly, and La Paz has one — its sky dome, at 101 by 25 by 101.
-static func _transform(placement: Dictionary, scale: Vector3) -> Transform3D:
+static func transform_of(placement: Dictionary, scale: Vector3) -> Transform3D:
     var degrees: Vector3 = placement["rotation"] as Vector3
     var basis: Basis = (
         Basis(Vector3.RIGHT, deg_to_rad(degrees.x))
@@ -122,7 +124,7 @@ static func _transform(placement: Dictionary, scale: Vector3) -> Transform3D:
 
 
 ## An object definition, read once per name.
-static func _definition(terrain: RorTerrain, name: String, state: Dictionary) -> Dictionary:
+static func definition(terrain: RorTerrain, name: String, state: Dictionary) -> Dictionary:
     var cache: Dictionary = state["definitions"] as Dictionary
     if cache.has(name):
         return cache[name] as Dictionary
@@ -132,7 +134,7 @@ static func _definition(terrain: RorTerrain, name: String, state: Dictionary) ->
 
 
 ## A mesh, read once per file, with its materials resolved.
-static func _mesh(terrain: RorTerrain, file: String, state: Dictionary) -> ArrayMesh:
+static func mesh_of(terrain: RorTerrain, file: String, state: Dictionary) -> ArrayMesh:
     var cache: Dictionary = state["meshes"] as Dictionary
     if cache.has(file):
         return cache[file] as ArrayMesh

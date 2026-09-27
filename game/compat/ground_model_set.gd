@@ -14,7 +14,8 @@ extends RefCounted
 
 ## Index -> name, upstream's order first.
 var _order: PackedStringArray = PackedStringArray()
-## name -> [adhesion, static, sliding, hydrodynamic, stribeck, alpha, strength].
+## name -> the values in `GroundModelCfg.KEYS` order: the five friction numbers, alpha and
+## strength, then the soft-ground five.
 var _values: Dictionary = {}
 
 
@@ -25,6 +26,8 @@ static func upstream() -> GroundModelSet:
         var values: Array = (GroundModels.SURFACES[name] as Array).duplicate()
         values.append(GroundModels.DEFAULT_ALPHA)
         values.append(GroundModels.DEFAULT_STRENGTH)
+        # Upstream's own file states no soft ground for any of its nine surfaces.
+        values.append_array([0.0, 0.0, 0.0, 1.0, 0.0])
         out._order.append(name)
         out._values[name] = values
     return out
@@ -89,3 +92,12 @@ func apply(solver: RefCounted) -> void:
             float(values[5]),
             float(values[6])
         )
+        if values.size() >= 12:
+            solver.set_ground_fluid(
+                index,
+                float(values[7]),
+                float(values[8]),
+                float(values[9]),
+                float(values[10]),
+                float(values[11])
+            )

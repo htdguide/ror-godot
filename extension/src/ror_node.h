@@ -19,6 +19,10 @@ struct RorNode {
     // it is how a rig asks for grippy tyres and a slippery chassis: the hero truck
     // states 0.65 for its bodywork and 1.06 for its tread.
     float friction_coef = 1.0f;
+    // How much fluid drag and how much buoyancy this node takes in soft ground. Upstream reads
+    // both from a node's own options; every node this project builds takes the default.
+    float surface_coef = 1.0f;
+    float volume_coef = 1.0f;
     bool immovable = false;
     // Set by ground contact each step, read by the wheels to tell a driven tread node
     // that is on the ground from one that is in the air.

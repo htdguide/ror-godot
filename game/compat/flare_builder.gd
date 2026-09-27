@@ -25,12 +25,25 @@ const COLOURS: Dictionary = {
 }
 const DEFAULT_COLOUR: Color = Color(1.0, 0.95, 0.85)
 ## A flare's stated size is a sprite scale, not metres. The hero truck's headlights state 0.9
-## and its tail lights 0.16, and this puts a 0.9 lens at 18 cm across, which is a headlight.
-const LENS_METRES_PER_SIZE: float = 0.2
-## Emission while the lamp is off: a lens still catches light, and a black disc on the front
-## of a truck reads as a hole.
-const LENS_EMISSION_OFF: float = 0.15
-const LENS_EMISSION_ON: float = 6.0
+## and its tail lights 0.16, and this puts a 0.9 lens at 25 cm across, which is a headlight.
+const LENS_METRES_PER_SIZE: float = 0.28
+## How far the lens stands off the panel it is mounted on.
+##
+## A flare's own position is on the bodywork, and the mod draws its own lamp geometry there: a
+## lens at exactly that point is inside the mod's dark plastic, which is what a session saw as
+## lamps that light the road without lighting up themselves. Upstream draws its flares as sprites
+## in front of the panel for the same reason.
+const LENS_STANDOFF_M: float = 0.04
+## How bright the glow is with the lamp off and on. Off is zero: an additive sprite that adds
+## nothing is not there, which is what a lamp that is off looks like.
+const LENS_EMISSION_OFF: float = 0.0
+const LENS_EMISSION_ON: float = 2.4
+## The glow sprite: how big across it is drawn compared with the lamp itself, how much of it is
+## the bright core, and how strong the halo around that is.
+const GLOW_SIZE_SCALE: float = 1.7
+const GLOW_TEXTURE_PX: int = 64
+const GLOW_CORE: float = 0.45
+const GLOW_HALO: float = 0.55
 ## A headlight's cone. Wide enough to light the road either side, not so wide it is a bulb, and
 ## far enough to be a headlight: at 45 m and six units it lit a patch of ground in front of the
 ## bumper, which in daylight is indistinguishable from being off.
@@ -57,6 +70,10 @@ const BRAKE_THRESHOLD: float = 0.08
 const BLINK_PERIOD_S: float = 0.8
 
 
+## The shared glow sprite, built on first use.
+static var _glow_sprite: Texture2D = null
+
+
 ## Builds every lamp under `root`, in the space `render_frame` maps rig coordinates into.
 ## Returns the lamp holders, one per flare, in file order.
 static func build(root: Node3D, truck: TruckParser, render_frame: Transform3D) -> Array[Node3D]:
@@ -67,6 +84,7 @@ static func build(root: Node3D, truck: TruckParser, render_frame: Transform3D) -
         var holder: Node3D = Node3D.new()
         holder.name = "Flare_%d_%s" % [index, flare["type"]]
         var colour: Color = COLOURS.get(flare["type"] as String, DEFAULT_COLOUR) as Color
+        holder.set_meta("lamp_colour", colour)
         holder.add_child(_lens(flare, colour))
         if FlareRows.projects(flare):
             holder.add_child(_beam(colour))
@@ -142,10 +160,19 @@ static func _set_lamp(lamp: Node3D, lit: bool) -> void:
         if lens == null:
             continue
         var material: StandardMaterial3D = lens.material_override as StandardMaterial3D
-        if material != null:
-            material.emission_energy_multiplier = (
-                LENS_EMISSION_ON if lit else LENS_EMISSION_OFF
-            )
+        if material == null:
+            continue
+        # The glow's own colour carries its brightness: additive, so off is nothing at all.
+        var colour: Color = material.albedo_color
+        var energy: float = LENS_EMISSION_ON if lit else LENS_EMISSION_OFF
+        material.albedo_color = _lamp_colour(lamp) * energy
+
+
+## What colour a lamp glows, kept on the holder so that turning it off and on again does not
+## fade it away: the glow's own colour is scaled by its brightness, and a colour scaled to
+## nothing has no hue left to scale back up.
+static func _lamp_colour(lamp: Node3D) -> Color:
+    return lamp.get_meta("lamp_colour", DEFAULT_COLOUR) as Color
 
 
 ## The lamp's frame: at its offset from the node triad, facing along the triad's normal.
@@ -167,22 +194,64 @@ static func _placement(nodes: PackedVector3Array, flare: Dictionary) -> Transfor
 
 
 static func _lens(flare: Dictionary, colour: Color) -> MeshInstance3D:
-    var size: float = (flare["size"] as float) * LENS_METRES_PER_SIZE
+    var size: float = (flare["size"] as float) * LENS_METRES_PER_SIZE * GLOW_SIZE_SCALE
     var quad: QuadMesh = QuadMesh.new()
     quad.size = Vector2(size, size)
     var material: StandardMaterial3D = StandardMaterial3D.new()
-    material.albedo_color = colour
-    material.emission_enabled = true
-    material.emission = colour
-    material.emission_energy_multiplier = LENS_EMISSION_OFF
+    # A glow, not a panel.
+    #
+    # Two earlier attempts are why this is what it is. An unshaded quad draws its albedo and
+    # ignores emission, so the lamp looked identical on and off — 0.723 display luma in both
+    # states. A lit quad with a dark albedo and emission did switch, and a session saw the thing
+    # it actually is: a square standing proud of the headlight. So the lens is additive with a
+    # radial falloff — bright in the middle, nothing at the edge, and nothing at all when it is
+    # off, because adding zero adds nothing. That is also what upstream draws: a flare sprite.
     material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+    material.albedo_texture = _glow_texture()
+    material.albedo_color = colour * LENS_EMISSION_OFF
+    material.disable_receive_shadows = true
     # Seen from behind a lamp is not there, rather than being a bright disc inside the wing.
     material.cull_mode = BaseMaterial3D.CULL_BACK
     var lens: MeshInstance3D = MeshInstance3D.new()
     lens.name = "Lens"
     lens.mesh = quad
     lens.material_override = material
+    lens.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    # Out along the lamp's own normal, which the holder's -Z is — and turned to face that way.
+    #
+    # A QuadMesh faces its own +Z, and the holder is built with -Z along the lamp's normal, so a
+    # lens added without this turn shows its back to the world: culled from outside the vehicle
+    # and visible from inside it.
+    lens.transform = Transform3D(
+        Basis(Vector3.UP, PI), Vector3(0.0, 0.0, -LENS_STANDOFF_M)
+    )
     return lens
+
+
+## The glow sprite every lens is drawn with: white in the middle, fading to nothing at the edge.
+##
+## Built once and shared. A radial falloff rather than a disc, because an additive disc has an
+## edge and an edge is what makes a lamp look like a sticker.
+static func _glow_texture() -> Texture2D:
+    if _glow_sprite != null:
+        return _glow_sprite
+    var image: Image = Image.create_empty(
+        GLOW_TEXTURE_PX, GLOW_TEXTURE_PX, false, Image.FORMAT_RGBAF
+    )
+    var centre: float = float(GLOW_TEXTURE_PX - 1) * 0.5
+    for y: int in GLOW_TEXTURE_PX:
+        for x: int in GLOW_TEXTURE_PX:
+            var away: float = Vector2(float(x) - centre, float(y) - centre).length() / centre
+            # A bright core inside a wider halo, which is what a lamp at night looks like.
+            var core: float = pow(clampf(1.0 - away / GLOW_CORE, 0.0, 1.0), 2.0)
+            var halo: float = pow(clampf(1.0 - away, 0.0, 1.0), 3.0)
+            var value: float = clampf(core + halo * GLOW_HALO, 0.0, 1.0)
+            image.set_pixel(x, y, Color(value, value, value, value))
+    image.generate_mipmaps()
+    _glow_sprite = ImageTexture.create_from_image(image)
+    return _glow_sprite
 
 
 static func _beam(colour: Color) -> SpotLight3D:

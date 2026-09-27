@@ -118,8 +118,10 @@ func _populate_terrain() -> void:
         printerr("PLAY  the solver could not take the terrain: " + error)
         return
     if loaded != null:
-        print("PLAY  driving on %s, spawned at %v under %.2f m/s^2" % [
-            loaded.name, loaded.start_position(), loaded.gravity()])
+        var solid: int = RorObjectCollision.apply(loaded, _drive.solver)
+        print("PLAY  driving on %s, spawned at %v under %.2f m/s^2; %d parts of its own"
+            % [loaded.name, loaded.start_position(), loaded.gravity(), solid]
+            + " scenery are solid")
         return
     if not valley:
         var props: int = ParkProps.apply_to_solver(_drive.solver)

@@ -4,6 +4,8 @@
 
 #include <godot_cpp/variant/vector3.hpp>
 
+#include <vector>
+
 namespace rorgd {
 
 // One of Rigs of Rods' ground models: the friction surface a node lands on.
@@ -25,6 +27,17 @@ struct RorGroundModel {
     float stribeck_velocity = 6.0f;
     float alpha = 2.0f;
     float strength = 1.0f;
+    // How deep a node sinks before it meets anything solid. Zero on every hard surface;
+    // La Paz's sand states 0.1 m, and it is what makes soft ground soft.
+    float solid_ground_level = 0.0f;
+    // The fluid layer above that solid level: a power-law fluid, which is upstream's model for
+    // mud, sand and water alike. Density gives buoyancy; the consistency index and the
+    // behaviour index give the drag; the anisotropy decides how much of that drag resists
+    // sinking as against sliding.
+    float fluid_density = 0.0f;
+    float flow_consistency_index = 0.0f;
+    float flow_behavior_index = 1.0f;
+    float drag_anisotropy = 0.0f;
 };
 
 // Upstream's `primitiveCollision`, solid-ground branch.
@@ -45,9 +58,27 @@ struct RorGroundModel {
 //
 // Without the friction half, torque on a tread node does nothing but spin the wheel.
 //
-// `penetration` is positive when the node is below the surface. The fluid branch of
-// upstream's function (mud, sand, water) is not here: it applies only to ground models
-// with a non-zero `solid_ground_level`, and every hard surface has zero.
+// `penetration` is positive when the node is below the surface.
+//
+// And a fluid branch, for the ground models that state one. A surface with a solid ground level
+// is soft down to that depth: a node inside it gets power-law drag and buoyancy instead of a
+// reaction, and only meets the solid law below it. That is what makes sand behave like sand —
+// without it, La Paz's desert brakes and corners exactly like its asphalt, which is what a
+// session reported.
+// The ground model at an index, growing the table to reach it. A surface map stores indices and
+// a terrain may name more surfaces than upstream does, so the table is as long as it needs to be
+// rather than a fixed nine.
+template <typename Apply>
+inline void ground_model_at(std::vector<RorGroundModel> &models, int index, Apply apply) {
+    if (index < 0) {
+        return;
+    }
+    if (index >= static_cast<int>(models.size())) {
+        models.resize(static_cast<size_t>(index) + 1);
+    }
+    apply(models[static_cast<size_t>(index)]);
+}
+
 godot::Vector3 ground_contact_force(const RorNode &node, const godot::Vector3 &normal, float penetration,
                                     float dt, const RorGroundModel &model);
 

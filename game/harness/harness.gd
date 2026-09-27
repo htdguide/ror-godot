@@ -67,6 +67,14 @@ func _apply_determinism() -> void:
     rng.seed = args.get_int("seed", HarnessCfg.SEED)
 
 
+## What weather a run uses when nothing asks for one: the preset's own in a gate, and the hour a
+## session wants to look at in a window.
+func _default_weather() -> String:
+    if args.has_flag("play"):
+        return DriveCfg.DEFAULT_WEATHER
+    return preset.get("weather", "noon_clear") as String
+
+
 func _build_world(scenario: String, weather: String) -> String:
     weather_name = weather
     if not Scenarios.has(scenario):
@@ -298,13 +306,17 @@ func _load_vehicle(spec: String) -> String:
 
 
 ## Builds the world a gate asked for. Gates never construct scenes themselves.
-func setup_for(shot: String) -> String:
+## Builds the world a gate asks for. `weather` overrides the preset's own, for a gate whose
+## claim is about a particular light — a lamp is not worth measuring at noon.
+func setup_for(shot: String, weather: String = "") -> String:
     var err: String = _resolve_preset(shot)
     if err != "":
         return err
     return _build_world(
         args.get_string("scenario", preset.get("scenario", "static") as String),
-        args.get_string("weather", preset.get("weather", "noon_clear") as String)
+        weather if weather != "" else args.get_string(
+            "weather", _default_weather()
+        )
     )
 
 

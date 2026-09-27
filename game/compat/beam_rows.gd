@@ -34,6 +34,21 @@ const FACTOR_FIELD: Dictionary = {
     "hydros": 2,
 }
 
+## How much stronger than the file's break figure a section's beams are.
+##
+## Upstream's spawner gives a shock four times the breaking threshold in force
+## (`SetBeamStrength(beam, def.beam_defaults->breaking_threshold * 4.f)`), and it is not a
+## detail: a shock's force is mostly damping, so at the hero truck's 2400 Ns/m and a 4000 N
+## threshold it snaps at 1.7 m/s of suspension travel — a kerb. Measured, two of its door
+## dampers broke while the rig was settling onto its own springs, before anything had been
+## driven at all, and a third broke on the next landing, which is what a session reported as
+## recovering the truck breaking a wheel.
+const STRENGTH_SCALE: Dictionary = {
+    "shocks": 4.0,
+    "shocks2": 4.0,
+    "shocks3": 4.0,
+}
+
 ## What a section's beams do outside their travel, matching the solver's BeamBound. A shock
 ## ramps towards the structural rates past either bound; a rope carries tension only; a
 ## support beam carries compression only.
@@ -158,7 +173,9 @@ static func joint(
         # own rates still takes the file's deform and break figures: upstream's `beams` section
         # has no per-beam yield, only the defaults in force where the row was written.
         "deform": defaults.deform(),
-        "strength": defaults.breaking_strength(),
+        "strength": defaults.breaking_strength() * float(
+            STRENGTH_SCALE.get(section, 1.0)
+        ),
         "plastic_coef": defaults.plastic_coef(),
         "factor": factor,
         "bound": int(BOUND_TYPE.get(section, BOUND_NORMAL)),

@@ -99,4 +99,30 @@ bool RorObstacles::contact(const Vector3 &position, float &penetration, Vector3 
     return found;
 }
 
+
+// The same contact law the ground uses, against the boxes a world puts on it.
+void apply_obstacle_forces(NodeArray &nodes, const RorObstacles &obstacles,
+                           const std::vector<RorGroundModel> &models, float dt) {
+    if (obstacles.selected() == 0 || models.empty()) {
+        return;
+    }
+    for (RorNode &node : nodes) {
+        if (node.immovable) {
+            continue;
+        }
+        float penetration = 0.0f;
+        Vector3 normal;
+        int surface = 0;
+        if (!obstacles.contact(node.position, penetration, normal, surface)) {
+            continue;
+        }
+        node.ground_contact = true;
+        size_t model = 0;
+        if (surface >= 0 && surface < static_cast<int>(models.size())) {
+            model = static_cast<size_t>(surface);
+        }
+        node.forces += ground_contact_force(node, normal, penetration, dt, models[model]);
+    }
+}
+
 } // namespace rorgd

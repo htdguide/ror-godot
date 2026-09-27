@@ -19,6 +19,13 @@ const SPAWN_HEIGHT_M: float = 0.05
 ## happens wherever the vehicle rolled and the ground there may be uneven.
 const RECOVER_CLEARANCE_M: float = 0.4
 
+## The light a session opens in.
+##
+## The camera presets state their own weather because a gate's numbers depend on it. A window is
+## not a gate: what a person wants to look at is the hour that shows a vehicle off, and that is
+## the low sun. `--weather <name>` still wins.
+const DEFAULT_WEATHER: String = "golden_dusk"
+
 ## Which way the driver's steering input goes.
 ##
 ## The solver's hydro law is upstream's and says nothing about which way is left: it shortens

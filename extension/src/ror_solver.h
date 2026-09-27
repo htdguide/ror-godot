@@ -83,6 +83,12 @@ public:
                              float hydrodynamic_friction, float stribeck_velocity, float strength);
     // Defines the ground model at `index`, for a world with more than one surface. Index 0 is
     // the one `set_ground_friction` sets and the one used where no surface map says otherwise.
+    // The soft half of a ground model: how deep the fluid layer is and what it is made of.
+    // Separate from the friction setter because most surfaces have none of it, and because a
+    // twelve-argument call is a call nobody can read.
+    void set_ground_fluid(int index, float solid_ground_level, float fluid_density,
+                          float flow_consistency_index, float flow_behavior_index,
+                          float drag_anisotropy);
     void set_ground_model(int index, float adhesion_velocity, float static_friction,
                           float sliding_friction, float hydrodynamic_friction,
                           float stribeck_velocity, float alpha, float strength);

@@ -217,6 +217,10 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("ground_contact_probe", "velocity", "forces", "mass",
                                   "friction_coef", "normal", "penetration", "dt"),
                          &RorSolver::ground_contact_probe);
+    ClassDB::bind_method(D_METHOD("set_ground_fluid", "index", "solid_ground_level",
+                                  "fluid_density", "flow_consistency_index",
+                                  "flow_behavior_index", "drag_anisotropy"),
+                         &RorSolver::set_ground_fluid);
     ClassDB::bind_method(D_METHOD("set_ground_model", "index", "adhesion_velocity",
                                   "static_friction", "sliding_friction", "hydrodynamic_friction",
                                   "stribeck_velocity", "alpha", "strength"),

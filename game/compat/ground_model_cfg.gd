@@ -27,7 +27,18 @@ const KEYS: Array[String] = [
     "stribeck velocity",
     "alpha",
     "strength",
+    # The soft half: how deep the surface is before anything solid, and what the layer above
+    # that is made of. Every hard surface states none of these and takes zeroes; La Paz's sand
+    # states a 0.1 m layer of a power-law fluid, and it is the whole of why sand is not asphalt.
+    "solid ground level",
+    "fluid density",
+    "flow consistency index",
+    "flow behavior index",
+    "drag anisotropy",
 ]
+## How many of the leading keys are the friction ones, which is what decides whether a section
+## is describing a surface at all.
+const FRICTION_KEYS: int = 5
 ## How many of the first five a section has to state to count as a surface description.
 const MIN_STATED: int = 1
 
@@ -65,7 +76,7 @@ static func _keep(out: Dictionary, section: String, stated: Dictionary) -> void:
         return
     var friction: int = 0
     for at: int in stated.keys():
-        if at < 5:
+        if at < FRICTION_KEYS:
             friction += 1
     if friction < MIN_STATED:
         return

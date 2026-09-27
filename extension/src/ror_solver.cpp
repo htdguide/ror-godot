@@ -65,33 +65,10 @@ void RorSolver::set_ground_friction(float adhesion_velocity, float static_fricti
                      stribeck_velocity, m_ground_models[0].alpha, strength);
 }
 
-void RorSolver::set_ground_model(int index, float adhesion_velocity, float static_friction,
-                                 float sliding_friction, float hydrodynamic_friction,
-                                 float stribeck_velocity, float alpha, float strength) {
-    if (index < 0) {
-        return;
-    }
-    if (index >= static_cast<int>(m_ground_models.size())) {
-        m_ground_models.resize(static_cast<size_t>(index) + 1);
-    }
-    RorGroundModel &model = m_ground_models[static_cast<size_t>(index)];
-    model.adhesion_velocity = adhesion_velocity;
-    model.static_friction = static_friction;
-    model.sliding_friction = sliding_friction;
-    model.hydrodynamic_friction = hydrodynamic_friction;
-    model.stribeck_velocity = stribeck_velocity;
-    model.alpha = alpha;
-    model.strength = strength;
-}
-
 bool RorSolver::set_surface_map(const PackedByteArray &surfaces, int width, int depth) {
     return m_heightfield.set_surfaces(surfaces, width, depth);
 }
-
-int RorSolver::ground_model_count() const {
-    return static_cast<int>(m_ground_models.size());
-}
-
+int RorSolver::ground_model_count() const { return static_cast<int>(m_ground_models.size()); }
 int RorSolver::surface_at(const Vector3 &position) const {
     return m_heightfield.surface_at(position);
 }
@@ -100,6 +77,32 @@ void RorSolver::set_fuselage_drag(int front_node, float width, bool enabled) {
     m_fuselage_node = front_node;
     m_fuselage_width = width;
     m_fuselage_enabled = enabled && front_node >= 0 && width > 0.0f;
+}
+
+void RorSolver::set_ground_fluid(int index, float solid_ground_level, float fluid_density,
+                                 float flow_consistency_index, float flow_behavior_index,
+                                 float drag_anisotropy) {
+    ground_model_at(m_ground_models, index, [&](RorGroundModel &model) {
+        model.solid_ground_level = solid_ground_level;
+        model.fluid_density = fluid_density;
+        model.flow_consistency_index = flow_consistency_index;
+        model.flow_behavior_index = flow_behavior_index;
+        model.drag_anisotropy = drag_anisotropy;
+    });
+}
+
+void RorSolver::set_ground_model(int index, float adhesion_velocity, float static_friction,
+                                 float sliding_friction, float hydrodynamic_friction,
+                                 float stribeck_velocity, float alpha, float strength) {
+    ground_model_at(m_ground_models, index, [&](RorGroundModel &model) {
+        model.adhesion_velocity = adhesion_velocity;
+        model.static_friction = static_friction;
+        model.sliding_friction = sliding_friction;
+        model.hydrodynamic_friction = hydrodynamic_friction;
+        model.stribeck_velocity = stribeck_velocity;
+        model.alpha = alpha;
+        model.strength = strength;
+    });
 }
 
 void RorSolver::set_air_drag(float coefficient, bool enabled) {
@@ -485,28 +488,8 @@ void RorSolver::apply_ground_contact(float dt) {
     apply_obstacle_contact(dt);
 }
 
-// The same law again, against the static boxes: a ramp's face, a wall, the top of a kerb.
 void RorSolver::apply_obstacle_contact(float dt) {
-    if (m_obstacles.selected() == 0) {
-        return;
-    }
-    for (RorNode &node : m_nodes) {
-        if (node.immovable) {
-            continue;
-        }
-        float penetration = 0.0f;
-        Vector3 normal;
-        int surface = 0;
-        if (!m_obstacles.contact(node.position, penetration, normal, surface)) {
-            continue;
-        }
-        node.ground_contact = true;
-        size_t model = 0;
-        if (surface >= 0 && surface < static_cast<int>(m_ground_models.size())) {
-            model = static_cast<size_t>(surface);
-        }
-        node.forces += ground_contact_force(node, normal, penetration, dt, m_ground_models[model]);
-    }
+    apply_obstacle_forces(m_nodes, m_obstacles, m_ground_models, dt);
 }
 
 PackedVector3Array RorSolver::get_positions() const {
