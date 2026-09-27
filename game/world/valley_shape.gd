@@ -26,6 +26,7 @@ const LANE_COUNT: int = 9
 ## `GroundModels.index_of` is a search through an array of names, and the surface map asks for
 ## one index per cell: at 4.2 M cells that search was most of what generating the valley cost.
 ## Measured, resolving the names once took the surface pass from 8.1 s to 1.9 s.
+static var _models: GroundModelSet = null
 static var _road_index: int = GroundModels.index_of(ValleyLayout.ROAD_SURFACE)
 static var _rock_index: int = GroundModels.index_of(ValleyLayout.ROCK_SURFACE)
 static var _river_index: int = GroundModels.index_of(ValleyLayout.RIVER_SURFACE)
@@ -39,6 +40,54 @@ static var _lane_indices: PackedByteArray = _build_lane_indices()
 ## when a control point moves, which cost the road's apron 2.5 m of its width.
 static var _road_z_min: float = _road_z_extent(true)
 static var _road_z_max: float = _road_z_extent(false)
+
+
+## The lattice this world is sampled on: how many cells across, how far apart, and where the
+## first one is. Part of the shape interface — a generated world takes the project's own terrain
+## resolution, and a world loaded from someone else's files brings its own.
+static func lattice() -> Dictionary:
+    return {
+        "size": TerrainCfg.MAP_SIZE,
+        "spacing": TerrainCfg.VERTEX_SPACING,
+        "origin": TerrainCfg.ORIGIN,
+    }
+
+
+## The surfaces this world can be driven on: upstream's set, which is what a generated world is
+## painted from. A loaded terrain returns its own, including surfaces upstream never named.
+static func ground_models() -> GroundModelSet:
+    if _models == null:
+        _models = GroundModelSet.upstream()
+    return _models
+
+
+## What colour each surface is drawn with, over its generated texture. A generated world has no
+## imagery of its own, so the surface's own colour is the whole of its look.
+static func surface_colours() -> Dictionary:
+    return TerrainCfg.SURFACE_COLOURS
+
+
+## Which textures Terrain3D draws at a lattice cell, and how they mix. A generated world paints
+## one texture per cell — its surface's own — so there is nothing to blend.
+static func control_at(x_index: int, z_index: int) -> Dictionary:
+    return {"base": surface_at(x_index, z_index), "overlay": 0, "blend": 0.0}
+
+
+## The textures a world brings with it. A generated world brings none: its textures are made
+## from its surfaces by `SurfaceTextures`.
+static func terrain_assets() -> Object:
+    return null
+
+
+## What this world's cache is called, and what else its cache key has to cover. A generated world
+## is decided entirely by its own source files, which the key already hashes, so there is nothing
+## to add.
+static func cache_name() -> String:
+    return "valley"
+
+
+static func cache_salt() -> String:
+    return ""
 
 
 ## The world position of a terrain grid cell, in the x/z plane.

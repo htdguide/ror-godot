@@ -56,9 +56,10 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
 ## Adds the world, when this session asked for one and Terrain3D is installed. It cannot be
 ## populated yet: a Terrain3D has no data until it has been inside a World3D for a frame.
 ##
-## Which world: the flat test park by default, and Valley One under `--valley`. The park is where
-## a person goes to try something — ramps, rocks, surfaces and walls within a few seconds of each
-## other — and the valley is the showcase the plan is measured in.
+## Which world: the flat test park by default, Valley One under `--valley`, and a shipped Rigs of
+## Rods terrain under `--terrain-dir`. The park is where a person goes to try something — ramps,
+## rocks, surfaces and walls within a few seconds of each other — the valley is the showcase the
+## plan is measured in, and a loaded terrain is a place someone else built and drove.
 func _build_terrain() -> void:
     if not Harness.args.has_flag("terrain"):
         return
@@ -73,8 +74,9 @@ func _build_terrain() -> void:
 
 func _populate_terrain() -> void:
     _terrain_pending = false
+    var loaded: RorTerrain = _load_terrain()
     var valley: bool = Harness.args.has_flag("valley")
-    var shape: Object = ValleyShape if valley else ParkShape
+    var shape: Object = loaded if loaded != null else (ValleyShape if valley else ParkShape)
     var error: String = ValleyTerrain.populate(_terrain, shape)
     if error != "":
         printerr("PLAY  the terrain could not be built: " + error)
@@ -84,22 +86,51 @@ func _populate_terrain() -> void:
     var ground: MeshInstance3D = _world.get_node_or_null(^"Ground") as MeshInstance3D
     if ground != null:
         ground.visible = false
-    if valley:
-        _build_valley()
-    else:
-        _world.add_child(ParkProps.build())
-        _world.add_child(ParkGrid.build())
+    # A loaded terrain brings its own furniture in its object files, which is separate work; the
+    # generated worlds' furniture is built here.
+    if loaded == null:
+        if valley:
+            _build_valley()
+        else:
+            _world.add_child(ParkProps.build())
+            _world.add_child(ParkGrid.build())
     if _drive == null:
         return
+    # Where a vehicle starts, and under what gravity, before the terrain is handed over: taking
+    # the terrain puts the rig down, and it has to be put down where the terrain says.
+    if loaded != null:
+        _drive.spawn = loaded.start_position()
+        _drive.solver.set_gravity(Vector3(0.0, loaded.gravity(), 0.0))
     error = _drive.use_terrain(_terrain.get("data"))
     if error != "":
         printerr("PLAY  the solver could not take the terrain: " + error)
+        return
+    if loaded != null:
+        print("PLAY  driving on %s, spawned at %v under %.2f m/s^2" % [
+            loaded.name, loaded.start_position(), loaded.gravity()])
         return
     if not valley:
         var props: int = ParkProps.apply_to_solver(_drive.solver)
         print("PLAY  driving in the test park: %d props are solid" % props)
         return
     print("PLAY  driving on the valley")
+
+
+## The terrain `--terrain-dir` asks for, or null when this session asked for a generated world.
+## A terrain that will not load is reported and the session falls back rather than opening a
+## window onto nothing.
+func _load_terrain() -> RorTerrain:
+    var directory: String = Harness.args.get_string("terrain-dir", "")
+    if directory.is_empty():
+        return null
+    var loaded: Dictionary = RorTerrain.load_from(
+        SourceScan.repo_root().path_join(directory)
+    )
+    if (loaded["error"] as String) != "":
+        printerr("PLAY  the terrain at %s could not be read: %s" % [
+            directory, loaded["error"]])
+        return null
+    return loaded["terrain"] as RorTerrain
 
 
 ## The valley's own furniture: the tunnel, the water and the forest.

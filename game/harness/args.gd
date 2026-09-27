@@ -9,7 +9,7 @@ extends RefCounted
 const KNOWN_VALUE_KEYS: Array[String] = [
     "gate", "shot", "scenario", "weather", "seed", "tick", "converge",
     "frames", "out", "movie", "width", "height", "at", "compare", "record",
-    "replay", "golden", "vehicle",
+    "replay", "golden", "vehicle", "terrain-dir",
 ]
 
 const KNOWN_FLAGS: Array[String] = [

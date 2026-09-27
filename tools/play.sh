@@ -6,6 +6,7 @@
 #   tools/play.sh --weather golden_dusk  any weather or time-of-day preset
 #   tools/play.sh --truck                the hero vehicle in the test park, to drive
 #   tools/play.sh --truck --valley       the same vehicle on Valley One instead
+#   tools/play.sh --truck --lapaz        the same vehicle on La Paz, a shipped RoR terrain
 #   tools/play.sh --truck --no-terrain   the same vehicle on a bare flat plane
 #
 # The window is tracked while it lives and the tracking file is removed on exit, so a
@@ -29,13 +30,22 @@ trap cleanup EXIT INT TERM
 
 # --truck is shorthand: loading the hero vehicle is the common reason to open a window, and
 # a vehicle with nowhere to drive is not much of a session, so it brings a world with it. The
-# test park is that world by default; --valley asks for Valley One.
+# test park is that world by default; --valley asks for Valley One, and --lapaz for the Rigs of
+# Rods terrain under assets/terrains/lapaz2, loaded from the files its author shipped.
 args=("$@")
 want_terrain=0
 for i in "${!args[@]}"; do
     if [[ "${args[$i]}" == "--truck" ]]; then
         args[$i]="--vehicle"
         args=("${args[@]:0:$((i+1))}" "assets/mods/ChevyS1023:S10offroad.truck" "${args[@]:$((i+1))}")
+        want_terrain=1
+        break
+    fi
+done
+for i in "${!args[@]}"; do
+    if [[ "${args[$i]}" == "--lapaz" ]]; then
+        args[$i]="--terrain-dir"
+        args=("${args[@]:0:$((i+1))}" "assets/terrains/lapaz2" "${args[@]:$((i+1))}")
         want_terrain=1
         break
     fi

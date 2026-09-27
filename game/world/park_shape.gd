@@ -12,6 +12,44 @@ extends RefCounted
 ## ground that is a function of x and z cannot have a wall in it.
 
 
+## The lattice the park is sampled on, and the surfaces it is painted from: the project's own
+## terrain resolution and upstream's ground models. Part of the shape interface.
+static func lattice() -> Dictionary:
+    return ValleyShape.lattice()
+
+
+static func ground_models() -> GroundModelSet:
+    return ValleyShape.ground_models()
+
+
+## Which textures Terrain3D draws at a lattice cell, and how they mix; and the textures this
+## world brings with it, which is none — the park's are made from its surfaces.
+static func control_at(x_index: int, z_index: int) -> Dictionary:
+    return {"base": surface_at(x_index, z_index), "overlay": 0, "blend": 0.0}
+
+
+static func terrain_assets() -> Object:
+    return null
+
+
+static func surface_colours() -> Dictionary:
+    return TerrainCfg.SURFACE_COLOURS
+
+
+static func cache_name() -> String:
+    return "park"
+
+
+static func cache_salt() -> String:
+    return ""
+
+
+## The world position of a terrain grid cell, in the x/z plane. The park shares the valley's
+## lattice, so it shares its arithmetic.
+static func world_of(x_index: int, z_index: int) -> Vector2:
+    return ValleyShape.world_of(x_index, z_index)
+
+
 ## The park's height at a terrain grid cell, in metres.
 static func height_at(x_index: int, z_index: int) -> float:
     var world: Vector2 = ValleyShape.world_of(x_index, z_index)

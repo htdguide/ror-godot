@@ -43,12 +43,16 @@ static func read(
 ## Hands a grid read by `read` to the solver, with the surfaces that go with it. Returns "" on
 ## success.
 ##
-## The surface map arrives as data rather than being generated here. Which surface is where is a
+## The surface map arrives as data rather than being generated here, and so does the set of
+## surfaces its indices refer to. Which surface is where is a
 ## property of the world, and the world builds the map already to tint the terrain with: a
 ## second copy computed in the bridge would be a second thing to keep in agreement, and at 4.2 M
 ## cells it also cost 7 s of every run.
 static func apply(
-    solver: RefCounted, field: Dictionary, surfaces: PackedByteArray
+    solver: RefCounted,
+    field: Dictionary,
+    surfaces: PackedByteArray,
+    models: GroundModelSet = null
 ) -> String:
     var width: int = field["width"] as int
     var depth: int = field["depth"] as int
@@ -62,7 +66,11 @@ static func apply(
     if not accepted:
         return "the solver rejected a %dx%d heightfield at %.2f m spacing" % [
             width, depth, field["spacing"] as float]
-    GroundModels.apply(solver)
+    # The surfaces a world can be driven on are the world's own: a terrain that ships its own
+    # ground model config names surfaces upstream never did, and a surface map written against
+    # that set means nothing without it.
+    var live_models: GroundModelSet = models if models != null else GroundModelSet.upstream()
+    live_models.apply(solver)
     if surfaces.size() != width * depth:
         return "the surface map is %d cells for a %dx%d grid" % [surfaces.size(), width, depth]
     if not solver.set_surface_map(surfaces, width, depth):

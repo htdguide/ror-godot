@@ -26,8 +26,6 @@ const TRACTION_SAMPLES: int = 64
 const TRACTION_STRIDE_PX: int = 4
 ## The most of the map one surface may cover before the traction map is not being read at all.
 const MAX_SINGLE_SURFACE_SHARE: float = 0.95
-## How much the tint has to vary across the map.
-const MIN_TINT_RANGE: float = 0.02
 ## The surface whose friction is checked against the terrain's own config, and where that config
 ## states it. La Paz overrides upstream's sand: 0.5 static where upstream has 0.7.
 const OVERRIDDEN_SURFACE: String = "sand"
@@ -91,16 +89,17 @@ func run(_harness: Node) -> Dictionary:
     var friction: String = _friction_is_the_terrains(terrain, directory)
     if friction != "":
         return fail(friction)
-    var tint: Dictionary = _tint_varies(terrain)
-    if (tint["error"] as String) != "":
-        return fail(tint["error"] as String, tint["value"] as float)
+    var painted_with: Dictionary = _layers_are_painted(terrain)
+    if (painted_with["error"] as String) != "":
+        return fail(painted_with["error"] as String, painted_with["value"] as float)
 
     var lattice: Dictionary = terrain.lattice()
     return ok(
-        "%s: %d cells of %.4f m, ground %.3f m under a spawn stated at %.3f m, %s, tint over"
+        "%s: %d cells of %.4f m, ground %.3f m under a spawn stated at %.3f m, %s"
         % [terrain.name, lattice["size"], lattice["spacing"], ground, start.y,
            painted["detail"] as String]
-        + " %.3f of luma" % (tint["value"] as float),
+        + ", %d of its %d texture layers drawn" % [
+            painted_with["value"] as int, terrain.layers().size()],
         off
     )
 
@@ -273,33 +272,52 @@ func _stated(text: String, section: String, key: String) -> float:
     return 0.0
 
 
-## The colour map the terrain will be painted with carries the map's own variety.
-func _tint_varies(terrain: RorTerrain) -> Dictionary:
+## The terrain's own textures are there, and its splat map actually varies across the map.
+##
+## Not a colour check any more: a loaded terrain is drawn in its own tiled textures through the
+## control map, so what matters is that every layer the page file lists has a file behind it and
+## that the splat map paints more than one of them.
+func _layers_are_painted(terrain: RorTerrain) -> Dictionary:
+    var layers: Array[Dictionary] = terrain.layers()
+    if layers.size() < 2:
+        return {
+            "error": "the page file lists %d texture layers: a terrain drawn in one texture is"
+                % layers.size() + " not being read",
+            "value": float(layers.size()),
+        }
+    var reader: RefCounted = ClassDB.instantiate("DdsReader") as RefCounted
+    for layer: Dictionary in layers:
+        var albedo: String = layer["albedo"] as String
+        var image: Image = RorTerrainSkin.image_of(
+            terrain.directory.path_join(albedo), reader
+        )
+        if image == null:
+            return {
+                "error": "the layer texture %s could not be read" % albedo,
+                "value": 0.0,
+            }
+        if (layer["tile_m"] as float) <= 0.0:
+            return {
+                "error": "%s is laid at %.2f m per repeat: it would be drawn at one texel"
+                    % [albedo, layer["tile_m"] as float],
+                "value": layer["tile_m"] as float,
+            }
+    # And the splat map has to put different layers in different places, or every texel is the
+    # base layer and the other three are decoration in a config file.
     var span_x: float = terrain.geometry["world_x"] as float
     var span_z: float = terrain.geometry["world_z"] as float
-    var lowest: float = INF
-    var highest: float = -INF
+    var drawn: Dictionary = {}
     for iz: int in TRACTION_SAMPLES:
         for ix: int in TRACTION_SAMPLES:
-            var tint: Color = terrain.tint_at(
+            var control: Dictionary = RorTerrainSkin.control_of(terrain.layer_coverage_at(
                 span_x * (float(ix) + 0.5) / float(TRACTION_SAMPLES),
                 span_z * (float(iz) + 0.5) / float(TRACTION_SAMPLES)
-            )
-            var luma: float = tint.get_luminance()
-            lowest = minf(lowest, luma)
-            highest = maxf(highest, luma)
-    var range_of: float = highest - lowest
-    if lowest < RorTerrain.MIN_TINT_LUMA:
+            ))
+            drawn[control["base"] as int] = true
+    if drawn.size() < 2:
         return {
-            "error": "the terrain's tint reaches %.3f luma: its textures are not being read" % lowest,
-            "value": lowest,
+            "error": "every sample of the map is drawn in layer %s: the splat map is not being"
+                % ", ".join(PackedStringArray([str(drawn.keys())])) + " read",
+            "value": float(drawn.size()),
         }
-    if range_of < MIN_TINT_RANGE:
-        return {
-            "error": (
-                "the terrain's tint varies by %.4f across the whole map: the splat map is not"
-                % range_of + " reaching the colour"
-            ),
-            "value": range_of,
-        }
-    return {"error": "", "value": range_of}
+    return {"error": "", "value": float(drawn.size())}

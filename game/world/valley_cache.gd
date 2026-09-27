@@ -39,18 +39,21 @@ static func disabled() -> bool:
     return OS.get_environment("VALLEY_NO_CACHE") == "1"
 
 
-## Where this valley's cache lives. The key is a hash of the shape's sources, so a layout edit
+## Where this world's cache lives. The key is a hash of the shape's sources, so a layout edit
 ## lands in a different directory rather than being loaded over.
 static func directory(shape: Object = null) -> String:
-    var name: String = "valley"
-    if shape != null and shape is Script:
-        name = (shape as Script).resource_path.get_file().get_basename()
-    return OS.get_user_data_dir().path_join("cache").path_join("%s_%s" % [name, key()])
+    var live_shape: Object = shape if shape != null else ValleyShape
+    var name: String = live_shape.call("cache_name") as String
+    return OS.get_user_data_dir().path_join("cache").path_join("%s_%s" % [name, key(live_shape)])
 
 
-## A short hash of every file that decides the shape. Returns "unhashable" when a source cannot
+## A short hash of everything that decides the shape. Returns "unhashable" when a source cannot
 ## be read, which is a key like any other — the point of it is only to change when they do.
-static func key() -> String:
+##
+## For a generated world the sources are the scripts. For a world loaded from someone else's
+## files the scripts decide only how those files are read, so the shape adds a salt of its own:
+## a different terrain in the same directory is a different world and must not load this cache.
+static func key(shape: Object = null) -> String:
     var context: HashingContext = HashingContext.new()
     context.start(HashingContext.HASH_SHA256)
     for path: String in SOURCES:
@@ -58,6 +61,10 @@ static func key() -> String:
         if bytes.is_empty():
             return "unhashable"
         context.update(bytes)
+    if shape != null:
+        var salt: String = shape.call("cache_salt") as String
+        if not salt.is_empty():
+            context.update(salt.to_utf8_buffer())
     return context.finish().hex_encode().substr(0, 16)
 
 
@@ -79,14 +86,13 @@ static func is_populated(path: String) -> bool:
 ## Returns "" when they agree and the disagreement when they do not.
 static func verify(data: Object, shape: Object = null) -> String:
     var live_shape: Object = shape if shape != null else ValleyShape
-    var size: int = TerrainCfg.MAP_SIZE
-    var spacing: float = TerrainCfg.VERTEX_SPACING
+    var size: int = live_shape.call("lattice")["size"] as int
     var rng: RandomNumberGenerator = RandomNumberGenerator.new()
     rng.seed = HarnessCfg.SEED
     for _sample: int in VERIFY_SAMPLES:
         var x_index: int = rng.randi_range(0, size - 1)
         var z_index: int = rng.randi_range(0, size - 1)
-        var world: Vector2 = ValleyShape.world_of(x_index, z_index)
+        var world: Vector2 = live_shape.call("world_of", x_index, z_index)
         var cached: float = data.call(
             "get_height", Vector3(world.x, 0.0, world.y)
         ) as float
@@ -101,8 +107,10 @@ static func verify(data: Object, shape: Object = null) -> String:
 
 ## Reads the surface map written beside the regions. Empty when it is missing or the wrong size
 ## for this map, which is treated as no cache at all.
-static func read_surfaces(path: String) -> PackedByteArray:
-    var expected: int = TerrainCfg.MAP_SIZE * TerrainCfg.MAP_SIZE
+static func read_surfaces(path: String, shape: Object = null) -> PackedByteArray:
+    var live_shape: Object = shape if shape != null else ValleyShape
+    var size: int = live_shape.call("lattice")["size"] as int
+    var expected: int = size * size
     var bytes: PackedByteArray = FileAccess.get_file_as_bytes(path.path_join(SURFACE_FILE))
     return bytes if bytes.size() == expected else PackedByteArray()
 

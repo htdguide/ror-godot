@@ -23,12 +23,6 @@ extends RefCounted
 ## and 2049 does not: the terrain is 3998.05 m of a 4000 m map, its far edge two metres short.
 ## Nothing is resampled to achieve that — a resampled heightmap is no longer the author's.
 
-## Where a terrain's own textures say the ground is, when it paints nothing over the base layer.
-const DEFAULT_TINT: Color = Color(0.5, 0.45, 0.4)
-## How dark the tint may go. The splat textures' averages are all mid-tones, and a colour map is
-## the only albedo this project has proven reaches the screen, so a black tint is a bug.
-const MIN_TINT_LUMA: float = 0.05
-
 var directory: String = ""
 var name: String = ""
 var config: Dictionary = {}
@@ -42,13 +36,14 @@ var _samples: int = 0
 var _height_scale: float = 0.0
 var _traction_image: Image = null
 var _blend_image: Image = null
-## One average colour per splat layer, and which channel of the blend map selects it.
-var _layer_tints: Array[Color] = []
+## Which channel of the blend map selects each splat layer, and at what strength.
 var _layer_channels: PackedStringArray = PackedStringArray()
 var _layer_alphas: PackedFloat32Array = PackedFloat32Array()
 ## Surface name -> index in `models`, so a per-cell lookup is not a string search.
 var _surface_indices: Dictionary = {}
 var _default_surface: int = 0
+## The terrain's own textures, built on demand.
+var _assets: Object = null
 
 
 ## Loads the terrain in a directory. Returns null and leaves `error` set on the result of
@@ -121,21 +116,74 @@ func surface_at_world(x: float, z: float) -> int:
 
 ## What colour the ground is at a world position.
 ##
-## The terrain's own look is four tiled textures blended by a splat map, and this is the honest
-## part of that a colour map can hold: each layer's average colour, composited in the order the
-## page file lists them, at the weights the splat map paints. Tiling detail needs the textures
-## themselves on the terrain material, which is a separate piece of work.
-func tint_at(x: float, z: float) -> Color:
-    if _layer_tints.is_empty():
-        return DEFAULT_TINT
-    var out: Color = _layer_tints[0]
-    if _blend_image == null:
+## White, deliberately. The terrain's look is its own tiled textures, laid on by
+## `RorTerrainSkin` through Terrain3D's control map, and Terrain3D multiplies the colour map
+## over them: any tint here would be this project's palette painted over the author's.
+##
+## What the splat map says is not discarded — it decides which textures are drawn, through
+## `layer_coverage_at` — it just does not become a colour.
+func tint_at(_x: float, _z: float) -> Color:
+    return Color.WHITE
+
+
+## The terrain's splat layers, as the page file lists them.
+func layers() -> Array[Dictionary]:
+    return page["layers"] as Array[Dictionary]
+
+
+## How much of the final picture each layer covers at a world position.
+##
+## Ogre draws layer 0 over the whole page and lays each later layer over it at that layer's own
+## alpha, taken from one channel of the splat map. So a layer's share is its own weight times
+## what the layers above it left uncovered, which is the composite unrolled.
+func layer_coverage_at(x: float, z: float) -> PackedFloat32Array:
+    var out: PackedFloat32Array = PackedFloat32Array()
+    out.resize(_layer_channels.size())
+    if out.is_empty():
         return out
-    var blend: Color = _blend_image.get_pixelv(_image_cell(_blend_image, x, z))
-    for index: int in range(1, _layer_tints.size()):
-        var weight: float = _channel(blend, _layer_channels[index]) * _layer_alphas[index]
-        out = out.lerp(_layer_tints[index], clampf(weight, 0.0, 1.0))
+    var blend: Color = Color(0.0, 0.0, 0.0, 0.0)
+    if _blend_image != null:
+        blend = _blend_image.get_pixelv(_image_cell(_blend_image, x, z))
+    var remaining: float = 1.0
+    for index: int in range(out.size() - 1, 0, -1):
+        var weight: float = clampf(
+            _channel(blend, _layer_channels[index]) * _layer_alphas[index], 0.0, 1.0
+        )
+        out[index] = weight * remaining
+        remaining -= out[index]
+    out[0] = maxf(remaining, 0.0)
     return out
+
+
+## Which textures Terrain3D draws at a lattice cell, and how they mix.
+func control_at(x_index: int, z_index: int) -> Dictionary:
+    var world: Vector2 = world_of(x_index, z_index)
+    return RorTerrainSkin.control_of(layer_coverage_at(world.x, world.y))
+
+
+## The terrain's own textures, as a Terrain3D asset set. Built once and kept: it holds every
+## splat texture the terrain ships.
+func terrain_assets() -> Object:
+    if _assets == null:
+        _assets = RorTerrainSkin.assets(self)
+    return _assets
+
+
+## The surfaces this terrain can be driven on: upstream's set with the terrain's own config laid
+## over it. Part of the shape interface — the surface map's indices mean nothing without it.
+func ground_models() -> GroundModelSet:
+    return models
+
+
+## What colour each surface is drawn with, over its generated texture: none of this project's
+## own, because a loaded terrain carries its own imagery.
+##
+## The colour map is built from the terrain's own splat layers, and Terrain3D multiplies a
+## texture's albedo colour over it. Tinting an imported terrain's asphalt with this project's
+## idea of asphalt multiplies two colours that were never meant to meet: measured, La Paz's
+## roads came out pure black beside ground that was correct.
+func surface_colours() -> Dictionary:
+    return {}
 
 
 ## Where a vehicle starts, as the terrain's own config states it.
@@ -209,39 +257,14 @@ func _read_surfaces() -> String:
     return ""
 
 
-## The splat layers: each one's average colour, and which channel paints it.
+## The splat layers: which channel paints each one, and the blend map they are painted with.
 func _read_layers() -> void:
     for layer: Dictionary in page["layers"] as Array[Dictionary]:
-        _layer_tints.append(_average(layer["albedo"] as String))
         _layer_channels.append(layer["channel"] as String)
         _layer_alphas.append(layer["alpha"] as float)
         var blend_file: String = layer["blend_map"] as String
         if _blend_image == null and not blend_file.is_empty():
             _blend_image = Image.load_from_file(directory.path_join(blend_file))
-
-
-## One texture's average colour. Its own pixels: a terrain's palette is in its textures, and
-## picking colours by eye here would be this project inventing the look of someone else's map.
-func _average(texture: String) -> Color:
-    if texture.is_empty():
-        return DEFAULT_TINT
-    var path: String = directory.path_join(texture)
-    var image: Image = Dds.load_image(path) if path.get_extension().to_lower() == "dds" else (
-        Image.load_from_file(path)
-    )
-    if image == null:
-        return DEFAULT_TINT
-    if image.is_compressed():
-        if image.decompress() != OK:
-            return DEFAULT_TINT
-    image.resize(1, 1, Image.INTERPOLATE_LANCZOS)
-    var out: Color = image.get_pixel(0, 0)
-    # These textures carry a spec or height channel in their alpha, and it is often zero. The
-    # colour is what is wanted, at full opacity.
-    out.a = 1.0
-    if out.get_luminance() < MIN_TINT_LUMA:
-        return DEFAULT_TINT
-    return out
 
 
 ## --- Sampling -------------------------------------------------------------------------------

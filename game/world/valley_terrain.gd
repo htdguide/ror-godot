@@ -63,12 +63,22 @@ static var _surfaces: PackedByteArray = PackedByteArray()
 static var _shape: Object = ValleyShape
 
 
+## The lattice the current shape is sampled on: how many cells across, how far apart, and where
+## the first one is.
+##
+## Asked of the shape rather than read from `TerrainCfg`, because a world loaded from someone
+## else's files brings its own: La Paz is 2048 cells of 1.953125 m starting at the origin, where
+## a generated world is 2048 of 1.0 m centred on it.
+static func lattice() -> Dictionary:
+    return _shape.call("lattice") as Dictionary
+
+
 ## The surface map of the terrain built last. Built on demand if the terrain was not built in
 ## this run, so that a caller cannot be handed an empty one.
 static func surface_map() -> PackedByteArray:
-    if _surfaces.size() == TerrainCfg.MAP_SIZE * TerrainCfg.MAP_SIZE:
+    var size: int = lattice()["size"] as int
+    if _surfaces.size() == size * size:
         return _surfaces
-    var size: int = TerrainCfg.MAP_SIZE
     var out: PackedByteArray = PackedByteArray()
     out.resize(size * size)
     for z: int in size:
@@ -88,11 +98,14 @@ static func surface_map() -> PackedByteArray:
 static func give_to_solver(solver: RefCounted, data: Object) -> String:
     if data == null:
         return "the terrain has no data object: it has not finished entering the tree"
-    var size: int = TerrainCfg.MAP_SIZE
+    var grid: Dictionary = lattice()
+    var size: int = grid["size"] as int
     var field: Dictionary = TerrainHeightfield.read(
-        data, TerrainCfg.ORIGIN, size, size, TerrainCfg.VERTEX_SPACING
+        data, grid["origin"] as Vector3, size, size, grid["spacing"] as float
     )
-    return TerrainHeightfield.apply(solver, field, surface_map())
+    return TerrainHeightfield.apply(
+        solver, field, surface_map(), _shape.call("ground_models") as GroundModelSet
+    )
 
 
 ## The shape the terrain is currently built from.
@@ -112,8 +125,9 @@ static func populate(terrain: Node3D, with_shape: Object = null) -> String:
         return "Terrain3D is not installed: run tools/build_terrain3d.sh"
     if not terrain.is_inside_tree():
         return "the terrain is not in the tree yet"
+    var grid: Dictionary = lattice()
     terrain.set("region_size", TerrainCfg.REGION_SIZE)
-    terrain.set("vertex_spacing", TerrainCfg.VERTEX_SPACING)
+    terrain.set("vertex_spacing", grid["spacing"] as float)
     # Terrain3D persists its regions in its data directory and loads them when the directory is
     # set, so this both names where the cache goes and loads it if it is already there.
     var directory: String = ValleyCache.directory(_shape)
@@ -123,14 +137,20 @@ static func populate(terrain: Node3D, with_shape: Object = null) -> String:
     if data == null:
         return "the terrain has no data object after a frame in the tree"
     terrain.set("collision_mode", TerrainCfg.COLLISION_DISABLED)
-    var assets: Object = SurfaceTextures.build()
+    # A world that ships its own textures is drawn in them; one that does not gets a set
+    # generated from its surfaces.
+    var assets: Object = _shape.call("terrain_assets")
+    if assets == null:
+        assets = SurfaceTextures.build(
+            _shape.call("ground_models"), _shape.call("surface_colours")
+        )
     if assets != null:
         terrain.set("assets", assets)
     _show_surfaces(terrain)
     if _load_cached(data, directory):
         return ""
 
-    var size: int = TerrainCfg.MAP_SIZE
+    var size: int = grid["size"] as int
     var height: Image = Image.create_empty(size, size, false, Image.FORMAT_RF)
     var colour: Image = Image.create_empty(size, size, false, Image.FORMAT_RGBA8)
     # The surface is asked for once per cell and used twice: it tints the colour map here and
@@ -150,15 +170,15 @@ static func populate(terrain: Node3D, with_shape: Object = null) -> String:
             height.set_pixel(x, z, Color(_shape.call("height_at", x, z), 0.0, 0.0))
             var surface: int = _shape.call("surface_at", x, z)
             surfaces[row + x] = surface
-            var world: Vector2 = ValleyShape.world_of(x, z)
+            var world: Vector2 = _shape.call("world_of", x, z)
             var tint: Color = _shape.call("tint_at", world.x, world.y)
             # Terrain3D's colour map carries roughness in its alpha channel.
             colour.set_pixel(x, z, Color(tint.r, tint.g, tint.b, COLOUR_MAP_ROUGHNESS))
     # import_images takes [height, control, colour]; the control map is left to its default.
-    data.call("import_images", [height, null, colour], TerrainCfg.ORIGIN, 0.0, 1.0)
+    data.call("import_images", [height, null, colour], grid["origin"] as Vector3, 0.0, 1.0)
     if int(data.call("get_region_count")) == 0:
         return "importing the heightmap produced no regions"
-    _paint_surfaces(terrain, data, surfaces)
+    _paint_surfaces(terrain, data)
     _surfaces = surfaces
     data.call("save_directory", directory)
     ValleyCache.write_surfaces(directory, surfaces)
@@ -178,7 +198,7 @@ static func _load_cached(data: Object, directory: String) -> bool:
         return false
     if int(data.call("get_region_count")) == 0:
         return false
-    var surfaces: PackedByteArray = ValleyCache.read_surfaces(directory)
+    var surfaces: PackedByteArray = ValleyCache.read_surfaces(directory, _shape)
     if surfaces.is_empty():
         return false
     var disagreement: String = ValleyCache.verify(data, _shape)
@@ -190,22 +210,30 @@ static func _load_cached(data: Object, directory: String) -> bool:
     return true
 
 
-## Writes which texture each part of the terrain uses, lane by lane.
+## Writes which textures each part of the terrain uses.
 ##
-## The control map is what selects a texture per texel, and it is written through Terrain3D's
-## own setter rather than by packing its bit layout here: the packing is an internal detail of
-## a pinned dependency and hand-writing it would break silently on an upgrade.
-static func _paint_surfaces(terrain: Node3D, data: Object, surfaces: PackedByteArray) -> void:
-    var size: int = TerrainCfg.MAP_SIZE
-    var spacing: float = TerrainCfg.VERTEX_SPACING
+## The control map holds two texture ids and a blend per texel, and which those are is the
+## world's answer: a generated world draws one texture per surface, and a loaded terrain draws
+## the two splat layers its author painted most of at that point.
+##
+## Written through Terrain3D's own setters rather than by packing its bit layout here: the
+## packing is an internal detail of a pinned dependency and hand-writing it would break
+## silently on an upgrade.
+static func _paint_surfaces(terrain: Node3D, data: Object) -> void:
+    var grid: Dictionary = lattice()
+    var size: int = grid["size"] as int
+    var spacing: float = grid["spacing"] as float
+    var origin: Vector3 = grid["origin"] as Vector3
     for z: int in size:
-        var world_z: float = TerrainCfg.ORIGIN.z + float(z) * spacing
+        var world_z: float = origin.z + float(z) * spacing
         var row: int = z * size
         for x: int in size:
-            data.call(
-                "set_control_base_id",
-                Vector3(TerrainCfg.ORIGIN.x + float(x) * spacing, 0.0, world_z),
-                surfaces[row + x]
-            )
+            var at: Vector3 = Vector3(origin.x + float(x) * spacing, 0.0, world_z)
+            var control: Dictionary = _shape.call("control_at", x, z)
+            data.call("set_control_base_id", at, control["base"] as int)
+            var blend: float = control["blend"] as float
+            if blend > 0.0:
+                data.call("set_control_overlay_id", at, control["overlay"] as int)
+                data.call("set_control_blend", at, blend)
     data.call("update_maps")
     terrain.set("data_directory", terrain.get("data_directory"))

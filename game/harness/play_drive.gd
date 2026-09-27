@@ -51,6 +51,12 @@ func eye() -> Vector3:
     return (_built["rig_to_local"] as Transform3D) * Cockpit.eye_position(truck)
 
 
+## Where this world starts a vehicle, and which way it faces. Zero is the middle of a generated
+## world; a loaded terrain states its own, and La Paz's is 3.9 km along its own map.
+var spawn: Vector3 = Vector3.ZERO
+var spawn_heading: float = 0.0
+
+
 ## Stands the rig on a terrain instead of the flat plane. Returns "" on success.
 func use_terrain(data: Object) -> String:
     var applied: String = ValleyTerrain.give_to_solver(solver, data)
@@ -212,7 +218,7 @@ func _recover() -> void:
 
 ## Puts the rig back where it started, upright and at rest.
 func _respawn() -> void:
-    RigBuilder.place(solver, truck, Vector3.ZERO, 0.0, DriveCfg.SPAWN_HEIGHT_M)
+    RigBuilder.place(solver, truck, spawn, spawn_heading, DriveCfg.SPAWN_HEIGHT_M)
     _lit = false
     solver.start_engine()
     _apply_pose()
