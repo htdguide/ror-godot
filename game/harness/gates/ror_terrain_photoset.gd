@@ -93,6 +93,7 @@ func run(harness: Node) -> Dictionary:
         var at: Vector3 = view["at"] as Vector3
         if vegetation != null:
             vegetation.focus_on(at)
+            vegetation.fill()
         harness.camera.look_at_from_position(
             _stand(terrain_data, at, view.get("close", false) as bool), at, Vector3.UP
         )

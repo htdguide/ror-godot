@@ -86,6 +86,30 @@ vehicle is doing, and `M` opens a panel for weather, gravity, the sun, fog and e
 response and the contact law against a vertical face, and nothing bends permanently. That is the
 next thing worth building if crashing is the point.
 
+**0b. Rigs of Rods terrains load, and any of them can be opened.** `tools/import_terrain.sh
+<zip>` puts a terrain in the library under `assets/terrains/`, `--list` says what is there, and
+`tools/play.sh --truck --map <name>` drives it. La Paz is the one this was built against: its
+heightmap, traction map, ground models, splat textures, 101 objects and two vegetation layers all
+come from the files its author shipped, and five gates hold that — `ror_terrain_matches_its_files`,
+`ror_terrain_is_drivable`, `ror_terrain_objects_are_placed`, `ror_terrain_grows_its_vegetation`
+and `terrain_library_loads_what_it_holds`, with `ror_terrain_photoset` for the sheet.
+
+What a loaded terrain does **not** have yet, each named rather than forgotten:
+
+- **Collision boxes and collision meshes.** An `.odef` can carry a box and a terrain can ship
+  hand-placed collision meshes; both are counted by `ror_terrain_objects_are_placed` and neither
+  reaches the solver. La Paz declares none, so nothing on it is solid but the ground.
+- **Procedural roads.** `.tobj` road/road2 sections are reported as unread lines. La Paz has none.
+- **Water.** A terrain's `Water` and `WaterLine` are read and ignored; La Paz has water off.
+- **Sky.** The terrn2 names a cube map from Rigs of Rods' core resources, which a terrain does
+  not ship, so the scene keeps its own physical sky.
+- **Vegetation colour maps and sway.** The layer's colour map and its sway numbers are read and
+  unused; plants are still and untinted.
+- **The last sample row and column.** Terrain3D's regions tile on a power of two, so a 2049
+  sample page is imported as 2048 cells and the map is 2 m short of its stated 4000 m.
+- **The traction map is nearest-sampled** at 3.9 m per pixel on La Paz, where upstream filters
+  it bilinearly; surface edges are a pixel blocky.
+
 **1. The ground material.** Water and vegetation tier 1 are in (see
 `docs/architecture/valley.md`); what is left of PLAN §0.5's M2 staging is the PBR ground material
 through `res://shaders/terrain3d_override.gdshader`, and vegetation tiers 2 and 3.
@@ -290,6 +314,26 @@ gates need a real window, and `tools/gate.sh` refuses to run while one is open.
   Measure with `tools/terrain_cost_probe.gd` before growing a map. The cache in
   `world/valley_cache.gd` is what makes the size affordable, and it verifies itself against the
   shape function on load because a cache is otherwise a golden artifact.
+- **Every odef object is pitched -90 degrees about its own x axis**, unconditionally, for every
+  object on every terrain (upstream's `TerrainObjectManager::LoadTerrainObject`). Object meshes
+  in this library are authored z-up. Without that turn La Paz's 99 roadside poles lie on their
+  sides in the ground — 6 m of mesh along z, 2 m along y, nothing above the surface — and the
+  terrain looks like an empty desert that loaded correctly.
+- **A terrain states its own heightmap scale and it is not a guess.** A height is
+  `sample / 65535 * WorldSizeY` and the lattice is `PageSize - 1` cells of
+  `WorldSizeX / (PageSize - 1)` metres. The oracle for all of it is the terrain's own
+  `StartPosition`: La Paz says a vehicle starts at 7.375 m and the decoded heightmap is 7.375 m
+  there. With the rows flipped it is 4.4 m out, with the bytes swapped 33 m.
+- **An imported terrain's textures must not be tinted by this project's palette.** Terrain3D
+  multiplies a texture's `albedo_color` over the colour map, and drawing La Paz's asphalt
+  through this project's idea of asphalt (0.20 grey) rendered its roads pure black beside
+  ground that was correct. A loaded terrain's colour map is white and its surfaces are neutral.
+- **A Terrain3D control map id with no texture behind it renders pure black.** A loaded terrain
+  names surfaces upstream's ground models have never heard of — La Paz adds `dirt` and
+  `softsand` — and the texture set has to cover every index the world can write.
+- **Ogre's `texture_unit scale` scales the texture, not the coordinates.** A stated 0.04 means
+  the texture tiles twenty-five times across what the mesh's UVs cover. La Paz's ground skirt is
+  one 20 km quad; without it the horizon is a beige wall.
 - **Every gate in the suite can be green while something is visibly broken.** Missing vertex
   normals, tyres buried 0.34 m in the ground, and a door hanging a metre off its hinges all
   passed every check that existed at the time, because each measured nodes and the nodes were

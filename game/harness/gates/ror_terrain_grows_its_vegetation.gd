@@ -99,6 +99,7 @@ func run(_harness: Node) -> Dictionary:
     # Grown around the terrain's own spawn.
     var start: Vector3 = terrain.start_position()
     first.focus_on(start)
+    first.fill()
     var planted: int = first.planted()
     if planted <= 0:
         first.free()
@@ -116,6 +117,7 @@ func run(_harness: Node) -> Dictionary:
     var second: RorVegetation = RorVegetation.new()
     second.setup(terrain)
     second.focus_on(start)
+    second.fill()
     var again: int = second.planted()
     second.free()
     first.free()

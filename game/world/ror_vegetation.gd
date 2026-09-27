@@ -22,8 +22,12 @@ const TILE_M: float = 32.0
 const MAX_RANGE_M: float = 128.0
 ## The most plants one tile may hold, so a density map's brightest corner cannot stall a frame.
 const MAX_PER_TILE: int = 4000
-## How far the focus moves before the ring is rebuilt.
+## How far the focus moves before the ring is worked out again.
 const REBUILD_AFTER_M: float = TILE_M * 0.5
+## How many tiles may be built in one call. A full ring is sixty-odd tiles and several thousand
+## plants; built in one frame that is a visible hitch every time the driver crosses a tile, so
+## the ring fills in over the following frames instead.
+const TILES_PER_CALL: int = 6
 ## Placement hash, the same shape the valley's trees use: position in, one deterministic number
 ## out, no RNG.
 const HASH_SALT: int = 0x9E3779B9
@@ -33,6 +37,8 @@ var _layers: Array[Dictionary] = []
 var _meshes: Array[Mesh] = []
 var _tiles: Dictionary = {}
 var _focus: Vector3 = Vector3(INF, 0.0, INF)
+## The ring the focus asks for, which may still be filling in.
+var _wanted: Dictionary = {}
 
 
 ## Grows a terrain's vegetation. Returns "" when there is something to grow, or a reason there is
@@ -57,28 +63,48 @@ func setup(terrain: RorTerrain) -> String:
 func focus_on(at: Vector3) -> void:
     if _layers.is_empty():
         return
-    if Vector2(at.x - _focus.x, at.z - _focus.z).length() < REBUILD_AFTER_M:
+    if Vector2(at.x - _focus.x, at.z - _focus.z).length() >= REBUILD_AFTER_M:
+        _focus = at
+        _wanted = _ring(at)
+        for key: Vector2i in _tiles.keys():
+            if _wanted.has(key):
+                continue
+            var node: Node = _tiles[key] as Node
+            if node != null:
+                node.queue_free()
+            _tiles.erase(key)
+    var built: int = 0
+    for key: Vector2i in _wanted.keys():
+        if _tiles.has(key):
+            continue
+        _build_tile(key)
+        built += 1
+        if built >= TILES_PER_CALL:
+            return
+
+
+## Fills the whole ring at once, however many tiles that is. What a gate and a photograph want:
+## nobody is waiting for frames.
+func fill() -> void:
+    if _layers.is_empty():
         return
-    _focus = at
+    for key: Vector2i in _wanted.keys():
+        if not _tiles.has(key):
+            _build_tile(key)
+
+
+## Which tiles a focus asks for.
+func _ring(at: Vector3) -> Dictionary:
     var range_m: float = minf(_range_m(), MAX_RANGE_M)
     var tiles: int = int(ceil(range_m / TILE_M))
     var centre: Vector2i = Vector2i(int(floor(at.x / TILE_M)), int(floor(at.z / TILE_M)))
-    var wanted: Dictionary = {}
+    var out: Dictionary = {}
     for dz: int in range(-tiles, tiles + 1):
         for dx: int in range(-tiles, tiles + 1):
-            var key: Vector2i = centre + Vector2i(dx, dz)
             if Vector2(float(dx), float(dz)).length() > float(tiles):
                 continue
-            wanted[key] = true
-            if not _tiles.has(key):
-                _build_tile(key)
-    for key: Vector2i in _tiles.keys():
-        if wanted.has(key):
-            continue
-        var node: Node = _tiles[key] as Node
-        if node != null:
-            node.queue_free()
-        _tiles.erase(key)
+            out[centre + Vector2i(dx, dz)] = true
+    return out
 
 
 ## How many plants are standing, which is what a gate counts.
