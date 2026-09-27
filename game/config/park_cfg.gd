@@ -135,14 +135,28 @@ const ANCHORS: Dictionary = {
 ##
 ## The test areas keep their own surfaces — the road, its patches, the skid pad — so the thing
 ## being tested is the thing that is coloured.
+##
+## The base colour is painted into the terrain's colour map; the lines are not. A colour map holds
+## one texel per metre and is filtered, so a line stored in it is a smear — reported in a session
+## as the grid being "too blurry". The lines are drawn per pixel instead, by `world/park_grid.gd`.
 const GRID_BASE: Color = Color(0.30, 0.31, 0.33)
 const GRID_LINE: Color = Color(0.46, 0.49, 0.54)
 ## Every tenth line is brighter, the way a drawing's major division is.
 const GRID_MAJOR: Color = Color(0.62, 0.70, 0.80)
 const GRID_SPACING_M: float = 5.0
 const GRID_MAJOR_EVERY: int = 10
-## How wide a line is. Wide enough to survive the colour map's own resolution at a distance.
+## How wide a line is, in metres. This is a width on the ground rather than a width in pixels:
+## the grid is drawn procedurally by `shaders/park_grid.gdshader`, so a line is the same 0.45 m
+## of floor whether it is under the wheels or 300 m away.
 const GRID_LINE_M: float = 0.45
+## How much wider a major line is than a minor one, so the major divisions read at a distance.
+const GRID_MAJOR_WIDTH_SCALE: float = 1.8
+## How high above the ground the overlay that draws the lines sits. Enough to clear the terrain's
+## own surface without the lines visibly floating off it: at 2 cm a line's shadow-side offset is
+## under a pixel from anywhere a driver looks from.
+const GRID_LIFT_M: float = 0.02
+## The lines are painted floor, so they are as rough as the floor.
+const GRID_ROUGHNESS: float = 0.9
 
 ## --- How it is drawn ----------------------------------------------------------------------------
 

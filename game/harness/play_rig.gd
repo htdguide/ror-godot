@@ -88,6 +88,7 @@ func _populate_terrain() -> void:
         _build_valley()
     else:
         _world.add_child(ParkProps.build())
+        _world.add_child(ParkGrid.build())
     if _drive == null:
         return
     error = _drive.use_terrain(_terrain.get("data"))

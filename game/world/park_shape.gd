@@ -53,33 +53,27 @@ static func surface_at_world(x: float, z: float) -> int:
 ## What colour the ground is drawn at a point.
 ##
 ## The test areas — the road, the patches let into it, the skid pad — are drawn as what they are.
-## Everything else is a dev grid: a measured pattern that tells a driver how far and how fast, and
-## tells anyone looking that this is a workshop floor rather than a place.
+## Everything else is the dev grid's floor: one flat workshop grey.
+##
+## The grid's *lines* are deliberately not here. This function is what the terrain's colour map is
+## baked from, and a colour map is one texel per metre and filtered, so a 0.45 m line stored in it
+## arrives as a smear — which is what a session reported as the grid being too blurry. The lines
+## are drawn per pixel by `world/park_grid.gd` on an overlay above this floor.
 static func tint_at(x: float, z: float) -> Color:
-    if _on_road(x, z) or Vector2(x, z).distance_to(ParkCfg.SKID_PAD_CENTRE) <= (
-        ParkCfg.SKID_PAD_RADIUS_M
-    ):
+    if is_test_area(x, z):
         var surface: String = GroundModels.name_of(surface_at_world(x, z))
         return TerrainCfg.SURFACE_COLOURS.get(surface, Color.GRAY) as Color
-    return _grid_tint(x, z)
+    return ParkCfg.GRID_BASE
 
 
-## The grid: a line every few metres, a brighter one every tenth, on a dark ground.
-static func _grid_tint(x: float, z: float) -> Color:
-    var spacing: float = ParkCfg.GRID_SPACING_M
-    var half_line: float = ParkCfg.GRID_LINE_M * 0.5
-    var along: float = absf(fposmod(x + spacing * 0.5, spacing) - spacing * 0.5)
-    var across: float = absf(fposmod(z + spacing * 0.5, spacing) - spacing * 0.5)
-    if along > half_line and across > half_line:
-        return ParkCfg.GRID_BASE
-    # Which line this is: every tenth gets the brighter colour, so the grid reads at a distance
-    # as well as under the wheels.
-    var major: bool = false
-    if along <= half_line:
-        major = major or int(round(x / spacing)) % ParkCfg.GRID_MAJOR_EVERY == 0
-    if across <= half_line:
-        major = major or int(round(z / spacing)) % ParkCfg.GRID_MAJOR_EVERY == 0
-    return ParkCfg.GRID_MAJOR if major else ParkCfg.GRID_LINE
+## Whether a point is part of something being tested, and so drawn as itself rather than as grid.
+##
+## The single answer to that question: the colour map is baked from it and the grid overlay's mask
+## is baked from it, so the floor and the lines cannot disagree about where the road is.
+static func is_test_area(x: float, z: float) -> bool:
+    if _on_road(x, z):
+        return true
+    return Vector2(x, z).distance_to(ParkCfg.SKID_PAD_CENTRE) <= ParkCfg.SKID_PAD_RADIUS_M
 
 
 ## Whether a point is on the main straight.

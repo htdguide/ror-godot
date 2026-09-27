@@ -67,6 +67,7 @@ func run(harness: Node) -> Dictionary:
     if ground != null:
         ground.visible = false
     harness.world.add_child(ParkProps.build())
+    harness.world.add_child(ParkGrid.build())
 
     var reported: PackedStringArray = PackedStringArray()
     var darkest: float = INF
