@@ -119,15 +119,21 @@ func _populate_terrain() -> void:
 
 
 ## The terrain `--terrain-dir` asks for, or null when this session asked for a generated world.
-## A terrain that will not load is reported and the session falls back rather than opening a
-## window onto nothing.
+##
+## The name may be a library name — a directory under `assets/terrains/` — or a path to one
+## anywhere. A terrain that will not load is reported and the session falls back rather than
+## opening a window onto nothing.
 func _load_terrain() -> RorTerrain:
-    var directory: String = Harness.args.get_string("terrain-dir", "")
-    if directory.is_empty():
+    var wanted: String = Harness.args.get_string("terrain-dir", "")
+    if wanted.is_empty():
         return null
-    var loaded: Dictionary = RorTerrain.load_from(
-        SourceScan.repo_root().path_join(directory)
-    )
+    var directory: String = RorTerrainLibrary.resolve(wanted)
+    if directory.is_empty():
+        printerr("PLAY  there is no terrain called '%s'. What there is:" % wanted)
+        for summary: Dictionary in RorTerrainLibrary.summaries():
+            printerr("PLAY    %s (%s)" % [summary["directory"], summary["name"]])
+        return null
+    var loaded: Dictionary = RorTerrain.load_from(directory)
     if (loaded["error"] as String) != "":
         printerr("PLAY  the terrain at %s could not be read: %s" % [
             directory, loaded["error"]])
