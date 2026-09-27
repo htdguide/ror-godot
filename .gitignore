@@ -41,10 +41,12 @@ history/
 # checkout that looks complete and does not load.
 game/addons/
 
-# Community mods. Not committed: Rigs of Rods repository content carries varied and
-# often unstated licensing, and this project has no right to redistribute it. Mods are
-# fetched or copied in locally; gates skip cleanly when one is absent.
+# Community content: vehicles under assets/mods/, terrains under assets/terrains/. Not
+# committed — Rigs of Rods repository content carries varied and often unstated licensing,
+# and this project has no right to redistribute it. Both are fetched or copied in locally,
+# and every gate that uses one skips cleanly when it is absent.
 assets/mods/
+assets/terrains/
 
 # The upstream parity oracle: Rigs of Rods' own physics, extracted from the pinned submodule
 # and compiled on its own by tools/build_parity.sh. Generated, never committed, for the same
