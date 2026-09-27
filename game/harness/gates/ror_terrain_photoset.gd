@@ -75,8 +75,15 @@ func run(harness: Node) -> Dictionary:
     var ground: MeshInstance3D = harness.world.get_node_or_null(^"Ground") as MeshInstance3D
     if ground != null:
         ground.visible = false
-    # The terrain's own props, so the sheet shows the place rather than its heightmap.
+    # The terrain's own props and vegetation, so the sheet shows the place rather than its
+    # heightmap.
     harness.world.add_child(RorObjects.build(terrain_data))
+    var vegetation: RorVegetation = RorVegetation.new()
+    if vegetation.setup(terrain_data) == "":
+        harness.world.add_child(vegetation)
+    else:
+        vegetation.free()
+        vegetation = null
 
     var views: Array[Dictionary] = _views(terrain_data)
     var reported: PackedStringArray = PackedStringArray()
@@ -84,6 +91,8 @@ func run(harness: Node) -> Dictionary:
     for index: int in views.size():
         var view: Dictionary = views[index]
         var at: Vector3 = view["at"] as Vector3
+        if vegetation != null:
+            vegetation.focus_on(at)
         harness.camera.look_at_from_position(
             _stand(terrain_data, at, view.get("close", false) as bool), at, Vector3.UP
         )

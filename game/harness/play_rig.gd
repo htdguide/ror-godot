@@ -26,6 +26,7 @@ var _view: PlayCamera = PlayCamera.new()
 var _menu: PlayMenu
 var _terrain: Node3D = null
 var _terrain_pending: bool = false
+var _vegetation: RorVegetation = null
 
 
 ## `vehicle` is a VehicleBuilder result, or empty when no vehicle was loaded. With one, the
@@ -90,6 +91,7 @@ func _populate_terrain() -> void:
     # here.
     if loaded != null:
         _world.add_child(RorObjects.build(loaded))
+        _grow_vegetation(loaded)
     else:
         if valley:
             _build_valley()
@@ -116,6 +118,18 @@ func _populate_terrain() -> void:
         print("PLAY  driving in the test park: %d props are solid" % props)
         return
     print("PLAY  driving on the valley")
+
+
+## The terrain's own vegetation, in a ring of tiles that follows whoever is driving.
+func _grow_vegetation(loaded: RorTerrain) -> void:
+    var vegetation: RorVegetation = RorVegetation.new()
+    var grown: String = vegetation.setup(loaded)
+    if grown != "":
+        vegetation.free()
+        return
+    _world.add_child(vegetation)
+    vegetation.focus_on(loaded.start_position())
+    _vegetation = vegetation
 
 
 ## The terrain `--terrain-dir` asks for, or null when this session asked for a generated world.
@@ -187,6 +201,8 @@ func _process(delta: float) -> void:
     if _drive != null:
         _drive.step(delta)
         _view.follow(_drive, delta)
+    if _vegetation != null:
+        _vegetation.focus_on(_camera.global_position)
     if _view.mode == PlayCamera.Mode.FREE:
         _view.fly(delta)
     _frames += 1

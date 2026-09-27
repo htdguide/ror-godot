@@ -197,6 +197,13 @@ static func _material(
             if texture != null:
                 material.albedo_texture = texture
                 material.albedo_color = Color.WHITE
+        # Ogre's texture_unit `scale` scales the texture rather than the coordinates, so a
+        # scale of 0.04 means the texture tiles twenty-five times across what the mesh's own
+        # UVs cover. La Paz's ground skirt is one 20 km quad and states exactly that; without
+        # it the skirt is one stretched texture and reads as a beige wall at the horizon.
+        var scale: Vector2 = declared["scale"] as Vector2
+        if scale.x > 0.0 and scale.y > 0.0 and not scale.is_equal_approx(Vector2.ONE):
+            material.uv1_scale = Vector3(1.0 / scale.x, 1.0 / scale.y, 1.0)
         if declared["alpha"] as bool:
             # Cut rather than blended: these are vegetation cards and horizon panels, and a
             # blended one both sorts wrongly against the terrain and writes no depth.
