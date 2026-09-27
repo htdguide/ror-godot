@@ -31,10 +31,23 @@ const LENS_METRES_PER_SIZE: float = 0.2
 ## of a truck reads as a hole.
 const LENS_EMISSION_OFF: float = 0.15
 const LENS_EMISSION_ON: float = 6.0
-## A headlight's cone. Wide enough to light the road either side, not so wide it is a bulb.
-const SPOT_ANGLE_DEG: float = 38.0
-const SPOT_RANGE_M: float = 45.0
-const SPOT_ENERGY: float = 6.0
+## A headlight's cone. Wide enough to light the road either side, not so wide it is a bulb, and
+## far enough to be a headlight: at 45 m and six units it lit a patch of ground in front of the
+## bumper, which in daylight is indistinguishable from being off.
+const SPOT_ANGLE_DEG: float = 32.0
+const SPOT_RANGE_M: float = 110.0
+const SPOT_ENERGY: float = 14.0
+## How the cone falls off across its width and along its length. Both are how a headlight is
+## told apart from a torch: bright in the middle, dim at the edge, and reaching.
+const SPOT_ANGLE_ATTENUATION: float = 0.8
+const SPOT_ATTENUATION: float = 1.3
+## And whether the beams cast shadows. Only the projecting lamps do, so a vehicle has at most a
+## pair of shadow-casting lights and the truck's own body stops its headlights lighting the cab.
+const SPOT_SHADOWS: bool = true
+## The lamps that do not project still light what they are mounted on: a brake light reddens the
+## tailgate, an indicator throws amber on the wing. Small, short and cheap.
+const GLOW_RANGE_M: float = 3.2
+const GLOW_ENERGY: float = 2.4
 
 
 ## How hard the pedal has to be pressed before the brake lights come on, and how fast an
@@ -57,6 +70,8 @@ static func build(root: Node3D, truck: TruckParser, render_frame: Transform3D) -
         holder.add_child(_lens(flare, colour))
         if FlareRows.projects(flare):
             holder.add_child(_beam(colour))
+        else:
+            holder.add_child(_glow(colour))
         holder.transform = to_local * _placement(truck.nodes, flare)
         root.add_child(holder)
         lamps.append(holder)
@@ -177,6 +192,20 @@ static func _beam(colour: Color) -> SpotLight3D:
     light.light_energy = SPOT_ENERGY
     light.spot_range = SPOT_RANGE_M
     light.spot_angle = SPOT_ANGLE_DEG
+    light.spot_angle_attenuation = SPOT_ANGLE_ATTENUATION
+    light.spot_attenuation = SPOT_ATTENUATION
+    light.shadow_enabled = SPOT_SHADOWS
+    light.visible = false
+    return light
+
+
+## What a lamp that does not project still does: light its own corner of the vehicle.
+static func _glow(colour: Color) -> OmniLight3D:
+    var light: OmniLight3D = OmniLight3D.new()
+    light.name = "Glow"
+    light.light_color = colour
+    light.light_energy = GLOW_ENERGY
+    light.omni_range = GLOW_RANGE_M
     light.shadow_enabled = false
     light.visible = false
     return light

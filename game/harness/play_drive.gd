@@ -51,6 +51,16 @@ func eye() -> Vector3:
     return (_built["rig_to_local"] as Transform3D) * Cockpit.eye_position(truck)
 
 
+## Whether the lamps are on, and a way for a panel to say so.
+func lights_on() -> bool:
+    return _lit
+
+
+func set_lights(on: bool) -> void:
+    _lit = on
+    print("DRIVE  lights %s" % ("on" if _lit else "off"))
+
+
 ## Where this world starts a vehicle, and which way it faces. Zero is the middle of a generated
 ## world; a loaded terrain states its own, and La Paz's is 3.9 km along its own map.
 var spawn: Vector3 = Vector3.ZERO
@@ -87,21 +97,24 @@ func step(delta: float) -> void:
 
 func on_key(keycode: Key) -> bool:
     match keycode:
-        KEY_R:
+        KEY_B:
             _set_selector(-1)
-        KEY_N:
+        KEY_H:
             _set_selector(0)
         KEY_G:
             _set_selector(1)
+        KEY_R:
+            # Recover, because that is what a person reaches for after rolling a truck. The
+            # gears moved to make room: B backs it up, H is neutral.
+            _recover()
         KEY_I:
             if solver.engine_running():
                 solver.stop_engine()
             else:
                 solver.start_engine()
             print("DRIVE  engine %s" % ("running" if solver.engine_running() else "off"))
-        KEY_L:
-            _lit = not _lit
-            print("DRIVE  lights %s" % ("on" if _lit else "off"))
+        KEY_L, KEY_N:
+            set_lights(not _lit)
         KEY_Z:
             _left_indicator = not _left_indicator
             _right_indicator = false

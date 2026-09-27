@@ -52,6 +52,13 @@ static func _build_environment(weather: Dictionary) -> WorldEnvironment:
         env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
         env.ambient_light_color = weather.get("bg_color", Color.GRAY) as Color
     env.ambient_light_energy = float(weather.get("ambient_energy", 0.0))
+    # Distance haze, so a 4 km terrain has depth to it and a session can say how far it wants
+    # to see. Not volumetric: that is a froxel grid with its own range and cost, and what a
+    # driver wants is depth cueing to the horizon.
+    env.fog_enabled = RenderCfg.FOG_ENABLED
+    env.fog_density = RenderCfg.FOG_DENSITY
+    env.fog_light_color = RenderCfg.FOG_COLOUR
+    env.fog_sky_affect = RenderCfg.FOG_SKY_AFFECT
     env.tonemap_mode = RenderCfg.TONEMAP as Environment.ToneMapper
     env.tonemap_white = RenderCfg.WHITE
     env.tonemap_exposure = RenderCfg.EXPOSURE

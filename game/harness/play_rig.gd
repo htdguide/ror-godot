@@ -50,6 +50,8 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
             _drive = drive
             _view.set_mode(PlayCamera.Mode.CHASE)
     _menu = _build_menu(weather)
+    # A loaded terrain is 4 km across and its own horizon stands at the edge of it.
+    camera.far = RenderCfg.VIEW_DISTANCE_M
     _build_terrain()
     _print_help()
 
@@ -130,6 +132,8 @@ func _grow_vegetation(loaded: RorTerrain) -> void:
     _world.add_child(vegetation)
     vegetation.focus_on(loaded.start_position())
     _vegetation = vegetation
+    if _menu != null:
+        _menu.set_vegetation(vegetation)
 
 
 ## The terrain `--terrain-dir` asks for, or null when this session asked for a generated world.
@@ -184,10 +188,10 @@ func _build_hud() -> Label:
 func _print_help() -> void:
     print(
         (
-            "PLAY  click to look with the mouse, Esc to release it, Esc again to quit\n"
+            "PLAY  click to look with the mouse, Esc releases it, Esc again opens the settings\n"
             + "PLAY  W A S D move, Q/E down/up, hold Shift to boost\n"
             + "PLAY  F1 toggle HUD, F2 cycle weather, F3 toggle shadows, F4 toggle the sun\n"
-            + "PLAY  M open the environment panel: weather, gravity, sun, fog\n"
+            + "PLAY  Esc or M open the settings: weather, gravity, sun, sky, fog, distance\n"
             + "PLAY  P save a screenshot to artifacts/human"
         )
     )
@@ -234,7 +238,7 @@ func _on_key(keycode: Key) -> void:
         KEY_M:
             if _menu != null:
                 _menu.toggle()
-                print("PLAY  environment panel %s" % ("open" if _menu.is_open() else "closed"))
+                print("PLAY  settings %s" % ("open" if _menu.is_open() else "closed"))
         KEY_F5:
             _view.set_mode(PlayCamera.Mode.CHASE if _drive != null else PlayCamera.Mode.FREE)
             print("PLAY  chase camera %s" % ("on" if _drive != null else "unavailable"))
@@ -261,10 +265,14 @@ func _on_key(keycode: Key) -> void:
         KEY_P:
             _screenshot()
         KEY_ESCAPE:
-            # First Esc releases the mouse, so the window can be left without quitting.
-            # A second one quits.
+            # First Esc gives the mouse back, because a panel nobody can click is no panel.
+            # After that it opens and closes the settings, and quitting is a button in there:
+            # a session that ends because somebody pressed Escape twice is a session lost.
             if _looking:
                 _set_looking(false)
+            elif _menu != null:
+                _menu.toggle()
+                print("PLAY  settings %s" % ("open" if _menu.is_open() else "closed"))
             else:
                 get_tree().quit(0)
 
@@ -339,14 +347,14 @@ func _hud_text() -> String:
 func _footer() -> String:
     var keys: String = (
         "click to look  WASD move  Q/E down/up  Shift boost  F1 hud  F2 weather"
-        + "  F3 shadows  F4 sun  P shot  Esc release/quit"
+        + "  F3 shadows  F4 sun  P shot  Esc settings"
     )
     if _drive == null:
         return keys
     return _drive.hud_line() + "\n" + keys + "  F5/F6 chase/free"
 
 
-## The environment panel, built once the vehicle exists so that gravity has a solver to go to.
+## The settings panel, built once the vehicle exists so that gravity has a solver to go to.
 func _build_menu(weather: String) -> PlayMenu:
     var holder: WorldEnvironment = _world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
     if holder == null:
@@ -358,7 +366,9 @@ func _build_menu(weather: String) -> PlayMenu:
         holder.environment,
         _world.get_node_or_null(^"Sun") as DirectionalLight3D,
         _drive,
+        _camera,
         weather,
-        func(name: String) -> void: _apply_weather(name)
+        func(name: String) -> void: _apply_weather(name),
+        func() -> void: get_tree().quit(0)
     )
     return menu

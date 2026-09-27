@@ -16,10 +16,13 @@ extends Node3D
 
 ## How big a tile is, and how many rings of them are kept around the focus.
 const TILE_M: float = 32.0
-## How far vegetation is drawn, whatever the terrain asks for. La Paz asks for 300 m, which at
-## its own density is two million plants in view; this is the honest limit of drawing them as
-## static geometry rather than as impostors.
-const MAX_RANGE_M: float = 128.0
+## How far vegetation is drawn by default, whatever the terrain asks for. La Paz asks for 300 m,
+## which at its own density is two million plants in view. A session can move this — the panel's
+## "Grass distance" — and pay for it.
+const MAX_RANGE_M: float = 220.0
+## The last stretch of that distance is faded rather than cut, so the ring's edge is a haze
+## rather than a wall of grass appearing as the driver arrives.
+const FADE_M: float = 40.0
 ## The most plants one tile may hold, so a density map's brightest corner cannot stall a frame.
 const MAX_PER_TILE: int = 4000
 ## How far the focus moves before the ring is worked out again.
@@ -31,11 +34,20 @@ const TILES_PER_CALL: int = 6
 ## Placement hash, the same shape the valley's trees use: position in, one deterministic number
 ## out, no RNG.
 const HASH_SALT: int = 0x9E3779B9
+## How a plant is built and lit.
+const FOLIAGE_SHADER: String = "res://shaders/foliage.gdshader"
+const CARDS_PER_PLANT: int = 3
+const SWAY_M: float = 0.10
+const SWAY_SPEED: float = 1.4
+## How much a plant's colour varies from its neighbours. A field of one colour is half of what
+## reads as fake, and the variation is hashed from the position like everything else here.
+const TINT_VARIATION: float = 0.18
 
 var _terrain: RorTerrain = null
 var _layers: Array[Dictionary] = []
 var _meshes: Array[Mesh] = []
 var _tiles: Dictionary = {}
+var _range_limit_m: float = MAX_RANGE_M
 var _focus: Vector3 = Vector3(INF, 0.0, INF)
 ## The ring the focus asks for, which may still be filling in.
 var _wanted: Dictionary = {}
@@ -95,7 +107,7 @@ func fill() -> void:
 
 ## Which tiles a focus asks for.
 func _ring(at: Vector3) -> Dictionary:
-    var range_m: float = minf(_range_m(), MAX_RANGE_M)
+    var range_m: float = minf(_range_m(), _range_limit_m)
     var tiles: int = int(ceil(range_m / TILE_M))
     var centre: Vector2i = Vector2i(int(floor(at.x / TILE_M)), int(floor(at.z / TILE_M)))
     var out: Dictionary = {}
@@ -105,6 +117,20 @@ func _ring(at: Vector3) -> Dictionary:
                 continue
             out[centre + Vector2i(dx, dz)] = true
     return out
+
+
+## How far vegetation is drawn now, and a way to change it while a session runs.
+func range_m() -> float:
+    return minf(_range_m(), _range_limit_m)
+
+
+func set_range(metres: float) -> void:
+    _range_limit_m = maxf(metres, 0.0)
+    # Force the ring to be worked out again from where the focus already is.
+    var focus: Vector3 = _focus
+    _focus = Vector3(INF, 0.0, INF)
+    if is_finite(focus.x):
+        focus_on(focus)
 
 
 ## How many plants are standing, which is what a gate counts.
@@ -148,13 +174,25 @@ func _tile_layer(key: Vector2i, index: int) -> MultiMeshInstance3D:
         return null
     var multimesh: MultiMesh = MultiMesh.new()
     multimesh.transform_format = MultiMesh.TRANSFORM_3D
+    multimesh.use_colors = true
     multimesh.mesh = mesh
     multimesh.instance_count = transforms.size()
     for at: int in transforms.size():
         multimesh.set_instance_transform(at, transforms[at])
+        # A little lighter or darker than its neighbours, hashed from where it stands.
+        var shade: float = 1.0 - TINT_VARIATION * 0.5 + TINT_VARIATION * _unit(
+            _hash(Vector2(transforms[at].origin.x, transforms[at].origin.z)), 5
+        )
+        multimesh.set_instance_color(at, Color(shade, shade, shade, 1.0))
     var instance: MultiMeshInstance3D = MultiMeshInstance3D.new()
     instance.multimesh = multimesh
-    instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    # Vegetation casts shadows: a bush with no shadow sits on the ground like a sticker, which
+    # is most of what makes a card of grass look like a card of grass.
+    instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
+    # And fades out at the edge of the ring rather than being cut off there.
+    instance.visibility_range_end = range_m()
+    instance.visibility_range_end_margin = FADE_M
+    instance.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
     return instance
 
 
@@ -212,16 +250,53 @@ func _density_at(layer: Dictionary, at: Vector2) -> float:
 ## --- The plant itself ---------------------------------------------------------------------------
 
 
-## One plant, as crossed quads a metre square, scaled per instance. Upstream's own default
-## technique, and the reason a lawn reads from any angle without facing the camera.
+## One plant, as crossed quads a metre square, scaled per instance.
+##
+## Three quads rather than upstream's two: the third costs almost nothing in a MultiMesh and
+## takes the silhouette from a cross to something with a mass to it, which is most of what stops
+## a plant flickering between two flat cards as the camera goes round it.
+##
+## The material is `shaders/foliage.gdshader` — rounded normals, translucency, wind and
+## alpha-to-coverage — because a card with a flat normal and a hard alpha cut is what reads as
+## flat and outdated however good the texture is.
 func _card(
     terrain: RorTerrain, layer: Dictionary, materials: Dictionary, dds: RefCounted
 ) -> Mesh:
-    var material: StandardMaterial3D = StandardMaterial3D.new()
-    material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-    material.cull_mode = BaseMaterial3D.CULL_DISABLED
-    material.alpha_scissor_threshold = 0.5
-    material.albedo_color = Color(0.55, 0.52, 0.38)
+    var material: ShaderMaterial = _foliage_material(terrain, layer, materials, dds)
+    var mesh: ArrayMesh = ArrayMesh.new()
+    var vertices: PackedVector3Array = PackedVector3Array()
+    var normals: PackedVector3Array = PackedVector3Array()
+    var uvs: PackedVector2Array = PackedVector2Array()
+    var indices: PackedInt32Array = PackedInt32Array()
+    for card: int in CARDS_PER_PLANT:
+        var turn: float = PI * float(card) / float(CARDS_PER_PLANT)
+        var along: Vector3 = Vector3(cos(turn), 0.0, sin(turn)) * 0.5
+        var face: Vector3 = Vector3(-sin(turn), 0.0, cos(turn))
+        var base: int = vertices.size()
+        vertices.append_array([
+            -along, along, along + Vector3.UP, -along + Vector3.UP,
+        ])
+        for _corner: int in 4:
+            normals.append(face)
+        uvs.append_array([Vector2(0, 1), Vector2(1, 1), Vector2(1, 0), Vector2(0, 0)])
+        indices.append_array([base, base + 1, base + 2, base, base + 2, base + 3])
+    var arrays: Array = []
+    arrays.resize(Mesh.ARRAY_MAX)
+    arrays[Mesh.ARRAY_VERTEX] = vertices
+    arrays[Mesh.ARRAY_NORMAL] = normals
+    arrays[Mesh.ARRAY_TEX_UV] = uvs
+    arrays[Mesh.ARRAY_INDEX] = indices
+    mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+    mesh.surface_set_material(0, material)
+    return mesh
+
+
+## The foliage material for one layer, wearing the terrain's own texture.
+func _foliage_material(
+    terrain: RorTerrain, layer: Dictionary, materials: Dictionary, dds: RefCounted
+) -> ShaderMaterial:
+    var material: ShaderMaterial = ShaderMaterial.new()
+    material.shader = load(FOLIAGE_SHADER) as Shader
     var declared: Dictionary = materials.get(layer["material"] as String, {}) as Dictionary
     if not declared.is_empty():
         var files: PackedStringArray = declared["textures"] as PackedStringArray
@@ -230,28 +305,10 @@ func _card(
                 terrain.directory.path_join(files[0]), dds
             )
             if texture != null:
-                material.albedo_texture = texture
-                material.albedo_color = Color.WHITE
-    var mesh: ArrayMesh = ArrayMesh.new()
-    var vertices: PackedVector3Array = PackedVector3Array()
-    var uvs: PackedVector2Array = PackedVector2Array()
-    var indices: PackedInt32Array = PackedInt32Array()
-    for card: int in 2:
-        var along: Vector3 = Vector3(0.5, 0.0, 0.0) if card == 0 else Vector3(0.0, 0.0, 0.5)
-        var base: int = vertices.size()
-        vertices.append_array([
-            -along, along, along + Vector3.UP, -along + Vector3.UP,
-        ])
-        uvs.append_array([Vector2(0, 1), Vector2(1, 1), Vector2(1, 0), Vector2(0, 0)])
-        indices.append_array([base, base + 1, base + 2, base, base + 2, base + 3])
-    var arrays: Array = []
-    arrays.resize(Mesh.ARRAY_MAX)
-    arrays[Mesh.ARRAY_VERTEX] = vertices
-    arrays[Mesh.ARRAY_TEX_UV] = uvs
-    arrays[Mesh.ARRAY_INDEX] = indices
-    mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-    mesh.surface_set_material(0, material)
-    return mesh
+                material.set_shader_parameter("albedo_texture", texture)
+    material.set_shader_parameter("sway_m", SWAY_M)
+    material.set_shader_parameter("sway_speed", SWAY_SPEED)
+    return material
 
 
 ## --- Reading ------------------------------------------------------------------------------------

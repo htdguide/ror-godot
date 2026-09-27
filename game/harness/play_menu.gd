@@ -1,12 +1,13 @@
 class_name PlayMenu
 extends CanvasLayer
-## The environment panel: the settings a person wants to change while driving, without leaving the
-## window or restarting a session.
+## The settings panel: everything about the world a person wants to change while driving, in one
+## place, opened with Esc.
 ##
-## Weather, gravity, the sun, fog, shadows and the solver's own rate. Everything here changes the
-## world the vehicle is in rather than the vehicle, which is the line: a panel that could also
-## retune the rig would be a panel that makes a session's findings unreproducible, and the rig's
-## own numbers belong in its file.
+## Weather, gravity, the sun, the sky, how far you can see, the fog that closes it, the grass, the
+## vehicle's lamps. Everything here changes the world the vehicle is in rather than the vehicle
+## itself, which is the line: a panel that could also retune the rig would make a session's
+## findings unreproducible, and a rig's numbers belong in its own file. The lamp switch is the one
+## exception, and it is a switch a driver has anyway.
 ##
 ## It writes to the live scene, not to the config files. A setting changed here lasts as long as
 ## the window does, and the next session starts from what the project says again — so an
@@ -25,36 +26,57 @@ const GRAVITY_PRESETS: Dictionary = {
 }
 const SUN_ELEVATION_RANGE: Vector2 = Vector2(-10.0, 89.0)
 const SUN_AZIMUTH_RANGE: Vector2 = Vector2(-180.0, 180.0)
-const FOG_MAX: float = 0.05
-const PANEL_WIDTH: int = 330
-const PANEL_MARGIN: int = 18
+## How far a session may push the view, and how thick the haze may get.
+const VIEW_RANGE_M: Vector2 = Vector2(200.0, 12000.0)
+const FOG_RANGE: Vector2 = Vector2(0.0, 0.02)
+const GRASS_RANGE_M: Vector2 = Vector2(0.0, 400.0)
+const PANEL_WIDTH: int = 380
+const PANEL_MAX_HEIGHT: int = 720
+
 
 var _panel: PanelContainer
 var _rows: VBoxContainer
 var _environment: Environment
 var _sun: DirectionalLight3D
 var _drive: PlayDrive
+var _camera: Camera3D
+var _vegetation: RorVegetation = null
 var _weather_names: PackedStringArray = PackedStringArray()
 var _weather_index: int = 0
 var _on_weather: Callable
+var _on_quit: Callable
 
 
 ## Builds the panel, hidden. `on_weather` is called with a preset name when the weather changes,
-## because rebuilding the sky is the session's business and not this panel's.
+## because rebuilding the sky is the session's business and not this panel's; `on_quit` ends the
+## session.
 func setup(
-    environment: Environment, sun: DirectionalLight3D, drive: PlayDrive, weather: String,
-    on_weather: Callable
+    environment: Environment,
+    sun: DirectionalLight3D,
+    drive: PlayDrive,
+    camera: Camera3D,
+    weather: String,
+    on_weather: Callable,
+    on_quit: Callable
 ) -> void:
     _environment = environment
     _sun = sun
     _drive = drive
+    _camera = camera
     _on_weather = on_weather
+    _on_quit = on_quit
     for name: String in WeatherCfg.PRESETS.keys():
         _weather_names.append(name)
     _weather_index = maxi(0, _weather_names.find(weather))
     layer = 2
     _build()
     _panel.visible = false
+
+
+## The vegetation this session is growing, once it exists: a terrain is loaded a frame or two
+## after the window opens, so the panel is built before there is any grass to move.
+func set_vegetation(vegetation: RorVegetation) -> void:
+    _vegetation = vegetation
 
 
 func toggle() -> void:
@@ -65,6 +87,10 @@ func toggle() -> void:
         Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
+func close() -> void:
+    _panel.visible = false
+
+
 func is_open() -> bool:
     return _panel != null and _panel.visible
 
@@ -73,127 +99,176 @@ func is_open() -> bool:
 
 
 func _build() -> void:
+    var centre: CenterContainer = CenterContainer.new()
+    centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+    add_child(centre)
+
     _panel = PanelContainer.new()
-    _panel.name = "EnvironmentPanel"
-    _panel.position = Vector2(PANEL_MARGIN, PANEL_MARGIN * 5)
+    _panel.name = "SettingsPanel"
     _panel.custom_minimum_size = Vector2(PANEL_WIDTH, 0)
-    add_child(_panel)
+    centre.add_child(_panel)
+
+    var margin: MarginContainer = MarginContainer.new()
+    for side: String in ["left", "right", "top", "bottom"]:
+        margin.add_theme_constant_override("margin_%s" % side, 16)
+    _panel.add_child(margin)
+
+    var scroll: ScrollContainer = ScrollContainer.new()
+    scroll.custom_minimum_size = Vector2(PANEL_WIDTH, PANEL_MAX_HEIGHT)
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    margin.add_child(scroll)
 
     _rows = VBoxContainer.new()
     _rows.add_theme_constant_override("separation", 6)
-    _panel.add_child(_rows)
+    _rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    scroll.add_child(_rows)
 
-    _heading("Environment  —  M to close")
-    _weather_row()
-    _gravity_row()
-    _slider("Sun elevation", SUN_ELEVATION_RANGE.x, SUN_ELEVATION_RANGE.y, _sun_elevation(),
-        func(value: float) -> void: _aim_sun(value, _sun_azimuth()))
-    _slider("Sun azimuth", SUN_AZIMUTH_RANGE.x, SUN_AZIMUTH_RANGE.y, _sun_azimuth(),
-        func(value: float) -> void: _aim_sun(_sun_elevation(), value))
-    _slider("Sun brightness", 0.0, 4.0, _sun.light_energy if _sun != null else 1.0,
+    _title()
+    _world_section()
+    _sky_section()
+    _distance_section()
+    _vehicle_section()
+    MenuWidgets.buttons(_rows, PackedStringArray(["Resume", "Quit"]), func(index: int) -> void:
+        if index == 0:
+            close()
+        elif _on_quit.is_valid():
+            _on_quit.call()
+    )
+
+
+func _title() -> void:
+    var label: Label = Label.new()
+    label.text = "Settings"
+    label.add_theme_font_size_override("font_size", 20)
+    _rows.add_child(label)
+    MenuWidgets.note(_rows, "Esc closes this. Everything here is live and lasts for this session.")
+
+
+## The world the vehicle is in: its weather, its gravity, its sun.
+func _world_section() -> void:
+    MenuWidgets.heading(_rows, "World")
+    MenuWidgets.options(
+        _rows, "Weather", _weather_names, _weather_index,
+        func(index: int) -> void:
+            _weather_index = index
+            if _on_weather.is_valid():
+                _on_weather.call(_weather_names[index])
+    )
+    var names: Array = GRAVITY_PRESETS.keys()
+    var gravity_names: PackedStringArray = PackedStringArray()
+    for name: String in names:
+        gravity_names.append(name)
+    MenuWidgets.options(
+        _rows, "Gravity", gravity_names, 0,
+        func(index: int) -> void: _set_gravity(float(GRAVITY_PRESETS[names[index]]))
+    )
+    MenuWidgets.slider(
+        _rows, "  m/s²", GRAVITY_MIN, GRAVITY_MAX, EARTH_GRAVITY,
+        func(value: float) -> void: _set_gravity(value), "%.2f"
+    )
+    MenuWidgets.slider(
+        _rows, "Sun elevation", SUN_ELEVATION_RANGE.x, SUN_ELEVATION_RANGE.y, _sun_elevation(),
+        func(value: float) -> void: _aim_sun(value, _sun_azimuth()), "%.0f°"
+    )
+    MenuWidgets.slider(
+        _rows, "Sun azimuth", SUN_AZIMUTH_RANGE.x, SUN_AZIMUTH_RANGE.y, _sun_azimuth(),
+        func(value: float) -> void: _aim_sun(_sun_elevation(), value), "%.0f°"
+    )
+    MenuWidgets.slider(
+        _rows, "Sun brightness", 0.0, 4.0, _sun.light_energy if _sun != null else 1.0,
         func(value: float) -> void:
             if _sun != null:
-                _sun.light_energy = value)
-    _slider("Sky brightness", 0.0, 4.0, _environment.ambient_light_energy,
-        func(value: float) -> void: _environment.ambient_light_energy = value)
-    _slider("Exposure", 0.1, 3.0, _environment.tonemap_exposure,
-        func(value: float) -> void: _environment.tonemap_exposure = value)
-    _slider("Fog", 0.0, FOG_MAX, _environment.volumetric_fog_density,
-        func(value: float) -> void:
-            _environment.volumetric_fog_enabled = value > 0.0001
-            _environment.volumetric_fog_density = value)
-    _check("Shadows", _sun != null and _sun.shadow_enabled,
+                _sun.light_energy = value
+    )
+    MenuWidgets.check(
+        _rows, "Shadows", _sun != null and _sun.shadow_enabled,
         func(on: bool) -> void:
             if _sun != null:
-                _sun.shadow_enabled = on)
-
-
-func _heading(text: String) -> void:
-    var label: Label = Label.new()
-    label.text = text
-    _rows.add_child(label)
-
-
-## Weather is a preset rather than a set of sliders: the presets are what the gates render under,
-## so a session and a gate can be talking about the same light.
-func _weather_row() -> void:
-    var row: HBoxContainer = HBoxContainer.new()
-    var label: Label = Label.new()
-    label.text = "Weather"
-    label.custom_minimum_size = Vector2(120, 0)
-    row.add_child(label)
-    var options: OptionButton = OptionButton.new()
-    for index: int in _weather_names.size():
-        options.add_item(_weather_names[index], index)
-    options.selected = _weather_index
-    options.item_selected.connect(func(index: int) -> void:
-        _weather_index = index
-        if _on_weather.is_valid():
-            _on_weather.call(_weather_names[index])
+                _sun.shadow_enabled = on
     )
-    row.add_child(options)
-    _rows.add_child(row)
 
 
-## Gravity goes to the solver, which is the only setting here that touches the simulation. It is
-## the one a person actually wants: a truck on the Moon is the fastest way to see what the
-## suspension is doing.
-func _gravity_row() -> void:
-    var row: HBoxContainer = HBoxContainer.new()
-    var label: Label = Label.new()
-    label.text = "Gravity"
-    label.custom_minimum_size = Vector2(120, 0)
-    row.add_child(label)
-    var options: OptionButton = OptionButton.new()
-    var names: Array = GRAVITY_PRESETS.keys()
-    for index: int in names.size():
-        options.add_item(names[index] as String, index)
-    options.selected = 0
-    options.item_selected.connect(func(index: int) -> void:
-        _set_gravity(float(GRAVITY_PRESETS[names[index]]))
+## The sky: how bright it is, how it is graded, and what is in it.
+func _sky_section() -> void:
+    MenuWidgets.heading(_rows, "Sky")
+    MenuWidgets.slider(
+        _rows, "Sky brightness", 0.0, 4.0, _environment.ambient_light_energy,
+        func(value: float) -> void: _environment.ambient_light_energy = value
     )
-    row.add_child(options)
-    _rows.add_child(row)
-    _slider("  m/s²", GRAVITY_MIN, GRAVITY_MAX, EARTH_GRAVITY,
-        func(value: float) -> void: _set_gravity(value))
+    MenuWidgets.slider(
+        _rows, "Exposure", 0.1, 3.0, _environment.tonemap_exposure,
+        func(value: float) -> void: _environment.tonemap_exposure = value
+    )
+    var clouds: Dictionary = SkyClouds.settings(_environment)
+    if clouds.is_empty():
+        MenuWidgets.note(_rows, "This sky has no clouds to move.")
+        return
+    MenuWidgets.slider(
+        _rows, "Cloud cover", 0.0, 1.0, clouds["coverage"] as float,
+        func(value: float) -> void: SkyClouds.set_parameter(_environment, "coverage", value)
+    )
+    MenuWidgets.slider(
+        _rows, "Cloud density", 0.0, 3.0, clouds["density"] as float,
+        func(value: float) -> void: SkyClouds.set_parameter(_environment, "density", value)
+    )
+    MenuWidgets.slider(
+        _rows, "Wind", 0.0, 0.05, clouds["wind_speed"] as float,
+        func(value: float) -> void: SkyClouds.set_parameter(_environment, "wind_speed", value),
+        "%.3f"
+    )
+
+
+## How far a person can see, and what closes the distance.
+func _distance_section() -> void:
+    MenuWidgets.heading(_rows, "Distance")
+    MenuWidgets.slider(
+        _rows, "View distance", VIEW_RANGE_M.x, VIEW_RANGE_M.y,
+        _camera.far if _camera != null else RenderCfg.VIEW_DISTANCE_M,
+        func(value: float) -> void:
+            if _camera != null:
+                _camera.far = value,
+        "%.0f m"
+    )
+    MenuWidgets.check(
+        _rows, "Fog", _environment.fog_enabled,
+        func(on: bool) -> void: _environment.fog_enabled = on
+    )
+    MenuWidgets.slider(
+        _rows, "Fog thickness", FOG_RANGE.x, FOG_RANGE.y, _environment.fog_density,
+        func(value: float) -> void:
+            _environment.fog_density = value
+            _environment.fog_enabled = value > 0.0,
+        "%.4f"
+    )
+    MenuWidgets.slider(
+        _rows, "Fog in the sky", 0.0, 1.0, _environment.fog_sky_affect,
+        func(value: float) -> void: _environment.fog_sky_affect = value
+    )
+    MenuWidgets.slider(
+        _rows, "Grass distance", GRASS_RANGE_M.x, GRASS_RANGE_M.y,
+        _vegetation.range_m() if _vegetation != null else RorVegetation.MAX_RANGE_M,
+        func(value: float) -> void:
+            if _vegetation != null:
+                _vegetation.set_range(value),
+        "%.0f m"
+    )
+
+
+## The one thing here that is on the vehicle: its lamps.
+func _vehicle_section() -> void:
+    if _drive == null:
+        return
+    MenuWidgets.heading(_rows, "Vehicle")
+    MenuWidgets.check(
+        _rows, "Lights  (N)", _drive.lights_on(),
+        func(on: bool) -> void: _drive.set_lights(on)
+    )
 
 
 func _set_gravity(value: float) -> void:
     if _drive == null or _drive.solver == null:
         return
     _drive.solver.set_gravity(Vector3(0.0, value, 0.0))
-
-
-func _slider(text: String, low: float, high: float, value: float, on_change: Callable) -> void:
-    var row: HBoxContainer = HBoxContainer.new()
-    var label: Label = Label.new()
-    label.text = text
-    label.custom_minimum_size = Vector2(120, 0)
-    row.add_child(label)
-    var slider: HSlider = HSlider.new()
-    slider.min_value = low
-    slider.max_value = high
-    slider.step = (high - low) / 200.0
-    slider.value = clampf(value, low, high)
-    slider.custom_minimum_size = Vector2(150, 0)
-    var readout: Label = Label.new()
-    readout.text = "%.2f" % slider.value
-    readout.custom_minimum_size = Vector2(46, 0)
-    slider.value_changed.connect(func(changed: float) -> void:
-        readout.text = "%.2f" % changed
-        on_change.call(changed)
-    )
-    row.add_child(slider)
-    row.add_child(readout)
-    _rows.add_child(row)
-
-
-func _check(text: String, value: bool, on_change: Callable) -> void:
-    var box: CheckBox = CheckBox.new()
-    box.text = text
-    box.button_pressed = value
-    box.toggled.connect(func(pressed: bool) -> void: on_change.call(pressed))
-    _rows.add_child(box)
 
 
 ## Where the sun is now, as elevation and azimuth in degrees, read back from the light so the
