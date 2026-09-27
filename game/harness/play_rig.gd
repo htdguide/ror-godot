@@ -86,9 +86,11 @@ func _populate_terrain() -> void:
     var ground: MeshInstance3D = _world.get_node_or_null(^"Ground") as MeshInstance3D
     if ground != null:
         ground.visible = false
-    # A loaded terrain brings its own furniture in its object files, which is separate work; the
-    # generated worlds' furniture is built here.
-    if loaded == null:
+    # A loaded terrain's furniture is in its own object files; the generated worlds' is built
+    # here.
+    if loaded != null:
+        _world.add_child(RorObjects.build(loaded))
+    else:
         if valley:
             _build_valley()
         else:

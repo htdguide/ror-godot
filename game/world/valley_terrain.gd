@@ -43,12 +43,22 @@ static func _show_surfaces(terrain: Node3D) -> void:
         return
     material.set("show_checkered", false)
     material.set("show_colormap", false)
+    # What lies beyond the map's edge. A generated world keeps Terrain3D's flat extension, which
+    # closes the horizon; a loaded terrain is the size its author made it and the sky should
+    # start where it ends, or the map appears to sit inside a beige wall.
+    material.set("world_background", WORLD_BACKGROUND_NONE if _shape.call(
+        "terrain_assets"
+    ) != null else WORLD_BACKGROUND_FLAT)
 
 
 ## Terrain3D reads a texel's roughness from the colour map's alpha channel, so this is the
 ## roughness the whole terrain is drawn with — not the per-surface values in `SurfaceCfg`, which
 ## reach the texture assets and, measured, do not reach the picture.
 const COLOUR_MAP_ROUGHNESS: float = 0.6
+## Terrain3DMaterial.WorldBackground values: nothing beyond the map, or the map's edge extended
+## flat to the horizon.
+const WORLD_BACKGROUND_NONE: int = 0
+const WORLD_BACKGROUND_FLAT: int = 1
 
 
 ## The surface map of the valley that was built last, one cell per byte.

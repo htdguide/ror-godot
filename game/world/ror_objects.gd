@@ -1,0 +1,208 @@
+class_name RorObjects
+extends RefCounted
+## Places the objects a Rigs of Rods terrain ships: its poles, its buildings, its horizon.
+##
+## A terrain's `.tobj` names a position, a rotation and an object definition; the definition
+## names meshes; the meshes name materials; the materials name textures. Every one of those is a
+## file the terrain's author shipped, and following the chain is the whole of this file.
+##
+## Meshes and materials are cached by name, so a hundred identical poles are a hundred transforms
+## over one mesh rather than a hundred parses of the same file. Nothing is instanced beyond that
+## yet: a terrain with thousands of objects will want a MultiMesh per definition, and this one has
+## a hundred.
+##
+## What is *not* here: the collision boxes an object definition can carry, and the vegetation the
+## object file asks for. Both are counted and reported rather than quietly dropped.
+
+## Objects at the origin are the format's own way of saying "the whole map" — a horizon card, a
+## ground skirt — and they are drawn like anything else. This is only the sanity bound on how far
+## outside the map an object may be placed before the file is being read wrong.
+const MAX_OUTSIDE_M: float = 6000.0
+
+
+## Builds every object in a terrain. Returns a node holding them, and never null.
+static func build(terrain: RorTerrain) -> Node3D:
+    var root: Node3D = Node3D.new()
+    root.name = "RorObjects"
+    var state: Dictionary = _state(terrain)
+    for placement: Dictionary in placements(terrain):
+        var node: Node3D = _place(terrain, placement, state)
+        if node != null:
+            root.add_child(node)
+    return root
+
+
+## Every object the terrain's object files ask for, as {"position", "rotation", "name"}.
+static func placements(terrain: RorTerrain) -> Array[Dictionary]:
+    var out: Array[Dictionary] = []
+    for file: String in terrain.config["objects"] as PackedStringArray:
+        var parsed: Dictionary = Tobj.read(terrain.directory.path_join(file))
+        if (parsed["error"] as String) != "":
+            push_warning(parsed["error"] as String)
+            continue
+        out.append_array(parsed["objects"] as Array[Dictionary])
+    return out
+
+
+## What the terrain asks for and this does not draw yet, as a line for a gate or a session to
+## report: vegetation, and collision boxes on object definitions.
+static func unbuilt(terrain: RorTerrain) -> Dictionary:
+    var grass: int = 0
+    var unread: int = 0
+    for file: String in terrain.config["objects"] as PackedStringArray:
+        var parsed: Dictionary = Tobj.read(terrain.directory.path_join(file))
+        grass += (parsed["grass"] as Array[Dictionary]).size()
+        unread += (parsed["unread"] as PackedStringArray).size()
+    var boxes: int = 0
+    var state: Dictionary = _state(terrain)
+    for placement: Dictionary in placements(terrain):
+        var definition: Dictionary = _definition(terrain, placement["name"] as String, state)
+        boxes += definition.get("boxes", 0) as int
+    return {"grass": grass, "collision_boxes": boxes, "unread_lines": unread}
+
+
+## The caches one build shares: definitions, meshes and the directory's materials.
+static func _state(terrain: RorTerrain) -> Dictionary:
+    return {
+        "definitions": {},
+        "meshes": {},
+        "materials": OgreMaterial.read_directory(terrain.directory),
+        "textures": {},
+        "reader": ClassDB.instantiate("OgreMeshReader") as RefCounted,
+        "dds": ClassDB.instantiate("DdsReader") as RefCounted,
+    }
+
+
+## One placed object, or null when its definition or meshes cannot be read.
+static func _place(terrain: RorTerrain, placement: Dictionary, state: Dictionary) -> Node3D:
+    var name: String = placement["name"] as String
+    var definition: Dictionary = _definition(terrain, name, state)
+    if (definition.get("error", "") as String) != "":
+        return null
+    var node: Node3D = Node3D.new()
+    node.name = name
+    node.transform = _transform(placement, definition["scale"] as Vector3)
+    var drawn: int = 0
+    for mesh_file: String in definition["meshes"] as PackedStringArray:
+        var mesh: ArrayMesh = _mesh(terrain, mesh_file, state)
+        if mesh == null:
+            continue
+        var instance: MeshInstance3D = MeshInstance3D.new()
+        instance.name = mesh_file.get_basename()
+        instance.mesh = mesh
+        node.add_child(instance)
+        drawn += 1
+    if drawn == 0:
+        node.queue_free()
+        return null
+    return node
+
+
+## Where an object stands.
+##
+## Upstream builds the rotation about x, then y, then z, in degrees — and then pitches the node
+## another -90 degrees about its own x axis, unconditionally, for every object on every terrain
+## (`TerrainObjectManager::LoadTerrainObject`). That last turn is the whole convention: object
+## meshes in this library are authored z-up, and without it La Paz's roadside poles lie on their
+## sides in the ground, which is how this was found — 99 poles, 6 m of mesh along z, and nothing
+## visible above the surface.
+##
+## The scale is a local scale, as a scene node's is: applied in the object's own axes before the
+## rotation, not to the world box it ends up occupying. It only shows on an object scaled
+## unevenly, and La Paz has one — its sky dome, at 101 by 25 by 101.
+static func _transform(placement: Dictionary, scale: Vector3) -> Transform3D:
+    var degrees: Vector3 = placement["rotation"] as Vector3
+    var basis: Basis = (
+        Basis(Vector3.RIGHT, deg_to_rad(degrees.x))
+        * Basis(Vector3.UP, deg_to_rad(degrees.y))
+        * Basis(Vector3.BACK, deg_to_rad(degrees.z))
+        * Basis(Vector3.RIGHT, deg_to_rad(-90.0))
+    )
+    return Transform3D(basis.scaled_local(scale), placement["position"] as Vector3)
+
+
+## An object definition, read once per name.
+static func _definition(terrain: RorTerrain, name: String, state: Dictionary) -> Dictionary:
+    var cache: Dictionary = state["definitions"] as Dictionary
+    if cache.has(name):
+        return cache[name] as Dictionary
+    var parsed: Dictionary = Odef.read(terrain.directory.path_join("%s.odef" % name))
+    cache[name] = parsed
+    return parsed
+
+
+## A mesh, read once per file, with its materials resolved.
+static func _mesh(terrain: RorTerrain, file: String, state: Dictionary) -> ArrayMesh:
+    var cache: Dictionary = state["meshes"] as Dictionary
+    if cache.has(file):
+        return cache[file] as ArrayMesh
+    var path: String = terrain.directory.path_join(file)
+    var read: Dictionary = (state["reader"] as RefCounted).read_file(path)
+    if (read.get("error", "") as String) != "":
+        push_warning("%s: %s" % [file, read.get("error", "")])
+        cache[file] = null
+        return null
+    var mesh: ArrayMesh = ArrayMesh.new()
+    for submesh: Dictionary in read["submeshes"] as Array:
+        var arrays: Array = _arrays(submesh)
+        if arrays.is_empty():
+            continue
+        mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+        mesh.surface_set_material(
+            mesh.get_surface_count() - 1,
+            _material(terrain, submesh["material"] as String, state)
+        )
+    if mesh.get_surface_count() == 0:
+        cache[file] = null
+        return null
+    cache[file] = mesh
+    return mesh
+
+
+## One submesh's geometry, as Godot's array format wants it.
+static func _arrays(submesh: Dictionary) -> Array:
+    var positions: PackedVector3Array = submesh["positions"] as PackedVector3Array
+    var indices: PackedInt32Array = submesh["indices"] as PackedInt32Array
+    if positions.is_empty() or indices.is_empty():
+        return []
+    var arrays: Array = []
+    arrays.resize(Mesh.ARRAY_MAX)
+    arrays[Mesh.ARRAY_VERTEX] = positions
+    var normals: PackedVector3Array = submesh["normals"] as PackedVector3Array
+    if normals.size() == positions.size():
+        arrays[Mesh.ARRAY_NORMAL] = normals
+    var uvs: PackedVector2Array = submesh["uvs"] as PackedVector2Array
+    if uvs.size() == positions.size():
+        arrays[Mesh.ARRAY_TEX_UV] = uvs
+    arrays[Mesh.ARRAY_INDEX] = indices
+    return arrays
+
+
+## The material a submesh names, built from the terrain's own scripts.
+static func _material(
+    terrain: RorTerrain, name: String, state: Dictionary
+) -> StandardMaterial3D:
+    var cache: Dictionary = state["textures"] as Dictionary
+    if cache.has(name):
+        return cache[name] as StandardMaterial3D
+    var material: StandardMaterial3D = StandardMaterial3D.new()
+    material.albedo_color = Color(0.72, 0.70, 0.68)
+    var declared: Dictionary = (state["materials"] as Dictionary).get(name, {}) as Dictionary
+    if not declared.is_empty():
+        var textures: PackedStringArray = declared["textures"] as PackedStringArray
+        if textures.size() > 0:
+            var texture: Texture2D = RorTerrainSkin.texture_of(
+                terrain.directory.path_join(textures[0]), state["dds"] as RefCounted
+            )
+            if texture != null:
+                material.albedo_texture = texture
+                material.albedo_color = Color.WHITE
+        if declared["alpha"] as bool:
+            # Cut rather than blended: these are vegetation cards and horizon panels, and a
+            # blended one both sorts wrongly against the terrain and writes no depth.
+            material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+            material.cull_mode = BaseMaterial3D.CULL_DISABLED
+        if not (declared["lit"] as bool):
+            material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    cache[name] = material
+    return material

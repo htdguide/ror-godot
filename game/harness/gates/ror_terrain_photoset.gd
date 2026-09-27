@@ -19,6 +19,9 @@ const LANDMARK_STRIDE: int = 32
 ## How far back and how far up a landmark is viewed from.
 const STAND_BACK_M: float = 70.0
 const STAND_UP_M: float = 28.0
+## And how close a view of a single prop stands.
+const CLOSE_BACK_M: float = 9.0
+const CLOSE_UP_M: float = 4.0
 ## A frame this dark is a camera inside the terrain or a scene that failed to light.
 const MIN_LUMA: float = 0.02
 ## And this much of the frame has to be something other than sky.
@@ -29,12 +32,12 @@ const SKY_LUMA: float = 0.35
 static func meta() -> Dictionary:
     return {
         "name": "ror_terrain_photoset",
-        "proves": "a shipped Rigs of Rods terrain renders from its own spawn and its own high, low and middle ground, and the set is captured for a session",
+        "proves": "a shipped Rigs of Rods terrain renders from its own spawn, one of its own props, and its high, low and middle ground, and the set is captured for a session",
         # the terrain has to import and hold a vehicle before its pictures mean anything.
         "builds_on": ["ror_terrain_is_drivable"],
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
-            "4 views, each brighter than %.2f luma with at least %.0f%% of the frame not sky"
+            "5 views, each brighter than %.2f luma with at least %.0f%% of the frame not sky"
             % [MIN_LUMA, MIN_GROUND_FRACTION * 100.0]
         ),
         "why": (
@@ -72,6 +75,8 @@ func run(harness: Node) -> Dictionary:
     var ground: MeshInstance3D = harness.world.get_node_or_null(^"Ground") as MeshInstance3D
     if ground != null:
         ground.visible = false
+    # The terrain's own props, so the sheet shows the place rather than its heightmap.
+    harness.world.add_child(RorObjects.build(terrain_data))
 
     var views: Array[Dictionary] = _views(terrain_data)
     var reported: PackedStringArray = PackedStringArray()
@@ -79,7 +84,9 @@ func run(harness: Node) -> Dictionary:
     for index: int in views.size():
         var view: Dictionary = views[index]
         var at: Vector3 = view["at"] as Vector3
-        harness.camera.look_at_from_position(_stand(terrain_data, at), at, Vector3.UP)
+        harness.camera.look_at_from_position(
+            _stand(terrain_data, at, view.get("close", false) as bool), at, Vector3.UP
+        )
         var shot: Dictionary = await harness.capture_shot(
             "ror_terrain/%d_%s" % [index + 1, view["name"]], "static", CONVERGE
         )
@@ -116,13 +123,15 @@ func run(harness: Node) -> Dictionary:
 ## Where a camera stands to look at a landmark: back and up, kept inside the map, and above the
 ## ground it happens to be standing over. A fixed offset put the camera inside a hillside on the
 ## first try and the frame came back black.
-func _stand(terrain_data: RorTerrain, at: Vector3) -> Vector3:
+func _stand(terrain_data: RorTerrain, at: Vector3, close: bool = false) -> Vector3:
     var grid: Dictionary = terrain_data.lattice()
     var span: float = float((grid["size"] as int) - 1) * (grid["spacing"] as float)
-    var eye: Vector3 = at + Vector3(-STAND_BACK_M, STAND_UP_M, -STAND_BACK_M)
+    var back: float = CLOSE_BACK_M if close else STAND_BACK_M
+    var up: float = CLOSE_UP_M if close else STAND_UP_M
+    var eye: Vector3 = at + Vector3(-back, up, -back)
     eye.x = clampf(eye.x, 2.0, span - 2.0)
     eye.z = clampf(eye.z, 2.0, span - 2.0)
-    eye.y = maxf(eye.y, terrain_data.height_at_world(eye.x, eye.z) + STAND_UP_M)
+    eye.y = maxf(eye.y, terrain_data.height_at_world(eye.x, eye.z) + up)
     return eye
 
 
@@ -144,7 +153,21 @@ func _views(terrain_data: RorTerrain) -> Array[Dictionary]:
     var start: Vector3 = terrain_data.start_position()
     var middle_x: float = float(size / 2) * spacing
     var middle_z: float = float(size / 2) * spacing
+    # And one of the terrain's own props, close enough to see what it is: an object chain that
+    # resolves to geometry can still put it underground or at the wrong scale.
+    # A prop rather than the map's own furniture: a horizon card and a ground skirt are placed
+    # like objects and are hundreds of metres across, so a close view of one is a view of the
+    # inside of it.
+    var props: Array[Dictionary] = RorObjects.placements(terrain_data)
+    var prop: Vector3 = start
+    for placement: Dictionary in props:
+        var name: String = (placement["name"] as String).to_lower()
+        if name.contains("horizon") or name.contains("base") or name.contains("sky"):
+            continue
+        prop = placement["position"] as Vector3
+        break
     return [
+        {"name": "object", "at": prop, "close": true},
         {"name": "spawn", "at": Vector3(
             start.x, terrain_data.height_at_world(start.x, start.z) + 1.0, start.z)},
         {"name": "highest", "at": highest},

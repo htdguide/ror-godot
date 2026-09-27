@@ -40,7 +40,11 @@ static func read(path: String) -> Dictionary:
             section = line.substr(1, line.length() - 2).to_lower()
             continue
         if section == "objects":
-            out["objects"] = _with(out["objects"] as PackedStringArray, line)
+            # Written by an ini writer that puts every entry on the left of an `=`, so La Paz's
+            # own file says `lapaz.tobj=` with nothing after it. The filename is the key.
+            out["objects"] = _with(
+                out["objects"] as PackedStringArray, line.get_slice("=", 0).strip_edges()
+            )
             continue
         if not line.contains("="):
             continue
