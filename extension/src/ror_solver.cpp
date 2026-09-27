@@ -1,6 +1,7 @@
 #include "ror_solver.h"
 
 #include "ror_deform.h"
+#include "ror_drag.h"
 
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
@@ -93,6 +94,12 @@ int RorSolver::ground_model_count() const {
 
 int RorSolver::surface_at(const Vector3 &position) const {
     return m_heightfield.surface_at(position);
+}
+
+void RorSolver::set_fuselage_drag(int front_node, float width, bool enabled) {
+    m_fuselage_node = front_node;
+    m_fuselage_width = width;
+    m_fuselage_enabled = enabled && front_node >= 0 && width > 0.0f;
 }
 
 void RorSolver::set_air_drag(float coefficient, bool enabled) {
@@ -222,22 +229,20 @@ void RorSolver::integrate(float dt) {
     }
 }
 
-// Viscous drag, quadratic in speed. Small at walking pace and the dominant damping at
-// road speed, which is why a rig without it keeps vibrating long after it should have
-// settled and needs a smaller timestep to stay stable.
+// Which of the two aerodynamic models this rig gets, which is upstream's own branch: a rig that
+// declares a fuselage is dragged as one body, and everything else node by node. The difference
+// is not small — the hero truck declares a 0.1 m fuselage, and given the turbulent model instead
+// it tops out at 63 km/h in fourth gear with the throttle on the floor. Both laws are in
+// ror_drag.
 void RorSolver::apply_air_drag() {
+    if (m_fuselage_enabled) {
+        apply_fuselage_drag(m_nodes, m_fuselage_node, m_fuselage_width);
+        return;
+    }
     if (!m_air_drag_enabled) {
         return;
     }
-    for (RorNode &node : m_nodes) {
-        // Upstream's approximate square root, not an exact one: a rig's aerodynamic damping
-        // is computed from an approximate speed. See ror_approx.h.
-        const float speed = approx_sqrt(static_cast<float>(node.velocity.length_squared()));
-        if (speed <= 0.0f) {
-            continue;
-        }
-        node.forces -= node.velocity * (m_air_drag * speed);
-    }
+    apply_turbulent_drag(m_nodes, m_air_drag);
 }
 
 void RorSolver::accumulate_beam_forces() {

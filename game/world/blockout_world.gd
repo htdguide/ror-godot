@@ -62,6 +62,15 @@ static func _build_environment(weather: Dictionary) -> WorldEnvironment:
 
 
 static func _build_sky(weather: Dictionary) -> Sky:
+    # Clouds when the project asks for them, and the stated gradient underneath either way: the
+    # cloud shader draws the same gradient, so the light a gate grades against does not move.
+    if RenderCfg.CLOUDS_ENABLED:
+        var clouded: ShaderMaterial = SkyClouds.material(weather)
+        if clouded != null:
+            var cloud_sky: Sky = Sky.new()
+            cloud_sky.sky_material = clouded
+            cloud_sky.radiance_size = RenderCfg.SKY_RADIANCE_SIZE as Sky.RadianceSize
+            return cloud_sky
     var material: ProceduralSkyMaterial = ProceduralSkyMaterial.new()
     material.sky_top_color = weather.get("sky_top", RenderCfg.SKY_TOP) as Color
     material.sky_horizon_color = weather.get("sky_horizon", RenderCfg.SKY_HORIZON) as Color

@@ -66,3 +66,40 @@ const SUN_CURVE: float = 0.08
 
 const GROUND_COLOR: Color = Color(0.15, 0.14, 0.13)
 const SKY_ENERGY: float = 1.0
+
+## --- Clouds -----------------------------------------------------------------------------------
+##
+## The gradient sky above is a dependable thing to measure lighting against and is not a sky
+## anybody believes. Clouds are marched in `shaders/sky_clouds.gdshader`; these are what a
+## session sees by default, and the panel moves them while it runs.
+const CLOUDS_ENABLED: bool = true
+## How much of the sky is cloud, and how solid each one is.
+const CLOUD_COVERAGE: float = 0.42
+const CLOUD_DENSITY: float = 1.1
+## The slab they live in, in metres, and how big one is across.
+const CLOUD_BOTTOM_M: float = 900.0
+const CLOUD_TOP_M: float = 2300.0
+const CLOUD_SCALE_M: float = 2600.0
+const CLOUD_WIND: Vector2 = Vector2(1.0, 0.35)
+const CLOUD_WIND_SPEED: float = 0.006
+const CLOUD_LIT: Color = Color(1.0, 0.99, 0.96)
+const CLOUD_SHADED: Color = Color(0.42, 0.46, 0.55)
+## Steps through the slab for the visible pass, for the radiance pass that lights the scene, and
+## toward the sun. The radiance pass is convolved into an irradiance map, so its detail is not
+## seen and its cost is not worth paying.
+const CLOUD_STEPS: int = 28
+const CLOUD_RADIANCE_STEPS: int = 10
+const CLOUD_LIGHT_STEPS: int = 4
+
+## --- Distance ---------------------------------------------------------------------------------
+##
+## How far a session can see, and the haze that closes it. Distance fog rather than volumetric:
+## the volumetric kind is a froxel grid with its own range and cost, and what a driver on a 4 km
+## map wants is depth cueing to the horizon.
+const FOG_ENABLED: bool = true
+const FOG_DENSITY: float = 0.0014
+const FOG_SKY_AFFECT: float = 0.35
+const FOG_COLOUR: Color = Color(0.68, 0.72, 0.78)
+## How far the camera draws. A Rigs of Rods terrain is 4 km across and its own horizon mesh
+## stands at its edge, so the default far plane has to reach it.
+const VIEW_DISTANCE_M: float = 6000.0

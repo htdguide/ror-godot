@@ -150,10 +150,18 @@ func _check_wheel(built: Dictionary, truck: TruckParser) -> String:
     if absf(ratio) < 1.0:
         return "the steering wheel's ratio reads %.2f degrees per unit: the file's last field on" \
             % ratio + " the props row is not being read"
+    # Measured as the turn itself — the angle between the wheel at rest and the wheel now —
+    # rather than as an Euler component. The wheel is raked before it is turned, and an Euler
+    # decomposition of the two together reports an angle that is nearly right and drifts with
+    # the rake: 175.71 degrees for a turn of 175.
+    var rest: Basis = Cockpit.steering_basis(0.0)
     for input: float in [0.0, 0.5, -1.0]:
         Cockpit.turn_wheel(built, truck, input)
-        var turned: float = rad_to_deg(
-            wheel.transform.basis.get_euler(PlacementRows.PROP_EULER_ORDER).z
+        var relative: Quaternion = (
+            rest.inverse() * wheel.transform.basis
+        ).get_rotation_quaternion()
+        var turned: float = rad_to_deg(relative.get_angle()) * signf(
+            relative.get_axis().normalized().dot(Vector3.UP)
         )
         var wanted: float = ratio * input
         if absf(wrapf(turned - wanted, -180.0, 180.0)) > WHEEL_TOLERANCE_DEG:

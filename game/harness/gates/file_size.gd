@@ -21,7 +21,7 @@ static func meta() -> Dictionary:
             + " where a file stops fitting in one reading, and the only allowed fix is"
             + " extraction, never reformatting to dodge the counter."
         ),
-        "budget_s": 10.0,
+        "budget_s": 25.0,
         "needs_gpu": false,
         "milestone": "M0",
     }

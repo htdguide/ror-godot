@@ -1,7 +1,7 @@
 class_name DriveRows
 extends RefCounted
 ## Parses the sections that describe a drivetrain: `globals`, `engine`, `engoption`,
-## `brakes` and `torquecurve`.
+## `brakes`, `torquecurve` and `fusedrag`.
 ##
 ## Read together they are a complete specification of how a rig accelerates and stops. The
 ## hero truck states a 450 Nm V8 with a 4.12 differential, six forward gears from 6.25 to
@@ -13,7 +13,9 @@ extends RefCounted
 ## time, stall rpm, idle rpm, ...", with the two times in the opposite order to how the
 ## engine's own setter takes them.
 
-const SECTIONS: Array[String] = ["globals", "engine", "engoption", "brakes", "torquecurve"]
+const SECTIONS: Array[String] = [
+    "globals", "engine", "engoption", "brakes", "torquecurve", "fusedrag",
+]
 ## Upstream's SimConstants defaults for anything a file leaves out. A negative clutch force
 ## means "pick by engine type", which the drivetrain does.
 const UNSET: float = -1.0
@@ -51,6 +53,13 @@ static func empty() -> Dictionary:
         "torque_model": "",
         "torque_rpm": PackedFloat32Array(),
         "torque_ratio": PackedFloat32Array(),
+        # The fuselage a rig declares for its aerodynamics. A rig that declares one is dragged
+        # as a body by upstream rather than node by node, and the difference decides its top
+        # speed: the hero truck states a 0.1 m fuselage and tops out at 63 km/h without it.
+        "fuse_front": "",
+        "fuse_width": 0.0,
+        "fuse_area_coefficient": 0.0,
+        "fuse_autocalc": false,
     }
 
 
@@ -67,6 +76,8 @@ static func read(section: String, fields: PackedStringArray, drive: Dictionary) 
             return _brakes(fields, drive)
         "torquecurve":
             return _torque_curve(fields, drive)
+        "fusedrag":
+            return _fusedrag(fields, drive)
     return "unknown drivetrain section '%s'" % section
 
 
@@ -159,3 +170,30 @@ static func curve_of(drive: Dictionary) -> Dictionary:
         return {"rpm": drive["torque_rpm"], "ratio": drive["torque_ratio"]}
     var model: String = drive["torque_model"] as String
     return TorqueCurves.samples(model if model != "" else "default")
+
+
+## "front_node, rear_node, approximate_width, airfoil" — or, in its other form,
+## "autocalc, front_node, rear_node, area_coefficient, airfoil", where the width is worked out
+## from the rig's own size when it is built.
+##
+## The rear node is read and not kept, because upstream does not keep it either: its spawner
+## sets the fuselage's back node to its front node, with a comment saying that is probably a bug
+## and has been since v0.38. With the two the same the airfoil's own axis is zero length and the
+## airfoil term drops out of the drag entirely, so a faithful port keeps the bug.
+##
+## A file may state several rows; upstream applies each over the last, so the last one wins.
+static func _fusedrag(fields: PackedStringArray, drive: Dictionary) -> String:
+    if fields.size() < 3:
+        return "fusedrag row has %d fields, expected at least 3" % fields.size()
+    if fields[0].to_lower() == "autocalc":
+        if fields.size() < 4:
+            return "fusedrag autocalc row has %d fields, expected at least 4" % fields.size()
+        drive["fuse_autocalc"] = true
+        drive["fuse_front"] = fields[1]
+        drive["fuse_area_coefficient"] = fields[3].to_float()
+        drive["fuse_width"] = 0.0
+        return ""
+    drive["fuse_autocalc"] = false
+    drive["fuse_front"] = fields[0]
+    drive["fuse_width"] = fields[2].to_float()
+    return ""

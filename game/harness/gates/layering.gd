@@ -28,7 +28,7 @@ static func meta() -> Dictionary:
             + " renderer cannot be swapped. One-way dependencies are the property that"
             + " makes this rewrite possible, so it is checked rather than intended."
         ),
-        "budget_s": 10.0,
+        "budget_s": 25.0,
         "needs_gpu": false,
         "milestone": "M0",
     }

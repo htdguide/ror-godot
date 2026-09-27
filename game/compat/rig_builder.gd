@@ -67,8 +67,44 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
     _add_steering(solver, truck)
     _configure_engine(solver, truck)
     solver.set_gravity(GRAVITY)
-    solver.set_air_drag(AIR_DRAG, true)
+    _add_drag(solver, truck)
     return {"error": "", "solver": solver, "masses": masses}
+
+
+## The aerodynamics a rig's own file asks for.
+##
+## Upstream has two models and picks between them by whether the rig declares a `fusedrag`
+## section: a fuselage is dragged as one body, and everything else is dragged node by node with
+## the turbulent model. They are not close to each other. The hero truck declares a 0.1 m
+## fuselage — a negligible drag — and given the per-node model instead it tops out at 63 km/h in
+## fourth gear with the throttle on the floor, which is what a session reported.
+static func _add_drag(solver: RefCounted, truck: TruckParser) -> void:
+    var width: float = _fuselage_width(truck)
+    if width > 0.0:
+        var front: int = truck.node_ids.find(truck.drivetrain["fuse_front"] as String)
+        if front >= 0:
+            solver.set_air_drag(AIR_DRAG, false)
+            solver.set_fuselage_drag(front, width, true)
+            return
+    solver.set_air_drag(AIR_DRAG, true)
+
+
+## The fuselage's width, stated or worked out. Upstream's autocalc form takes the rig's own
+## extent in z and y and multiplies by the stated area coefficient, which makes "width" an area
+## — its own name for it — and the drag law squares it either way.
+static func _fuselage_width(truck: TruckParser) -> float:
+    if not (truck.drivetrain["fuse_autocalc"] as bool):
+        return truck.drivetrain["fuse_width"] as float
+    if truck.nodes.is_empty():
+        return 0.0
+    var low: Vector3 = truck.nodes[0]
+    var high: Vector3 = truck.nodes[0]
+    for node: Vector3 in truck.nodes:
+        low = low.min(node)
+        high = high.max(node)
+    return (high.z - low.z) * (high.y - low.y) * (
+        truck.drivetrain["fuse_area_coefficient"] as float
+    )
 
 
 ## A convenience for the common case: parse a file and build its solver in one step.

@@ -9,15 +9,27 @@ extends RefCounted
 ## prop's own frame, and it is 3D geometry in the world rather than an overlay on the screen —
 ## which is what makes it move with the truck, tilt with it, and be lit by what lights the cab.
 
-## Where the cluster sits, measured from the driver's own eye rather than from the dashboard prop.
+## Where the cluster sits, and how it is found.
 ##
-## The prop's frame is the mod's: the hero truck's dashboard row turns it by -95, 0, 180 degrees,
-## so "forward" and "down" in that frame are neither, and a cluster placed in it ends up at the
-## driver's face. Measuring from the eye — which is the rig's own cinecam — puts the dials where a
-## driver looks, in a frame whose axes are the vehicle's.
+## Three attempts, and the first two are worth writing down because each was wrong in a
+## different way. An offset in the *dashboard prop's* frame is an offset in no direction a person
+## can name — the hero truck turns that prop by -95, 0, 180 degrees — so the dials ended up in
+## the driver's face. Measured from the driver's eye instead, the direction was right and the
+## distance was not: an eye is a cinecam, which hangs where a camera hangs, and a session
+## reported the dials "flying in the air". And the dashboard prop's own mesh turns out to be a
+## 0.8 mm placeholder on this rig — its dashboard is painted into the cab — so there is no
+## dashboard surface to sit on either.
 ##
-## In the vehicle's local frame: -Z is ahead, +Y is up. So this is forward of the eye and below it.
-const EYE_TO_DIALS_M: Vector3 = Vector3(0.0, -0.17, -0.62)
+## What there is, on every rig with a cab, is the steering wheel. So the cluster goes just ahead
+## of it, and its height is chosen so that the dials sit this far below the driver's sightline:
+## a glance rather than a look down. 16 degrees against a 44 degree lens puts them 86% of the way
+## down the frame — low, and in it.
+const GLANCE_DEG: float = 16.0
+## How far ahead of the steering wheel's own front face the dials stand.
+const DIALS_AHEAD_OF_WHEEL_M: float = 0.05
+## And where they go on a rig with no steering wheel to measure from: from the eye, forward and
+## down.
+const EYE_TO_DIALS_M: Vector3 = Vector3(0.0, -0.20, -0.65)
 ## Tilted back to face the driver's eye rather than the windscreen.
 const TILT_DEG: Vector3 = Vector3(-18.0, 0.0, 0.0)
 ## Dial size and spacing.

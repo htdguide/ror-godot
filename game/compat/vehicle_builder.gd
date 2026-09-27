@@ -296,11 +296,7 @@ static func _build_prop(
         # steering input, which is zero at rest; it belongs to the steering animation,
         # not to the wheel's resting pose.
         steering.transform = Transform3D(
-            Basis.from_euler(
-                Vector3(deg_to_rad(PlacementRows.STEERING_COLUMN_RAKE_DEG), 0.0, 0.0),
-                PlacementRows.PROP_EULER_ORDER
-            ),
-            entry["steering_offset"] as Vector3
+            Cockpit.steering_basis(0.0), entry["steering_offset"] as Vector3
         )
         holder.add_child(steering)
     if body == null and steering == null:

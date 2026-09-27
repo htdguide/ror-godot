@@ -96,6 +96,10 @@ public:
     // turbulence term is deliberately left out: this project's gates may not depend on
     // unseeded randomness.
     void set_air_drag(float coefficient, bool enabled);
+    // The fuselage drag a rig's own `fusedrag` section asks for, which replaces the per-node
+    // turbulent model for rigs that declare one. `width` is the section's approximate width in
+    // metres, or the area its autocalc form works out.
+    void set_fuselage_drag(int front_node, float width, bool enabled);
     void set_node_immovable(int node, bool immovable);
     void set_node_position(int node, const godot::Vector3 &position);
     void set_node_velocity(int node, const godot::Vector3 &velocity);
@@ -206,6 +210,9 @@ private:
     // Upstream's DEFAULT_DRAG.
     float m_air_drag = 0.05f;
     bool m_air_drag_enabled = false;
+    int m_fuselage_node = -1;
+    float m_fuselage_width = 0.0f;
+    bool m_fuselage_enabled = false;
 
     void integrate(float dt);
     void apply_air_drag();

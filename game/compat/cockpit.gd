@@ -40,7 +40,7 @@ static func build(vehicle_root: Node3D, truck: TruckParser, built: Dictionary) -
             deg_to_rad(CockpitCfg.TILT_DEG.x), deg_to_rad(CockpitCfg.TILT_DEG.y),
             deg_to_rad(CockpitCfg.TILT_DEG.z)
         )),
-        eye + CockpitCfg.EYE_TO_DIALS_M
+        dials_position(truck, built)
     )
     cluster.add_child(_dial("Tacho", -CockpitCfg.DIAL_SPACING_M * 0.5))
     cluster.add_child(_dial("Speedo", CockpitCfg.DIAL_SPACING_M * 0.5))
@@ -88,11 +88,57 @@ static func turn_wheel(built: Dictionary, truck: TruckParser, steer_state: float
         if wheel == null:
             continue
         var degrees: float = float(entry["steering_deg_per_input"]) * steer_state
-        # About the column, which after the rake is the wheel's own Z.
-        wheel.transform.basis = Basis.from_euler(
-            Vector3(deg_to_rad(PlacementRows.STEERING_COLUMN_RAKE_DEG), 0.0, deg_to_rad(degrees)),
-            PlacementRows.PROP_EULER_ORDER
-        )
+        wheel.transform.basis = steering_basis(degrees)
+
+
+## How a steering wheel sits at a given amount of lock.
+##
+## Upstream's chain for a steering prop is: the prop's own rotation, then a rake about x, then
+## the steering angle about **y** — `Quaternion(rake, UNIT_X) * Quaternion(steer, UNIT_Y)`. The
+## order matters and so does the axis: composed the other way round, or about z, the wheel turns
+## about an axis that is not its column, which a session reported as the wheel "not spinning
+## around its correct axle". The rake is this project's measured 121 degrees rather than
+## upstream's -59; see `PlacementRows`.
+static func steering_basis(degrees: float) -> Basis:
+    return (
+        Basis(Vector3.RIGHT, deg_to_rad(PlacementRows.STEERING_COLUMN_RAKE_DEG))
+        * Basis(Vector3.UP, deg_to_rad(degrees))
+    )
+
+
+## Where the cluster stands in the vehicle's own frame.
+##
+## On the dashboard where there is one, which is what a dashboard is for, and from the driver's
+## eye where a rig has no dashboard prop. Only the prop's position is used: its basis is the
+## mod's own and points nowhere in particular.
+static func dials_position(truck: TruckParser, built: Dictionary) -> Vector3:
+    var eye: Vector3 = (built["rig_to_local"] as Transform3D) * eye_position(truck)
+    var wheel: AABB = _steering_wheel_box(truck, built)
+    if wheel.size == Vector3.ZERO:
+        return eye + CockpitCfg.EYE_TO_DIALS_M
+    # Ahead of the wheel, on the driver's own centre line, and low enough to be a glance.
+    var z: float = wheel.position.z - CockpitCfg.DIALS_AHEAD_OF_WHEEL_M
+    var drop: float = (eye.z - z) * tan(deg_to_rad(CockpitCfg.GLANCE_DEG))
+    return Vector3(wheel.get_center().x, eye.y - drop, z)
+
+
+## The steering wheel's own box in the vehicle's frame, or a zero box when the rig has none.
+##
+## The wheel is the one thing in a cab that is always where a cab is: a dashboard prop can be a
+## placeholder — the hero truck's is 0.8 mm across, because its dashboard is painted into the cab
+## mesh — and a cinecam can be anywhere the mod hung it.
+static func _steering_wheel_box(truck: TruckParser, built: Dictionary) -> AABB:
+    var props: Array[Node3D] = built.get("prop_nodes", [] as Array[Node3D]) as Array[Node3D]
+    for index: int in mini(props.size(), truck.props.size()):
+        if (truck.props[index]["steering_mesh"] as String).is_empty():
+            continue
+        var wheel: MeshInstance3D = props[index].get_node_or_null(
+            ^"SteeringWheel"
+        ) as MeshInstance3D
+        if wheel == null or wheel.mesh == null:
+            continue
+        return props[index].transform * (wheel.transform * wheel.mesh.get_aabb())
+    return AABB()
 
 
 ## Where the driver's eye is, in the rig's own space, or the vehicle's centre when the file

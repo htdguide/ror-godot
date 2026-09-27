@@ -226,6 +226,8 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("ground_model_count"), &RorSolver::ground_model_count);
     ClassDB::bind_method(D_METHOD("surface_at", "position"), &RorSolver::surface_at);
     ClassDB::bind_method(D_METHOD("set_air_drag", "coefficient", "enabled"), &RorSolver::set_air_drag);
+    ClassDB::bind_method(D_METHOD("set_fuselage_drag", "front_node", "width", "enabled"),
+                         &RorSolver::set_fuselage_drag);
     ClassDB::bind_method(D_METHOD("set_node_immovable", "node", "immovable"), &RorSolver::set_node_immovable);
     ClassDB::bind_method(D_METHOD("set_node_position", "node", "position"), &RorSolver::set_node_position);
     ClassDB::bind_method(D_METHOD("set_node_velocity", "node", "velocity"), &RorSolver::set_node_velocity);

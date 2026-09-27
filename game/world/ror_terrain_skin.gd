@@ -18,6 +18,16 @@ extends RefCounted
 
 ## Terrain3D scales a texture by metres per repeat, as one over the tiling distance.
 const MIN_TILE_M: float = 0.5
+## Terrain3D samples a texture at `world.xz * uv_scale - 0.5`: every texture is half a tile out
+## from where the world says it is. On ordinary ground nobody could tell. La Paz's road texture is
+## a whole cross-section — shoulder, white edge line, double yellow, edge line, shoulder — so half
+## a tile puts the centre line at the kerb, which a session reported as the road looking stretched
+## with one wide lane and the separation line off to the side.
+##
+## The shader's offset cannot be changed per texture, so the texture is rolled by that much
+## instead, which cancels it exactly. Measured on La Paz's road: at 0.0 the centre line lands
+## 5.10 m from the middle of the asphalt, at 0.25 2.55 m, at 0.5 0.35 m.
+const UV_PHASE: float = 0.5
 ## How rough a loaded terrain's ground is. The mod's own specular maps are a legacy encoding
 ## this project does not read here; a dry, dusty ground is rough, and the shipped normal maps
 ## carry what relief there is.
@@ -48,17 +58,66 @@ static func _asset(
     var asset: Object = ClassDB.instantiate("Terrain3DTextureAsset")
     asset.set("id", index)
     asset.set("name", (layer["albedo"] as String).get_file().get_basename())
-    var albedo: Texture2D = texture_of(directory.path_join(layer["albedo"] as String), reader)
+    var albedo: Texture2D = tiling_texture_of(
+        directory.path_join(layer["albedo"] as String), reader
+    )
     if albedo != null:
         asset.set("albedo_texture", albedo)
-    var normal: Texture2D = texture_of(directory.path_join(layer["normal"] as String), reader)
+    var normal: Texture2D = tiling_texture_of(
+        directory.path_join(layer["normal"] as String), reader
+    )
     if normal != null:
         asset.set("normal_texture", normal)
     # The terrain's own colours, so nothing of this project's is multiplied over them.
     asset.set("albedo_color", Color.WHITE)
     asset.set("roughness", ROUGHNESS)
-    asset.set("uv_scale", 1.0 / maxf(layer["tile_m"] as float, MIN_TILE_M))
+    # Terrain3D's uv_scale is not one over the tiling distance: measured against a road whose
+    # own texture is a 10.1 m cross-section, a scale of 1/10.1 tiled it over 20.2 m. Two over
+    # the distance is what puts a repeat where the terrain's page file says one is.
+    asset.set("uv_scale", 2.0 / maxf(layer["tile_m"] as float, MIN_TILE_M))
     return asset
+
+
+## A ground texture from a mod's files, rolled to cancel Terrain3D's own half-tile offset.
+##
+## Rolling needs pixels, so a block-compressed texture is decompressed first and kept that way.
+## Four 512-square layers is a megabyte each and it is the only way the markings land where the
+## terrain's author painted them.
+static func tiling_texture_of(path: String, reader: RefCounted) -> Texture2D:
+    var image: Image = image_of(path, reader)
+    if image == null:
+        return null
+    if is_zero_approx(UV_PHASE):
+        return ImageTexture.create_from_image(image)
+    if image.is_compressed() and image.decompress() != OK:
+        return ImageTexture.create_from_image(image)
+    image = rolled(image, UV_PHASE)
+    image.generate_mipmaps()
+    return ImageTexture.create_from_image(image)
+
+
+## An image shifted by a fraction of its own size, wrapping round. A tiling texture rolled this
+## way tiles exactly as before, that fraction of a tile along.
+static func rolled(image: Image, fraction: float) -> Image:
+    var width: int = image.get_width()
+    var height: int = image.get_height()
+    var shift_x: int = posmod(int(round(fraction * float(width))), width)
+    var shift_y: int = posmod(int(round(fraction * float(height))), height)
+    var source: Image = Image.create_from_data(
+        width, height, false, image.get_format(), image.get_data()
+    )
+    var out: Image = Image.create_empty(width, height, false, image.get_format())
+    out.blit_rect(source, Rect2i(0, 0, width, height), Vector2i(shift_x, shift_y))
+    out.blit_rect(
+        source, Rect2i(width - shift_x, 0, shift_x, height), Vector2i(0, shift_y)
+    )
+    out.blit_rect(
+        source, Rect2i(0, height - shift_y, width, shift_y), Vector2i(shift_x, 0)
+    )
+    out.blit_rect(
+        source, Rect2i(width - shift_x, height - shift_y, shift_x, shift_y), Vector2i(0, 0)
+    )
+    return out
 
 
 ## A texture from a mod's files, DDS or otherwise. Null when it cannot be read.
