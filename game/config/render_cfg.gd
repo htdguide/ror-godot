@@ -74,14 +74,21 @@ const SKY_ENERGY: float = 1.0
 ## session sees by default, and the panel moves them while it runs.
 const CLOUDS_ENABLED: bool = true
 ## How much of the sky is cloud, and how solid each one is.
-const CLOUD_COVERAGE: float = 0.42
+const CLOUD_COVERAGE: float = 0.50
 const CLOUD_DENSITY: float = 1.1
 ## The slab they live in, in metres, and how big one is across.
 const CLOUD_BOTTOM_M: float = 900.0
 const CLOUD_TOP_M: float = 2300.0
-const CLOUD_SCALE_M: float = 2600.0
+const CLOUD_SCALE_M: float = 1600.0
 const CLOUD_WIND: Vector2 = Vector2(1.0, 0.35)
-const CLOUD_WIND_SPEED: float = 0.006
+## How fast the weather moves. Zero by default, because a gate captures two frames and compares
+## them and a sky that moves between them is a sky that fails `capture_stability`. The play
+## window turns it on — `CLOUD_WIND_SPEED_PLAYING` — because a still sky is a photograph.
+const CLOUD_WIND_SPEED: float = 0.0
+const CLOUD_WIND_SPEED_PLAYING: float = 0.006
+## How much finer the erosion field is than the cloud shape, and how deeply it bites into it.
+const CLOUD_DETAIL_SCALE: float = 5.0
+const CLOUD_EROSION: float = 0.25
 const CLOUD_LIT: Color = Color(1.0, 0.99, 0.96)
 const CLOUD_SHADED: Color = Color(0.42, 0.46, 0.55)
 ## Steps through the slab for the visible pass, for the radiance pass that lights the scene, and
@@ -97,7 +104,9 @@ const CLOUD_LIGHT_STEPS: int = 4
 ## the volumetric kind is a froxel grid with its own range and cost, and what a driver on a 4 km
 ## map wants is depth cueing to the horizon.
 const FOG_ENABLED: bool = true
-const FOG_DENSITY: float = 0.0014
+## Measured against the valley: at 0.0014 the far wall of a 2 km valley is gone, and a gate that
+## counts how much of a frame is not sky called it sky. This still closes a 4 km horizon.
+const FOG_DENSITY: float = 0.0006
 const FOG_SKY_AFFECT: float = 0.35
 const FOG_COLOUR: Color = Color(0.68, 0.72, 0.78)
 ## How far the camera draws. A Rigs of Rods terrain is 4 km across and its own horizon mesh

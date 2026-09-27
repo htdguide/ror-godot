@@ -23,6 +23,9 @@ var camera: Camera3D
 var frame_index: int = 0
 var preset_name: String = ""
 var preset: Dictionary = {}
+## The weather this run is rendering under, for a gate that wants to build something of its own
+## with the same light.
+var weather_name: String = "noon_clear"
 ## The vehicle loaded by --vehicle, as VehicleBuilder returned it. Kept so a human session
 ## can drive the same built vehicle rather than building a second one.
 var vehicle: Dictionary = {}
@@ -65,12 +68,16 @@ func _apply_determinism() -> void:
 
 
 func _build_world(scenario: String, weather: String) -> String:
+    weather_name = weather
     if not Scenarios.has(scenario):
         return "unknown scenario '%s'; known: %s" % [scenario, Scenarios.names()]
     if not WeatherCfg.has(weather):
         return "unknown weather preset '%s'" % weather
+    # Clouds in a window, the stated gradient in a gate: see `BlockoutWorld._clouds`.
     world = BlockoutWorld.build(
-        WeatherCfg.get_preset(weather), bool(preset.get("props", true))
+        WeatherCfg.get_preset(weather),
+        bool(preset.get("props", true)),
+        args.has_flag("play")
     )
     _main.add_child(world)
     camera = _build_camera(preset)

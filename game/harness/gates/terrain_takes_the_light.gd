@@ -95,6 +95,7 @@ func run(harness: Node) -> Dictionary:
     var err: String = harness.setup_for(PRESET)
     if err != "":
         return fail(err)
+    clear_fog(harness)
     var terrain: Node3D = ValleyTerrain.create()
     if terrain == null:
         return fail("Terrain3D is registered but would not instantiate")

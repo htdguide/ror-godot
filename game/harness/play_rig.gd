@@ -52,6 +52,12 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
     _menu = _build_menu(weather)
     # A loaded terrain is 4 km across and its own horizon stands at the edge of it.
     camera.far = RenderCfg.VIEW_DISTANCE_M
+    # And the weather moves in a window, where nothing is comparing two frames.
+    var holder: WorldEnvironment = _world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
+    if holder != null:
+        SkyClouds.set_parameter(
+            holder.environment, "wind_speed", RenderCfg.CLOUD_WIND_SPEED_PLAYING
+        )
     _build_terrain()
     _print_help()
 

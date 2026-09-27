@@ -42,6 +42,8 @@ static func material(weather: Dictionary) -> ShaderMaterial:
     material.set_shader_parameter("cloud_bottom_m", RenderCfg.CLOUD_BOTTOM_M)
     material.set_shader_parameter("cloud_top_m", RenderCfg.CLOUD_TOP_M)
     material.set_shader_parameter("cloud_scale_m", RenderCfg.CLOUD_SCALE_M)
+    material.set_shader_parameter("detail_scale", RenderCfg.CLOUD_DETAIL_SCALE)
+    material.set_shader_parameter("erosion", RenderCfg.CLOUD_EROSION)
     material.set_shader_parameter("wind", RenderCfg.CLOUD_WIND)
     material.set_shader_parameter("wind_speed", RenderCfg.CLOUD_WIND_SPEED)
     material.set_shader_parameter("steps", RenderCfg.CLOUD_STEPS)

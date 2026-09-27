@@ -76,3 +76,17 @@ static func validate_meta(meta_dict: Dictionary) -> String:
             if not (edge is String) or (edge as String).strip_edges().is_empty():
                 return "builds_on must hold gate names"
     return ""
+
+
+## Turns the distance haze off for a measurement.
+##
+## Fog is grading, and a gate that measures light or framing is measuring neither the grading nor
+## the weather: with haze on, a body lit from the front and one lit from behind wash to the same
+## number, and distant ground takes the colour of the sky and counts as sky. Sessions see fog by
+## default; measurements of contrast and of framing ask for it to be taken away first.
+func clear_fog(harness: Node) -> void:
+    var holder: WorldEnvironment = harness.world.get_node_or_null(
+        ^"WorldEnvironment"
+    ) as WorldEnvironment
+    if holder != null and holder.environment != null:
+        holder.environment.fog_enabled = false

@@ -66,6 +66,7 @@ func run(harness: Node) -> Dictionary:
     var err: String = harness.setup_for(PRESET)
     if err != "":
         return fail(err)
+    clear_fog(harness)
     _hide_props(harness)
     var sun: DirectionalLight3D = harness.world.get_node_or_null(^"Sun") as DirectionalLight3D
     if sun == null:

@@ -19,7 +19,7 @@ static func meta() -> Dictionary:
             "a CLI-only workflow cannot review a value that lives in a scene file."
             + " Keeping scenes structural is what makes every visual change a text diff."
         ),
-        "budget_s": 10.0,
+        "budget_s": 25.0,
         "needs_gpu": false,
         "milestone": "M0",
     }

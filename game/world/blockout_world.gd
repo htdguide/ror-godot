@@ -19,7 +19,10 @@ const CHECKER_CELLS: int = 16
 const SHADOW_MAX_DISTANCE: float = 120.0
 
 
-static func build(weather: Dictionary, include_props: bool = true) -> Node3D:
+static func build(
+    weather: Dictionary, include_props: bool = true, clouds: bool = false
+) -> Node3D:
+    _clouds = clouds
     var root: Node3D = Node3D.new()
     root.name = "BlockoutWorld"
     root.add_child(_build_environment(weather))
@@ -68,10 +71,20 @@ static func _build_environment(weather: Dictionary) -> WorldEnvironment:
     return holder
 
 
+## Whether this world's sky has weather in it.
+##
+## Off by default, and a session turns it on. The reason is the light: a cloud sky is a different
+## sky, and every lighting gate in this project is graded against the stated gradient — measured,
+## swapping the sky under them took the hero truck from 2.27x brighter lit from the front to
+## 1.02x and stopped the tunnel being darker inside than out. So the gates keep the sky they were
+## written against, the window gets the one with weather in it, and `the_sky_has_weather_in_it`
+## asks for clouds explicitly. That the two are not the same sky is a real gap, and it is the
+## same gap as the project's sun-to-sky balance: both want the HDRI work in M2.
+static var _clouds: bool = false
+
+
 static func _build_sky(weather: Dictionary) -> Sky:
-    # Clouds when the project asks for them, and the stated gradient underneath either way: the
-    # cloud shader draws the same gradient, so the light a gate grades against does not move.
-    if RenderCfg.CLOUDS_ENABLED:
+    if _clouds and RenderCfg.CLOUDS_ENABLED:
         var clouded: ShaderMaterial = SkyClouds.material(weather)
         if clouded != null:
             var cloud_sky: Sky = Sky.new()

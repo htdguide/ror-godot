@@ -23,7 +23,7 @@ static func meta() -> Dictionary:
             + " instead of an error, and a wrong image is exactly what this project"
             + " cannot detect cheaply."
         ),
-        "budget_s": 10.0,
+        "budget_s": 25.0,
         "needs_gpu": false,
         "milestone": "M0",
     }

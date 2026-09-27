@@ -76,15 +76,20 @@ per-surface ground textures with detiling, and recovery from a roll.
 
 ## What to do next
 
-**0. What a session opens now.** `tools/play.sh --truck` opens the flat test park, not the
-valley: a straight road with eight surface patches let into it, a washboard, ruts, dips, a ramp
-yard, a rock garden, a crash yard and an ice skid pad, all within a few seconds of each other.
-Valley One is `--valley`. The cab works: `F7` is the driver's seat, the steering wheel turns by
-the ratio the mod's own file declares, the dials read the drivetrain, the lamps light by what the
-vehicle is doing, and `M` opens a panel for weather, gravity, the sun, fog and exposure. What is
-*not* there yet is beam deformation and breaking, so the crash yard tests the rig's elastic
-response and the contact law against a vertical face, and nothing bends permanently. That is the
-next thing worth building if crashing is the point.
+**0. What a session opens now.** `tools/play.sh --truck` opens the flat test park: a straight
+road with eight surface patches let into it, a washboard, ruts, dips, a ramp yard, a rock garden,
+a crash yard and an ice skid pad, all within a few seconds of each other. Valley One is
+`--valley`, and a shipped Rigs of Rods terrain is `--map <name>`.
+
+Controls: `G` drive, `B` reverse, `H` neutral, `I` ignition, `N` or `L` lights, `R` recover
+upright, Backspace respawn, `Z`/`C`/`X` indicators, `F5`/`F6`/`F7` chase, free and driver's seat.
+`Esc` opens the settings panel — weather, gravity, sun, shadows, sky brightness, exposure, cloud
+cover and density, wind, view distance, fog, grass distance, lamps — with Resume and Quit in it.
+
+The cab works: the wheel turns on its own column by the ratio the mod's file declares, the dials
+sit ahead of the wheel and read the drivetrain, and the lamps light by what the vehicle is doing.
+Rigs bend and break: `a_crash_bends_the_rig` drives the hero truck into a wall at 32 m/s and 276
+beams take a permanent set.
 
 **0b. Rigs of Rods terrains load, and any of them can be opened.** `tools/import_terrain.sh
 <zip>` puts a terrain in the library under `assets/terrains/`, `--list` says what is there, and
@@ -314,6 +319,36 @@ gates need a real window, and `tools/gate.sh` refuses to run while one is open.
   Measure with `tools/terrain_cost_probe.gd` before growing a map. The cache in
   `world/valley_cache.gd` is what makes the size affordable, and it verifies itself against the
   shape function on load because a cache is otherwise a golden artifact.
+- **The sky a session sees and the sky the gates measure are not the same sky, on purpose.** A
+  window gets the marched clouds; a gate gets the stated gradient. Swapping the cloud sky under
+  the gates took the hero truck from 2.27x brighter lit from the front to 1.02x and stopped the
+  tunnel being darker inside than out, because a sky full of bright cloud raises the irradiance
+  the whole scene is lit by. That gap — an overcast sky that does not yet light like one — is
+  the same gap as the project's 3:1 sun-to-sky balance, and both want M2's HDRI work.
+- **Distance haze flattens every contrast measurement.** Fog is on by default for sessions, and
+  `GateBase.clear_fog` takes it away for gates that measure light or framing: with it on, a body
+  lit from the front and one lit from behind wash to the same number, and distant ground takes
+  the colour of the sky and counts as sky.
+- **A rig's aerodynamics depend on one section in its file.** Upstream drags a rig that declares
+  `fusedrag` as a single flat plate from the fuselage's width, and every other rig node by node
+  with a turbulent model. Given the wrong one the hero truck stopped accelerating at 63 km/h in
+  fourth gear at full throttle; given its own — a 0.1 m fuselage, which is almost no drag — it
+  reaches 288 km/h in top gear. Upstream's own fuselage code also sets the fuselage's back node
+  to its front node, which zeroes the airfoil term; the port keeps that.
+- **Terrain3D's `uv_scale` is two over the tiling distance, not one over it**, and it samples at
+  `world.xz * uv_scale - 0.5`. Measured on La Paz's road, whose texture is a 10.1 m cross-section:
+  at 1/10.1 it tiled over 20.2 m, and the half-tile offset put the double yellow line at the kerb.
+  Ground textures are rolled half a tile to cancel it — measured 0.35 m from the middle of the
+  asphalt, against 5.10 m before.
+- **A cab's cluster belongs on the steering wheel, not on the dashboard prop or the eye.** The
+  eye is a cinecam and hangs where a camera hangs; the hero truck's dashboard prop is a 0.8 mm
+  placeholder because its dashboard is painted into the cab mesh. The wheel is the one thing in
+  a cab that is always where the cab is.
+- **A steering wheel turns about y after its rake** — upstream's chain is
+  `Quaternion(rake, UNIT_X) * Quaternion(steer, UNIT_Y)` — and the mesh agrees: 0.207 m through
+  the column against a 0.371 m rim. Composed as a single Euler triple it turns about an axis that
+  is not the column, and an Euler *reading* of the result drifts with the rake: 175.71 degrees
+  for a turn of 175.
 - **Every odef object is pitched -90 degrees about its own x axis**, unconditionally, for every
   object on every terrain (upstream's `TerrainObjectManager::LoadTerrainObject`). Object meshes
   in this library are authored z-up. Without that turn La Paz's 99 roadside poles lie on their

@@ -29,7 +29,10 @@ uniform float density : hint_range(0.0, 4.0) = 1.1;
 // The slab the clouds live in, in metres above the camera, and how big a cloud is across.
 uniform float cloud_bottom_m = 900.0;
 uniform float cloud_top_m = 2300.0;
-uniform float cloud_scale_m = 2600.0;
+uniform float cloud_scale_m = 1600.0;
+// The erosion field: how much finer than the shape, and how deeply it bites.
+uniform float detail_scale : hint_range(1.0, 12.0) = 5.0;
+uniform float erosion : hint_range(0.0, 1.0) = 0.25;
 // Where the weather is going, and how fast.
 uniform vec2 wind = vec2(1.0, 0.35);
 uniform float wind_speed = 0.006;
@@ -76,14 +79,24 @@ float fbm(vec3 p) {
 	return total;
 }
 
-// How much cloud is at a point in the slab: the noise field, cut by coverage, faded at the top
-// and bottom so a cloud has a base and a crown rather than square ends.
+// How much cloud is at a point in the slab.
+//
+// A low-frequency field decides where the clouds are, and a higher-frequency one is subtracted
+// from their edges — erosion, the standard way of getting a billowing edge out of smooth noise.
+// Without it the shapes are soft blobs whatever the coverage is, which is what a first version of
+// this looked like.
 float cloud_density(vec3 position, float time) {
 	vec3 sample_at = position / cloud_scale_m;
 	sample_at.xz += wind * time * wind_speed;
 	float shape = fbm(sample_at);
 	float cut = 1.0 - coverage;
 	float value = clamp((shape - cut) / max(1.0 - cut, 0.001), 0.0, 1.0);
+	if (value > 0.0) {
+		float detail = fbm(sample_at * detail_scale + vec3(11.3, 4.1, 7.7));
+		value = clamp(value - detail * erosion * (1.0 - value), 0.0, 1.0);
+		// And a firmer edge, so a cloud has a surface rather than fading out over a kilometre.
+		value = smoothstep(0.0, 0.35, value);
+	}
 	float height = clamp(
 		(position.y - cloud_bottom_m) / max(cloud_top_m - cloud_bottom_m, 1.0), 0.0, 1.0
 	);
@@ -111,9 +124,15 @@ void sky() {
 
 	vec3 colour = base * sky_energy;
 
-	// Clouds only exist above the horizon, and a ray that never climbs never meets the slab.
-	if (direction.y > 0.02) {
-		int march = AT_CUBEMAP_PASS ? radiance_steps : steps;
+	// Clouds are drawn for the eye and not into the radiance map. The map is what lights the
+	// scene, and a sky full of bright cloud raises its irradiance enough to flatten everything:
+	// measured, the hero truck went from 2.1x brighter lit from the front to 1.02x, and the
+	// tunnel stopped being darker inside than out. The scene is still lit by the stated
+	// gradient — which is what every lighting gate here is graded against — and the clouds are
+	// what a person sees. That is a real limitation and it is named rather than hidden: an
+	// overcast sky does not yet light like one.
+	if (!AT_CUBEMAP_PASS && direction.y > 0.02) {
+		int march = steps;
 		float enter = cloud_bottom_m / direction.y;
 		float exit = cloud_top_m / direction.y;
 		float span = (exit - enter) / float(march);

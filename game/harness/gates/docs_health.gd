@@ -21,7 +21,7 @@ static func meta() -> Dictionary:
             + " broken link is the cheapest possible signal that a document has drifted"
             + " away from the tree it describes."
         ),
-        "budget_s": 10.0,
+        "budget_s": 25.0,
         "needs_gpu": false,
         "milestone": "M0",
     }

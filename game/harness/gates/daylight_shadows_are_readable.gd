@@ -78,6 +78,7 @@ func run(harness: Node) -> Dictionary:
     var err: String = harness.setup_for(PRESET)
     if err != "":
         return fail(err)
+    clear_fog(harness)
     var environment: Environment = _environment(harness)
     if environment == null:
         return fail("the world has no environment to configure")

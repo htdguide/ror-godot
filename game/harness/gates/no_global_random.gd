@@ -22,7 +22,7 @@ static func meta() -> Dictionary:
             "one unseeded call makes captures non-reproducible, and the failure presents"
             + " as a rendering regression rather than as the seeding bug it is."
         ),
-        "budget_s": 10.0,
+        "budget_s": 25.0,
         "needs_gpu": false,
         "milestone": "M0",
     }

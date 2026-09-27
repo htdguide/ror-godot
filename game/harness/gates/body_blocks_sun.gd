@@ -65,6 +65,7 @@ func run(harness: Node) -> Dictionary:
     var err: String = harness.setup_for(BASE_PRESET)
     if err != "":
         return fail(err)
+    clear_fog(harness)
     harness.use_measurement_environment()
 
     var built: Dictionary = VehicleBuilder.build(mod_dir, TRUCK)
