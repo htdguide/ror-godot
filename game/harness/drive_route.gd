@@ -35,10 +35,11 @@ const STUCK_WINDOW_S: float = 8.0
 const STUCK_TRAVEL_M: float = 3.0
 ## A node this far under the terrain has gone through it.
 ##
-## The terrain here is the one the renderer draws — `ValleyShape` — and not the heightfield the
-## solver was handed. Asking the solver whether its own ground is where it thinks it is cannot
-## fail: a heightfield handed over five metres low was driven on quite happily, with the rig
-## floating five metres over the drawn valley and every check reporting nothing wrong.
+## The terrain here is the one the renderer draws — the `RorTerrain` read from its author's own
+## files — and not the heightfield the solver was handed. Asking the solver whether its own
+## ground is where it thinks it is cannot fail: a heightfield handed over five metres low was
+## driven on quite happily, with the rig floating five metres over the drawn terrain and every
+## check reporting nothing wrong.
 const FALL_THROUGH_M: float = 1.0
 ## And the other half of the same claim: the rig has to stay *on* that ground. A wheel lifts over a
 ## crest, so this is a clearance that has to be held for a while before it counts.
@@ -58,8 +59,11 @@ const SETTLE_S: float = 1.5
 ##
 ## Returns {"error", "reason", "completed", "reached", "distance_m", "seconds", "worst_speed_ms",
 ## "deepest_m", "energy_ratio", "path"}. `reason` is "" when the route completed.
+## `terrain` is the terrain being driven on, asked for its own heights as the renderer-side
+## oracle. Without it the fall-through and floating checks have nothing to compare against.
 static func drive(
-    solver: RefCounted, truck: TruckParser, waypoints: Array[Vector2], options: Dictionary
+    solver: RefCounted, truck: TruckParser, waypoints: Array[Vector2], options: Dictionary,
+    terrain: Object
 ) -> Dictionary:
     var substep_hz: float = float(options.get("substep_hz", 2000.0))
     var limit_s: float = float(options.get("limit_s", 180.0))
@@ -113,7 +117,7 @@ static func drive(
 
         var watched: String = ""
         if frame % WATCH_EVERY == 0:
-            watched = _watch(solver, state, settled_energy, seconds)
+            watched = _watch(solver, state, settled_energy, seconds, terrain)
         if watched != "":
             state["reason"] = watched
             state["seconds"] = seconds
@@ -155,7 +159,8 @@ static func drive(
 
 ## The four ways a run ends badly, watched every frame. Returns "" while nothing is wrong.
 static func _watch(
-    solver: RefCounted, state: Dictionary, settled_energy: float, seconds: float
+    solver: RefCounted, state: Dictionary, settled_energy: float, seconds: float,
+    terrain: Object
 ) -> String:
     var deepest: float = 0.0
     var fastest: float = 0.0
@@ -163,7 +168,7 @@ static func _watch(
     var positions: PackedVector3Array = solver.get_positions()
     for node: int in positions.size():
         var at: Vector3 = positions[node]
-        var ground: float = ValleyShape.height_at_world(at.x, at.z)
+        var ground: float = terrain.call("height_at_world", at.x, at.z)
         deepest = maxf(deepest, ground - at.y)
         clearance = minf(clearance, at.y - ground)
         fastest = maxf(fastest, solver.get_node_velocity(node).length())

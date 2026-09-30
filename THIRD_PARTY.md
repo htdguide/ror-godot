@@ -81,14 +81,47 @@ has no corresponding record under `LICENSES/`.
 ### Chevrolet S10 pack (hero asset, not redistributed)
 - Local path: `assets/mods/ChevyS1023` — **gitignored, never committed**
 - Source: Rigs of Rods repository, supplied by the project owner
-- Licence: not stated in the package. No licence file ships with it, so no redistribution
-  right can be assumed. It is used locally as a test and hero asset only.
+- Author: **Gabester** (`author chassis` and `author texture` rows in `S10offroad.truck`)
+- Licence: none stated. Its `readme.txt` says, in full: "1985 Chevrolet S10 for Rigs of Rods /
+  by Gabester / DO NOT modify this or use any part of it and release without my permission."
+  That is an explicit restriction rather than silence: the pack may be used locally, and
+  releasing it or anything built from it — including inside a web build's `.pck` — needs the
+  author's permission first. **Not cleared for publication.**
 - Why this one: `S10offroad.truck` has 255 nodes and uses `flexbodies` with external
   OGRE meshes, `managedmaterials` with inline material definitions, and `submesh`/`cab`
   sections. It therefore exercises both deformation paths of ADR 0003 and the legacy
   material classification of ADR 0001, which upstream's own content pack cannot.
 - Consequence: gates that need it must skip cleanly when it is absent, so a fresh clone
   still runs the suite green.
+
+### Rigs of Rods base content (shipped default map and vehicles)
+- Local path: `vendor/rigs-of-rods/content` — a submodule of the `rigs-of-rods` submodule
+- Source: https://github.com/RigsOfRods/content, pinned at `34fefdd`
+- Licence: **GPL-3.0-or-later**, `vendor/rigs-of-rods/content/LICENSE`. Same licence as this
+  project, so unlike the mods below it may be redistributed.
+- Authors: the default map `simple2` states `terrain = tdev`, `texture = Miura`,
+  `update = CuriousMike` in each of its three `.terrn2`.
+- What is used: `simple2-terrain/`, which is the map Rigs of Rods itself opens with — three
+  terrains over one set of files (`simple2` gravel, `simple2_a` asphalt, `simple2_w` flooded),
+  1024 m, `Flat=1`. It is the default world of `tools/play.sh --truck` and the subject of
+  `a_shipped_map_drives_from_a_fresh_clone`.
+- Why this one: it is the only terrain this project can rely on being present. `assets/terrains/`
+  and `assets/mods/` are gitignored, so before this every terrain gate skipped on a fresh clone
+  and the only world the suite could build was one this project generated for itself.
+- Attribution: any build shipping it must credit tdev, Miura and CuriousMike, and the Rigs of
+  Rods project.
+
+### La Paz terrain (loaded terrain, not redistributed)
+- Local path: `assets/terrains/lapaz2` — **gitignored, never committed**
+- Source: Rigs of Rods repository, supplied by the project owner
+- Authors: as its own `lapaz.terrn2` states — `terrain = -1`, `converting = Klink`. The original
+  terrain author is not named in the package; the conversion is Klink's.
+- Licence: none stated. No licence file ships with the package.
+- Why this one: it is a whole shipped terrain — heightmap, traction map, ground models, splat
+  textures, 101 objects and two vegetation layers — so every reader in `compat/` is checked
+  against a real author's data rather than against this project's own generator.
+- Attribution: any build that ships it must credit La Paz and Klink on its own credits page,
+  and the Rigs of Rods project for the formats and the physics.
 
 ## Rejected
 

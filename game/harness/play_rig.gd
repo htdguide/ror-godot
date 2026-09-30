@@ -7,6 +7,10 @@ extends Node
 ## effect so that "this effect is wrong" can be told apart from "this scene is wrong"
 ## without a rebuild.
 
+## The map a session opens when it names none: the one Rigs of Rods itself ships, which is in
+## the tree under GPL and therefore present on any clone.
+const DEFAULT_MAP: String = "simple2"
+
 const HUD_MARGIN: int = 12
 const HUD_FONT_SIZE: int = 15
 const HUD_REFRESH_FRAMES: int = 10
@@ -65,14 +69,13 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
 ## Adds the world, when this session asked for one and Terrain3D is installed. It cannot be
 ## populated yet: a Terrain3D has no data until it has been inside a World3D for a frame.
 ##
-## Which world: the flat test park by default, Valley One under `--valley`, and a shipped Rigs of
-## Rods terrain under `--terrain-dir`. The park is where a person goes to try something — ramps,
-## rocks, surfaces and walls within a few seconds of each other — the valley is the showcase the
-## plan is measured in, and a loaded terrain is a place someone else built and drove.
+## Which world is always a Rigs of Rods terrain — `--map <name>`, defaulting to the map the game
+## itself ships. This project used to generate two worlds of its own and they are gone: a place
+## someone else built and drove is the only world worth checking a reader against.
 func _build_terrain() -> void:
     if not Harness.args.has_flag("terrain"):
         return
-    _terrain = ValleyTerrain.create()
+    _terrain = TerrainWorld.create()
     if _terrain == null:
         printerr("PLAY  --terrain asked for, but Terrain3D is not installed."
             + " Run tools/build_terrain3d.sh")
@@ -84,50 +87,33 @@ func _build_terrain() -> void:
 func _populate_terrain() -> void:
     _terrain_pending = false
     var loaded: RorTerrain = _load_terrain()
-    var valley: bool = Harness.args.has_flag("valley")
-    var shape: Object = loaded if loaded != null else (ValleyShape if valley else ParkShape)
-    var error: String = ValleyTerrain.populate(_terrain, shape)
+    if loaded == null:
+        return
+    var error: String = TerrainWorld.populate(_terrain, loaded)
     if error != "":
         printerr("PLAY  the terrain could not be built: " + error)
         return
-    # The flat plane would otherwise sit inside the generated ground and the rig would rest on
+    # The blockout plane would otherwise sit inside the terrain and the rig would rest on
     # whichever happened to be higher.
     var ground: MeshInstance3D = _world.get_node_or_null(^"Ground") as MeshInstance3D
     if ground != null:
         ground.visible = false
-    # A loaded terrain's furniture is in its own object files; the generated worlds' is built
-    # here.
-    if loaded != null:
-        _world.add_child(RorObjects.build(loaded))
-        _grow_vegetation(loaded)
-    else:
-        if valley:
-            _build_valley()
-        else:
-            _world.add_child(ParkProps.build())
-            _world.add_child(ParkGrid.build())
+    _world.add_child(RorObjects.build(loaded))
+    _grow_vegetation(loaded)
     if _drive == null:
         return
     # Where a vehicle starts, and under what gravity, before the terrain is handed over: taking
     # the terrain puts the rig down, and it has to be put down where the terrain says.
-    if loaded != null:
-        _drive.spawn = loaded.start_position()
-        _drive.solver.set_gravity(Vector3(0.0, loaded.gravity(), 0.0))
+    _drive.spawn = loaded.start_position()
+    _drive.solver.set_gravity(Vector3(0.0, loaded.gravity(), 0.0))
     error = _drive.use_terrain(_terrain.get("data"))
     if error != "":
         printerr("PLAY  the solver could not take the terrain: " + error)
         return
-    if loaded != null:
-        var solid: int = RorObjectCollision.apply(loaded, _drive.solver)
-        print("PLAY  driving on %s, spawned at %v under %.2f m/s^2; %d parts of its own"
-            % [loaded.name, loaded.start_position(), loaded.gravity(), solid]
-            + " scenery are solid")
-        return
-    if not valley:
-        var props: int = ParkProps.apply_to_solver(_drive.solver)
-        print("PLAY  driving in the test park: %d props are solid" % props)
-        return
-    print("PLAY  driving on the valley")
+    var solid: int = RorObjectCollision.apply(loaded, _drive.solver)
+    print("PLAY  driving on %s, spawned at %v under %.2f m/s^2; %d parts of its own"
+        % [loaded.name, loaded.start_position(), loaded.gravity(), solid]
+        + " scenery are solid")
 
 
 ## The terrain's own vegetation, in a ring of tiles that follows whoever is driving.
@@ -144,38 +130,21 @@ func _grow_vegetation(loaded: RorTerrain) -> void:
         _menu.set_vegetation(vegetation)
 
 
-## The terrain `--terrain-dir` asks for, or null when this session asked for a generated world.
+## The terrain `--map` asks for, or upstream's own shipped default map when this session named
+## none. Null when it cannot be loaded.
 ##
-## The name may be a library name — a directory under `assets/terrains/` — or a path to one
-## anywhere. A terrain that will not load is reported and the session falls back rather than
-## opening a window onto nothing.
+## The name is a library name — a `.terrn2` under `assets/terrains/` or in upstream's own shipped
+## content — or a path to a directory holding one. A terrain that will not load is reported and
+## the library is listed, rather than opening a window onto nothing.
 func _load_terrain() -> RorTerrain:
-    var wanted: String = Harness.args.get_string("terrain-dir", "")
-    if wanted.is_empty():
-        return null
-    var directory: String = RorTerrainLibrary.resolve(wanted)
-    if directory.is_empty():
-        printerr("PLAY  there is no terrain called '%s'. What there is:" % wanted)
-        for summary: Dictionary in RorTerrainLibrary.summaries():
-            printerr("PLAY    %s (%s)" % [summary["directory"], summary["name"]])
-        return null
-    var loaded: Dictionary = RorTerrain.load_from(directory)
+    var wanted: String = Harness.args.get_string("terrain-dir", DEFAULT_MAP)
+    var loaded: Dictionary = RorTerrainLibrary.load_named(wanted)
     if (loaded["error"] as String) != "":
-        printerr("PLAY  the terrain at %s could not be read: %s" % [
-            directory, loaded["error"]])
+        printerr("PLAY  %s" % loaded["error"])
+        for summary: Dictionary in RorTerrainLibrary.summaries():
+            printerr("PLAY    %s (%s)" % [summary["name"], summary["title"]])
         return null
     return loaded["terrain"] as RorTerrain
-
-
-## The valley's own furniture: the tunnel, the water and the forest.
-func _build_valley() -> void:
-    _world.add_child(Tunnel.build())
-    var water: Node3D = ValleyWater.build()
-    if water != null:
-        _world.add_child(water)
-    var vegetation: Node3D = ValleyVegetation.build()
-    if vegetation != null:
-        _world.add_child(vegetation)
 
 
 func _build_hud() -> Label:

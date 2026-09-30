@@ -3,27 +3,41 @@ extends GateBase
 ##
 ## Everything before this stands the rig on a plane at y = 0, where "on the ground" and "at
 ## zero" are the same statement and a solver that ignored the terrain entirely would pass.
-## Here the spawn point is on a valley wall, so the two come apart: each wheel rests at a
-## different height, and each has to rest at the height of the terrain underneath *it*.
+## Here the spawn is on a hillside of a terrain somebody else authored, so the two come apart:
+## each wheel rests at a different height, and each has to rest at the height of the terrain
+## underneath *it*.
 ##
 ## The oracle is the terrain's own height query, taken under each axle after the rig has
 ## settled. It is the same surface the renderer draws, so this is also the check that the rig
 ## and the visible ground are in the same place — measured per wheel rather than once for the
 ## whole vehicle, because a rig resting on a slope at the right average height can still have
 ## two wheels buried and two in the air.
+##
+## The spawn is searched for rather than written down. A hardcoded point is a point that means
+## something on one map and nothing on the next, and this gate used to hold a coordinate on a
+## valley wall this project generated itself. So the terrain is scanned in a fixed order for the
+## first place whose relief across a vehicle is in range — enough slope for the wheels to
+## disagree, not enough for a parked truck to slide — and the gate reports where it went.
 
+const TERRAIN_DIR: String = "assets/terrains/lapaz2"
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
 const SUBSTEP_HZ: float = 2000.0
 const SETTLE_SECONDS: float = 3.0
-## On the valley wall, off the floor, where the ground is sloped but not steep enough for a
-## parked vehicle to slide.
-const SPAWN: Vector3 = Vector3(20.0, 0.0, 160.0)
 const SPAWN_CLEARANCE_M: float = 0.15
+## How the spawn is looked for: a coarse grid over the map, in a fixed order, taking the first
+## cell whose relief over a vehicle's footprint is in range.
+const SEARCH_STEP_M: float = 64.0
+const SEARCH_MARGIN_M: float = 128.0
+const FOOTPRINT_M: float = 3.0
+const WANTED_RELIEF_MIN_M: float = 0.30
+const WANTED_RELIEF_MAX_M: float = 1.20
 ## An axle sits a tyre radius above the ground, plus whatever the tyre has squashed by. The
 ## bound is on the error against that, not on the height itself.
 const AXLE_TOLERANCE_M: float = 0.12
 ## The terrain under the rig has to actually be sloped, or this is the flat-plane test again.
+## Below what the search asks for, because the search measures a square footprint and the rig's
+## own wheels sit inside it.
 const MIN_SLOPE_M: float = 0.15
 
 
@@ -57,16 +71,30 @@ func run(harness: Node) -> Dictionary:
     var mod_dir: String = SourceScan.repo_root().path_join(MOD_DIR)
     if not DirAccess.dir_exists_absolute(mod_dir):
         return ok("skipped: hero asset not present at %s" % MOD_DIR, 0)
+    var directory: String = SourceScan.repo_root().path_join(TERRAIN_DIR)
+    if not DirAccess.dir_exists_absolute(directory):
+        return ok("skipped: no terrain at %s" % TERRAIN_DIR, 0)
     if not ClassDB.class_exists("Terrain3D"):
         return ok("skipped: Terrain3D is not installed. Run tools/build_terrain3d.sh", 0)
+    var loaded: Dictionary = RorTerrain.load_from(directory)
+    if (loaded["error"] as String) != "":
+        return fail(loaded["error"] as String)
+    var terrain_data: RorTerrain = loaded["terrain"] as RorTerrain
+    var spawn: Vector3 = _sloped_spawn(terrain_data)
+    if spawn == Vector3.INF:
+        return fail(
+            "no cell of %s has between %.2f m and %.2f m of relief across %.0f m: there is"
+            % [terrain_data.name, WANTED_RELIEF_MIN_M, WANTED_RELIEF_MAX_M, FOOTPRINT_M]
+            + " nowhere on this map to test a slope"
+        )
     var err: String = harness.setup_for("hero_3q")
     if err != "":
         return fail(err)
 
-    var terrain: Node3D = ValleyTerrain.create()
+    var terrain: Node3D = TerrainWorld.create()
     harness.world.add_child(terrain)
     await harness.advance_frames(2, "static", "terrain")
-    var built: String = ValleyTerrain.populate(terrain)
+    var built: String = TerrainWorld.populate(terrain, terrain_data)
     if built != "":
         return fail(built)
     var data: Object = terrain.get("data")
@@ -76,11 +104,11 @@ func run(harness: Node) -> Dictionary:
         return fail(rig["error"] as String)
     var truck: TruckParser = rig["truck"] as TruckParser
     var solver: RefCounted = rig["solver"] as RefCounted
-    var applied: String = ValleyTerrain.give_to_solver(solver, data)
+    var applied: String = TerrainWorld.give_to_solver(solver, data)
     if applied != "":
         return fail(applied)
     solver.set_ground(0.0, true)
-    _place(solver, truck)
+    _place(solver, truck, spawn)
 
     var dt: float = 1.0 / SUBSTEP_HZ
     var chunk: int = int(SUBSTEP_HZ / 60.0)
@@ -128,20 +156,53 @@ func run(harness: Node) -> Dictionary:
             worst
         )
     return ok(
-        "settled on %.2f m of slope: %s; worst axle %.0f mm from a tyre radius above ground"
-        % [slope, ", ".join(report), worst * 1000.0],
+        "settled on %s at %.0f, %.0f, on %.2f m of slope: %s; worst axle %.0f mm from a tyre"
+        % [terrain_data.name, spawn.x, spawn.z, slope, ", ".join(report), worst * 1000.0]
+        + " radius above ground",
         worst
     )
 
 
+## The first place on the terrain with enough relief across a vehicle to make the wheels
+## disagree, and not so much that a parked truck slides off it.
+##
+## Scanned in a fixed order over a coarse grid, so the answer is the same on every machine and
+## every run. Returns `Vector3.INF` when the map has nowhere like that.
+func _sloped_spawn(terrain_data: RorTerrain) -> Vector3:
+    var grid: Dictionary = terrain_data.lattice()
+    var span: float = float((grid["size"] as int) - 1) * (grid["spacing"] as float)
+    var half: float = FOOTPRINT_M * 0.5
+    var at: float = SEARCH_MARGIN_M
+    while at < span - SEARCH_MARGIN_M:
+        var across: float = SEARCH_MARGIN_M
+        while across < span - SEARCH_MARGIN_M:
+            var lowest: float = INF
+            var highest: float = -INF
+            for corner: Vector2 in [
+                Vector2(-half, -half), Vector2(half, -half),
+                Vector2(-half, half), Vector2(half, half),
+            ]:
+                var height: float = terrain_data.height_at_world(
+                    across + corner.x, at + corner.y
+                )
+                lowest = minf(lowest, height)
+                highest = maxf(highest, height)
+            var relief: float = highest - lowest
+            if relief >= WANTED_RELIEF_MIN_M and relief <= WANTED_RELIEF_MAX_M:
+                return Vector3(across, 0.0, at)
+            across += SEARCH_STEP_M
+        at += SEARCH_STEP_M
+    return Vector3.INF
+
+
 ## Puts the rig down above the spawn point, with its lowest node just clear of the terrain.
-func _place(solver: RefCounted, truck: TruckParser) -> void:
-    var ground: float = solver.ground_height_at(SPAWN)
+func _place(solver: RefCounted, truck: TruckParser, spawn: Vector3) -> void:
+    var ground: float = solver.ground_height_at(spawn)
     var lowest: float = INF
     for node: Vector3 in truck.nodes:
         lowest = minf(lowest, node.y)
     var lift: Vector3 = Vector3(
-        SPAWN.x, ground + SPAWN_CLEARANCE_M - lowest, SPAWN.z
+        spawn.x, ground + SPAWN_CLEARANCE_M - lowest, spawn.z
     )
     for i: int in truck.nodes.size():
         solver.set_node_position(i, truck.nodes[i] + lift)

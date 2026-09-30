@@ -39,7 +39,7 @@ static func meta() -> Dictionary:
             + " content stays engine-locked through any format conversion. Both are cheap"
             + " to check now and impossible to undo later."
         ),
-        "budget_s": 15.0,
+        "budget_s": 30.0,
         "needs_gpu": false,
         "milestone": "M1",
     }

@@ -49,27 +49,48 @@ afternoon to rediscover.
   solver reads a heightfield in. Stored the other way round it is transposed, and a transposed
   map is not obviously wrong: the right surfaces appear, in the wrong places, and the first
   symptom was the terrain drawing sand where the solver gripped concrete.
-- **A gate that measures the wrong quantity passes on the fault it was written for.** The first
-  version of `valley_has_its_features` measured how deep the lake's water was, which is mostly
-  the valley floor descending under a flat water level: it passed with the basin set to half a
-  metre. It measures the basin's carve against the floor now, and the negative control is the
-  layout constant set to 0.5.
-- **A contour road cannot be declared as a table of heights.** Give each control point a height
-  and the road floats: the wall it is benched into is 3.9 m high where the table said 30 m. The
-  road's height is read from the wall at the nearest point of its own centre line instead, so
-  cut and fill are bounded by construction — 1.20 m measured — and the grade becomes a property
-  of the path, which a gate can then measure.
-- **A valley wall wants a constant slope where a road is benched into it, not a quadratic
-  curve.** A quadratic wall is gentle at the toe and near-vertical at the top, so the contours a
-  switchback road follows are 100 m apart at the bottom and 10 m apart at the top and the legs
-  collide before reaching the ridge.
-- **Feature bounds have to be derived from the feature, not written down.** The road corridor was
-  clipped to a hand-written band of z and the apron lost 2.5 m of its width as soon as a control
-  point moved; the band comes from the control points now.
-- **Generating 4.2 M cells of terrain in GDScript costs 22 s, and it is the suite's runtime.**
-  Measure with `tools/terrain_cost_probe.gd` before growing a map. The cache in
-  `world/valley_cache.gd` is what makes the size affordable, and it verifies itself against the
-  shape function on load because a cache is otherwise a golden artifact.
+- **A gate that measures the wrong quantity passes on the fault it was written for.** Measured
+  twice here. A gate on the deleted valley read how deep a lake's water was, which is mostly the
+  floor descending under a flat water level, and passed with the basin set to half a metre. And
+  the negative control for `terrain_collision_agreement`'s transposition check was first wired to
+  the wrong copy of the surface-map build — `TerrainWorld.surface_map()`'s lazy fallback, which
+  `populate` never reaches — so the break changed nothing and the gate looked worthless when it
+  was not. **A negative control that produces no change is a miswired control until proven
+  otherwise.**
+- **A place a gate stands on has to be derived, not written down.** This is what the generated
+  valley and test park cost when they were removed: every gate holding a coordinate on them had
+  no subject left. A coordinate means something on one map and nothing on the next, so a gate
+  searches an author's own heightmap for the ground it needs — a slope, a level patch, a drivable
+  heading — in a fixed order so the answer is the same on every machine, and reports where it
+  went. The same lesson cost 2.5 m of a road apron when a feature's bounds were written down
+  beside it rather than derived from it.
+- **Importing 4.2 M cells of terrain costs about 4 s, and it is most of the suite's runtime.**
+  `world/terrain_cache.gd` is what makes it affordable, and it verifies itself against the
+  terrain's own heightmap on load because a cache is otherwise a golden artifact. The cache key
+  is the readers plus a salt from the terrain: upstream's shipped package is three terrains over
+  one set of files, so keying it on the directory serves one map's heights for another.
+- **A terrain with no traction map grips like gravel, not like the first ground model.** Upstream
+  keeps two defaults (`Collisions.cpp:134-135`): `defaultgm` is concrete and is for collision
+  meshes, `defaultgroundgm` is gravel and is what the ground uses when landuse is absent or
+  cannot answer. Reading the wrong one made Rigs of Rods' own shipped gravel map grip like a road.
+- **Upstream's `.otc` keys are almost all optional and their defaults are not zero.**
+  `OTCParser::LoadMasterConfig` defaults `PageSize` to 1025, `WorldSizeY` to 50, `WorldSizeX/Z` to
+  1024 and `Heightmap.0.0.raw.size` to 1025. A reader that requires them rejects terrains the game
+  loads: the shipped map sets four keys and leaves nine to the parser.
+- **`Flat=1` means there is no heightmap at all, and the page file still names one.** Upstream
+  defines the page at height zero and `TerrainGeometryManager::getHeightAt` returns 0.0 before it
+  reads anything, so the filename is never opened — which is why the shipped map names a `.png`
+  it does not ship. A reader that opens it fails on the map the game starts with.
+- **Terrain3D's ground takes far less of its light from the sky than a surface standing on it,
+  and how much less depends on the terrain.** `terrain_takes_the_light` compares the ground with a
+  Lambertian patch by how each responds to the sun being switched off: the deleted generated
+  valley read 13.6% apart, upstream's flat gravel map reads 36%, and La Paz reads 111%. The small
+  number was an artifact of the valley's flat-tint colour map — the same finding as "the texture
+  assets attached to Terrain3D reach nothing". It is the M2 ground material's to close.
+- **A patch compared with the terrain has to be matched in albedo even when the measurement is a
+  ratio.** The ratio cancels diffuse albedo but not specular, which does not scale with it: a
+  fixed 0.18 grey moved the patch's own sun response from 2.12 to 1.71 with nothing else changed.
+  `terrain_takes_the_light` calibrates the patch against the ground in the frame itself.
 - **Upstream gives a shock four times the file's breaking threshold** in force
   (`SetBeamStrength(beam, def.beam_defaults->breaking_threshold * 4.f)`), and a shock's force is
   mostly damping: at the hero truck's 2400 Ns/m against a 4000 N threshold it snaps at 1.7 m/s of

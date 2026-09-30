@@ -4,9 +4,9 @@ extends GateBase
 ## Terrain3D draws the ground through its own shader, with its own textures, its own normal maps
 ## and its own detiling. Everything else in the scene goes through Godot's standard material. If
 ## those two disagree about what a given amount of light does to a given albedo, every judgement
-## about how the valley looks is made against a surface that is lit differently from the vehicle
-## standing on it — and the symptom is exactly the complaint this gate was written after: "the
-## valley is too dark", with no way to tell a lighting fault from a grading choice.
+## about how the world looks is made against a surface that is lit differently from the vehicle
+## standing on it — and the symptom is exactly the complaint this gate was written after: "it is
+## too dark", with no way to tell a lighting fault from a grading choice.
 ##
 ## The oracle is a reference patch: a plain Lambertian quad laid on the terrain, photographed in
 ## the same frame under the same light. What is compared is not their brightness but how each
@@ -23,35 +23,55 @@ extends GateBase
 ## Measured scene-referred, with linear tonemapping at unit exposure, because what is being
 ## compared is the light the two surfaces return and not how the grade treats it.
 
+const TERRAIN_DIR: String = "assets/terrains/lapaz2"
 const PRESET: String = "hero_3q"
 const SETTLE_FRAMES: int = 3
-## Where the comparison is made: the valley floor beside the spawn point, flat and sunlit, where
-## the patch and the terrain it lies on are the same surface at the same angle to the light.
+## The comparison is made on flat, sunlit ground, where the patch and the terrain it lies on are
+## at the same angle to the light.
 ##
-## The wall was tried first and is a worse place for it. A sloped, distant, textured surface reads
+## A slope was tried first and is a worse place for it. A sloped, distant, textured surface reads
 ## 0.67 of a flat patch laid on it, and most of that difference is the normal map and the viewing
 ## angle rather than the shading model — so a terrain whose albedo had been cut by two thirds
 ## still landed inside any band wide enough to allow the slope. On the flat the two agree to 1%,
 ## which leaves no room for a fault to hide in.
-const PATCH_AT: Vector2 = Vector2(-18.0, 0.0)
+##
+## So the flat spot is searched for rather than written down: a coordinate means something on one
+## map and nothing on the next, and this gate used to hold one on a valley floor this project
+## generated itself.
 const PATCH_SIZE: float = 8.0
-## Where the bare terrain is read, beside the patch and on the same surface lane, so the two
-## samples differ in what draws them and in nothing else.
-const TERRAIN_AT: Vector2 = Vector2(-18.0, 8.0)
+## How flat the ground under the patch has to be, over its own footprint.
+const MAX_PATCH_RELIEF_M: float = 0.10
+## How the flat spot is looked for: a coarse grid over the map, in a fixed order, taking the
+## first place level enough to lay a patch on.
+const SEARCH_STEP_M: float = 32.0
+const SEARCH_MARGIN_M: float = 200.0
 ## Half the side of the sampled window, in pixels.
 const WINDOW_PX: int = 26
 ## How far the patch floats over the terrain, so it does not z-fight with it.
 const PATCH_LIFT_M: float = 0.3
-## The surface whose tint the patch is matched to, and the mean of the generated texture that
-## multiplies it. Both are read from the config rather than restated.
-const SURFACE: String = "sand"
+## The patch's albedo is calibrated against the ground it lies on, in the frame itself.
+##
+## Not for the brightness comparison — that is a ratio and would cancel albedo — but because the
+## patch has a specular lobe and specular does not scale with albedo. A patch much darker or
+## brighter than the ground has a different *share* of its return coming from specular, and that
+## share responds to sun and sky differently, so a mismatched albedo shows up as a shading
+## disagreement that is not one. Measured: a fixed 0.18 grey on La Paz read 128% apart, and the
+## patch's own sun response moved from 2.12 to 1.71 with nothing but its albedo changed.
+##
+## So the patch starts at mid-grey, one frame is captured, and its albedo is scaled by how far
+## its rendered level is from the ground's. A terrain drawn in an author's own textures has no
+## single albedo to read out of a config, which is what the earlier version of this gate did.
+const PATCH_ALBEDO_START: float = 0.18
+## How far the calibration may move the patch. Beyond this the two surfaces are not comparable
+## at all and the gate says so rather than photographing a black square.
+const MAX_ALBEDO_SCALE: float = 8.0
 
 ## How far the terrain's sun response may sit from the patch's, as a share of the patch's.
 ##
-## Measured, the terrain responds to the sun *more* than the patch does — 3.19 against 2.63 — which
-## means it is taking a smaller share of its light from the sky. That gap is real and is a named
-## finding rather than a tolerance chosen to make a number pass: it is why the valley's shaded
-## walls read darker than anything standing on them, and it is the M2 ground material's to close,
+## Measured, the terrain responds to the sun *more* than the patch does, which means it is taking
+## a smaller share of its light from the sky. That gap is real and is a named finding rather than
+## a tolerance chosen to make a number pass: it is why a shaded slope reads darker than anything
+## standing on it, and it is the M2 ground material's to close,
 ## since that replaces Terrain3D's shading with a shader this project owns. Roughness, the normal
 ## map's depth, the texture's brightness and the asset's albedo colour were each tried and none of
 ## them moved the picture at all — Terrain3D draws the ground from the colour map and the
@@ -92,24 +112,40 @@ static func meta() -> Dictionary:
 func run(harness: Node) -> Dictionary:
     if not ClassDB.class_exists("Terrain3D"):
         return ok("skipped: Terrain3D is not installed. Run tools/build_terrain3d.sh", 0)
+    var directory: String = SourceScan.repo_root().path_join(TERRAIN_DIR)
+    if not DirAccess.dir_exists_absolute(directory):
+        return ok("skipped: no terrain at %s" % TERRAIN_DIR, 0)
+    var loaded: Dictionary = RorTerrain.load_from(directory)
+    if (loaded["error"] as String) != "":
+        return fail(loaded["error"] as String)
+    var terrain_data: RorTerrain = loaded["terrain"] as RorTerrain
+    var flat: Vector2 = _flat_spot(terrain_data)
+    if flat == Vector2.INF:
+        return fail(
+            "no %.0f m of %s is level to %.2f m: there is nowhere on this map to lay a"
+            % [PATCH_SIZE, terrain_data.name, MAX_PATCH_RELIEF_M] + " reference patch"
+        )
     var err: String = harness.setup_for(PRESET)
     if err != "":
         return fail(err)
     clear_fog(harness)
-    var terrain: Node3D = ValleyTerrain.create()
+    var terrain: Node3D = TerrainWorld.create()
     if terrain == null:
         return fail("Terrain3D is registered but would not instantiate")
     harness.world.add_child(terrain)
     await harness.advance_frames(2, "static", "terrain")
-    var built: String = ValleyTerrain.populate(terrain)
+    var built: String = TerrainWorld.populate(terrain, terrain_data)
     if built != "":
         return fail(built)
     var ground: MeshInstance3D = harness.world.get_node_or_null(^"Ground") as MeshInstance3D
     if ground != null:
         ground.visible = false
 
+    # The bare terrain is read beside the patch, one patch-width along, so the two samples
+    # differ in what draws them and in nothing else.
+    var terrain_at: Vector2 = flat + Vector2(0.0, PATCH_SIZE)
     var at: Vector3 = Vector3(
-        PATCH_AT.x, ValleyShape.height_at_world(PATCH_AT.x, PATCH_AT.y), PATCH_AT.y
+        flat.x, terrain_data.height_at_world(flat.x, flat.y), flat.y
     )
     harness.world.add_child(_patch(at))
     var environment: Environment = _environment(harness)
@@ -118,7 +154,7 @@ func run(harness: Node) -> Dictionary:
     environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
     environment.tonemap_exposure = 1.0
     harness.camera.look_at_from_position(
-        Vector3(6.0, 9.0, 4.0), at, Vector3.UP
+        at + Vector3(6.0, 9.0, 4.0), at, Vector3.UP
     )
     await harness.advance_frames(1, "static", "terrain")
     # The sampled windows are unprojected from the world, not guessed at in screen space: a
@@ -126,12 +162,16 @@ func run(harness: Node) -> Dictionary:
     # subject when a camera moves, and this gate's first version compared the patch with itself.
     _patch_px = harness.camera.unproject_position(at + Vector3(0.0, PATCH_LIFT_M, 0.0))
     _terrain_px = harness.camera.unproject_position(Vector3(
-        TERRAIN_AT.x, ValleyShape.height_at_world(TERRAIN_AT.x, TERRAIN_AT.y), TERRAIN_AT.y
+        terrain_at.x, terrain_data.height_at_world(terrain_at.x, terrain_at.y), terrain_at.y
     ))
 
     var sun: DirectionalLight3D = harness.world.get_node_or_null(^"Sun") as DirectionalLight3D
     if sun == null:
         return fail("the world has no sun to switch off")
+
+    var calibrated: Dictionary = await _match_albedo(harness)
+    if (calibrated["error"] as String) != "":
+        return fail(calibrated["error"] as String, calibrated["scale"] as float)
 
     var lit: Dictionary = await _sample(harness, "lit")
     if (lit["error"] as String) != "":
@@ -184,9 +224,10 @@ func run(harness: Node) -> Dictionary:
     return ok(
         "the sun multiplies the patch by %.2f and the terrain by %.2f, %.1f%% apart; sunlit"
         % [patch_response, terrain_response, error * 100.0]
-        + " %.4f and %.4f, sky-lit %.4f and %.4f" % [
+        + " %.4f and %.4f, sky-lit %.4f and %.4f, patch albedo %.3f" % [
             lit["patch"] as float, lit["terrain"] as float,
-            shaded["patch"] as float, shaded["terrain"] as float],
+            shaded["patch"] as float, shaded["terrain"] as float,
+            calibrated["albedo"] as float],
         error
     )
 
@@ -224,18 +265,17 @@ func _window(image: Image, centre: Vector2) -> float:
     )
 
 
-## A plain Lambertian quad, albedo matched to the terrain's tint times the mean of the texture
-## that multiplies it, laid on the floor beside the terrain it is compared with.
+## A plain Lambertian quad laid on the ground beside the terrain it is compared with.
 func _patch(at: Vector3) -> MeshInstance3D:
-    var tint: Color = TerrainCfg.SURFACE_COLOURS[SURFACE] as Color
-    var mean: float = SurfaceCfg.DETAIL_BASE
     var material: StandardMaterial3D = StandardMaterial3D.new()
-    material.albedo_color = Color(tint.r * mean, tint.g * mean, tint.b * mean)
+    material.albedo_color = Color(
+        PATCH_ALBEDO_START, PATCH_ALBEDO_START, PATCH_ALBEDO_START
+    )
     # The roughness the terrain is actually drawn with, which is the one written into the colour
     # map's alpha channel rather than the per-surface value in SurfaceCfg: Terrain3D reads it from
     # there. Specular is left on, because a patch with no specular lobe responds to the sun
     # differently from one with, and the comparison is with the terrain as it is drawn.
-    material.roughness = ValleyTerrain.COLOUR_MAP_ROUGHNESS
+    material.roughness = TerrainWorld.COLOUR_MAP_ROUGHNESS
     var plane: PlaneMesh = PlaneMesh.new()
     plane.size = Vector2(PATCH_SIZE, PATCH_SIZE)
     var instance: MeshInstance3D = MeshInstance3D.new()
@@ -262,3 +302,82 @@ func _environment(harness: Node) -> Environment:
         ^"WorldEnvironment"
     ) as WorldEnvironment
     return holder.environment if holder != null else null
+
+
+## The first place on the terrain level enough to lay the reference patch on, and far enough
+## inside the map that the camera looking at it sees ground rather than the edge.
+##
+## Scanned in a fixed order over a coarse grid, so the answer is the same on every machine and
+## every run. Returns `Vector2.INF` when the map has nowhere like that.
+func _flat_spot(terrain_data: RorTerrain) -> Vector2:
+    var grid: Dictionary = terrain_data.lattice()
+    var span: float = float((grid["size"] as int) - 1) * (grid["spacing"] as float)
+    # The patch, and the ground read beside it, have to be level together.
+    var half: float = PATCH_SIZE * 0.5
+    var at: float = SEARCH_MARGIN_M
+    while at < span - SEARCH_MARGIN_M:
+        var across: float = SEARCH_MARGIN_M
+        while across < span - SEARCH_MARGIN_M:
+            var lowest: float = INF
+            var highest: float = -INF
+            for corner: Vector2 in [
+                Vector2(-half, -half), Vector2(half, -half),
+                Vector2(-half, half), Vector2(half, half),
+                Vector2(-half, PATCH_SIZE + half), Vector2(half, PATCH_SIZE + half),
+            ]:
+                var height: float = terrain_data.height_at_world(
+                    across + corner.x, at + corner.y
+                )
+                lowest = minf(lowest, height)
+                highest = maxf(highest, height)
+            if highest - lowest <= MAX_PATCH_RELIEF_M:
+                return Vector2(across, at)
+            across += SEARCH_STEP_M
+        at += SEARCH_STEP_M
+    return Vector2.INF
+
+
+## Scales the patch's albedo until it renders at the level the ground beside it does.
+##
+## One capture and one correction: the patch is Lambertian and linear in its albedo, so the
+## scale that makes their rendered levels match is the ratio of the two levels. The specular
+## term is not linear in albedo, which is the whole reason for doing this, so the match is close
+## rather than exact — close is enough, since what it has to remove is a large mismatch and not
+## the last percent.
+func _match_albedo(harness: Node) -> Dictionary:
+    var out: Dictionary = {"error": "", "scale": 1.0, "albedo": PATCH_ALBEDO_START}
+    var patch_node: MeshInstance3D = harness.world.get_node_or_null(
+        ^"ReferencePatch"
+    ) as MeshInstance3D
+    if patch_node == null:
+        out["error"] = "the reference patch is not in the world"
+        return out
+    var sampled: Dictionary = await _sample(harness, "calibrate")
+    if (sampled["error"] as String) != "":
+        out["error"] = sampled["error"] as String
+        return out
+    var patch: float = sampled["patch"] as float
+    var terrain: float = sampled["terrain"] as float
+    if patch <= 0.0005 or terrain <= 0.0005:
+        out["error"] = (
+            "calibrating: the patch renders at %.5f and the ground at %.5f, so one of them is"
+            % [patch, terrain] + " not being drawn. See %s" % (sampled["png"] as String)
+        )
+        return out
+    var scale: float = terrain / patch
+    out["scale"] = scale
+    if scale > MAX_ALBEDO_SCALE or scale < 1.0 / MAX_ALBEDO_SCALE:
+        out["error"] = (
+            "the ground renders %.1f times the patch's level: no albedo makes these two"
+            % scale + " surfaces comparable. See %s" % (sampled["png"] as String)
+        )
+        return out
+    var material: StandardMaterial3D = patch_node.get_active_material(0) as StandardMaterial3D
+    if material == null:
+        out["error"] = "the reference patch has no material to calibrate"
+        return out
+    var albedo: float = PATCH_ALBEDO_START * scale
+    out["albedo"] = albedo
+    material.albedo_color = Color(albedo, albedo, albedo)
+    await harness.advance_frames(1, "static", "terrain")
+    return out

@@ -7,21 +7,23 @@ extends SceneTree
 func _initialize() -> void:
     var summaries: Array[Dictionary] = RorTerrainLibrary.summaries()
     if summaries.is_empty():
-        print("No terrains. Put one under assets/terrains/<name>/ with its .terrn2, or run")
-        print("  tools/import_terrain.sh <zip>")
+        print("No terrains. Rigs of Rods' own shipped map should be here — check that the")
+        print("vendor/rigs-of-rods submodule and its content submodule are checked out:")
+        print("  git submodule update --init --recursive")
+        print("A downloaded terrain goes in with  tools/import_terrain.sh <zip>")
         quit()
         return
-    print("%-20s %-24s %9s  %s" % ["DIRECTORY", "NAME", "SIZE", "SPAWN"])
+    print("%-16s %-28s %9s  %s" % ["NAME", "TITLE", "SIZE", "SPAWN"])
     for summary: Dictionary in summaries:
         if (summary["error"] as String) != "":
-            print("%-20s %s" % [summary["directory"], summary["error"]])
+            print("%-16s %s" % [summary["name"], summary["error"]])
             continue
-        print("%-20s %-24s %7.0f m  %s" % [
-            summary["directory"],
+        print("%-16s %-28s %7.0f m  %s" % [
             summary["name"],
+            summary["title"],
             summary["size_m"],
             str(summary["start"]),
         ])
     print("")
-    print("Play one:  tools/play.sh --truck --map <directory>")
+    print("Play one:  tools/play.sh --truck --map <name>")
     quit()

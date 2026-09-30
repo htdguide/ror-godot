@@ -4,10 +4,9 @@
 #   tools/play.sh                        default preset, windowed
 #   tools/play.sh --shot diag_grid_wide  start from a named camera preset
 #   tools/play.sh --weather golden_dusk  any weather or time-of-day preset
-#   tools/play.sh --truck                the hero vehicle in the test park, to drive
-#   tools/play.sh --truck --valley       the same vehicle on Valley One instead
-#   tools/play.sh --truck --map <name>   the same vehicle on a Rigs of Rods terrain from
-#                                        assets/terrains/<name> (tools/import_terrain.sh --list)
+#   tools/play.sh --truck                the hero vehicle on the map Rigs of Rods itself ships
+#   tools/play.sh --truck --map <name>   the same vehicle on another Rigs of Rods terrain
+#                                        (tools/import_terrain.sh --list says what there is)
 #   tools/play.sh --truck --no-terrain   the same vehicle on a bare flat plane
 #
 # The window is tracked while it lives and the tracking file is removed on exit, so a
@@ -29,11 +28,11 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# --truck is shorthand: loading the hero vehicle is the common reason to open a window, and
-# a vehicle with nowhere to drive is not much of a session, so it brings a world with it. The
-# test park is that world by default; --valley asks for Valley One, and --map <name> for a Rigs
-# of Rods terrain from the library under assets/terrains/, loaded from the files its author
-# shipped.
+# --truck is shorthand: loading the hero vehicle is the common reason to open a window, and a
+# vehicle with nowhere to drive is not much of a session, so it brings a world with it. Every
+# world is a Rigs of Rods terrain loaded from the files its author shipped. With no --map that
+# is the one the game itself ships, which is in the tree as a submodule and therefore present
+# on any clone; --map <name> picks another from the library under assets/terrains/.
 args=("$@")
 want_terrain=0
 for i in "${!args[@]}"; do

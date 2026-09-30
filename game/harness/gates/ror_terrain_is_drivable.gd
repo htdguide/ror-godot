@@ -78,10 +78,10 @@ func run(harness: Node) -> Dictionary:
     var err: String = harness.setup_for(PRESET)
     if err != "":
         return fail(err)
-    var terrain: Node3D = ValleyTerrain.create()
+    var terrain: Node3D = TerrainWorld.create()
     harness.world.add_child(terrain)
     await harness.advance_frames(2, "static", "terrain")
-    var built: String = ValleyTerrain.populate(terrain, terrain_data)
+    var built: String = TerrainWorld.populate(terrain, terrain_data)
     if built != "":
         return fail(built)
     await harness.advance_frames(1, "static", "terrain")
@@ -160,7 +160,7 @@ func _drive(mod_dir: String, data: Object, terrain_data: RorTerrain) -> Dictiona
         return out
     var truck: TruckParser = rig["truck"] as TruckParser
     var solver: RefCounted = rig["solver"] as RefCounted
-    var applied: String = ValleyTerrain.give_to_solver(solver, data)
+    var applied: String = TerrainWorld.give_to_solver(solver, data)
     if applied != "":
         out["error"] = applied
         return out

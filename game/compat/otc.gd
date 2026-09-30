@@ -13,24 +13,48 @@ extends RefCounted
 ## and the sample count is one more than the number of cells, because a 2049-sample page is
 ## 2048 cells of 1.953125 m across 4000 m. Reading either as the other puts the terrain at the
 ## wrong height or the wrong scale, both of which look plausible until something is driven on it.
+##
+## Most keys are optional, and a terrain that omits one means upstream's default rather than zero.
+## The defaults here are `OTCParser::LoadMasterConfig`'s own, field for field, because a terrain
+## written against them is a terrain that states only what it changes: Rigs of Rods' own shipped
+## map sets four keys and leaves nine to the parser.
+##
+## `Flat=1` is the case where there is no heightmap at all. Upstream defines the page at height
+## zero and `TerrainGeometryManager::getHeightAt` returns 0.0 before it looks at anything, so the
+## page file's heightmap name is never opened — which is why the shipped map names a `.png` it
+## does not ship. A flat terrain still has a size, a lattice and texture layers; it just has no
+## relief, so `WorldSizeY` is meaningless on one and is not required to be set.
+
+
+## Upstream's own defaults for the keys a terrain may omit, from `OTCParser::LoadMasterConfig`.
+## A terrain that leaves `PageSize` out is a 1025-sample terrain, not a zero-sample one.
+const DEFAULT_SAMPLES: int = 1025
+const DEFAULT_BYTES_PER_SAMPLE: int = 2
+const DEFAULT_WORLD_X: float = 1024.0
+const DEFAULT_WORLD_Y: float = 50.0
+const DEFAULT_WORLD_Z: float = 1024.0
 
 
 ## Reads a .otc. Returns a dictionary whose "error" is "" on success.
 static func read(path: String) -> Dictionary:
     var out: Dictionary = {
         "error": "",
-        "samples": 0,
-        "bytes_per_sample": 2,
+        "samples": DEFAULT_SAMPLES,
+        "bytes_per_sample": DEFAULT_BYTES_PER_SAMPLE,
         "flip_x": false,
-        "world_x": 0.0,
-        "world_z": 0.0,
-        "world_y": 0.0,
-        "page_file": "",
+        "flat": false,
+        "world_x": DEFAULT_WORLD_X,
+        "world_z": DEFAULT_WORLD_Z,
+        "world_y": DEFAULT_WORLD_Y,
+        "page_file": "%s-page-0-0.otc" % path.get_file().get_basename(),
     }
     var text: String = RorText.read(path)
     if text.is_empty():
         out["error"] = "the geometry config at %s could not be read" % path
         return out
+    # A stated size wins over the default, and the two keys that can state it agree or the
+    # larger is the page: upstream reads both and a terrain sets whichever its author knew.
+    var stated_samples: int = 0
     for raw_line: String in text.split("\n"):
         var line: String = RorText.strip_comment(raw_line)
         if not line.contains("="):
@@ -39,11 +63,13 @@ static func read(path: String) -> Dictionary:
         var value: String = line.substr(line.find("=") + 1).strip_edges()
         match key:
             "heightmap.0.0.raw.size", "pagesize":
-                out["samples"] = maxi(out["samples"] as int, value.to_int())
+                stated_samples = maxi(stated_samples, value.to_int())
             "heightmap.0.0.raw.bpp":
                 out["bytes_per_sample"] = value.to_int()
             "heightmap.0.0.flipx":
                 out["flip_x"] = value.to_int() != 0
+            "flat":
+                out["flat"] = value.to_int() != 0
             "worldsizex":
                 out["world_x"] = value.to_float()
             "worldsizez":
@@ -52,10 +78,21 @@ static func read(path: String) -> Dictionary:
                 out["world_y"] = value.to_float()
             "pagefileformat":
                 out["page_file"] = value
+    if stated_samples >= 2:
+        out["samples"] = stated_samples
+    # Upstream's format string names the page by index. This project reads the one page at 0,0,
+    # so a terrain that writes the placeholders rather than the numbers means the same page.
+    out["page_file"] = (out["page_file"] as String).replace("{X}", "0").replace("{Z}", "0")
     if (out["samples"] as int) < 2:
-        out["error"] = "%s states no heightmap size" % path.get_file()
-    elif (out["world_x"] as float) <= 0.0 or (out["world_y"] as float) <= 0.0:
+        out["error"] = "%s states a heightmap of %d samples" % [
+            path.get_file(), out["samples"]
+        ]
+    elif (out["world_x"] as float) <= 0.0 or (out["world_z"] as float) <= 0.0:
         out["error"] = "%s states no world size" % path.get_file()
+    elif not (out["flat"] as bool) and (out["world_y"] as float) <= 0.0:
+        # A relief terrain with no height range is a terrain that would load as a plane while
+        # claiming to have hills, which is the failure this reader exists to make loud.
+        out["error"] = "%s states no height range and is not flat" % path.get_file()
     return out
 
 

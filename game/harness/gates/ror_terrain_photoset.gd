@@ -66,10 +66,10 @@ func run(harness: Node) -> Dictionary:
     var err: String = harness.setup_for("hero_3q")
     if err != "":
         return fail(err)
-    var terrain: Node3D = ValleyTerrain.create()
+    var terrain: Node3D = TerrainWorld.create()
     harness.world.add_child(terrain)
     await harness.advance_frames(2, "static", "terrain")
-    var built: String = ValleyTerrain.populate(terrain, terrain_data)
+    var built: String = TerrainWorld.populate(terrain, terrain_data)
     if built != "":
         return fail(built)
     var ground: MeshInstance3D = harness.world.get_node_or_null(^"Ground") as MeshInstance3D

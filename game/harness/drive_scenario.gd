@@ -1,6 +1,6 @@
 class_name DriveScenario
 extends RefCounted
-## Stands the hero rig at the start of a route in the valley and drives it, for the gates that
+## Stands the hero rig at the start of a route on a terrain and drives it, for the gates that
 ## make PLAN M1 acceptance 7's claims.
 ##
 ## Everything a drivability gate needs that is not the route itself: the terrain, the rig, the
@@ -16,10 +16,12 @@ const SUBSTEP_HZ: float = 2000.0
 const SPAWN_CLEARANCE_M: float = 0.15
 
 
-## Builds the world, spawns at `waypoints[0]` facing `waypoints[1]`, and drives. Returns
-## `DriveRoute.drive`'s report, with "error" set when the setup itself could not be made, or
-## "skipped" set when the machine cannot run it.
-static func run(harness: Node, waypoints: Array[Vector2], options: Dictionary) -> Dictionary:
+## Builds the world from `terrain_data`, spawns at `waypoints[0]` facing `waypoints[1]`, and
+## drives. Returns `DriveRoute.drive`'s report, with "error" set when the setup itself could not
+## be made, or "skipped" set when the machine cannot run it.
+static func run(
+    harness: Node, waypoints: Array[Vector2], options: Dictionary, terrain_data: RorTerrain
+) -> Dictionary:
     var mod_dir: String = SourceScan.repo_root().path_join(MOD_DIR)
     if not DirAccess.dir_exists_absolute(mod_dir):
         return {"skipped": "hero asset not present at %s" % MOD_DIR}
@@ -27,16 +29,18 @@ static func run(harness: Node, waypoints: Array[Vector2], options: Dictionary) -
         return {"skipped": "Terrain3D is not installed. Run tools/build_terrain3d.sh"}
     if waypoints.size() < 2:
         return {"error": "a route needs at least a start and a destination"}
+    if terrain_data == null:
+        return {"error": "a route needs a terrain to drive on"}
     var err: String = harness.setup_for(PRESET)
     if err != "":
         return {"error": err}
 
-    var terrain: Node3D = ValleyTerrain.create()
+    var terrain: Node3D = TerrainWorld.create()
     if terrain == null:
         return {"error": "Terrain3D is registered but would not instantiate"}
     harness.world.add_child(terrain)
     await harness.advance_frames(2, "static", "terrain")
-    var built: String = ValleyTerrain.populate(terrain)
+    var built: String = TerrainWorld.populate(terrain, terrain_data)
     if built != "":
         return {"error": built}
 
@@ -45,14 +49,15 @@ static func run(harness: Node, waypoints: Array[Vector2], options: Dictionary) -
         return {"error": rig["error"] as String}
     var truck: TruckParser = rig["truck"] as TruckParser
     var solver: RefCounted = rig["solver"] as RefCounted
-    var applied: String = ValleyTerrain.give_to_solver(solver, terrain.get("data"))
+    var applied: String = TerrainWorld.give_to_solver(solver, terrain.get("data"))
     if applied != "":
         return {"error": applied}
 
     # The flat ground is switched on as well as the heightfield, the way every other gate that
-    # stands a rig on the valley does: `set_ground` is what arms ground contact at all, and the
+    # stands a rig on a terrain does: `set_ground` is what arms ground contact at all, and the
     # heightfield is what it then collides against.
     solver.set_ground(0.0, true)
+    solver.set_gravity(Vector3(0.0, terrain_data.gravity(), 0.0))
 
     var start: Vector2 = waypoints[0]
     var toward: Vector2 = (waypoints[1] - start).normalized()
@@ -65,8 +70,8 @@ static func run(harness: Node, waypoints: Array[Vector2], options: Dictionary) -
         "substep_hz": SUBSTEP_HZ,
         "limit_s": float(options.get("limit_s", 180.0)),
         "target_speed_ms": float(options.get("target_speed_ms", 6.0)),
-    })
-    report["surface_at_start"] = GroundModels.name_of(
+    }, terrain_data)
+    report["surface_at_start"] = terrain_data.models.name_of(
         solver.surface_at(Vector3(start.x, 0.0, start.y))
     )
     return report
@@ -80,6 +85,9 @@ static func run(harness: Node, waypoints: Array[Vector2], options: Dictionary) -
 ## rather than assumed: place at two known headings, see what the rig's own heading does, and
 ## solve for the one that points it where it is going. Then check the result, because a rig that
 ## spawns backwards should say so rather than drive away.
+##
+## The 431 m it drove the wrong way was down a valley this project generated; the convention it
+## established is the placement's, not that world's, so the measurement stays.
 static func _aim(
     solver: RefCounted, truck: TruckParser, origin: Vector3, toward: Vector2
 ) -> String:

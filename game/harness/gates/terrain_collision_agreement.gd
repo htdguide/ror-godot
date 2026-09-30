@@ -16,7 +16,10 @@ extends GateBase
 ## half a cell, which is a 0.5 m horizontal shift of the whole world and precisely the fault
 ## it exists to catch.
 
+const TERRAIN_DIR: String = "assets/terrains/lapaz2"
 const SAMPLES: int = 400
+## How many points the solver's surface is checked against the terrain's own traction map.
+const SURFACE_SAMPLES: int = 2000
 ## Generous headroom over the 0.0 mm this measures when correct, and tight enough that a
 ## half-cell offset — which reads 41.9 mm — fails loudly.
 const TOLERANCE_M: float = 0.002
@@ -52,29 +55,37 @@ static func meta() -> Dictionary:
 func run(harness: Node) -> Dictionary:
     if not ClassDB.class_exists("Terrain3D"):
         return ok("skipped: Terrain3D is not installed. Run tools/build_terrain3d.sh", 0)
+    var directory: String = SourceScan.repo_root().path_join(TERRAIN_DIR)
+    if not DirAccess.dir_exists_absolute(directory):
+        return ok("skipped: no terrain at %s" % TERRAIN_DIR, 0)
+    var loaded: Dictionary = RorTerrain.load_from(directory)
+    if (loaded["error"] as String) != "":
+        return fail(loaded["error"] as String)
+    var terrain_data: RorTerrain = loaded["terrain"] as RorTerrain
     var err: String = harness.setup_for("hero_3q")
     if err != "":
         return fail(err)
 
-    var terrain: Node3D = ValleyTerrain.create()
+    var terrain: Node3D = TerrainWorld.create()
     if terrain == null:
         return fail("Terrain3D is registered but would not instantiate")
     harness.world.add_child(terrain)
     # Terrain3D finishes building only once it is inside a World3D, which is a frame away.
     await harness.advance_frames(2, "static", "terrain")
-    var built: String = ValleyTerrain.populate(terrain, ValleyShape)
+    var built: String = TerrainWorld.populate(terrain, terrain_data)
     if built != "":
         return fail(built)
     await harness.advance_frames(1, "static", "terrain")
 
     var data: Object = terrain.get("data")
-    var grid: Dictionary = ValleyTerrain.lattice()
+    var grid: Dictionary = TerrainWorld.lattice()
     var size: int = grid["size"] as int
     var spacing: float = grid["spacing"] as float
+    var origin: Vector3 = grid["origin"] as Vector3
     var solver: RefCounted = ClassDB.instantiate("RorSolver") as RefCounted
     if solver == null:
         return fail("RorSolver is not registered: the GDExtension did not load")
-    var applied: String = ValleyTerrain.give_to_solver(solver, data)
+    var applied: String = TerrainWorld.give_to_solver(solver, data)
     if applied != "":
         return fail(applied)
 
@@ -89,9 +100,9 @@ func run(harness: Node) -> Dictionary:
     var margin: float = 4.0 * spacing
     for _i: int in SAMPLES:
         var position: Vector3 = Vector3(
-            TerrainCfg.ORIGIN.x + rng.randf_range(margin, float(size) * spacing - margin),
+            origin.x + rng.randf_range(margin, float(size) * spacing - margin),
             0.0,
-            TerrainCfg.ORIGIN.z + rng.randf_range(margin, float(size) * spacing - margin)
+            origin.z + rng.randf_range(margin, float(size) * spacing - margin)
         )
         var drawn: float = data.call("get_height", position) as float
         var collided: float = solver.ground_height_at(position)
@@ -123,56 +134,66 @@ func run(harness: Node) -> Dictionary:
             ],
             worst
         )
-    var surfaces: String = _check_surfaces(data, solver)
-    if surfaces != "":
-        return fail(surfaces)
+    var surfaces: Dictionary = _check_surfaces(solver, terrain_data)
+    if (surfaces["error"] as String) != "":
+        return fail(surfaces["error"] as String)
     return ok(
-        "%d samples off the grid over %.1f m of relief: worst disagreement %.1f mm at %v;"
-        % [SAMPLES, relief, worst * 1000.0, worst_at]
-        + " every surface lane grips as it is tinted",
+        "%s: %d samples off the grid over %.1f m of relief, worst disagreement %.1f mm at %v;"
+        % [terrain_data.name, SAMPLES, relief, worst * 1000.0, worst_at]
+        + " %d points grip on the surface its traction map paints (%s)"
+        % [SURFACE_SAMPLES, surfaces["seen"] as String],
         worst
     )
 
 
-## The surface the solver grips on is the surface the terrain is tinted with.
+## The surface the solver grips on is the surface the terrain's own traction map paints.
 ##
-## Height agreement alone would pass a world whose sand is drawn in one place and gripped in
-## another: the map that carries the surfaces is separate from the one that carries the
-## heights, and only shares its origin and spacing by construction. Terrain3D's own colour map
-## is the outside side of this comparison, being what the renderer shows.
-func _check_surfaces(data: Object, solver: RefCounted) -> String:
-    var size: int = TerrainCfg.MAP_SIZE
-    var spacing: float = TerrainCfg.VERTEX_SPACING
-    for index: int in GroundModels.ORDER.size():
-        var name: String = GroundModels.ORDER[index]
-        # The middle of the first patch of terrain carrying this surface.
-        var found: bool = false
-        for z: int in range(2, size - 2, 3):
-            if ValleyShape.surface_at(size / 2, z) != index:
-                continue
-            found = true
-            var position: Vector3 = Vector3(
-                TerrainCfg.ORIGIN.x + float(size / 2) * spacing,
-                0.0,
-                TerrainCfg.ORIGIN.z + float(z) * spacing
+## Height agreement alone would pass a terrain whose sand is drawn in one place and gripped in
+## another: the map that carries the surfaces is separate from the one that carries the heights,
+## and the two share their origin and row order only by construction. The author's own traction
+## map is the outside side of this comparison, read straight off the image they shipped.
+##
+## A transposed surface map is the fault this catches, and it has happened in this project. It
+## survives a height check untouched, because a symmetric-enough heightmap agrees with itself
+## transposed, and it reads as a terrain that grips like a different terrain.
+func _check_surfaces(solver: RefCounted, terrain_data: RorTerrain) -> Dictionary:
+    var out: Dictionary = {"error": "", "seen": ""}
+    var grid: Dictionary = terrain_data.lattice()
+    var size: int = grid["size"] as int
+    var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+    rng.seed = HarnessCfg.SEED
+    var counts: Dictionary = {}
+    # Compared at lattice cells, not at arbitrary points. The solver holds one surface per cell
+    # and La Paz's traction map is 3.9 m per pixel over a 1.95 m lattice, so two points inside
+    # one cell can sit in different pixels of the author's image: comparing off the lattice
+    # measures that sampling rather than the wiring this gate is about.
+    for _i: int in SURFACE_SAMPLES:
+        var x_index: int = rng.randi_range(2, size - 3)
+        var z_index: int = rng.randi_range(2, size - 3)
+        var at: Vector2 = terrain_data.world_of(x_index, z_index)
+        var painted: int = terrain_data.surface_at(x_index, z_index)
+        var gripped: int = solver.surface_at(Vector3(at.x, 0.0, at.y))
+        if gripped != painted:
+            out["error"] = (
+                "at cell %d, %d (%.1f, %.1f) the traction map paints %s and the solver grips"
+                % [x_index, z_index, at.x, at.y, terrain_data.models.name_of(painted)]
+                + " on %s: the surface map reached the solver transposed or offset"
+                % terrain_data.models.name_of(gripped)
             )
-            var gripped: int = solver.surface_at(position)
-            if gripped != index:
-                return (
-                    "at %v the terrain is %s but the solver grips on %s"
-                    % [position, name, GroundModels.name_of(gripped)]
-                )
-            var drawn: Color = data.call("get_color", position) as Color
-            var expected: Color = TerrainCfg.SURFACE_COLOURS.get(name, Color.GRAY) as Color
-            # Terrain3D stores the colour map at a lower resolution than the heightmap and
-            # filters it, so this is a family resemblance rather than an equality.
-            if Vector3(drawn.r - expected.r, drawn.g - expected.g, drawn.b - expected.b).length() > 0.25:
-                return (
-                    "at %v the solver grips on %s but the terrain is tinted %v, not %v"
-                    % [position, name, Vector3(drawn.r, drawn.g, drawn.b),
-                       Vector3(expected.r, expected.g, expected.b)]
-                )
-            break
-        if not found:
-            return "no part of the terrain uses the %s surface" % name
-    return ""
+            return out
+        var name: String = terrain_data.models.name_of(painted)
+        counts[name] = int(counts.get(name, 0)) + 1
+    # A terrain that is one surface everywhere would pass this without the map being read at
+    # all, so the gate says what it saw and refuses a single-surface answer.
+    if counts.size() < 2:
+        out["error"] = (
+            "every one of %d samples grips on %s: this terrain cannot tell a correct surface"
+            % [SURFACE_SAMPLES, ", ".join(counts.keys())] + " map from a broken one"
+        )
+        return out
+    var seen: PackedStringArray = PackedStringArray()
+    for name: String in counts.keys():
+        seen.append("%s %.0f%%" % [name, 100.0 * float(counts[name]) / float(SURFACE_SAMPLES)])
+    seen.sort()
+    out["seen"] = ", ".join(seen)
+    return out

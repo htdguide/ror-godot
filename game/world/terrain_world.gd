@@ -1,10 +1,15 @@
-class_name ValleyTerrain
+class_name TerrainWorld
 extends RefCounted
-## Builds a drivable world: a Terrain3D with a generated heightmap and its collision off.
+## Builds a drivable world: a Terrain3D holding a Rigs of Rods terrain, with its collision off.
 ##
-## Which world is a parameter. `ValleyShape` is Valley One, the showcase the plan is measured in;
-## `ParkShape` is the flat test park. Both are two static functions of a grid cell — a height and a
-## surface — and everything downstream of here takes either without knowing which it has.
+## Which terrain is a parameter, and it is always a `RorTerrain` — a map somebody else authored
+## and shipped. This project generated its own worlds for a while, a valley and a flat test park,
+## and they are gone: a world this project wrote is a world whose every gate is this project
+## agreeing with itself, and the readers in `compat/` are the thing that needs checking.
+##
+## What is asked of a terrain is four static questions of a grid cell — a height, a surface, a
+## tint, and where the cell is in the world — so everything downstream takes any terrain without
+## knowing which it has.
 ##
 ## Two things here are not obvious and both cost a probe to establish.
 ##
@@ -43,12 +48,9 @@ static func _show_surfaces(terrain: Node3D) -> void:
         return
     material.set("show_checkered", false)
     material.set("show_colormap", false)
-    # What lies beyond the map's edge. A generated world keeps Terrain3D's flat extension, which
-    # closes the horizon; a loaded terrain is the size its author made it and the sky should
-    # start where it ends, or the map appears to sit inside a beige wall.
-    material.set("world_background", WORLD_BACKGROUND_NONE if _shape.call(
-        "terrain_assets"
-    ) != null else WORLD_BACKGROUND_FLAT)
+    # What lies beyond the map's edge. A terrain is the size its author made it and the sky
+    # should start where it ends, or the map appears to sit inside a beige wall.
+    material.set("world_background", WORLD_BACKGROUND_NONE)
 
 
 ## Terrain3D reads a texel's roughness from the colour map's alpha channel, so this is the
@@ -68,9 +70,13 @@ const WORLD_BACKGROUND_FLAT: int = 1
 ## collision bridge is handed it, instead of both computing it from the same function and
 ## hoping they agree.
 static var _surfaces: PackedByteArray = PackedByteArray()
-## The shape the terrain was last built from. The surface map and the cache key both depend on it,
-## so it is remembered rather than passed to everything that needs it.
-static var _shape: Object = ValleyShape
+## The terrain that was built last. The surface map and the cache key both depend on it, so it is
+## remembered rather than passed to everything that needs it.
+##
+## Null until something is built. There is no default world: a terrain comes from its author's
+## files or there is nothing to stand on, and a caller that forgets to pass one should be told
+## so rather than served whichever map happened to be compiled in.
+static var _shape: Object = null
 
 
 ## The lattice the current shape is sampled on: how many cells across, how far apart, and where
@@ -80,12 +86,16 @@ static var _shape: Object = ValleyShape
 ## else's files brings its own: La Paz is 2048 cells of 1.953125 m starting at the origin, where
 ## a generated world is 2048 of 1.0 m centred on it.
 static func lattice() -> Dictionary:
+    if _shape == null:
+        return {"size": 0, "spacing": 0.0, "origin": Vector3.ZERO}
     return _shape.call("lattice") as Dictionary
 
 
 ## The surface map of the terrain built last. Built on demand if the terrain was not built in
 ## this run, so that a caller cannot be handed an empty one.
 static func surface_map() -> PackedByteArray:
+    if _shape == null:
+        return PackedByteArray()
     var size: int = lattice()["size"] as int
     if _surfaces.size() == size * size:
         return _surfaces
@@ -108,6 +118,8 @@ static func surface_map() -> PackedByteArray:
 static func give_to_solver(solver: RefCounted, data: Object) -> String:
     if data == null:
         return "the terrain has no data object: it has not finished entering the tree"
+    if _shape == null:
+        return "no terrain has been built: populate() takes the terrain to build"
     var grid: Dictionary = lattice()
     var size: int = grid["size"] as int
     var field: Dictionary = TerrainHeightfield.read(
@@ -123,14 +135,15 @@ static func shape() -> Object:
     return _shape
 
 
-## Generates the heightmap and imports it, or loads the cached world when there is one. Call after
-## the node has been in the tree a frame. `shape` is `ValleyShape` or `ParkShape`; leaving it null
-## keeps whichever was used last, which is the valley until something asks for otherwise.
-## Returns "" on success.
+## Imports a terrain's heightmap, or loads the cached import when there is one. Call after the
+## node has been in the tree a frame. `with_shape` is the `RorTerrain` to build; leaving it null
+## keeps whichever was built last, so a second call is cheap. Returns "" on success.
 static func populate(terrain: Node3D, with_shape: Object = null) -> String:
     if with_shape != null and with_shape != _shape:
         _shape = with_shape
         _surfaces = PackedByteArray()
+    if _shape == null:
+        return "populate() was given no terrain, and there is no default world to fall back to"
     if terrain == null:
         return "Terrain3D is not installed: run tools/build_terrain3d.sh"
     if not terrain.is_inside_tree():
@@ -140,22 +153,19 @@ static func populate(terrain: Node3D, with_shape: Object = null) -> String:
     terrain.set("vertex_spacing", grid["spacing"] as float)
     # Terrain3D persists its regions in its data directory and loads them when the directory is
     # set, so this both names where the cache goes and loads it if it is already there.
-    var directory: String = ValleyCache.directory(_shape)
+    var directory: String = TerrainCache.directory(_shape)
     DirAccess.make_dir_recursive_absolute(directory)
     terrain.set("data_directory", directory)
     var data: Object = terrain.get("data")
     if data == null:
         return "the terrain has no data object after a frame in the tree"
     terrain.set("collision_mode", TerrainCfg.COLLISION_DISABLED)
-    # A world that ships its own textures is drawn in them; one that does not gets a set
-    # generated from its surfaces.
+    # A terrain is drawn in the textures its author shipped. There is no generated fallback any
+    # more: every world here comes from somebody's files and every one of them brings its own.
     var assets: Object = _shape.call("terrain_assets")
     if assets == null:
-        assets = SurfaceTextures.build(
-            _shape.call("ground_models"), _shape.call("surface_colours")
-        )
-    if assets != null:
-        terrain.set("assets", assets)
+        return "%s ships no textures, and there is no generated set to draw it in" % _shape
+    terrain.set("assets", assets)
     _show_surfaces(terrain)
     if _load_cached(data, directory):
         return ""
@@ -167,9 +177,8 @@ static func populate(terrain: Node3D, with_shape: Object = null) -> String:
     # selects the texture in _paint_surfaces. Asking twice cost 8 s over a 4.2 M cell map.
     var surfaces: PackedByteArray = PackedByteArray()
     surfaces.resize(size * size)
-    # The colour is asked of the shape rather than looked up from the surface, so that a world can
-    # draw something the surface map does not describe — the test park draws a dev grid on
-    # everything that is not a test area, while the surface under it stays what it is.
+    # The colour is asked of the terrain rather than looked up from the surface, because a
+    # loaded terrain's look is its own splat layers and not a palette per surface name.
     # The surface map is stored row by row — z outer, x inner — because that is the order the
     # solver reads a heightfield in, and the two are indexed by the same arithmetic. Stored the
     # other way round the whole map is transposed, which reads as the right surfaces in the
@@ -191,30 +200,30 @@ static func populate(terrain: Node3D, with_shape: Object = null) -> String:
     _paint_surfaces(terrain, data)
     _surfaces = surfaces
     data.call("save_directory", directory)
-    ValleyCache.write_surfaces(directory, surfaces)
+    TerrainCache.write_surfaces(directory, surfaces)
     return ""
 
 
-## Takes the cached valley if there is one and it still agrees with the shape function.
+## Takes the cached import if there is one and it still agrees with the terrain's own files.
 ##
 ## The agreement check is what keeps this an optimisation rather than a golden artifact: the key
 ## already covers an edit to the files that decide the shape, and the sampling covers everything
 ## the key cannot — a half-written cache, a Terrain3D upgrade that stores heights differently,
 ## or a shape that reads something the key does not hash.
 static func _load_cached(data: Object, directory: String) -> bool:
-    if ValleyCache.disabled():
+    if TerrainCache.disabled():
         return false
-    if not ValleyCache.is_populated(directory):
+    if not TerrainCache.is_populated(directory):
         return false
     if int(data.call("get_region_count")) == 0:
         return false
-    var surfaces: PackedByteArray = ValleyCache.read_surfaces(directory, _shape)
+    var surfaces: PackedByteArray = TerrainCache.read_surfaces(directory, _shape)
     if surfaces.is_empty():
         return false
-    var disagreement: String = ValleyCache.verify(data, _shape)
+    var disagreement: String = TerrainCache.verify(data, _shape)
     if disagreement != "":
-        push_warning("the cached valley was discarded: %s" % disagreement)
-        ValleyCache.discard(directory)
+        push_warning("the cached terrain was discarded: %s" % disagreement)
+        TerrainCache.discard(directory)
         return false
     _surfaces = surfaces
     return true
@@ -223,8 +232,7 @@ static func _load_cached(data: Object, directory: String) -> bool:
 ## Writes which textures each part of the terrain uses.
 ##
 ## The control map holds two texture ids and a blend per texel, and which those are is the
-## world's answer: a generated world draws one texture per surface, and a loaded terrain draws
-## the two splat layers its author painted most of at that point.
+## terrain's own answer: the two splat layers its author painted most of at that point.
 ##
 ## Written through Terrain3D's own setters rather than by packing its bit layout here: the
 ## packing is an internal detail of a pinned dependency and hand-writing it would break
