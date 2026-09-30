@@ -69,6 +69,27 @@ afternoon to rediscover.
   terrain's own heightmap on load because a cache is otherwise a golden artifact. The cache key
   is the readers plus a salt from the terrain: upstream's shipped package is three terrains over
   one set of files, so keying it on the directory serves one map's heights for another.
+- **Process-global state hides in more places than `static var`.** `Harness.rng` was one RNG
+  seeded once for the process, and every gate that drew from it advanced it, so the numbers a
+  gate was handed depended on how many draws the gates before it had made. `extension_parity`
+  measured 5.89e-06 in one order and 1.35e-06 in another. A gate container owns the RNG now and
+  seeds it the same every time. The rule this generalises to: anything a gate reads that outlives
+  a gate is state, whatever keyword declares it.
+- **A `SubViewport` isolates a gate only with `own_world_3d` set.** Without it the viewport draws
+  into the parent's `World3D` and the container contains nothing: one gate's `DirectionalLight3D`
+  lights the next gate's frame.
+- **Orphan count is the exact leak signal; node count is not.** The engine adds nodes of its own
+  during a run — overlay and tooltip scaffolding — so a container that leaves a few nodes behind
+  has not necessarily leaked. A node with no parent that did not exist before has no innocent
+  explanation, so that is the counter with no slack on it.
+- **A rendered measurement is not stable to the last decimal across a warm process.**
+  `ror_terrain_photoset`'s mean luma over seven views of La Paz came out 0.282191, 0.282165,
+  0.282781 and 0.282671 across four runs, in the same order and in different ones. Shader
+  compilation, reflection-probe capture timing and deferred frees all warm across a process and
+  none of them is inside a container's power. `tools/gate.sh --order-check` therefore compares
+  measured values to 1e-3 relative rather than exactly, and always prints the worst drift so a
+  gate that starts moving further is visible before it crosses. Computed gates still compare bit
+  for bit.
 - **A terrain with no traction map grips like gravel, not like the first ground model.** Upstream
   keeps two defaults (`Collisions.cpp:134-135`): `defaultgm` is concrete and is for collision
   meshes, `defaultgroundgm` is gravel and is what the ground uses when landuse is absent or

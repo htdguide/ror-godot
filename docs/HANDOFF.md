@@ -12,8 +12,14 @@ authoritative. It was re-scoped on 2026-09-30 from a renderer rewrite to a clien
 and §1's ordering are the new parts and the decisions table records what was superseded. Then
 `docs/architecture/bridge.md` and `docs/decisions/`.
 
-**Next milestone is D0, the dev environment** (§0.8), plus the §0.7 folder mirror. Nothing else is
-in progress. The order after it is: M2, M2b, C1 GUI+audio, C2 format coverage+AngelScript, M3–M8,
+**Next milestone is D0, the dev environment** (§0.8). Three of its seven acceptance items are
+done: the §0.7 folder mirror, the one-window container runner, and order independence. What is
+left is the console, the agent channel, and `tools/gate.sh` becoming a client of the console's own
+command table. Nothing else is in progress.
+
+The suite runs in one window per tier -- five windows for the whole suite instead of 62, 88 s
+instead of 144 s -- and `tools/gate.sh --order-check` runs all 77 gates twice, once in the graph's
+order and once in a seeded shuffle, in one window each, comparing verdicts and measured values. The order after it is: M2, M2b, C1 GUI+audio, C2 format coverage+AngelScript, M3–M8,
 C3 airplanes+boats, C4 repository, C5 multiplayer. Local milestones first; the two networked ones
 last, deliberately. The UI's design is settled in §0.11: recognisably RoR and refreshed, with the
 in-vehicle instruments under glass that reflects, backlights warm from below with the lights, and

@@ -36,6 +36,12 @@ var vehicle: Dictionary = {}
 
 var _main: Node
 var _run_started: bool = false
+## The gate container currently open, or null outside gate mode. A gate's world lives inside it
+## and nothing a gate builds reaches the next one -- see `GateContainer`.
+var container: GateContainer = null
+## What the window shows: the container that is running. One window for the whole suite, which is
+## the point of D0, and a session can watch a gate build its world in place.
+var _screen: TextureRect = null
 
 
 func begin(main: Node) -> void:
@@ -54,7 +60,10 @@ func begin(main: Node) -> void:
         return
     _apply_determinism()
     if args.values.has("gate"):
-        _run_gate(args.get_string("gate", ""))
+        # `--gate a,b,c` runs three gates in one window, each in its own container. One name is
+        # the same path with a list of one, so there is no separate single-gate mode to keep
+        # honest. `GateRunner` owns the loop and the containers.
+        _run_suite(args.get_string("gate", "").split(",", false))
         return
     _run_capture()
 
@@ -91,11 +100,17 @@ func _build_world(scenario: String, weather: String) -> String:
         bool(preset.get("props", true)),
         args.has_flag("play")
     )
-    _main.add_child(world)
+    # In gate mode the world belongs to the container, which is what keeps one gate's lights,
+    # environment and probes out of the next one's frame.
+    var host: Node = container.viewport if container != null else _main
+    host.add_child(world)
     camera = _build_camera(preset)
     world.add_child(camera)
+    if container != null:
+        container.world = world
+        container.camera = camera
     metrics = HarnessMetrics.new()
-    metrics.begin(get_viewport())
+    metrics.begin(render_viewport())
     return ""
 
 
@@ -174,7 +189,7 @@ func capture_shot(out_dir: String, scenario: String, converge: int) -> Dictionar
     var png_path: String = "%s/%s.png" % [dir, preset_name]
     var manifest_path: String = "%s/%s.json" % [dir, preset_name]
     await advance_frames(converge, scenario, "converge")
-    var err: String = HarnessCapture.capture_png(get_viewport(), png_path)
+    var err: String = HarnessCapture.capture_png(render_viewport(), png_path)
     if err != "":
         return {"error": err, "png": "", "manifest": ""}
     var summary: Dictionary = metrics.summarize({"preset": preset_name})
@@ -187,13 +202,23 @@ func capture_shot(out_dir: String, scenario: String, converge: int) -> Dictionar
             "seed": args.get_int("seed", HarnessCfg.SEED),
             "tick_hz": args.get_int("tick", HarnessCfg.TICK_HZ),
             "converge_frames": converge,
-            "resolution": "%dx%d" % [get_viewport().get_visible_rect().size.x, get_viewport().get_visible_rect().size.y],
+            "resolution": "%dx%d" % [
+                render_viewport().get_visible_rect().size.x,
+                render_viewport().get_visible_rect().size.y,
+            ],
             "summary": summary,
         }
     )
     if err != "":
         return {"error": err, "png": "", "manifest": ""}
     return {"error": "", "png": png_path, "manifest": manifest_path}
+
+
+## The viewport a gate renders into and captures from: its container's, or the window's when
+## there is no container. Never `get_viewport()` directly in gate code — that is the window, and
+## in gate mode the window only *displays* the container.
+func render_viewport() -> Viewport:
+    return container.viewport if container != null else get_viewport()
 
 
 ## Renders exactly `count` frames, sampling metrics on each. Frame-accurate: gates
@@ -213,40 +238,18 @@ func advance_frames(count: int, scenario: String, tag: String) -> void:
 ## Gate mode
 
 
-func _run_gate(name: String) -> void:
-    var script_path: String = "%s/%s.gd" % [GATE_DIR, name]
-    if not ResourceLoader.exists(script_path):
-        _die(EXIT_USAGE, "no gate '%s' at %s" % [name, script_path])
+## Runs the named gates, each in its own container, and exits with the suite's verdict.
+func _run_suite(names: PackedStringArray) -> void:
+    var runner: GateRunner = GateRunner.new()
+    var outcome: Dictionary = await runner.run(self, names)
+    if (outcome["usage_error"] as bool):
+        _quit(EXIT_USAGE)
         return
-    var gate_script: GDScript = load(script_path) as GDScript
-    if gate_script == null or not gate_script.can_instantiate():
-        _die(EXIT_USAGE, "gate '%s' failed to compile; see the parse errors above" % name)
-        return
-    var meta_dict: Dictionary = gate_script.call("meta") as Dictionary
-    var meta_error: String = GateBase.validate_meta(meta_dict)
-    if meta_error != "":
-        _die(EXIT_USAGE, "gate '%s' metadata invalid: %s" % [name, meta_error])
-        return
-    var gate: GateBase = gate_script.new() as GateBase
-    print("HARNESS_GATE_BEGIN " + JSON.stringify(meta_dict))
-    var started_usec: int = Time.get_ticks_usec()
-    var result: Dictionary = await gate.run(self)
-    var elapsed_s: float = float(Time.get_ticks_usec() - started_usec) / 1000000.0
-    var passed: bool = result.get("pass", false) as bool
-    var over_budget: bool = elapsed_s > float(meta_dict["budget_s"])
-    var row: Dictionary = {
-        "gate": name,
-        "pass": passed and not over_budget,
-        "detail": result.get("detail", "") as String,
-        "measured": result.get("measured"),
-        "threshold": meta_dict["threshold"],
-        "oracle": meta_dict["oracle"],
-        "elapsed_s": snappedf(elapsed_s, 0.01),
-        "budget_s": meta_dict["budget_s"],
-        "over_budget": over_budget,
-    }
-    print("HARNESS_GATE_RESULT " + JSON.stringify(row))
-    _quit(EXIT_OK if row["pass"] else EXIT_FAIL)
+    _quit(EXIT_OK if int(outcome["failed"]) == 0 else EXIT_FAIL)
+
+
+## --------------------------------------------------------------------------------
+## Plumbing
 
 
 ## Puts the world into a state where numbers encoded into pixels survive to the capture:

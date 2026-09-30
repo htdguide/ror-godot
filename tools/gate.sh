@@ -6,6 +6,9 @@
 #   tools/gate.sh <gate> [extra args]    run one gate
 #   tools/gate.sh --all [extra args]     run the suite highest tier first, skipping what a
 #                                        passing gate implies; non-zero on failure
+#   tools/gate.sh --order-check [seed]   every gate twice, in the graph's order and in a seeded
+#                                        shuffle, comparing verdicts AND measured values. The
+#                                        acceptance test for the gate containers.
 #   tools/gate.sh --all --every          run every gate, ignoring the graph. What a release
 #                                        run uses: it is the only thing that catches an edge
 #                                        that was never true
@@ -163,6 +166,50 @@ run_one() {
     DETAIL="$(result_field "$json" detail)"
 }
 
+# Runs a whole list of gates in ONE engine invocation, which is one window, and leaves their
+# verdicts in BATCH_FILE as `gate<TAB>verdict<TAB>elapsed<TAB>detail`.
+#
+# The engine opens a fresh container per gate, so batching changes which window a gate runs in
+# and nothing about what it measures. `harness/dev/gate_container.gd` is what makes that true and
+# `gates_are_order_independent` is what checks it.
+BATCH_FILE=""
+run_batch() {
+    local gates="$1"
+    shift
+    local output
+    BATCH_FILE="$(mktemp)"
+    output="$(run_engine --gate "$gates" "$@" 2>&1)"
+    printf '%s\n' "$output" | grep 'HARNESS_GATE_RESULT ' |
+        python3 -c '
+import json, sys
+for line in sys.stdin:
+    row = json.loads(line.split("HARNESS_GATE_RESULT ", 1)[1])
+    verdict = "PASS" if row.get("pass") else "FAIL"
+    elapsed = row.get("elapsed_s", "-")
+    print("\t".join([
+        row.get("gate", "?"), verdict,
+        ("%ss" % elapsed) if elapsed != "-" else "-",
+        str(row.get("detail", "")).replace("\t", " "),
+        repr(row.get("measured")),
+    ]))
+' > "$BATCH_FILE"
+    if [[ ! -s "$BATCH_FILE" ]]; then
+        printf '%s\n' "$output" | tail -25 >&2
+    fi
+}
+
+# The verdict a batch recorded for one gate, or a synthetic failure when the engine died before
+# reaching it -- which is the case a per-gate runner reported for free and a batch has to state.
+batch_row() {
+    local gate="$1" row
+    row="$(grep -F "$gate	" "$BATCH_FILE" 2>/dev/null | head -1)"
+    if [[ -z "$row" ]]; then
+        printf '%s\tFAIL\t-\tno result: the engine did not reach this gate (see output above)\tNone\n' "$gate"
+        return
+    fi
+    printf '%s\n' "$row"
+}
+
 table_header() {
     printf '%-26s %-7s %-8s %s\n' GATE RESULT ELAPSED DETAIL
     printf '%-26s %-7s %-8s %s\n' "--------------------------" "-------" "--------" "------"
@@ -174,38 +221,55 @@ run_suite() {
     load_chain
     RESULTS_FILE="$(mktemp)"
     IMPLIED_FILE="$(mktemp)"
-    local failed=0 ran=0 implied=0
+    local failed=0 ran=0 implied=0 windows=0
     table_header
-    while read -r gate; do
-        local implier=""
-        if [[ "$every" -eq 0 ]]; then
-            implier="$(grep -F "	$gate	" "$IMPLIED_FILE" 2>/dev/null | head -1 | cut -f3)"
-        fi
-        if [[ -n "$implier" ]]; then
-            printf '%-26s %-7s %-8s %s\n' "$gate" IMPLIED "-" "implied by $implier, which passed"
-            printf '%s\t%s\n' "$gate" "IMPLIED" >> "$RESULTS_FILE"
-            implied=$((implied + 1))
-            continue
-        fi
-        run_one "$gate" "$@"
-        ran=$((ran + 1))
-        printf '%-26s %-7s %-8s %s\n' "$gate" "$VERDICT" "$ELAPSED" "$DETAIL"
-        printf '%s\t%s\n' "$gate" "$VERDICT" >> "$RESULTS_FILE"
-        if [[ "$VERDICT" == "PASS" ]]; then
+    # One batch per tier, and one window per batch. A tier is safe to batch because `builds_on`
+    # edges run from a higher tier to a lower one, so no gate in a tier implies another in the
+    # same tier: nothing in a batch depends on a result from the same batch.
+    while IFS= read -r tier; do
+        [[ -n "$tier" ]] || continue
+        local todo="" name
+        while IFS= read -r name; do
+            [[ -n "$name" ]] || continue
+            local implier=""
             if [[ "$every" -eq 0 ]]; then
-                while read -r covered; do
-                    [[ -n "$covered" ]] || continue
-                    printf '\t%s\t%s\n' "$covered" "$gate" >> "$IMPLIED_FILE"
-                done < <(plan implied "$gate")
+                implier="$(grep -F "	$name	" "$IMPLIED_FILE" 2>/dev/null | head -1 | cut -f3)"
             fi
-        else
-            failed=1
-        fi
-    done < <(plan order)
+            if [[ -n "$implier" ]]; then
+                printf '%-26s %-7s %-8s %s\n' "$name" IMPLIED "-" "implied by $implier, which passed"
+                printf '%s\t%s\n' "$name" "IMPLIED" >> "$RESULTS_FILE"
+                implied=$((implied + 1))
+                continue
+            fi
+            todo="${todo:+$todo,}$name"
+        done < <(printf '%s' "$tier" | tr '\t' '\n')
+        [[ -n "$todo" ]] || continue
+        run_batch "$todo" "$@"
+        windows=$((windows + 1))
+        while IFS= read -r name; do
+            [[ -n "$name" ]] || continue
+            IFS=$'\t' read -r _g verdict elapsed detail _measured < <(batch_row "$name")
+            ran=$((ran + 1))
+            printf '%-26s %-7s %-8s %s\n' "$name" "$verdict" "$elapsed" "$detail"
+            printf '%s\t%s\n' "$name" "$verdict" >> "$RESULTS_FILE"
+            if [[ "$verdict" == "PASS" ]]; then
+                if [[ "$every" -eq 0 ]]; then
+                    while read -r covered; do
+                        [[ -n "$covered" ]] || continue
+                        printf '\t%s\t%s\n' "$covered" "$name" >> "$IMPLIED_FILE"
+                    done < <(plan implied "$name")
+                fi
+            else
+                failed=1
+            fi
+        done < <(printf '%s' "$todo" | tr ',' '\n')
+        rm -f "$BATCH_FILE"
+    done < <(plan tiers)
     archive_history
     prune_artifacts
     if [[ $failed -eq 0 ]]; then
-        printf '%d gates run, %d implied by a higher gate; all passed' "$ran" "$implied"
+        printf '%d gates run in %d windows, %d implied by a higher gate; all passed' \
+            "$ran" "$windows" "$implied"
         if [[ $implied -gt 0 ]]; then
             printf ' (run --all --every to check the implied ones)'
         fi
@@ -217,6 +281,107 @@ run_suite() {
     report_localization
     cleanup_plan
     return 1
+}
+
+# Order independence: the acceptance test for the gate containers themselves.
+#
+# Every gate, twice, in one window each: once in the graph's own order and once in a seeded
+# shuffle. Same verdicts and the same measured values, or a container is not containing something
+# and the suite's results depend on what ran before them. Verdicts alone are too weak -- a number
+# that drifts inside a threshold is the same bug one release before it fails.
+run_order_check() {
+    local seed="${1:-7}"
+    local forward shuffled first second
+    first="$(mktemp)"
+    second="$(mktemp)"
+    forward="$(list_gates | tr '\n' ',' | sed 's/,$//')"
+    shuffled="$(list_gates | python3 -c "
+import random, sys
+gates = [line.strip() for line in sys.stdin if line.strip()]
+random.Random($seed).shuffle(gates)
+print(','.join(gates))
+")"
+    echo "order check: $(list_gates | wc -l | tr -d ' ') gates, twice, one window each (seed $seed)" >&2
+    run_batch "$forward"
+    cp "$BATCH_FILE" "$first"
+    rm -f "$BATCH_FILE"
+    run_batch "$shuffled"
+    cp "$BATCH_FILE" "$second"
+    rm -f "$BATCH_FILE"
+    python3 - "$first" "$second" << 'ORDER_EOF'
+import sys
+
+def rows(path):
+    out = {}
+    with open(path) as handle:
+        for line in handle:
+            parts = line.rstrip("\n").split("\t")
+            if len(parts) >= 5:
+                out[parts[0]] = (parts[1], parts[4])
+    return out
+
+# How far a measured value may move between the two orders.
+#
+# Zero for anything computed, and it holds: those compare bit for bit. Not zero for anything
+# rendered, and the reason is measured rather than assumed -- `ror_terrain_photoset` returns a
+# mean luma over seven rendered views of La Paz and produced 0.282191, 0.282165, 0.282781 and
+# 0.282671 across four runs, in the same order and in different ones. Renderer state that warms
+# across a process -- shader compilation, probe capture timing, deferred frees -- is outside what
+# a container can isolate, and this gate's own threshold is "no view is black", which none of
+# those numbers comes close to moving.
+#
+# So the bound is tight enough to catch a real dependence and loose enough to admit that limit,
+# and the worst drift is always printed, pass or fail, so a gate that starts drifting further is
+# visible before it crosses.
+TOLERANCE = 1e-3
+
+
+def as_float(text):
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return None
+
+
+a, b = rows(sys.argv[1]), rows(sys.argv[2])
+problems = []
+worst, worst_gate = 0.0, ""
+for gate in sorted(set(a) | set(b)):
+    if gate not in a or gate not in b:
+        problems.append("%s ran in only one of the two orders" % gate)
+        continue
+    if a[gate][0] != b[gate][0]:
+        problems.append("%s: %s in order, %s shuffled" % (gate, a[gate][0], b[gate][0]))
+        continue
+    first, second = as_float(a[gate][1]), as_float(b[gate][1])
+    if first is None or second is None:
+        if a[gate][1] != b[gate][1]:
+            problems.append(
+                "%s: measured %s in order, %s shuffled" % (gate, a[gate][1], b[gate][1])
+            )
+        continue
+    scale = max(abs(first), abs(second), 1e-12)
+    drift = abs(first - second) / scale
+    if drift > worst:
+        worst, worst_gate = drift, gate
+    if drift > TOLERANCE:
+        problems.append(
+            "%s: measured %r in order, %r shuffled (%.2g relative, over %g)"
+            % (gate, first, second, drift, TOLERANCE)
+        )
+if problems:
+    print("ORDER CHECK FAILED -- a gate depends on what ran before it:")
+    for problem in problems:
+        print("  " + problem)
+    raise SystemExit(1)
+print(
+    "order check passed: %d gates, identical verdicts in both orders; worst measured drift"
+    " %.2g (%s), under %g" % (len(a), worst, worst_gate or "none", TOLERANCE)
+)
+ORDER_EOF
+    local status=$?
+    rm -f "$first" "$second"
+    return $status
 }
 
 # Where the fault is, rather than everything downstream of it: for each failing gate, the lowest
@@ -303,6 +468,11 @@ case "${1:-}" in
             if [[ "$arg" == "--every" ]]; then every=1; else extra+=("$arg"); fi
         done
         run_suite "$every" ${extra[@]+"${extra[@]}"}
+        exit "$?"
+        ;;
+    --order-check)
+        shift
+        run_order_check "${1:-}"
         exit "$?"
         ;;
     --chain)

@@ -58,7 +58,9 @@ def read_results(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["order", "closure", "implied", "localize"])
+    parser.add_argument(
+        "command", choices=["order", "tiers", "closure", "implied", "localize"]
+    )
     parser.add_argument("gate", nargs="?", default="")
     parser.add_argument("--chain", required=True)
     parser.add_argument("--results", default="")
@@ -68,6 +70,20 @@ def main():
     if options.command == "order":
         for gate in chain.get("order", sorted(chain["gates"])):
             print(gate)
+        return 0
+
+    # tiers: the same order as `order`, grouped into batches that can run together.
+    #
+    # A batch is one tier. `builds_on` edges run from a higher tier to a lower one, so no gate in
+    # a tier implies another gate in the same tier, which is what makes a tier safe to run as one
+    # batch before any of its results are consulted. The runner opens one window per tier instead
+    # of one per gate.
+    if options.command == "tiers":
+        by_tier = {}
+        for gate in chain.get("order", sorted(chain["gates"])):
+            by_tier.setdefault(tier_of(chain, gate), []).append(gate)
+        for tier in sorted(by_tier, reverse=True):
+            print("\t".join(by_tier[tier]))
         return 0
 
     if options.command in ("closure", "implied"):

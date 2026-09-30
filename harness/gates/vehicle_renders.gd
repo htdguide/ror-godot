@@ -235,7 +235,7 @@ func _projected_fill(harness: Node, vehicle: Node3D, coverage: float) -> float:
         var screen: Vector2 = camera.unproject_position(point)
         min_screen = min_screen.min(screen)
         max_screen = max_screen.max(screen)
-    var viewport: Vector2 = harness.get_viewport().get_visible_rect().size
+    var viewport: Vector2 = harness.render_viewport().get_visible_rect().size
     var area: float = (
         (max_screen.x - min_screen.x) * (max_screen.y - min_screen.y)
         / maxf(viewport.x * viewport.y, 1.0)
