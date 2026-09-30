@@ -15,8 +15,11 @@ and §1's ordering are the new parts and the decisions table records what was su
 **Next milestone is D0, the dev environment** (§0.8), and all seven of its acceptance items are
 done: the §0.7 folder mirror, the one-window container runner, order independence, no leaks, the
 `static_state` lint, one command table behind three front ends, and one JSONL line per command.
-What is left of §0.8's prose is `tools/gate.sh` becoming a client of that table rather than a
-parallel runner. Nothing else is in progress.
+`tools/gate.sh` is a client of that table too: `--gate a,b,c` is sugar for `gate run a b c`, so
+the path CI uses is the path a person uses, and `tools/gate.sh --cmd "<line>"` runs any console
+command from a shell.
+
+**M2 is next** — PBR ground and HDRI sky. It is also what closes the one red gate.
 
 **The console.** `tools/play.sh` and `--console` open it; ` or F1 drops it down over whatever is
 running, without pausing it. `help` lists the twelve commands, Tab completes and cycles, Up

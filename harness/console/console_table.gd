@@ -199,15 +199,19 @@ func _cmd_help(args: PackedStringArray, _harness_node: Node) -> Dictionary:
 func _cmd_gate_run(args: PackedStringArray, harness_node: Node) -> Dictionary:
     if harness_node == null:
         return ConsoleResult.err("gate run needs a harness; none is attached to this table")
-    var unknown: PackedStringArray = PackedStringArray()
-    for name: String in args:
-        if not ResourceLoader.exists("res://harness/gates/%s.gd" % name):
-            unknown.append(name)
-    if unknown.size() > 0:
-        return ConsoleResult.err("no such gate: %s" % " ".join(unknown))
+    # Names are not pre-validated here. `GateRunner` reports a missing gate as that gate's own
+    # result line, which is what a caller parsing the run needs: a batch that answered "no such
+    # gate" for the whole list would leave every other gate in it unaccounted for.
     var runner: GateRunner = GateRunner.new()
     runner.gate_finished.connect(_on_gate_finished)
     var outcome: Dictionary = await runner.run(harness_node, args)
+    # A gate that does not exist, or does not compile, stops the run and is not a failed gate --
+    # so it arrives as `usage_error` with a `failed` count of zero. Reading only `failed` reports
+    # a typo'd gate name as a clean run, which is the worst possible answer to give CI.
+    if outcome["usage_error"] as bool:
+        return ConsoleResult.err(
+            "the run stopped: a named gate does not exist or does not compile (see above)"
+        )
     var failed: int = int(outcome["failed"])
     var detail: String = "%d gate(s) run, %d failed" % [args.size(), failed]
     if failed == 0:

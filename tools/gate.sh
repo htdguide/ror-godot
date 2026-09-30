@@ -6,6 +6,9 @@
 #   tools/gate.sh <gate> [extra args]    run one gate
 #   tools/gate.sh --all [extra args]     run the suite highest tier first, skipping what a
 #                                        passing gate implies; non-zero on failure
+#   tools/gate.sh --cmd "<line>"         run any console command: `map list`, `cvar get X`,
+#                                        `gate meta smoke`. Same table the console and the
+#                                        agent's channel use; `tools/gate.sh --cmd help` lists.
 #   tools/gate.sh --order-check [seed]   every gate twice, in the graph's order and in a seeded
 #                                        shuffle, comparing verdicts AND measured values. The
 #                                        acceptance test for the gate containers.
@@ -151,7 +154,7 @@ run_one() {
     local gate="$1"
     shift
     local output line json
-    output="$(run_engine --gate "$gate" "$@" 2>&1)"
+    output="$(run_engine --command "gate run $gate" "$@" 2>&1)"
     line="$(printf '%s\n' "$output" | grep 'HARNESS_GATE_RESULT ' | tail -1)"
     if [[ -z "$line" ]]; then
         VERDICT=FAIL
@@ -178,21 +181,36 @@ run_batch() {
     shift
     local output
     BATCH_FILE="$(mktemp)"
-    output="$(run_engine --gate "$gates" "$@" 2>&1)"
+    # Through the console's own command table, which is what makes this runner a client of it
+    # rather than a second way to run gates -- PLAN 0.8. `--gate` is sugar for the same line.
+    output="$(run_engine --command "gate run ${gates//,/ }" "$@" 2>&1)"
     printf '%s\n' "$output" | grep 'HARNESS_GATE_RESULT ' |
         python3 -c '
 import json, sys
+
+# Only the gates this batch asked for, and only the first row for each.
+#
+# Some gates run gates -- `console_fronts_agree` and
+# `the_console_reports_a_run_as_it_happens` both drive the real runner -- so a run emits result
+# lines for gates nobody in this batch requested, and can emit a second line for one who was.
+# Taking them at face value would report an inner run as the outer one.
+wanted = [name for name in sys.argv[1].split(",") if name]
+seen = set()
 for line in sys.stdin:
     row = json.loads(line.split("HARNESS_GATE_RESULT ", 1)[1])
+    gate = row.get("gate", "?")
+    if gate not in wanted or gate in seen:
+        continue
+    seen.add(gate)
     verdict = "PASS" if row.get("pass") else "FAIL"
     elapsed = row.get("elapsed_s", "-")
     print("\t".join([
-        row.get("gate", "?"), verdict,
+        gate, verdict,
         ("%ss" % elapsed) if elapsed != "-" else "-",
         str(row.get("detail", "")).replace("\t", " "),
         repr(row.get("measured")),
     ]))
-' > "$BATCH_FILE"
+' "$gates" > "$BATCH_FILE"
     if [[ ! -s "$BATCH_FILE" ]]; then
         printf '%s\n' "$output" | tail -25 >&2
     fi
@@ -468,6 +486,12 @@ case "${1:-}" in
             if [[ "$arg" == "--every" ]]; then every=1; else extra+=("$arg"); fi
         done
         run_suite "$every" ${extra[@]+"${extra[@]}"}
+        exit "$?"
+        ;;
+    --cmd)
+        shift
+        [[ -n "${1:-}" ]] || { echo "gate.sh: --cmd needs a command line" >&2; exit 2; }
+        run_engine --command "$1"
         exit "$?"
         ;;
     --order-check)

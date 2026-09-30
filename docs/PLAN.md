@@ -600,8 +600,8 @@ local milestone, then the two networked ones.
 | --- | --- | --- |
 | M0 | CLI harness | done; nothing else could be committed before it |
 | M1 | Softbody bridge + a rig on screen | done but for three acceptance items, listed in its section |
-| **D0** | **The dev environment** (§0.8) | **next.** Every milestone after it is built and gated inside it, so it comes before them rather than being retrofitted. Carries the §0.7 tree mirror, because moving files is cheapest before there are more of them. |
-| M2 | PBR + HDR + tonemap + IBL sky | first after D0: it is the highest visual payoff per unit work, and it closes the one red gate in the suite (`terrain_takes_the_light`, §0.5) |
+| **D0** | **The dev environment** (§0.8) | **done 2026-09-30.** Every milestone after it is built and gated inside it, so it comes before them rather than being retrofitted. Carries the §0.7 tree mirror, because moving files is cheapest before there are more of them. |
+| M2 | PBR + HDR + tonemap + IBL sky | **next.** First after D0: it is the highest visual payoff per unit work, and it closes the one red gate in the suite (`terrain_takes_the_light`, §0.5) |
 | M2b | Physical camera and the post stack | follows M2 directly; same pipeline |
 | C1 | GUI + audio | the point at which this stops being a harness with a window and becomes a client a person can use. Menu, vehicle selector, console surfaced to the user, chat shell, engine and impact sound. |
 | C2 | Format coverage + AngelScript | every ground rig-def section and every `.terrn2` feature, plus the script interpreter. The mod archive is the oracle. |
@@ -718,6 +718,9 @@ Scope:
 - **`tools/gate.sh` becomes a thin client of the same command table**, so CI and a broken console
   both still have a runner.
 
+**Closed 2026-09-30.** What it delivered against each item is recorded below; the numbers are
+from the run that closed it.
+
 **Acceptance:**
 1. `gate all` runs the whole suite in **one** window and every gate's result matches what it
    produces in a fresh window of its own, gate for gate.
@@ -736,6 +739,22 @@ Scope:
 
 **Visual verification:** the user opens one window, types `gate all`, watches gates run in place,
 and can stop on a failure and inspect that gate's world with the free camera without relaunching.
+
+**What closed it.** One window per tier of the gate graph rather than one per gate: 5 windows
+against 62, 88 s against 144 s. `tools/gate.sh --order-check` runs all 79 gates twice, once in
+the graph's order and once in a seeded shuffle, comparing verdicts and measured values; it found
+two order dependences on its first run and both are fixed. `static_state` bans process-global
+state with one named exemption. The console, the agent's watched drop box and `tools/gate.sh`
+all dispatch into `ConsoleTable` — `--gate` is sugar for `gate run`, so the path CI uses is the
+path a person uses. One command costs the agent one JSONL line; the console gets a line per gate
+as the run happens, and the channel does not.
+
+**One limit, stated rather than hidden.** A rendered measurement is not stable to the last
+decimal across a warm process: shader compilation, probe capture timing and deferred frees all
+warm across a run and none is inside a container's power. `ror_terrain_photoset` moved in the
+fourth decimal between identical runs. The order check therefore compares measured values to
+1e-3 relative and prints the worst drift on every run, passing or failing, so a gate that starts
+moving further is visible before it crosses.
 
 ---
 

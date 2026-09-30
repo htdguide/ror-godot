@@ -73,11 +73,16 @@ func begin(main: Node) -> void:
     # this it fell through to capture mode and exited before the channel had polled once.
     if args.has_flag("console") and not args.has_flag("play"):
         return
+    # The command line is a front end onto the console's table like any other, and `--gate` is
+    # sugar over one of its commands rather than a second way to run gates. PLAN 0.8 asks for
+    # one command table; a runner the command line reached and the console did not would be the
+    # first thing to drift, and it would drift in the path CI uses.
+    if args.values.has("command"):
+        _run_command(args.get_string("command", ""))
+        return
     if args.values.has("gate"):
-        # `--gate a,b,c` runs three gates in one window, each in its own container. One name is
-        # the same path with a list of one, so there is no separate single-gate mode to keep
-        # honest. `GateRunner` owns the loop and the containers.
-        _run_suite(args.get_string("gate", "").split(",", false))
+        var names: PackedStringArray = args.get_string("gate", "").split(",", false)
+        _run_command("gate run %s" % " ".join(names))
         return
     _run_capture()
 
@@ -260,14 +265,16 @@ func _open_console() -> void:
 ## Gate mode
 
 
-## Runs the named gates, each in its own container, and exits with the suite's verdict.
-func _run_suite(names: PackedStringArray) -> void:
-    var runner: GateRunner = GateRunner.new()
-    var outcome: Dictionary = await runner.run(self, names)
-    if (outcome["usage_error"] as bool):
-        _quit(EXIT_USAGE)
-        return
-    _quit(EXIT_OK if int(outcome["failed"]) == 0 else EXIT_FAIL)
+## Runs one console command and exits with its verdict. The command line's whole gate mode.
+##
+## `HARNESS_COMMAND` carries the answer for a caller that wants the result rather than the
+## per-gate lines `gate run` prints on its way through.
+func _run_command(line: String) -> void:
+    var started: int = Time.get_ticks_usec()
+    var result: Dictionary = await commands.dispatch(line)
+    var elapsed_ms: float = float(Time.get_ticks_usec() - started) / 1000.0
+    print("HARNESS_COMMAND " + ConsoleResult.to_line(1, line, result, elapsed_ms))
+    _quit(EXIT_OK if (result.get("ok", false) as bool) else EXIT_FAIL)
 
 
 ## --------------------------------------------------------------------------------

@@ -31,6 +31,10 @@ const COMMANDS: Array[String] = [
     "cvar get render_cfg.EXPOSURE",
     "gate meta smoke",
     "nonsense command",
+    # A gate name that does not exist. It reached `ok: true, 0 failed` once, because the
+    # runner reports a missing gate as a usage error rather than a failed gate and the command
+    # read only the failure count -- which told a caller a typo'd suite was a clean run.
+    "gate run definitely_not_a_gate",
 ]
 ## The drop box writes and the channel polls, so a reply is not instant. Generous: what is being
 ## checked is that it arrives and matches, not how fast.
