@@ -1,6 +1,13 @@
-# Rigs of Rods → Godot 4.x: Rendering Rewrite Plan
+# Rigs of Rods → Godot 4.x: an alternative client
 
 ## Context
+
+**Re-scoped 2026-09-30, from a rendering rewrite to a client.** What this project builds is an
+alternative Rigs of Rods client: it loads the content the community already has, plays the way the
+game already plays, and eventually talks to the servers and the repository the community already
+uses. The renderer rewrite is the reason it is worth doing and it is now one subsystem of it rather
+than the whole of it. Everything the plan said about rendering still holds; what changed is that it
+is no longer the definition of done.
 
 Rigs of Rods renders on OGRE 1.x. That renderer is the bottleneck on how the game looks, not the
 simulation: no PBR, no HDR pipeline or tonemapper, no GI or AO, weak PSSM shadows, no modern AA or
@@ -8,14 +15,66 @@ upscaler, no SSR, sprite particles, 2010-era terrain and vegetation, and single-
 submission that is draw-call-bound long before the GPU is busy. The softbody solver is the part of
 RoR that is actually good and is not the problem.
 
-So: keep the simulation, replace the renderer. Godot 4.x becomes the shell — windowing, scene graph,
-renderer, asset loading, UI — and RoR's node/beam solver comes along as a C++ GDExtension. Godot's
-physics engine is not used for vehicle simulation at all.
+So: keep the simulation, replace the renderer, and build the rest of the client around it. Godot
+4.x becomes the shell — windowing, scene graph, renderer, asset loading, UI, networking — and RoR's
+node/beam solver comes along as a C++ GDExtension. Godot's physics engine is not used for vehicle
+simulation at all.
+
+### What "an alternative client" commits this project to
+
+Named here so none of it is discovered late. Each has its own milestone below.
+
+- **Every vehicle.** All of the rig-def format, not the parts one hero truck happens to use.
+  Ground types first and completely; airplanes and boats are two further physics subsystems —
+  aerofoils, turbojets, turboprops, screwprops, wings, autopilot, buoyancy — and they come after.
+- **Every map.** `.terrn2` and legacy `.terrn`, with the features a terrain can declare that are
+  read and ignored today: procedural roads, water, sky, hand-placed collision meshes, vegetation
+  colour maps and sway.
+- **AngelScript.** Terrains and rigs ship `.as` scripts. A scripted map loads today and then does
+  nothing, with no error. AngelScript is zlib-licensed, so the real library can be bound rather
+  than reimplemented.
+- **Audio.** `soundsources`, per-rig sound scripts, Doppler. There is none at all today.
+- **A GUI.** RoR's own is MyGUI plus ImGui: main menu, vehicle selector, repository browser, chat,
+  console, top menubar. None of it exists here. Recognisably RoR and refreshed, with the
+  instruments under glass — §0.11.
+- **Client surface that is not the renderer.** Spawn manager, camera modes including cinecam,
+  character and walking mode, save and replay, free-cam.
+- **The online repository**, including upload. Second to last, and see §0.9 for why it is handled
+  differently from everything else in this plan.
+- **Multiplayer**, wire-compatible with RoRnet so this client joins the community's existing
+  servers. Last, and §0.10 states the seam.
+
+Things a client needs that are easy to leave out of a plan until they block it, named here for the
+same reason:
+
+- **Input, remapping and force feedback.** RoR has an input-map system with joystick, wheel and
+  pedal support and FFB. This is a driving game; a wheel is not a nice-to-have, and Godot's input
+  layer does not give FFB for free. Currently there is a hardcoded keyboard map and nothing else.
+- **Settings persistence.** The equivalent of `RoR.cfg`: graphics, audio, input and gameplay
+  settings that survive a restart. Today every tunable is a `.gd` const, which is right for gates
+  and wrong for a person.
+- **Skins and dashboards.** `.skin` files retexture a rig without modifying it, and `.dashboard`
+  files define instrument layouts. Both are content the archive is full of and neither is read.
+- **Content management at archive scale.** Upstream has a ContentManager and a cache because a user
+  with 500 mods cannot pay a filesystem scan per launch. This project mounts one mod directory.
+- **Character and walking mode**, which is also how a player gets into a vehicle.
+- **Save and replay.**
+- **Localization.** Upstream ships translations; every string this project writes is English in a
+  format string today.
+- **Screenshot and video capture** as user features, not as the gate harness's `--write-movie`.
+- **A server browser** against the master server list, which belongs with C5.
+
+**Local first.** The order in §1 does everything that works on one machine with no network before
+either of the two networked milestones. A client that is good offline is a client worth connecting;
+the reverse is not true, and a network dependency in the middle of the plan makes every milestone
+after it harder to gate.
 
 Development is CLI-only through the ClaudeGodot editor, with no human eyes in the loop by default.
-That constraint drives two structural decisions that come before any rendering work: everything
-tunable lives in `.gd` / `.gdshader` (never in a `.tscn`), and a screenshot/metrics harness is
-commit #1 so the agent can see what it is doing.
+That constraint drove two structural decisions that come before any other work: everything tunable
+lives in `.gd` / `.gdshader` (never in a `.tscn`), and a screenshot/metrics harness was commit #1 so
+the agent can see what it is doing. **The harness is now being replaced by the dev environment in
+§0.8**, for the same reason and with the same authority: one window, one gate at a time, each in its
+own container, and a console both the user and the agent drive.
 
 ### Decisions already fixed (from grilling, 2026-09-25)
 
@@ -24,10 +83,13 @@ commit #1 so the agent can see what it is doing.
 | Solver integration | C++ GDExtension wrapping the existing RoR beam solver. No reimplementation. |
 | Engine fork | Stock Godot first. Fork only where proven impossible, patch set kept minimal and listed. |
 | Legacy content | Runtime compatibility shim: existing `.truck` / `.zip` / OGRE assets load unmodified. |
-| Target | Tech demo first: one hero vehicle, one terrain. No multiplayer/UI/game-mode work. |
+| Target | **Superseded 2026-09-30.** Was: tech demo, one hero vehicle, one terrain, no multiplayer/UI/game-mode work. Now: an alternative client with full vehicle and map support, a GUI, audio, the online repository and RoRnet multiplayer. Local milestones first; the two networked ones last. |
 | Platform | **macOS only for now.** The dev Mac is the sole authority for pixels, timings, and logic gates. No Linux/`xvfb`/lavapipe lane — deferred for speed, kept cheap to add later via the portability rules in §3.5. |
 | Hero asset | An existing community truck with its original diffuse-only textures, unchanged. |
 | Frame budget | 1080p, 60 fps, one truck + terrain. |
+| Folder layout | **Mirrors upstream's `source/main/` literally**, so an RoR developer opening this project finds the file they expect. `project.godot` moves to the repo root to make that possible. Spec in §0.7. |
+| Dev environment | **One window, one gate at a time, each in its own container**, driven by a Quake/Counter-Strike-style console that both the user and the agent use. Replaces the one-window-per-gate runner. Spec in §0.8. |
+| Netcode | **RoRnet first, behind an `ITransport` seam**, so this client joins existing servers and a native protocol can be added later without the simulation knowing. Spec in §0.10. |
 | Showcase scene | A Rigs of Rods terrain loaded from the files its author shipped, standing up from M1 and dressed progressively by every later milestone. Spec in §0.5 — which supersedes the generated "Valley One" that section originally asked for. |
 | Terrain layer | **Terrain3D** (TokisanGames, MIT, asset-library #3892) instead of writing our own clipmap. Rationale and integration in §0.6. |
 | Camera and post | Physical camera model (`CameraAttributesPhysical`: focal length, f-stop, shutter) plus a full post stack — AO, DOF, motion blur, glow, grade, grain, flare. Its own milestone, M2b. |
@@ -275,10 +337,268 @@ clipmap and instancer, which is roughly the work M8 originally budgeted. Accepta
 
 ---
 
+## 0.7 Folder layout — mirror upstream's own tree
+
+**Decision: `game/` mirrors `source/main/` from the Rigs of Rods repository, directory for
+directory.** The reason is people, not code. This project asks RoR developers to look at a Godot
+codebase and recognise their own game in it, and a tree named after this project's own history —
+`compat/`, `world/` — maps to nothing they know. `resources/` and `terrain/` do.
+
+```
+project.godot            <- at the REPO ROOT, not in game/
+game/
+  physics/               solver glue, the bridge, ground models      (source/main/physics)
+  gfx/                   materials, flexbodies, props, flares, sky   (source/main/gfx)
+  terrain/               terrain reading, objects, vegetation        (source/main/terrain)
+  resources/             rig-def, .otc, .terrn2, .odef, OGRE mesh    (source/main/resources)
+  gui/                   menu, vehicle selector, chat, menubar       (source/main/gui)
+  network/               RoRnet, ITransport                          (source/main/network)
+  audio/                 sound sources, engine sound                 (source/main/audio)
+  scripting/             AngelScript binding                         (source/main/scripting)
+  utils/                 shared helpers                             (source/main/utils)
+harness/                 THIS PROJECT'S OWN — upstream has no counterpart
+  gates/                 one file per gate
+  console/               the dev console and its command surface
+  dev/                   the one-window runner, containers, probes
+  config/                every tunable, as `.gd` consts
+extension/src/           mirrors game/'s division
+tools/                   shell entry points                          (upstream tools/)
+doc/                     upstream has this name too
+docs/                    this project's own documents
+```
+
+**`project.godot` moves to the repo root.** Godot loads resources only from its own project
+directory, so a top-level `harness/` is invisible to an engine rooted at `game/`. Paths become
+`res://game/...` and `res://harness/...`, and `tools/*.sh` invoke `--path .` instead of
+`--path game`. This is a prerequisite of the layout decision rather than a separate choice.
+
+**`harness/` is deliberately not given an upstream-looking name.** Upstream's `tools/` holds build
+scripts; naming a test harness after it would give an RoR developer a familiar directory with an
+unfamiliar meaning, which is worse than an honestly new one.
+
+**The move is mechanical and must be provably so.** Every commit in the move keeps the suite green
+and changes no behaviour: the `layering` gate already knows which directories may depend on which
+and is updated in the same commit, and `file_size`, `typing` and `scene_purity` do not care where a
+file lives. A rename that also changes something is two commits.
+
+---
+
+## 0.8 The dev environment — one window, contained gates, one console
+
+**Decision: gates run inside one long-lived window, one at a time, each in its own container, driven
+by a console that both the user and the agent use.** The present runner opens a fresh OS window per
+gate. With 76 gates that is 76 windows over a suite run, it is the single most annoying thing about
+working here, and it is also slow: each one pays engine startup, shader compilation and Terrain3D
+region loading again.
+
+### What "containerized" has to mean
+
+Not a process. A gate that leaks state into the next gate is worse than a gate that is slow,
+because the failure it produces is order-dependent and looks like a flake. So a container is:
+
+- **Its own `SubViewport` with its own `World3D`.** Separate environment, separate lighting,
+  separate physics space, separate camera. Nothing a gate adds to its world can be seen by the next.
+- **Torn down and asserted empty.** After each gate the container is freed and the node count,
+  the `RenderingServer` instance count and the orphan-node count are checked back to their
+  pre-gate values. A leak fails the gate that caused it, not the one that ran next.
+- **Its own static state.** This is the part that needs work rather than a viewport:
+  `TerrainWorld._shape` and `_surfaces`, `BlockoutWorld._clouds` and every other `static var` in
+  the tree is process-global and survives a container. Each of them is either reset by the
+  container or moved into an instance the container owns. **`static var` becomes a lint**, the way
+  `no_global_random` already is, because this is exactly the class of bug the containers exist to
+  remove.
+- **Reproducible in isolation.** `gate run <name>` in a fresh window and `gate run <name>` as the
+  fortieth gate of a suite run must produce the same number. A gate whose result depends on what
+  ran before it is a broken gate and the runner proves this by running the suite in a second,
+  seeded order and comparing. **This is the acceptance test for the whole dev environment** — it
+  is also the only way to know the containers work, since "it looked fine" is not available.
+
+### The console
+
+A Quake/Counter-Strike-style drop-down console, because that is the interaction RoR developers and
+players already know, and because it is the one UI that is useful before any other UI exists.
+
+- **Opens on `` ` `` / F1**, over whatever is running, without pausing it unless asked.
+- **Commands and cvars.** `gate run <name>`, `gate list`, `gate all`, `gate why <name>`,
+  `map load <name>`, `veh spawn <path>`, `weather <preset>`, `cam <mode>`, `r_*` render cvars,
+  `sim_*` solver cvars. A cvar reads and writes the same `harness/config/*.gd` values the gates
+  use, so a number tuned in the console is the number a gate then measures.
+- **Autocomplete, history, aliases.** Tab completes commands, cvar names, gate names, map names and
+  vehicle paths from the library. Up/down history persisted across runs. `alias` and `bind`.
+- **Output is scrollable, filterable and copyable**, with severity colours and a `condump`.
+- **It is the only command surface.** The agent's channel, the keyboard and `tools/gate.sh` all
+  dispatch into the same command table, so anything the user can type, the agent can run, and
+  neither has a capability the other lacks.
+
+### The agent channel
+
+**Decision: a watched file drop is the contract, with a local socket as a fast path.** Both front
+ends dispatch into the same command table as the keyboard.
+
+```
+artifacts/console/in/<seq>.cmd     the agent writes; one command or a script per file
+artifacts/console/out.jsonl        the console appends exactly one line per command
+artifacts/console/state.json       current cvars, loaded map, spawned rigs, last N errors
+127.0.0.1:<port>                   same commands, line protocol, when a window is up
+```
+
+**Token efficiency is a design constraint, not a nicety**, since the agent pays for every line it
+reads:
+
+- One JSON line per command, with `seq` so the agent reads only what it asked for.
+- `ok`, `ms`, and a `detail` string that is the gate's own one-line result — never a frame, never
+  a log dump, never a stack unless it failed.
+- Anything large — an image, a capture, a heightfield — is written to a file and the line carries
+  the **path**, not the content.
+- `--quiet` by default: engine chatter, Terrain3D's region logging and Godot's own warnings go to a
+  file, not to the channel. Today a single gate run prints region-save lines the agent has to read
+  past to find one result.
+- A script file is one round trip for many commands, so a whole investigation costs one write and
+  one read rather than one per step.
+
+### What survives from the old harness
+
+`tools/gate.sh` stays, because CI and a headless machine need a runner that is not a window, and
+because a gate must be runnable when the console itself is what is broken. It becomes a thin client
+of the same command table. The gate metadata contract, the gate graph and `--all --every` are
+unchanged.
+
+---
+
+## 0.9 The online repository — why it is handled differently
+
+Second to last in the order, and the only milestone in this plan that writes to a service other
+people depend on. Upload, edit and delete of the user's own content are in scope, and that means a
+bug here does not produce a wrong pixel, it produces wrong content published under the user's name
+on a live community site.
+
+Rules, fixed now rather than at implementation time:
+
+- **Every write is confirmed by the user, per action, with what will be sent shown first.** No
+  batch upload that was not reviewed item by item.
+- **A dry-run mode that exercises the whole path and sends nothing** is part of the milestone, not
+  an afterthought, and it is what the gates use. **No gate ever writes to the live repository.**
+- **Credentials live in the OS keychain.** Never in the repo, never in a log, never in a gate
+  artifact, never in the console's `condump` or the agent's channel.
+- **Nothing is mirrored or re-hosted.** The user downloads their own copy; this client never becomes
+  a distribution point for content whose licence does not allow it — which is most of the archive.
+  See `THIRD_PARTY.md`.
+- **An open question to settle before any code**: the repository is a forum resource manager and its
+  write API is not a documented public interface. Whether a third-party client may upload through it
+  at all is a question for the Rigs of Rods maintainers, not one to answer by reading the network
+  traffic. Read-only browse and download are uncontroversial; upload is not, and it may end up out
+  of scope for reasons that have nothing to do with engineering.
+
+---
+
+## 0.10 Multiplayer — the transport seam
+
+Last, and structurally simple as long as one decision is honoured: **the simulation never learns
+which transport it is on.**
+
+```
+game/network/
+  i_transport.gd / .h      connect, disconnect, register stream, send, poll
+  rornet_transport         RoRnet as upstream defines it. First and primary.
+  native_transport         later, optional
+```
+
+- **RoRnet is a wire contract, not an interface to design.** `source/main/network/RoRnet.h` defines
+  fixed-size structs and a version string, and the server's handshake rejects a client whose version
+  does not match. That version is pinned from the submodule, so a submodule bump that changes it is
+  a change this project has to notice.
+- **It is state replication, not lockstep.** RoRnet registers a stream per actor and sends node
+  state; it does not send inputs and it does not require two clients to compute the same result.
+  That is the reason multiplayer does not depend on solver determinism, and it is why this milestone
+  can come after the solver's own divergence question rather than before it.
+- **The outside oracle is a live server with other clients on it**, which is the strongest oracle
+  in this entire plan and the reason RoRnet comes before any native protocol. A native transport
+  with no players has no oracle at all.
+- **Real RoR clients on the same server are the fidelity check**: if this client's actor looks and
+  moves right in their windows, the streams are right.
+
+---
+
+
+## 0.11 UI design — Rigs of Rods, refreshed, and the instruments under glass
+
+**Decision: the UI is recognisably Rigs of Rods and redrawn, not redesigned.** The same wallpapers,
+the same main-menu furniture, the same layout a player already knows how to use — a player who has
+used RoR should never have to look for anything. What changes is the drawing: current type, real
+spacing, a modern skin. The same rule as §0.7's folder mirror, applied to what the user sees rather
+than to what a developer reads.
+
+### The instruments are under glass
+
+The distinguishing idea, and it applies to every ported RoR gauge: a speedometer stays *that*
+speedometer, the same dial and the same needle, wrapped in a piece of glass that behaves like glass.
+Three behaviours, and each is a separate thing to get right:
+
+- **It reflects its environment.** A specular layer over the dial taking the scene's own reflection
+  probe — the actor already has one — so the glass picks up the sky, the cab and what is out of the
+  window. Subtle: a reflection that competes with the needle is a worse instrument.
+- **It lights from below when the lights are on.** A warm glow rising from the bottom edge, the way
+  a Casio watch backlight does, driven by the same lamp state `lights_follow_the_controls` already
+  gates. Off when the lights are off — the lamp work established that an unshaded material draws
+  its albedo and ignores emission, so this is an emissive layer and not a brighter texture.
+- **It has inertia tied to the vehicle.** The glass, and the housing it sits in, move slightly
+  against the vehicle's own acceleration — a gyroscope mounted in the cab, not a camera shake. The
+  reference is Night Runners. The input is the solver's own acceleration, which the cockpit already
+  reads, so this is a damped spring on a transform and not a new source of truth.
+
+**Why this is stated in the plan rather than left to implementation.** It is the project's one
+visual signature, it applies to every gauge rather than to one screen, and all three behaviours are
+measurable — which means they are gateable, and a thing that looks right in a screenshot and is
+wrong in motion is exactly what this project's gates exist to catch:
+
+- The reflection changes when the environment changes, and does not when it does not.
+- The backlight's luminance follows the lamp state, and the gauge is readable in both states — the
+  failure mode is a dial that is beautiful at night and unreadable at noon.
+- The inertia is bounded and settles: a gauge that keeps swinging after the vehicle is still, or
+  that swings far enough to be read wrong, fails. A number for how far it may move and how quickly
+  it must settle, not an opinion.
+
+**The needle is not the glass.** The reading has to be correct and legible first;
+`cockpit_tracks_the_drivetrain` already holds that the dials read the drivetrain, and no amount of
+glass may cost that gate. Inertia moves the housing, never the value.
+
+---
+
 ## 1. Milestone plan
 
-Ordered by visual payoff per unit work, with two prerequisites inserted ahead of the requested order
-because nothing renders without them.
+**Re-ordered 2026-09-30 for the client scope.** Two prerequisites still come ahead of everything
+because nothing renders without them, and the order after them is: the dev environment, then every
+local milestone, then the two networked ones.
+
+| # | Milestone | Why here |
+| --- | --- | --- |
+| M0 | CLI harness | done; nothing else could be committed before it |
+| M1 | Softbody bridge + a rig on screen | done but for three acceptance items, listed in its section |
+| **D0** | **The dev environment** (§0.8) | **next.** Every milestone after it is built and gated inside it, so it comes before them rather than being retrofitted. Carries the §0.7 tree mirror, because moving files is cheapest before there are more of them. |
+| M2 | PBR + HDR + tonemap + IBL sky | first after D0: it is the highest visual payoff per unit work, and it closes the one red gate in the suite (`terrain_takes_the_light`, §0.5) |
+| M2b | Physical camera and the post stack | follows M2 directly; same pipeline |
+| C1 | GUI + audio | the point at which this stops being a harness with a window and becomes a client a person can use. Menu, vehicle selector, console surfaced to the user, chat shell, engine and impact sound. |
+| C2 | Format coverage + AngelScript | every ground rig-def section and every `.terrn2` feature, plus the script interpreter. The mod archive is the oracle. |
+| M3–M8 | The rest of the renderer | motion vectors, TAA, FSR, GI, AO, shadow overhaul, volumetrics, SSR, wetness, particles, FFT water, terrain VT |
+| C3 | Airplanes and boats | two further physics subsystems: aerofoils, turbojets, turboprops, screwprops, wings, autopilot, buoyancy |
+| C4 | The online repository (§0.9) | second to last. Networked, and the only milestone that writes to a service other people depend on. |
+| C5 | Multiplayer (§0.10) | last. RoRnet behind `ITransport`; a live server with other clients on it is the oracle. |
+
+Not yet placed in a milestone, and each needs one before it is forgotten: input remapping and force
+feedback, settings persistence, skins and dashboards, content management at archive scale, character
+and walking mode, save and replay, localization, user-facing capture. Input and settings are the two
+that C1 will run into immediately.
+
+**Local first, and the reason is gating.** Every milestone through C3 can be checked on one machine
+against content that is already on disk. Both networked milestones depend on a service this project
+does not control, and a gate that needs the internet is a gate that goes red for reasons that are
+nobody's fault. Putting them last means no local milestone is ever blocked behind one.
+
+**What the renderer milestones below still assume, and no longer should.** M3 through M8 were
+written when the target was one hero vehicle on one terrain. Their acceptance criteria are still
+correct as written — they are about pixels and frame times — but three of them reference the
+generated valley or the eight money shots, and both are gone (§0.5). Each is marked where it comes
+up. A replacement money-shot set is open work and M2 is the milestone that needs it first.
 
 ### M0 — CLI harness (commit #1, no rendering work)
 
@@ -349,6 +669,47 @@ agent for correct deformation silhouette; side-by-side PNG of the same frame ren
 FlexBody path and the skinned path, plus the numeric error histogram as the real proof. The money-shot
 sheet that was to establish the before-image does not exist: the eight frames named features of the
 deleted valley and a replacement set is open work (§0.5).
+
+---
+
+### D0 — The dev environment (next; everything after it is built inside it)
+
+Full detail in §0.8, and the tree mirror in §0.7. This is infrastructure with no user-visible
+output, and it comes first because every milestone after it is gated inside it and because moving
+the tree is cheapest while the tree is small.
+
+Scope:
+- **The §0.7 tree mirror**, including `project.godot` moving to the repo root. Mechanical, suite
+  green at every commit, `layering` updated in the same commit as the move it describes.
+- **One window, one gate at a time, each in its own `SubViewport`/`World3D` container**, torn down
+  and asserted empty between gates.
+- **`static var` eliminated or container-owned**, and a lint that keeps it that way. This is the
+  real work of the milestone: a viewport is easy, process-global state is not.
+- **The console**: command table, cvars bound to `harness/config/*.gd`, autocomplete over commands,
+  cvars, gate names, maps and vehicle paths, persisted history, aliases and binds, `condump`.
+- **The agent channel**: watched file drop plus a local socket, one JSONL line per command, large
+  results written to files and referenced by path, engine chatter off the channel by default.
+- **`tools/gate.sh` becomes a thin client of the same command table**, so CI and a broken console
+  both still have a runner.
+
+**Acceptance:**
+1. `gate all` runs the whole suite in **one** window and every gate's result matches what it
+   produces in a fresh window of its own, gate for gate.
+2. **Order independence**: the suite run in a second, seeded order produces identical results. This
+   is the gate on the containers themselves and the milestone does not close without it.
+3. **No leaks**: after each gate the container is freed and node count, `RenderingServer` instance
+   count and orphan-node count are back to their pre-gate values. A leak fails the gate that caused
+   it.
+4. A suite run is faster than the present one-window-per-gate runner, reported as a number. Engine
+   startup, shader compilation and terrain import are paid once.
+5. `static_state` gate: no `static var` outside `harness/config/` holds mutable state.
+6. The console runs every command the agent's channel can, and the reverse, from one table — proven
+   by a gate that drives the same command through both front ends and compares.
+7. One command through the agent channel costs one JSONL line; a gate's failure carries its own
+   detail string and an artifact path, not a log.
+
+**Visual verification:** the user opens one window, types `gate all`, watches gates run in place,
+and can stop on a failure and inspect that gate's world with the free camera without relaunching.
 
 ---
 
@@ -704,6 +1065,125 @@ Scope:
 a terrain vista sheet at three times of day.
 
 ---
+
+### C1 — GUI and audio (the client becomes usable)
+
+The point at which this stops being a harness that happens to open a window. Placed after M2/M2b so
+the first thing a person sees is the renderer at its best rather than at its M1 state.
+
+Scope:
+- **Main menu, vehicle selector, map selector**, reading the terrain library and the mod directory
+  and showing what each one says about itself — which `RorTerrainLibrary.summaries()` already does.
+- **The console surfaced to the user** as the in-game console, not a dev tool. It exists from D0;
+  this is where it gets a skin, a chat pane and a menubar around it.
+- **Audio, which does not exist at all today.** `soundsources` and `soundsources2` from the rig-def,
+  per-rig sound scripts, engine sound driven by the drivetrain state the cockpit already reads,
+  tyre and impact sound driven by `ror_ground`'s own contact events, Doppler and distance
+  attenuation.
+- **Camera modes** including cinecam from the rig's own `cinecam` section, and free-cam.
+- **Spawn manager**: more than one actor at a time, selected, removed, reset.
+
+**Acceptance:**
+1. A person can start the client, pick a map, pick a vehicle, drive it and quit without a command
+   line. Gated by a scripted UI walk, not by a screenshot.
+2. `a_rig_sounds_like_its_drivetrain`: engine pitch tracks reported RPM over a sweep, measured off
+   the audio bus rather than asserted.
+3. Impact sound fires on the same contact events the solver reports, within one frame.
+4. Two actors spawn, are independently driven, and neither's solver state reaches the other.
+5. Cinecam matches the position the rig's own file declares.
+
+**UI design is decided — see §0.11.** Recognisably Rigs of Rods, refreshed: the same wallpapers and
+the same layout a player already knows, redrawn; and the in-vehicle instruments under glass.
+
+---
+
+### C2 — Format coverage and AngelScript (the archive is the oracle)
+
+Every ground rig-def section and every `.terrn2` feature, plus the script interpreter. This is the
+milestone the `mod_corpus` gate from M1 acceptance 5 belongs to, and it is where that gate stops
+asserting "loads or fails cleanly" and starts asserting fidelity per section.
+
+Scope, vehicles:
+- **Every section a ground rig uses.** The named gaps today: `contacters` (79 rows unparsed on the
+  hero truck), `commands2` not key-driven so doors do not open, differentials not modelled,
+  `fusedrag` given per-node drag instead of a fuselage vector, traction control and ABS absent,
+  flares placed but not animated.
+- **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
+- **A section inventory as a gate**: every section upstream's `RigDef::Parser` knows, against what
+  this project reads, reported as a number. A section that is parsed and ignored counts as ignored.
+
+Scope, terrains:
+- **Procedural roads** from `.tobj` `road`/`road2`, which are reported as unread lines today.
+- **Water**, a terrain's own `Water` and `WaterLine`. There is no water in the project at all since
+  the valley went, so this is also where water returns.
+- **Hand-placed collision meshes**, which a terrain can ship.
+- **Vegetation colour maps and sway**, read and unused today.
+- **Legacy `.terrn`**, the pre-0.38 format, if "all maps" is to mean all of them.
+- **Sky**: the terrn2 names a cube map from RoR's core resources, which a terrain does not ship.
+
+Scope, scripting:
+- **Bind the real AngelScript library** — zlib licence, GPL-compatible — rather than reimplement it.
+- **Upstream's script API surface**, as much of it as the archive actually uses, measured rather
+  than guessed: the corpus says which functions real scripts call.
+- **A script that calls something unbound fails loudly and names it**, which is the whole point.
+  Today a scripted map loads and silently does nothing.
+
+**Acceptance:**
+1. `mod_corpus` over 200 archive mods: zero crashes, zero hangs, each either loads or names its
+   unsupported feature. (M1 acceptance 5, unmet, lands here.)
+2. `section_coverage`: the count of rig-def sections read, against upstream's parser, with the
+   unread ones named individually. A number that can only go up.
+3. `a_terrains_own_road_is_drivable`: a `.tobj` procedural road, driven.
+4. `a_terrains_own_water_floats_a_rig`: water read from a terrain's own declaration.
+5. `a_scripted_map_runs_its_script`, against a real archive map that ships one.
+6. Doors open, indicators blink, brake lights follow the pedal, reversing lights follow the gear.
+
+---
+
+### C3 — Airplanes and boats
+
+Two further physics subsystems, and the reason they are not in C2: they are not more parsing, they
+are aerodynamics and buoyancy. Until this milestone an `.airplane` or `.boat` spawns and **says it
+does not fly or float yet**, rather than silently sinking.
+
+Scope:
+- **Aerofoils** from `airfoils/*.afl`, upstream's own tables.
+- **Turbojets, turboprops, screwprops**, each a port of upstream's own law, each parity-checked the
+  way `ror_ground` was.
+- **Wings, ailerons, elevators, rudders, autopilot.**
+- **Buoyancy**, per submesh, which is also what a terrain's water from C2 feeds.
+
+**Acceptance:** per-force-law parity against upstream extracted functions, the way
+`upstream_contact_parity` works today; then an aircraft that takes off, flies level and lands, and a
+boat that floats at the waterline its file implies and makes way under its own screw.
+
+---
+
+### C4 — The online repository
+
+Rules in §0.9 and they are binding. Browse, search, download into the library, account login, and
+upload/edit/delete of the user's own content, with per-action confirmation, a dry-run mode the gates
+use, credentials in the OS keychain, and no mirroring.
+
+**Acceptance:** browse and download gated against a recorded fixture rather than the live service;
+every write path gated in dry-run only; a gate that fails if any credential appears in an artifact,
+a log, a `condump` or the agent's channel. **Before any code: the answer from the Rigs of Rods
+maintainers on whether a third-party client may upload at all** (§0.9).
+
+---
+
+### C5 — Multiplayer
+
+Seam in §0.10. `ITransport`, then `RoRnetTransport` pinned to the submodule's own RoRnet version,
+then joinability, streams, chat and the user list. A native transport is optional and later.
+
+**Acceptance:** this client joins a real Rigs of Rods server alongside real clients; its actor
+appears and moves correctly **in their windows**, which is the oracle; chat and the user list work
+both ways; a version mismatch is reported as a version mismatch rather than a failure to connect.
+The simulation contains no reference to any transport.
+
+---
+
 
 ## 2. The softbody-to-Godot bridge
 

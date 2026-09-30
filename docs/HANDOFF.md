@@ -6,9 +6,18 @@ Copy everything below the line into a fresh session.
 
 ---
 
-Continue work on the Rigs of Rods → Godot 4.x renderer rewrite in `/Users/htdguide/ror-godot`.
-Read `docs/PLAN.md` first — it is the approved plan and it is authoritative, and its §0.5 was
-superseded on 2026-09-30. Then `docs/architecture/bridge.md` and `docs/decisions/`.
+Continue work on **an alternative Rigs of Rods client**, built on Godot 4.x, in
+`/Users/htdguide/ror-godot`. Read `docs/PLAN.md` first — it is the approved plan and it is
+authoritative. It was re-scoped on 2026-09-30 from a renderer rewrite to a client: §0.5, §0.7–§0.10
+and §1's ordering are the new parts and the decisions table records what was superseded. Then
+`docs/architecture/bridge.md` and `docs/decisions/`.
+
+**Next milestone is D0, the dev environment** (§0.8), plus the §0.7 folder mirror. Nothing else is
+in progress. The order after it is: M2, M2b, C1 GUI+audio, C2 format coverage+AngelScript, M3–M8,
+C3 airplanes+boats, C4 repository, C5 multiplayer. Local milestones first; the two networked ones
+last, deliberately. The UI's design is settled in §0.11: recognisably RoR and refreshed, with the
+in-vehicle instruments under glass that reflects, backlights warm from below with the lights, and
+carries a bounded inertia against the vehicle's own acceleration.
 
 ## Where things stand
 
