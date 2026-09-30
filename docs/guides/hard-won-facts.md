@@ -109,12 +109,35 @@ afternoon to rediscover.
   defines the page at height zero and `TerrainGeometryManager::getHeightAt` returns 0.0 before it
   reads anything, so the filename is never opened — which is why the shipped map names a `.png`
   it does not ship. A reader that opens it fails on the map the game starts with.
-- **Terrain3D's ground takes far less of its light from the sky than a surface standing on it,
-  and how much less depends on the terrain.** `terrain_takes_the_light` compares the ground with a
-  Lambertian patch by how each responds to the sun being switched off: the deleted generated
-  valley read 13.6% apart, upstream's flat gravel map reads 36%, and La Paz reads 111%. The small
-  number was an artifact of the valley's flat-tint colour map — the same finding as "the texture
-  assets attached to Terrain3D reach nothing". It is the M2 ground material's to close.
+- **`Image.create_from_data` takes a `use_mipmaps` flag, and an image's byte array contains its
+  mipmap chain.** Passing `false` for an image that has them means "expected 1920000 bytes, got
+  2559756", the image is not created, and whatever was going to use it gets nothing. This cost
+  more than any other single line in the project: `RorTerrainSkin.rolled` did it, so every ground
+  texture rolled to cancel Terrain3D's half-tile offset came out **blank**, and the consequences
+  were recorded as four separate findings that were all this one bug:
+  - "Terrain3D is drawing the ground from the colour map and the texture assets attached to it
+    reach nothing." They reached nothing because they were empty. Darkening an albedo, whitening
+    `albedo_color` and taking normal depth to zero each changed the render by 0.0000 — they were
+    changing a black texture into a slightly different black texture.
+  - "The ground takes far less of its light from the sky than a surface standing on it", measured
+    at 13.6%, 36% and 111% on three terrains. Measured against blank ground.
+    `terrain_takes_the_light` reads 22.6% and passes on its original threshold now.
+  - The M2 ground material was scoped around replacing Terrain3D's shading to fix both. It does
+    not need to.
+  **Prefer `image.duplicate()` to rebuilding an image from its own bytes**, and if you must
+  rebuild one, pass `image.has_mipmaps()`.
+- **Terrain3D turns its checkerboard on when a texture array is empty, and this project switched
+  it off two lines later.** `Terrain3DMaterial::_update_texture_arrays` calls
+  `set_show_checkered(true)` when `get_texture_count() == 0`; `TerrainWorld._show_surfaces` sets
+  it to false unconditionally, with a comment explaining that the checkerboard is a placeholder
+  for missing textures. It was not a placeholder, it was the diagnosis, and turning it off hid
+  the blank textures for as long as they existed. A debug view a dependency turns on by itself is
+  worth reading before switching off.
+- **Terrain3D packs its textures into an array when its asset list is initialised, and a change
+  to an asset afterwards is invisible until the array is repacked.** `update_texture_list()` is
+  the call it makes itself and it is exposed to script. Reassigning a whole new `Terrain3DAssets`
+  is *not* equivalent and silently does nothing: `Terrain3D::set_assets` reinitialises only while
+  the node is inside a world, and an array that is already packed stays packed.
 - **A patch compared with the terrain has to be matched in albedo even when the measurement is a
   ratio.** The ratio cancels diffuse albedo but not specular, which does not scale with it: a
   fixed 0.18 grey moved the patch's own sun response from 2.12 to 1.71 with nothing else changed.

@@ -98,15 +98,30 @@ static func tiling_texture_of(path: String, reader: RefCounted) -> Texture2D:
 
 ## An image shifted by a fraction of its own size, wrapping round. A tiling texture rolled this
 ## way tiles exactly as before, that fraction of a tile along.
+##
+## The source is duplicated, not rebuilt from its own bytes. `Image.create_from_data` was used
+## here with `use_mipmaps` hardcoded false, and an image that carries mipmaps carries them in
+## that byte array: for one of La Paz's 800x600 textures it meant "expected 1920000 bytes, got
+## 2559756", the reconstruction failed, `blit_rect` was handed a zero-size source, and the roll
+## produced an empty image.
+##
+## That is the whole of the recorded finding that "Terrain3D is drawing the ground from the
+## colour map and the texture assets reach nothing". They reached nothing because they were
+## blank. Every experiment that followed — darkening an albedo, whitening `albedo_color`, taking
+## normal depth to zero — was changing a black texture into a slightly different black texture,
+## and Terrain3D's own warning for it, the checkerboard it turns on when a texture array is
+## empty, was being switched off two lines later by `TerrainWorld._show_surfaces`.
 static func rolled(image: Image, fraction: float) -> Image:
     var width: int = image.get_width()
     var height: int = image.get_height()
     var shift_x: int = posmod(int(round(fraction * float(width))), width)
     var shift_y: int = posmod(int(round(fraction * float(height))), height)
-    var source: Image = Image.create_from_data(
-        width, height, false, image.get_format(), image.get_data()
-    )
-    var out: Image = Image.create_empty(width, height, false, image.get_format())
+    var source: Image = image.duplicate() as Image
+    # Mipmaps are regenerated after the roll, and a source that has them makes every rect
+    # arithmetic here wrong by the size of its own chain.
+    if source.has_mipmaps():
+        source.clear_mipmaps()
+    var out: Image = Image.create_empty(width, height, false, source.get_format())
     out.blit_rect(source, Rect2i(0, 0, width, height), Vector2i(shift_x, shift_y))
     out.blit_rect(
         source, Rect2i(width - shift_x, 0, shift_x, height), Vector2i(0, shift_y)

@@ -116,43 +116,36 @@ distance, lamps — with Resume and Quit in it. Controls: `G` drive, `B` reverse
 ignition, `N` or `L` lights, `R` recover upright, Backspace respawn, `Z`/`C`/`X` indicators,
 `F5`/`F6`/`F7` chase, free and driver's seat.
 
-## The one red gate
+## The suite is green
 
-**`terrain_takes_the_light` fails at 111% and the threshold is 30%.** It compares the ground with a
-Lambertian patch laid on it by how each responds to the sun being switched off, which cancels
-albedo and leaves the shading model. Measured on three grounds:
+80 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
+twice in one session with a worst measured drift of zero.
 
-| ground | patch | terrain | apart |
-| --- | --- | --- | --- |
-| the deleted generated valley | 2.12 | 2.41 | 13.6% |
-| upstream's flat gravel map | 1.87 | 2.56 | 36% |
-| La Paz | 1.84 | 3.89 | 111% |
-
-The 30% threshold was calibrated against the valley, and the 13.6% it was calibrated on was an
-artifact of that world's flat-tint colour map — which is the same finding as "the texture assets
-attached to Terrain3D reach nothing". On any terrain an author drew, the ground takes far less of
-its light from the sky than a surface standing on it does, and that is why a shaded slope reads
-darker than a truck parked against it.
-
-**This is left red deliberately.** Raising the threshold to 1.2 would be the gate writing its own
-expectation, which this project does not allow. It belongs to M2's ground material — that work
-replaces Terrain3D's shading with `res://shaders/terrain3d_override.gdshader`, which this project
-owns — so the options are to do that work, or to decide with the user that the gate is M2's and
-should say so.
+It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%
+threshold — and the cause was not what it was recorded as. See the entry on
+`Image.create_from_data` in `docs/guides/hard-won-facts.md`: one wrong `use_mipmaps` flag made
+every ground texture blank, and four separate findings were all that one bug. The gate passes at
+22.6% on its original threshold. It was worth not widening.
 
 ## What to do next
 
-**1. The ground material.** PLAN §0.5's M2 staging: the PBR ground material through
-`res://shaders/terrain3d_override.gdshader`, and vegetation tiers 2 and 3. This is also what closes
-the red gate above. Established while chasing it, and worth not re-deriving: **Terrain3D is drawing
-the ground from the colour map and the heightmap, and the texture assets attached to it reach
-nothing.** Darkening a surface's albedo texture to a third, setting its `albedo_color` to white, and
-taking the normal map's depth to zero each changed the render by nothing at all, to four decimal
-places.
+**1. M2, the renderer milestone.** Its scope is in PLAN §1 and it is mostly untouched: the
+`WorldEnvironment` in code, HDRI skies per weather preset, the vehicle `.gdshader` with
+metallic-roughness and clearcoat, derived roughness for legacy assets, and the Khronos
+`pbr_spheres` oracle — an AI-free check of the BRDF and the IBL path against the reference image
+shipped with `glTF-Sample-Assets`.
+
+**What M2 no longer has to do:** replace Terrain3D's shading with
+`res://shaders/terrain3d_override.gdshader` to make the ground draw its author's textures. It
+already does — `the_ground_draws_its_own_textures` holds it, and darkening one splat layer to a
+third moves the rendered ground 0.2384 luma. The override is still the right seam for a PBR
+ground material that does more than Terrain3D's own, but it is no longer a prerequisite for
+anything.
 
 Also measured and still open: `daylight_shadows_are_readable` records that the scene's sun-to-sky
 balance is about 3:1 where clear-sky daylight is nearer 14:1 — the sky is roughly three times too
-strong relative to the sun — which belongs with M2's HDRI sky.
+strong relative to the sun — which belongs with M2's HDRI sky. That one was measured against a
+grey quad rather than against the ground, so the blank-texture bug did not reach it.
 
 **2. The money shots do not exist.** PLAN §0.5 named eight, and half of them named features of the
 deleted valley. Nothing renders the sheet today, so there is no before-image for the project to be
