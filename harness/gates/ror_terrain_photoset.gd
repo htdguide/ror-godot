@@ -52,6 +52,11 @@ static func meta() -> Dictionary:
     }
 
 
+## The sway phase every capture here is taken at. Any fixed number would do; what
+## matters is that it is fixed.
+const FROZEN_WIND_PHASE: float = 0.0
+
+
 func run(harness: Node) -> Dictionary:
     var directory: String = SourceScan.repo_root().path_join(TERRAIN_DIR)
     if not DirAccess.dir_exists_absolute(directory):
@@ -79,6 +84,8 @@ func run(harness: Node) -> Dictionary:
     # heightmap.
     harness.world.add_child(RorObjects.build(terrain_data))
     var vegetation: RorVegetation = RorVegetation.new()
+    # A captured frame must not depend on when it was captured.
+    vegetation.wind_phase = FROZEN_WIND_PHASE
     if vegetation.setup(terrain_data) == "":
         harness.world.add_child(vegetation)
     else:

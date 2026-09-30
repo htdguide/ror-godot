@@ -30,10 +30,14 @@ var _transcript: PackedStringArray = PackedStringArray()
 ## went over the source cap, and it is a real seam: none of them touches the table's own state,
 ## so none of them needed to be here.
 var _queries: ConsoleQueries = ConsoleQueries.new()
+## The commands that run things rather than answer questions. They are handed the table back,
+## unlike the queries: `exec` dispatches through it and the gate commands report progress on it.
+var _runs: ConsoleRuns = ConsoleRuns.new()
 
 
 func _init(harness: Node) -> void:
     _harness = harness
+    _runs.setup(self)
     _register(ConsoleCommand.make(
         "help", "help [command]", "list the commands, or explain one", 0, _cmd_help, _complete_command
     ))
@@ -42,7 +46,15 @@ func _init(harness: Node) -> void:
     ))
     _register(ConsoleCommand.make(
         "gate run", "gate run <name> [name...]",
-        "run gates, each in its own container, in this window", 1, _cmd_gate_run, _queries._complete_gate
+        "run gates, each in its own container, in this window", 1, _runs._cmd_gate_run, _queries._complete_gate
+    ))
+    _register(ConsoleCommand.make(
+        "gate all", "gate all [every]",
+        "run the whole suite here, scheduling from the graph; `every` ignores the graph", 0,
+        _runs._cmd_gate_all
+    ))
+    _register(ConsoleCommand.make(
+        "exec", "exec <file>", "run a file of commands, one per line", 1, _runs._cmd_exec
     ))
     _register(ConsoleCommand.make(
         "gate meta", "gate meta <name>", "what a gate claims, and how it is bounded", 1,
@@ -196,33 +208,6 @@ func _cmd_help(args: PackedStringArray, _harness_node: Node) -> Dictionary:
     return ConsoleResult.ok("%d commands: %s" % [lines.size(), "; ".join(lines)])
 
 
-func _cmd_gate_run(args: PackedStringArray, harness_node: Node) -> Dictionary:
-    if harness_node == null:
-        return ConsoleResult.err("gate run needs a harness; none is attached to this table")
-    # Names are not pre-validated here. `GateRunner` reports a missing gate as that gate's own
-    # result line, which is what a caller parsing the run needs: a batch that answered "no such
-    # gate" for the whole list would leave every other gate in it unaccounted for.
-    var runner: GateRunner = GateRunner.new()
-    runner.gate_finished.connect(_on_gate_finished)
-    var outcome: Dictionary = await runner.run(harness_node, args)
-    # A gate that does not exist, or does not compile, stops the run and is not a failed gate --
-    # so it arrives as `usage_error` with a `failed` count of zero. Reading only `failed` reports
-    # a typo'd gate name as a clean run, which is the worst possible answer to give CI.
-    if outcome["usage_error"] as bool:
-        return ConsoleResult.err(
-            "the run stopped: a named gate does not exist or does not compile (see above)"
-        )
-    var failed: int = int(outcome["failed"])
-    var detail: String = "%d gate(s) run, %d failed" % [args.size(), failed]
-    if failed == 0:
-        return ConsoleResult.ok(detail, {"gates": args.size(), "failed": 0})
-    return ConsoleResult.err(detail)
-
-
-## --------------------------------------------------------------------------------
-## Completion sources
-
-
 func _complete_command(prefix: String, _harness_node: Node) -> PackedStringArray:
     var out: PackedStringArray = PackedStringArray()
     for name: String in names():
@@ -319,19 +304,3 @@ func _cmd_quit(_args: PackedStringArray, harness_node: Node) -> Dictionary:
         return ConsoleResult.err("no harness to quit")
     harness_node.get_tree().quit(0)
     return ConsoleResult.ok("quitting")
-
-
-## One line per gate as a suite runs, for whichever front end is watching.
-##
-## Shaped like the suite table a person already reads on the command line — name, verdict,
-## elapsed, detail — so the console and `tools/gate.sh` do not present the same run two ways.
-func _on_gate_finished(row: Dictionary) -> void:
-    var passed: bool = row.get("pass", false) as bool
-    var detail: String = row.get("detail", "") as String
-    progress.emit(
-        "  %-30s %-5s %6.2fs  %s" % [
-            row.get("gate", "?"), "PASS" if passed else "FAIL",
-            float(row.get("elapsed_s", 0.0)), detail
-        ],
-        passed
-    )

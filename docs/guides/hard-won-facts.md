@@ -82,14 +82,21 @@ afternoon to rediscover.
   during a run — overlay and tooltip scaffolding — so a container that leaves a few nodes behind
   has not necessarily leaked. A node with no parent that did not exist before has no innocent
   explanation, so that is the counter with no slack on it.
-- **A rendered measurement is not stable to the last decimal across a warm process.**
-  `ror_terrain_photoset`'s mean luma over seven views of La Paz came out 0.282191, 0.282165,
-  0.282781 and 0.282671 across four runs, in the same order and in different ones. Shader
-  compilation, reflection-probe capture timing and deferred frees all warm across a process and
-  none of them is inside a container's power. `tools/gate.sh --order-check` therefore compares
-  measured values to 1e-3 relative rather than exactly, and always prints the worst drift so a
-  gate that starts moving further is visible before it crosses. Computed gates still compare bit
-  for bit.
+- **A gate that renders animated geometry has no deterministic frame, and "renderer warm-up" is
+  the wrong explanation to reach for.** `ror_terrain_photoset` drifted in its fourth decimal and
+  it was written off as shader compilation and probe timing warming across a process. Running
+  two passes in *one* session made the drift bigger and monotonic — 0.282191, 0.282288, 0.282456
+  — and monotonic is not what warm-up looks like. `surfaces_are_visible` rendered the same
+  terrain three times in the same session bit for bit, which said it was not general. Turning the
+  vegetation off made it stop. It was `foliage.gdshader` swaying on `TIME`: a captured frame
+  depended on the wall clock, and with one gate per process every run started near zero and
+  landed in the same part of the sway. The shader takes a `wind_phase` now, a gate fixes it, and
+  the drift went from 9.4e-4 to 1.1e-7. **Anything a gate photographs that moves with `TIME` has
+  to be given a phase.**
+- **A wrong explanation shows up as a tolerance.** The order check was loosened to 1e-3 to admit
+  that drift, with the reasoning written down beside it, and the reasoning was wrong — so the
+  loosening hid a real bug for two commits. A tolerance widened to fit an unexplained measurement
+  is a bug with a comment on it. It is 1e-5 now.
 - **A terrain with no traction map grips like gravel, not like the first ground model.** Upstream
   keeps two defaults (`Collisions.cpp:134-135`): `defaultgm` is concrete and is for collision
   meshes, `defaultgroundgm` is gravel and is what the ground uses when landuse is absent or

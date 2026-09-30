@@ -236,58 +236,65 @@ table_header() {
 run_suite() {
     local every="$1"
     shift
-    load_chain
     RESULTS_FILE="$(mktemp)"
-    IMPLIED_FILE="$(mktemp)"
-    local failed=0 ran=0 implied=0 windows=0
+    local output line command
+    command="gate all"
+    [[ "$every" -eq 1 ]] && command="gate all every"
+    # ONE window for the whole suite. The scheduling that used to be here -- walk the graph, run
+    # a tier, consult its results, decide the next -- is `GateSuite` in the engine now, because
+    # it is arithmetic on a graph the engine already holds and keeping it out here cost a fresh
+    # engine per tier. See PLAN 0.8.
+    output="$(run_engine --command "$command" "$@" 2>&1)"
     table_header
-    # One batch per tier, and one window per batch. A tier is safe to batch because `builds_on`
-    # edges run from a higher tier to a lower one, so no gate in a tier implies another in the
-    # same tier: nothing in a batch depends on a result from the same batch.
-    while IFS= read -r tier; do
-        [[ -n "$tier" ]] || continue
-        local todo="" name
-        while IFS= read -r name; do
-            [[ -n "$name" ]] || continue
-            local implier=""
-            if [[ "$every" -eq 0 ]]; then
-                implier="$(grep -F "	$name	" "$IMPLIED_FILE" 2>/dev/null | head -1 | cut -f3)"
-            fi
-            if [[ -n "$implier" ]]; then
-                printf '%-26s %-7s %-8s %s\n' "$name" IMPLIED "-" "implied by $implier, which passed"
-                printf '%s\t%s\n' "$name" "IMPLIED" >> "$RESULTS_FILE"
+    local failed=0 ran=0 implied=0
+    while IFS=$'\t' read -r kind gate verdict elapsed detail; do
+        case "$kind" in
+            RESULT)
+                ran=$((ran + 1))
+                printf '%-26s %-7s %-8s %s\n' "$gate" "$verdict" "$elapsed" "$detail"
+                printf '%s\t%s\n' "$gate" "$verdict" >> "$RESULTS_FILE"
+                [[ "$verdict" == "PASS" ]] || failed=1
+                ;;
+            IMPLIED)
                 implied=$((implied + 1))
-                continue
-            fi
-            todo="${todo:+$todo,}$name"
-        done < <(printf '%s' "$tier" | tr '\t' '\n')
-        [[ -n "$todo" ]] || continue
-        run_batch "$todo" "$@"
-        windows=$((windows + 1))
-        while IFS= read -r name; do
-            [[ -n "$name" ]] || continue
-            IFS=$'\t' read -r _g verdict elapsed detail _measured < <(batch_row "$name")
-            ran=$((ran + 1))
-            printf '%-26s %-7s %-8s %s\n' "$name" "$verdict" "$elapsed" "$detail"
-            printf '%s\t%s\n' "$name" "$verdict" >> "$RESULTS_FILE"
-            if [[ "$verdict" == "PASS" ]]; then
-                if [[ "$every" -eq 0 ]]; then
-                    while read -r covered; do
-                        [[ -n "$covered" ]] || continue
-                        printf '\t%s\t%s\n' "$covered" "$name" >> "$IMPLIED_FILE"
-                    done < <(plan implied "$name")
-                fi
-            else
-                failed=1
-            fi
-        done < <(printf '%s' "$todo" | tr ',' '\n')
-        rm -f "$BATCH_FILE"
-    done < <(plan tiers)
+                printf '%-26s %-7s %-8s %s\n' "$gate" IMPLIED "-" "$detail"
+                printf '%s\t%s\n' "$gate" "IMPLIED" >> "$RESULTS_FILE"
+                ;;
+        esac
+    done < <(printf '%s\n' "$output" | python3 -c '
+import json, sys
+
+# The run, in the order it happened, and only what the suite itself scheduled.
+#
+# A gate that runs gates emits result lines of its own -- `console_fronts_agree` deliberately
+# runs one named `definitely_not_a_gate` -- so reading every `HARNESS_GATE_RESULT` reported
+# those as part of the suite, with a gate name that does not exist. The suite marks its own.
+for line in sys.stdin:
+    if "HARNESS_SUITE_RESULT " in line:
+        row = json.loads(line.split("HARNESS_SUITE_RESULT ", 1)[1])
+        gate = row.get("gate", "?")
+        print("\t".join([
+            "RESULT", gate, "PASS" if row.get("pass") else "FAIL",
+            "%ss" % row.get("elapsed_s", "-"),
+            str(row.get("detail", "")).replace("\t", " "),
+        ]))
+    elif "HARNESS_GATE_IMPLIED " in line:
+        row = json.loads(line.split("HARNESS_GATE_IMPLIED ", 1)[1])
+        print("\t".join([
+            "IMPLIED", row["gate"], "IMPLIED", "-",
+            "implied by %s, which passed" % row["by"],
+        ]))
+')
+    if [[ $ran -eq 0 ]]; then
+        printf '%s\n' "$output" | tail -25 >&2
+        echo "gate.sh: the engine ran no gates" >&2
+        cleanup_plan
+        return 1
+    fi
     archive_history
     prune_artifacts
     if [[ $failed -eq 0 ]]; then
-        printf '%d gates run in %d windows, %d implied by a higher gate; all passed' \
-            "$ran" "$windows" "$implied"
+        printf '%d gates run in 1 window, %d implied by a higher gate; all passed' "$ran" "$implied"
         if [[ $implied -gt 0 ]]; then
             printf ' (run --all --every to check the implied ones)'
         fi
@@ -296,38 +303,69 @@ run_suite() {
         return 0
     fi
     echo "FAILURES present" >&2
+    load_chain
     report_localization
     cleanup_plan
     return 1
 }
 
-# Order independence: the acceptance test for the gate containers themselves.
+# Order independence: the acceptance test for the gate containers, and for the development loop.
 #
-# Every gate, twice, in one window each: once in the graph's own order and once in a seeded
-# shuffle. Same verdicts and the same measured values, or a container is not containing something
-# and the suite's results depend on what ran before them. Verdicts alone are too weak -- a number
-# that drifts inside a threshold is the same bug one release before it fails.
+# Every gate twice, in the graph's order and in a seeded shuffle, and **both passes in one
+# session**. That is the stronger claim and it is the one a window kept open all day depends on:
+# "the same results in a fresh process" is not what has to hold when the process is not fresh.
+# The second pass is therefore measured against a renderer the first has already warmed.
+#
+# Verdicts alone would be too weak -- a number that drifts inside a threshold is the same bug one
+# release before it fails -- so measured values are compared too.
 run_order_check() {
     local seed="${1:-7}"
-    local forward shuffled first second
+    local forward shuffled first second script output
     first="$(mktemp)"
     second="$(mktemp)"
-    forward="$(list_gates | tr '\n' ',' | sed 's/,$//')"
+    script="$(mktemp)"
+    forward="$(list_gates | tr '\n' ' ')"
     shuffled="$(list_gates | python3 -c "
 import random, sys
 gates = [line.strip() for line in sys.stdin if line.strip()]
 random.Random($seed).shuffle(gates)
-print(','.join(gates))
+print(' '.join(gates))
 ")"
-    echo "order check: $(list_gates | wc -l | tr -d ' ') gates, twice, one window each (seed $seed)" >&2
-    run_batch "$forward"
-    cp "$BATCH_FILE" "$first"
-    rm -f "$BATCH_FILE"
-    run_batch "$shuffled"
-    cp "$BATCH_FILE" "$second"
-    rm -f "$BATCH_FILE"
+    printf 'gate run %s\ngate run %s\n' "$forward" "$shuffled" > "$script"
+    echo "order check: $(list_gates | wc -l | tr -d ' ') gates, twice, in ONE session (seed $seed)" >&2
+    output="$(run_engine --command "exec $script" 2>&1)"
+    rm -f "$script"
+    printf '%s\n' "$output" | python3 -c '
+import json, sys
+
+# Two passes over every gate in one process: the first line for a gate is pass one, the second
+# is pass two. A gate that runs gates emits lines of its own, so only the first two for each
+# name are taken -- a third line for one gate would silently shift every comparison after it.
+first, second = {}, {}
+for line in sys.stdin:
+    if "HARNESS_GATE_RESULT " not in line:
+        continue
+    row = json.loads(line.split("HARNESS_GATE_RESULT ", 1)[1])
+    gate = row.get("gate", "?")
+    value = ("PASS" if row.get("pass") else "FAIL", repr(row.get("measured")))
+    if gate not in first:
+        first[gate] = value
+    elif gate not in second:
+        second[gate] = value
+for table, path in ((first, sys.argv[1]), (second, sys.argv[2])):
+    with open(path, "w") as handle:
+        for gate in sorted(table):
+            handle.write("\t".join([gate, table[gate][0], "-", "", table[gate][1]]) + "\n")
+' "$first" "$second"
+    if [[ ! -s "$first" || ! -s "$second" ]]; then
+        printf '%s\n' "$output" | tail -25 >&2
+        echo "order check: the session did not complete both passes" >&2
+        rm -f "$first" "$second"
+        return 1
+    fi
     python3 - "$first" "$second" << 'ORDER_EOF'
 import sys
+
 
 def rows(path):
     out = {}
@@ -338,20 +376,24 @@ def rows(path):
                 out[parts[0]] = (parts[1], parts[4])
     return out
 
-# How far a measured value may move between the two orders.
+
+# How far a measured value may move between the two passes.
 #
-# Zero for anything computed, and it holds: those compare bit for bit. Not zero for anything
-# rendered, and the reason is measured rather than assumed -- `ror_terrain_photoset` returns a
-# mean luma over seven rendered views of La Paz and produced 0.282191, 0.282165, 0.282781 and
-# 0.282671 across four runs, in the same order and in different ones. Renderer state that warms
-# across a process -- shader compilation, probe capture timing, deferred frees -- is outside what
-# a container can isolate, and this gate's own threshold is "no view is black", which none of
-# those numbers comes close to moving.
+# Nearly zero, and the history of this number is worth keeping. It was 1e-3, on the grounds that
+# a rendered measurement cannot be stable across a warm process -- shader compilation, probe
+# capture timing, deferred frees. **That was wrong**, and running both passes in one session is
+# what exposed it: `ror_terrain_photoset` drifted 0.282191 -> 0.282288 -> 0.282456 over three
+# runs, monotonically, while `surfaces_are_visible` rendered the same terrain three times bit
+# for bit. Renderer warmth does not drift monotonically; something was accumulating.
 #
-# So the bound is tight enough to catch a real dependence and loose enough to admit that limit,
-# and the worst drift is always printed, pass or fail, so a gate that starts drifting further is
+# It was the wind. `foliage.gdshader` swayed on `TIME`, so a captured frame depended on the wall
+# clock, and with one gate per process every run had started near zero and landed in the same
+# part of the sway. The shader takes a phase now and gates fix it, and the drift went to 1e-7.
+#
+# So the bound is what the measurements actually hold, not what a wrong explanation asked for.
+# The worst drift is printed on every run, pass or fail, so anything that starts moving is
 # visible before it crosses.
-TOLERANCE = 1e-3
+TOLERANCE = 1e-5
 
 
 def as_float(text):
@@ -366,26 +408,26 @@ problems = []
 worst, worst_gate = 0.0, ""
 for gate in sorted(set(a) | set(b)):
     if gate not in a or gate not in b:
-        problems.append("%s ran in only one of the two orders" % gate)
+        problems.append("%s ran in only one of the two passes" % gate)
         continue
     if a[gate][0] != b[gate][0]:
         problems.append("%s: %s in order, %s shuffled" % (gate, a[gate][0], b[gate][0]))
         continue
-    first, second = as_float(a[gate][1]), as_float(b[gate][1])
-    if first is None or second is None:
+    first_value, second_value = as_float(a[gate][1]), as_float(b[gate][1])
+    if first_value is None or second_value is None:
         if a[gate][1] != b[gate][1]:
             problems.append(
                 "%s: measured %s in order, %s shuffled" % (gate, a[gate][1], b[gate][1])
             )
         continue
-    scale = max(abs(first), abs(second), 1e-12)
-    drift = abs(first - second) / scale
+    scale = max(abs(first_value), abs(second_value), 1e-12)
+    drift = abs(first_value - second_value) / scale
     if drift > worst:
         worst, worst_gate = drift, gate
     if drift > TOLERANCE:
         problems.append(
             "%s: measured %r in order, %r shuffled (%.2g relative, over %g)"
-            % (gate, first, second, drift, TOLERANCE)
+            % (gate, first_value, second_value, drift, TOLERANCE)
         )
 if problems:
     print("ORDER CHECK FAILED -- a gate depends on what ran before it:")
@@ -393,8 +435,8 @@ if problems:
         print("  " + problem)
     raise SystemExit(1)
 print(
-    "order check passed: %d gates, identical verdicts in both orders; worst measured drift"
-    " %.2g (%s), under %g" % (len(a), worst, worst_gate or "none", TOLERANCE)
+    "order check passed: %d gates, two passes in one session, identical verdicts; worst"
+    " measured drift %.2g (%s), under %g" % (len(a), worst, worst_gate or "none", TOLERANCE)
 )
 ORDER_EOF
     local status=$?

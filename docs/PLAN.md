@@ -749,12 +749,14 @@ all dispatch into `ConsoleTable` — `--gate` is sugar for `gate run`, so the pa
 path a person uses. One command costs the agent one JSONL line; the console gets a line per gate
 as the run happens, and the channel does not.
 
-**One limit, stated rather than hidden.** A rendered measurement is not stable to the last
-decimal across a warm process: shader compilation, probe capture timing and deferred frees all
-warm across a run and none is inside a container's power. `ror_terrain_photoset` moved in the
-fourth decimal between identical runs. The order check therefore compares measured values to
-1e-3 relative and prints the worst drift on every run, passing or failing, so a gate that starts
-moving further is visible before it crosses.
+**What the order check found, and what it corrected.** Running both passes in *one* session --
+which is what a window kept open all day actually does -- made a drift in `ror_terrain_photoset`
+bigger and monotonic, and monotonic is not what renderer warm-up looks like. It was
+`foliage.gdshader` swaying on `TIME`: a captured frame depended on the wall clock, invisible for
+as long as every gate had its own process because each started near zero. The shader takes a
+phase now and gates fix it. Worst drift across the whole suite, two passes in one session, is
+1.1e-7, and the check's tolerance came back down from 1e-3 to 1e-5 — the earlier figure had been
+chosen to admit a measurement nobody had explained, which is a bug with a comment on it.
 
 ---
 

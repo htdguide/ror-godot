@@ -30,6 +30,9 @@ const USAGE: int = 2
 ## What the window shows: the container that is running. One window for the whole suite, which is
 ## the point of D0, and a session can watch a gate build its world in place.
 var _screen: TextureRect = null
+## The last result row this runner produced, for a caller that schedules gate by gate and wants
+## the row rather than only the exit code.
+var last_row: Dictionary = {}
 
 
 ## Runs each named gate in its own container, in the order given, and exits non-zero if any of
@@ -142,6 +145,7 @@ func _run_one_gate(harness: Node, name: String) -> int:
     if leaked != "":
         row["leaked"] = leaked
         row["detail"] = "%s [container leak: %s]" % [row["detail"], leaked]
+    last_row = row
     print("HARNESS_GATE_RESULT " + JSON.stringify(row))
     gate_finished.emit(row)
     return OK if row["pass"] else FAIL

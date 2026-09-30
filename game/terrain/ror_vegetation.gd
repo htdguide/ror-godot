@@ -55,6 +55,14 @@ var _wanted: Dictionary = {}
 
 ## Grows a terrain's vegetation. Returns "" when there is something to grow, or a reason there is
 ## not — a terrain with no vegetation lines is not a fault.
+## The sway phase every plant is drawn at, or negative to sway with the wall clock.
+##
+## A window wants the wall clock; anything that captures a frame and measures it wants a number,
+## because a frame that animates with wall-clock time is a different frame every time it is
+## taken. Set it before `setup`.
+var wind_phase: float = -1.0
+
+
 func setup(terrain: RorTerrain) -> String:
     _terrain = terrain
     name = "RorVegetation"
@@ -308,6 +316,7 @@ func _foliage_material(
                 material.set_shader_parameter("albedo_texture", texture)
     material.set_shader_parameter("sway_m", SWAY_M)
     material.set_shader_parameter("sway_speed", SWAY_SPEED)
+    material.set_shader_parameter("wind_phase", wind_phase)
     return material
 
 

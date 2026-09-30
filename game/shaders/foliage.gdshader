@@ -32,6 +32,16 @@ uniform vec3 translucency_tint : source_color = vec3(0.55, 0.62, 0.32);
 uniform float sway_m : hint_range(0.0, 1.0) = 0.12;
 uniform float sway_speed : hint_range(0.0, 8.0) = 1.4;
 uniform vec2 wind_direction = vec2(1.0, 0.3);
+// The phase to sway at, instead of the wall clock. Negative means use TIME, which is what a
+// window wants; a gate sets a number, because a frame that animates with the wall clock is a
+// frame that is different every time it is captured.
+//
+// This was not a theoretical problem. `ror_terrain_photoset` drifted monotonically through a
+// session -- 0.282191, 0.282288, 0.282456 over three runs -- and it was invisible for as long as
+// every gate got its own process, because each one started with TIME near zero and landed in the
+// same part of the sway. Running the suite in one window made it a real disagreement, and it was
+// wrongly written off as renderer warm-up first.
+uniform float wind_phase = -1.0;
 uniform float roughness_value : hint_range(0.0, 1.0) = 0.85;
 
 varying vec3 plant_normal;
@@ -41,7 +51,8 @@ void vertex() {
 	float height = clamp(VERTEX.y, 0.0, 4.0);
 	vec3 world = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	float phase = world.x * 0.7 + world.z * 0.9;
-	float wave = sin(TIME * sway_speed + phase) + 0.4 * sin(TIME * sway_speed * 2.3 + phase);
+	float clock = wind_phase < 0.0 ? TIME : wind_phase;
+	float wave = sin(clock * sway_speed + phase) + 0.4 * sin(clock * sway_speed * 2.3 + phase);
 	vec2 push = normalize(wind_direction) * wave * sway_m * height * height;
 	VERTEX.xz += push;
 

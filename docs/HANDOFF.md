@@ -34,9 +34,17 @@ read. Anything large is written to a file and the line carries the path — `gat
 gates is one line for the agent and three for the person watching. `console_fronts_agree` and
 `the_console_reports_a_run_as_it_happens` hold both halves of that.
 
-The suite runs in one window per tier -- five windows for the whole suite instead of 62, 88 s
-instead of 144 s -- and `tools/gate.sh --order-check` runs all 77 gates twice, once in the graph's
-order and once in a seeded shuffle, in one window each, comparing verdicts and measured values. The order after it is: M2, M2b, C1 GUI+audio, C2 format coverage+AngelScript, M3–M8,
+**One window, all day.** `tools/dev.sh` opens a session and leaves it open; `tools/send.sh "<any
+console command>"` runs in it from another shell, and so does the console in the window itself.
+`gate run rig_steers` in an open session is under a second where a fresh engine pays startup,
+shader compilation and terrain import first. The whole suite is `gate all` — one window, 77 s.
+`tools/gate.sh --all` does the same thing in one launch; the scheduling that used to live in bash
+and cost an engine per tier is `harness/gate_suite.gd` now.
+
+`tools/gate.sh --order-check` runs every gate twice **in one session**, once in the graph's order
+and once in a seeded shuffle, comparing verdicts and measured values. Worst drift across the
+suite is 1.1e-7. Use `tools/gate.sh --all --every` for a number that goes in a commit message: it
+starts fresh, which a session kept open all day does not. The order after it is: M2, M2b, C1 GUI+audio, C2 format coverage+AngelScript, M3–M8,
 C3 airplanes+boats, C4 repository, C5 multiplayer. Local milestones first; the two networked ones
 last, deliberately. The UI's design is settled in §0.11: recognisably RoR and refreshed, with the
 in-vehicle instruments under glass that reflects, backlights warm from below with the lights, and
