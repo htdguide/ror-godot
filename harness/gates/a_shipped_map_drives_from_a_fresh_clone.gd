@@ -91,7 +91,7 @@ func run(harness: Node) -> Dictionary:
     var terrain: Node3D = TerrainWorld.create()
     harness.world.add_child(terrain)
     await harness.advance_frames(2, "static", "terrain")
-    var built: String = TerrainWorld.populate(terrain, terrain_data)
+    var built: String = harness.terrain.populate(terrain, terrain_data)
     if built != "":
         return fail(built)
     await harness.advance_frames(1, "static", "terrain")
@@ -111,7 +111,7 @@ func run(harness: Node) -> Dictionary:
             + " the hero asset is not present",
             flat["value"]
         )
-    var driven: Dictionary = _drive(mod_dir, data, terrain_data)
+    var driven: Dictionary = _drive(mod_dir, data, terrain_data, harness.terrain)
     if (driven["error"] as String) != "":
         return fail(driven["error"] as String, driven["value"] as float)
     return ok(
@@ -183,7 +183,9 @@ func _drawn_is_flat(data: Object, terrain_data: RorTerrain) -> Dictionary:
 
 
 ## Spawns the hero truck where the map says and asks it to drive.
-func _drive(mod_dir: String, data: Object, terrain_data: RorTerrain) -> Dictionary:
+func _drive(
+    mod_dir: String, data: Object, terrain_data: RorTerrain, world: TerrainWorld
+) -> Dictionary:
     var out: Dictionary = {"error": "", "value": 0.0, "rest": 0.0, "speed": 0.0, "surface": ""}
     var rig: Dictionary = RigBuilder.from_file(mod_dir, TRUCK, 0.0)
     if (rig["error"] as String) != "":
@@ -191,7 +193,7 @@ func _drive(mod_dir: String, data: Object, terrain_data: RorTerrain) -> Dictiona
         return out
     var truck: TruckParser = rig["truck"] as TruckParser
     var solver: RefCounted = rig["solver"] as RefCounted
-    var applied: String = TerrainWorld.give_to_solver(solver, data)
+    var applied: String = world.give_to_solver(solver, data)
     if applied != "":
         out["error"] = applied
         return out

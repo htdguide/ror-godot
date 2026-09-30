@@ -11,6 +11,13 @@ extends RefCounted
 ## tint, and where the cell is in the world — so everything downstream takes any terrain without
 ## knowing which it has.
 ##
+## **One instance per world, and the harness owns it.** This was a class of static functions over
+## two `static var`s, which made the terrain that was built last a property of the process: a
+## caller that asked for `lattice()` without having populated in its own run was served the
+## previous run's map, silently and with the right-looking numbers. One gate per process hid it.
+## D0 runs many gates in one process, so it is an instance and a container owns it — and the
+## class of bug is now unreachable rather than avoided by convention.
+##
 ## Two things here are not obvious and both cost a probe to establish.
 ##
 ## A Terrain3D builds its subsystems when it enters the tree and finishes only once it is
@@ -42,7 +49,7 @@ static func create() -> Node3D:
 ## Now they do, so both go off: a flat tint tells a driver which surface they are on but gives
 ## the eye nothing to track, and a ground with no detail in it reads as stationary however
 ## fast the vehicle is going.
-static func _show_surfaces(terrain: Node3D) -> void:
+func _show_surfaces(terrain: Node3D) -> void:
     var material: Object = terrain.get("material")
     if material == null:
         return
@@ -63,20 +70,20 @@ const WORLD_BACKGROUND_NONE: int = 0
 const WORLD_BACKGROUND_FLAT: int = 1
 
 
-## The surface map of the valley that was built last, one cell per byte.
+## The surface map of the terrain this instance built, one cell per byte.
 ##
 ## The solver needs the same surfaces the renderer is painted with, and generating them is a
-## second pass over 4.2 M cells. So the pass that built the terrain keeps its result and the
-## collision bridge is handed it, instead of both computing it from the same function and
+## second pass over millions of cells. So the pass that built the terrain keeps its result and
+## the collision bridge is handed it, instead of both computing it from the same function and
 ## hoping they agree.
-static var _surfaces: PackedByteArray = PackedByteArray()
-## The terrain that was built last. The surface map and the cache key both depend on it, so it is
+var _surfaces: PackedByteArray = PackedByteArray()
+## The terrain this instance built. The surface map and the cache key both depend on it, so it is
 ## remembered rather than passed to everything that needs it.
 ##
 ## Null until something is built. There is no default world: a terrain comes from its author's
 ## files or there is nothing to stand on, and a caller that forgets to pass one should be told
 ## so rather than served whichever map happened to be compiled in.
-static var _shape: Object = null
+var _shape: Object = null
 
 
 ## The lattice the current shape is sampled on: how many cells across, how far apart, and where
@@ -85,7 +92,7 @@ static var _shape: Object = null
 ## Asked of the shape rather than read from `TerrainCfg`, because a world loaded from someone
 ## else's files brings its own: La Paz is 2048 cells of 1.953125 m starting at the origin, where
 ## a generated world is 2048 of 1.0 m centred on it.
-static func lattice() -> Dictionary:
+func lattice() -> Dictionary:
     if _shape == null:
         return {"size": 0, "spacing": 0.0, "origin": Vector3.ZERO}
     return _shape.call("lattice") as Dictionary
@@ -93,7 +100,7 @@ static func lattice() -> Dictionary:
 
 ## The surface map of the terrain built last. Built on demand if the terrain was not built in
 ## this run, so that a caller cannot be handed an empty one.
-static func surface_map() -> PackedByteArray:
+func surface_map() -> PackedByteArray:
     if _shape == null:
         return PackedByteArray()
     var size: int = lattice()["size"] as int
@@ -115,7 +122,7 @@ static func surface_map() -> PackedByteArray:
 ## The grid handed over is the terrain's own lattice — same origin, same spacing, same row order
 ## — because `terrain_collision_agreement` measures the two against each other and any
 ## resampling here would show up there as a disagreement.
-static func give_to_solver(solver: RefCounted, data: Object) -> String:
+func give_to_solver(solver: RefCounted, data: Object) -> String:
     if data == null:
         return "the terrain has no data object: it has not finished entering the tree"
     if _shape == null:
@@ -131,14 +138,14 @@ static func give_to_solver(solver: RefCounted, data: Object) -> String:
 
 
 ## The shape the terrain is currently built from.
-static func shape() -> Object:
+func shape() -> Object:
     return _shape
 
 
 ## Imports a terrain's heightmap, or loads the cached import when there is one. Call after the
 ## node has been in the tree a frame. `with_shape` is the `RorTerrain` to build; leaving it null
 ## keeps whichever was built last, so a second call is cheap. Returns "" on success.
-static func populate(terrain: Node3D, with_shape: Object = null) -> String:
+func populate(terrain: Node3D, with_shape: Object = null) -> String:
     if with_shape != null and with_shape != _shape:
         _shape = with_shape
         _surfaces = PackedByteArray()
@@ -210,7 +217,7 @@ static func populate(terrain: Node3D, with_shape: Object = null) -> String:
 ## already covers an edit to the files that decide the shape, and the sampling covers everything
 ## the key cannot — a half-written cache, a Terrain3D upgrade that stores heights differently,
 ## or a shape that reads something the key does not hash.
-static func _load_cached(data: Object, directory: String) -> bool:
+func _load_cached(data: Object, directory: String) -> bool:
     if TerrainCache.disabled():
         return false
     if not TerrainCache.is_populated(directory):
@@ -237,7 +244,7 @@ static func _load_cached(data: Object, directory: String) -> bool:
 ## Written through Terrain3D's own setters rather than by packing its bit layout here: the
 ## packing is an internal detail of a pinned dependency and hand-writing it would break
 ## silently on an upgrade.
-static func _paint_surfaces(terrain: Node3D, data: Object) -> void:
+func _paint_surfaces(terrain: Node3D, data: Object) -> void:
     var grid: Dictionary = lattice()
     var size: int = grid["size"] as int
     var spacing: float = grid["spacing"] as float

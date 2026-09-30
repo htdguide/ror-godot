@@ -22,10 +22,9 @@ const SHADOW_MAX_DISTANCE: float = 120.0
 static func build(
     weather: Dictionary, include_props: bool = true, clouds: bool = false
 ) -> Node3D:
-    _clouds = clouds
     var root: Node3D = Node3D.new()
     root.name = "BlockoutWorld"
-    root.add_child(_build_environment(weather))
+    root.add_child(_build_environment(weather, clouds))
     root.add_child(_build_sun(weather))
     var fill: DirectionalLight3D = _build_fill(weather)
     if fill != null:
@@ -39,11 +38,11 @@ static func build(
     return root
 
 
-static func _build_environment(weather: Dictionary) -> WorldEnvironment:
+static func _build_environment(weather: Dictionary, clouds: bool) -> WorldEnvironment:
     var env: Environment = Environment.new()
     if bool(weather.get("physical_sky", false)):
         env.background_mode = Environment.BG_SKY
-        env.sky = _build_sky(weather)
+        env.sky = _build_sky(weather, clouds)
         # The sky lights the scene: diffuse from its irradiance, specular from its
         # radiance map. This is what makes metal look like metal without a light rig.
         env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
@@ -80,11 +79,13 @@ static func _build_environment(weather: Dictionary) -> WorldEnvironment:
 ## written against, the window gets the one with weather in it, and `the_sky_has_weather_in_it`
 ## asks for clouds explicitly. That the two are not the same sky is a real gap, and it is the
 ## same gap as the project's sun-to-sky balance: both want the HDRI work in M2.
-static var _clouds: bool = false
-
-
-static func _build_sky(weather: Dictionary) -> Sky:
-    if _clouds and RenderCfg.CLOUDS_ENABLED:
+##
+## Threaded as a parameter rather than held in a `static var`, which is what it was: a build
+## option smuggled through process-global state, so the sky a world got depended on what the
+## last world to be built had asked for. Invisible with one world per process and an
+## order-dependent bug the moment there is not — which is what D0's containers exist to stop.
+static func _build_sky(weather: Dictionary, clouds: bool) -> Sky:
+    if clouds and RenderCfg.CLOUDS_ENABLED:
         var clouded: ShaderMaterial = SkyClouds.material(weather)
         if clouded != null:
             var cloud_sky: Sky = Sky.new()

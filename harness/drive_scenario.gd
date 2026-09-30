@@ -40,7 +40,7 @@ static func run(
         return {"error": "Terrain3D is registered but would not instantiate"}
     harness.world.add_child(terrain)
     await harness.advance_frames(2, "static", "terrain")
-    var built: String = TerrainWorld.populate(terrain, terrain_data)
+    var built: String = harness.terrain.populate(terrain, terrain_data)
     if built != "":
         return {"error": built}
 
@@ -49,7 +49,7 @@ static func run(
         return {"error": rig["error"] as String}
     var truck: TruckParser = rig["truck"] as TruckParser
     var solver: RefCounted = rig["solver"] as RefCounted
-    var applied: String = TerrainWorld.give_to_solver(solver, terrain.get("data"))
+    var applied: String = harness.terrain.give_to_solver(solver, terrain.get("data"))
     if applied != "":
         return {"error": applied}
 

@@ -89,7 +89,7 @@ func _populate_terrain() -> void:
     var loaded: RorTerrain = _load_terrain()
     if loaded == null:
         return
-    var error: String = TerrainWorld.populate(_terrain, loaded)
+    var error: String = Harness.terrain.populate(_terrain, loaded)
     if error != "":
         printerr("PLAY  the terrain could not be built: " + error)
         return

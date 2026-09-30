@@ -70,7 +70,16 @@ const BRAKE_THRESHOLD: float = 0.08
 const BLINK_PERIOD_S: float = 0.8
 
 
-## The shared glow sprite, built on first use.
+## The shared glow sprite, built on first use and never changed after.
+##
+## The one `static var` D0 allows, and it is allowed because it is a memo and not state: it is
+## derived from constants, it is written once, and no observable behaviour depends on whether it
+## was built by this gate or an earlier one. `static_state` knows about it by name — an
+## exemption a human granted for a stated reason, not a pattern the lint waves through.
+##
+## It does outlive a gate container, which means one texture stays allocated for the life of the
+## process. That is bounded at one and deliberate: rebuilding a 64 px radial gradient per
+## container would be slower and would prove nothing.
 static var _glow_sprite: Texture2D = null
 
 

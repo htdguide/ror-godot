@@ -69,7 +69,7 @@ var spawn_heading: float = 0.0
 
 ## Stands the rig on a terrain instead of the flat plane. Returns "" on success.
 func use_terrain(data: Object) -> String:
-    var applied: String = TerrainWorld.give_to_solver(solver, data)
+    var applied: String = Harness.terrain.give_to_solver(solver, data)
     if applied != "":
         return applied
     # Put the rig down on the surface rather than where the flat plane used to be, or it

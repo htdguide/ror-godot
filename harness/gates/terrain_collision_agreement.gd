@@ -72,20 +72,20 @@ func run(harness: Node) -> Dictionary:
     harness.world.add_child(terrain)
     # Terrain3D finishes building only once it is inside a World3D, which is a frame away.
     await harness.advance_frames(2, "static", "terrain")
-    var built: String = TerrainWorld.populate(terrain, terrain_data)
+    var built: String = harness.terrain.populate(terrain, terrain_data)
     if built != "":
         return fail(built)
     await harness.advance_frames(1, "static", "terrain")
 
     var data: Object = terrain.get("data")
-    var grid: Dictionary = TerrainWorld.lattice()
+    var grid: Dictionary = harness.terrain.lattice()
     var size: int = grid["size"] as int
     var spacing: float = grid["spacing"] as float
     var origin: Vector3 = grid["origin"] as Vector3
     var solver: RefCounted = ClassDB.instantiate("RorSolver") as RefCounted
     if solver == null:
         return fail("RorSolver is not registered: the GDExtension did not load")
-    var applied: String = TerrainWorld.give_to_solver(solver, data)
+    var applied: String = harness.terrain.give_to_solver(solver, data)
     if applied != "":
         return fail(applied)
 

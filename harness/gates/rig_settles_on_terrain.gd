@@ -94,7 +94,7 @@ func run(harness: Node) -> Dictionary:
     var terrain: Node3D = TerrainWorld.create()
     harness.world.add_child(terrain)
     await harness.advance_frames(2, "static", "terrain")
-    var built: String = TerrainWorld.populate(terrain, terrain_data)
+    var built: String = harness.terrain.populate(terrain, terrain_data)
     if built != "":
         return fail(built)
     var data: Object = terrain.get("data")
@@ -104,7 +104,7 @@ func run(harness: Node) -> Dictionary:
         return fail(rig["error"] as String)
     var truck: TruckParser = rig["truck"] as TruckParser
     var solver: RefCounted = rig["solver"] as RefCounted
-    var applied: String = TerrainWorld.give_to_solver(solver, data)
+    var applied: String = harness.terrain.give_to_solver(solver, data)
     if applied != "":
         return fail(applied)
     solver.set_ground(0.0, true)

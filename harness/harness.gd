@@ -20,6 +20,10 @@ var metrics: HarnessMetrics
 var rng: RandomNumberGenerator
 var world: Node3D
 var camera: Camera3D
+## The terrain world this run builds into. One instance, owned here rather than reached through
+## the class, so that the terrain built last is a property of this run and not of the process —
+## see `TerrainWorld`'s own header. D0's containers hand each gate a fresh one.
+var terrain: TerrainWorld = TerrainWorld.new()
 var frame_index: int = 0
 var preset_name: String = ""
 var preset: Dictionary = {}
