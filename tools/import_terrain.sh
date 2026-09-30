@@ -22,7 +22,7 @@ list_terrains() {
         ls -1 "$LIBRARY" 2>/dev/null
         return 0
     fi
-    "$GODOT" --headless --path "$REPO_ROOT/game" --script res://tools/list_terrains.gd 2>/dev/null \
+    "$GODOT" --headless --path "$REPO_ROOT" --script res://harness/dev/list_terrains.gd 2>/dev/null \
         | grep -v "^Godot Engine"
 }
 

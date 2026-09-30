@@ -4,9 +4,11 @@
 export_presets.cfg
 .import/
 
-# Build output
+# Build output. bin/ holds the built GDExtension and its .gdextension descriptor; it is at
+# the repository root rather than under game/ since the PLAN 0.7 tree mirror, and it is
+# rebuilt by scons rather than committed.
 build/
-bin/
+/bin/
 *.o
 *.os
 *.obj
@@ -39,7 +41,10 @@ history/
 # published release instead would mean 41 MB of binaries for platforms this project does
 # not target, and the binaries would be caught by the rules above anyway, leaving a
 # checkout that looks complete and does not load.
-game/addons/
+#
+# At the repository root rather than under game/, because Godot requires addons/ at its
+# project root and project.godot moved there with the PLAN 0.7 tree mirror.
+/addons/
 
 # Community content: vehicles under assets/mods/, terrains under assets/terrains/. Not
 # committed — Rigs of Rods repository content carries varied and often unstated licensing,

@@ -18,7 +18,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GAME_DIR="$REPO_ROOT/game"
+PROJECT_DIR="$REPO_ROOT"
 ARTIFACTS="$REPO_ROOT/artifacts"
 GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 RESOLUTION="${RESOLUTION:-1920x1080}"
@@ -38,10 +38,10 @@ bootstrap() {
     # which only an import pass writes. A new class_name is therefore invisible until
     # the project is re-imported, and the symptom is a parse error that reads like a
     # code bug. The runner re-imports whenever a script is newer than the cache.
-    local cache="$GAME_DIR/.godot/global_script_class_cache.cfg"
-    if [[ ! -f "$cache" ]] || [[ -n "$(find "$GAME_DIR" -name '*.gd' -newer "$cache" -print -quit)" ]]; then
+    local cache="$PROJECT_DIR/.godot/global_script_class_cache.cfg"
+    if [[ ! -f "$cache" ]] || [[ -n "$(find "$PROJECT_DIR" -name '*.gd' -newer "$cache" -print -quit)" ]]; then
         echo "gate.sh: importing project (script cache stale)..." >&2
-        "$GODOT" --path "$GAME_DIR" --headless --import >/dev/null 2>&1
+        "$GODOT" --path "$PROJECT_DIR" --headless --import >/dev/null 2>&1
     fi
 }
 
@@ -58,7 +58,7 @@ run_engine() {
     while IFS= read -r line; do [[ -n "$line" ]] && extra+=("$line"); done < <(movie_args)
     # macOS has no surfaceless GPU path: --headless renders nothing, so image gates
     # need a real window. This is why the dev Mac is the sole authority for pixels.
-    "$GODOT" --path "$GAME_DIR" \
+    "$GODOT" --path "$PROJECT_DIR" \
         --resolution "$RESOLUTION" \
         --fixed-fps "$FIXED_FPS" \
         --quit-after "$QUIT_AFTER" \
@@ -97,7 +97,7 @@ prune_artifacts() {
 }
 
 list_gates() {
-    find "$GAME_DIR/harness/gates" -name '*.gd' -exec basename {} .gd \; | sort
+    find "$PROJECT_DIR/harness/gates" -name '*.gd' -exec basename {} .gd \; | sort
 }
 
 result_field() {

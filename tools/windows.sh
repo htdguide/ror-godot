@@ -11,11 +11,11 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GAME_DIR="$REPO_ROOT/game"
+PROJECT_DIR="$REPO_ROOT"
 
 repo_pids() {
     # Match only engines started against this project, never the user's other Godot work.
-    pgrep -f "Godot.*--path $GAME_DIR" 2>/dev/null || true
+    pgrep -f "Godot.*--path $PROJECT_DIR" 2>/dev/null || true
 }
 
 case "${1:-list}" in

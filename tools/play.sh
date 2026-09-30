@@ -14,7 +14,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GAME_DIR="$REPO_ROOT/game"
+PROJECT_DIR="$REPO_ROOT"
 GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 RESOLUTION="${RESOLUTION:-1600x900}"
 TRACK_DIR="$REPO_ROOT/artifacts/windows"
@@ -63,6 +63,6 @@ printf '{"pid": %d, "purpose": "human session", "started": "%s", "args": "%s"}\n
     "$$" "$(date -u +%FT%TZ)" "$*" > "$track_file"
 
 echo "play.sh: opening a window. Close it to end the session."
-"$GODOT" --path "$GAME_DIR" --resolution "$RESOLUTION" -- --play ${args[@]+"${args[@]}"} &
+"$GODOT" --path "$PROJECT_DIR" --resolution "$RESOLUTION" -- --play ${args[@]+"${args[@]}"} &
 engine_pid=$!
 wait "$engine_pid"

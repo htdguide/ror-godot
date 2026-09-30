@@ -347,25 +347,38 @@ codebase and recognise their own game in it, and a tree named after this project
 ```
 project.godot            <- at the REPO ROOT, not in game/
 game/
-  physics/               solver glue, the bridge, ground models      (source/main/physics)
+  physics/               solver glue, ground models, heightfield     (source/main/physics)
   gfx/                   materials, flexbodies, props, flares, sky   (source/main/gfx)
   terrain/               terrain reading, objects, vegetation        (source/main/terrain)
   resources/             rig-def, .otc, .terrn2, .odef, OGRE mesh    (source/main/resources)
+  shaders/               shared by every layer that draws
+  config/                the game's own tunables, as `.gd` consts
   gui/                   menu, vehicle selector, chat, menubar       (source/main/gui)
   network/               RoRnet, ITransport                          (source/main/network)
   audio/                 sound sources, engine sound                 (source/main/audio)
   scripting/             AngelScript binding                         (source/main/scripting)
-  utils/                 shared helpers                             (source/main/utils)
+  utils/                 shared helpers                              (source/main/utils)
 harness/                 THIS PROJECT'S OWN — upstream has no counterpart
   gates/                 one file per gate
   console/               the dev console and its command surface
   dev/                   the one-window runner, containers, probes
-  config/                every tunable, as `.gd` consts
+addons/                  Terrain3D — Godot requires this at the project root
+bin/                     the GDExtension and its .gdextension
 extension/src/           mirrors game/'s division
 tools/                   shell entry points                          (upstream tools/)
-doc/                     upstream has this name too
 docs/                    this project's own documents
 ```
+
+Two things in this layout are corrections to the first draft of it, both forced by building it:
+
+- **`config/` is under `game/`, not under `harness/`.** Shipping code must not depend on the test
+  harness, and every one of these is a tunable of the game rather than of the gates. C1's settings
+  persistence is what they become for a user.
+- **`shaders/` is under `game/`, beside `gfx/` rather than inside it.** A shader is an asset that
+  any layer which draws may use, the way config is: with them under `gfx/`, `game/terrain/`
+  referencing the foliage shader read as terrain depending on gfx and the `layering` gate said so.
+  Upstream keeps its own shader and material assets in its content tree rather than in
+  `source/main`, so this is not a departure from the mirror.
 
 **`project.godot` moves to the repo root.** Godot loads resources only from its own project
 directory, so a top-level `harness/` is invisible to an engine rooted at `game/`. Paths become
@@ -380,6 +393,19 @@ unfamiliar meaning, which is worse than an honestly new one.
 and changes no behaviour: the `layering` gate already knows which directories may depend on which
 and is updated in the same commit, and `file_size`, `typing` and `scene_purity` do not care where a
 file lives. A rename that also changes something is two commits.
+
+**Moving `res://` is what makes the move dangerous, and it caught two things.** `res://` was
+`<repo>/game` and is now `<repo>`, so every expression of the form `res://..` silently moved up one
+directory: `SourceScan.repo_root()` returned the repository's *parent*, and `Capture.artifact_root()`
+wrote every artifact outside the repository. Both passed their gates while doing it, because a gate
+that reads and writes under one wrong root is self-consistent. Anything computing a path from
+`res://` is worth re-reading after this move rather than trusted.
+
+**Godot imports everything under its project root**, which after the move includes `vendor/`,
+`assets/`, `artifacts/` and `history/` — hundreds of megabytes of DDS, PNG and mesh files that the
+engine has no business importing and that made the first import after the move never finish. Each
+carries a `.gdignore`, which stops the importer and does not stop `FileAccess`: terrains and mods
+are read by absolute path, so nothing about loading content depends on Godot indexing it.
 
 ---
 
