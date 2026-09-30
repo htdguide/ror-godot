@@ -36,6 +36,12 @@ var vehicle: Dictionary = {}
 
 var _main: Node
 var _run_started: bool = false
+## The command table every front end dispatches into: the keyboard's console, the agent's
+## channel, and `tools/gate.sh`. One table is what stops the agent and the user having different
+## capabilities — `console_fronts_agree` holds it.
+var commands: ConsoleTable = null
+## The agent's front end, when this run has one open.
+var channel: AgentChannel = null
 ## The gate container currently open, or null outside gate mode. A gate's world lives inside it
 ## and nothing a gate builds reaches the next one -- see `GateContainer`.
 var container: GateContainer = null
@@ -59,6 +65,7 @@ func begin(main: Node) -> void:
         _quit(EXIT_OK)
         return
     _apply_determinism()
+    _open_console()
     if args.values.has("gate"):
         # `--gate a,b,c` runs three gates in one window, each in its own container. One name is
         # the same path with a list of one, so there is no separate single-gate mode to keep
@@ -232,6 +239,27 @@ func advance_frames(count: int, scenario: String, tag: String) -> void:
         await RenderingServer.frame_post_draw
         metrics.sample(frame_index, tag)
         frame_index += 1
+
+
+## Opens the command table, and the agent's channel with it when this run is one the agent can
+## usefully drive.
+##
+## Not in every run. A gate run launched from the command line is over in seconds and polling a
+## drop box during it would let a stray file change what a gate measures — the channel belongs to
+## a session that stays open. `--console` asks for it explicitly, and a window always has it.
+func _open_console() -> void:
+    commands = ConsoleTable.new(self)
+    if not (args.has_flag("play") or args.has_flag("console")):
+        return
+    channel = AgentChannel.new()
+    channel.name = "AgentChannel"
+    channel.setup(self, commands)
+    add_child(channel)
+    print("HARNESS_CONSOLE " + JSON.stringify({
+        "in": HarnessCapture.resolve_dir(AgentChannel.IN_DIR),
+        "out": HarnessCapture.resolve_dir("").path_join(AgentChannel.OUT_FILE),
+        "commands": commands.names().size(),
+    }))
 
 
 ## --------------------------------------------------------------------------------
