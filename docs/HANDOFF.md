@@ -12,10 +12,24 @@ authoritative. It was re-scoped on 2026-09-30 from a renderer rewrite to a clien
 and §1's ordering are the new parts and the decisions table records what was superseded. Then
 `docs/architecture/bridge.md` and `docs/decisions/`.
 
-**Next milestone is D0, the dev environment** (§0.8). Three of its seven acceptance items are
-done: the §0.7 folder mirror, the one-window container runner, and order independence. What is
-left is the console, the agent channel, and `tools/gate.sh` becoming a client of the console's own
-command table. Nothing else is in progress.
+**Next milestone is D0, the dev environment** (§0.8), and all seven of its acceptance items are
+done: the §0.7 folder mirror, the one-window container runner, order independence, no leaks, the
+`static_state` lint, one command table behind three front ends, and one JSONL line per command.
+What is left of §0.8's prose is `tools/gate.sh` becoming a client of that table rather than a
+parallel runner. Nothing else is in progress.
+
+**The console.** `tools/play.sh` and `--console` open it; ` or F1 drops it down over whatever is
+running, without pausing it. `help` lists the twelve commands, Tab completes and cycles, Up
+recalls across runs, `alias` names a line, `bind` ties a key to one, `condump` writes the
+transcript to a file. `gate run <name...>` runs gates here, in this window, each in its own
+container, and reports each one as it finishes rather than summarising at the end.
+
+**The agent's channel is the same table.** Write a file into `artifacts/console/in/<seq>.cmd`,
+one command per line, and read one JSONL line per command out of `artifacts/console/out.jsonl`;
+`artifacts/console/state.json` says what is loaded. A whole investigation is one write and one
+read. Anything large is written to a file and the line carries the path — `gate run` over three
+gates is one line for the agent and three for the person watching. `console_fronts_agree` and
+`the_console_reports_a_run_as_it_happens` hold both halves of that.
 
 The suite runs in one window per tier -- five windows for the whole suite instead of 62, 88 s
 instead of 144 s -- and `tools/gate.sh --order-check` runs all 77 gates twice, once in the graph's

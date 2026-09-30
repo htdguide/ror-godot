@@ -42,6 +42,8 @@ var _run_started: bool = false
 var commands: ConsoleTable = null
 ## The agent's front end, when this run has one open.
 var channel: AgentChannel = null
+## The keyboard's front end: the drop-down console. Same table as the channel.
+var console: ConsoleUi = null
 ## The gate container currently open, or null outside gate mode. A gate's world lives inside it
 ## and nothing a gate builds reaches the next one -- see `GateContainer`.
 var container: GateContainer = null
@@ -66,6 +68,11 @@ func begin(main: Node) -> void:
         return
     _apply_determinism()
     _open_console()
+    # `--console` on its own is a session that exists to be driven: it holds the process open,
+    # serving the agent's channel and the keyboard, until something tells it to quit. Without
+    # this it fell through to capture mode and exited before the channel had polled once.
+    if args.has_flag("console") and not args.has_flag("play"):
+        return
     if args.values.has("gate"):
         # `--gate a,b,c` runs three gates in one window, each in its own container. One name is
         # the same path with a list of one, so there is no separate single-gate mode to keep
@@ -241,25 +248,12 @@ func advance_frames(count: int, scenario: String, tag: String) -> void:
         frame_index += 1
 
 
-## Opens the command table, and the agent's channel with it when this run is one the agent can
-## usefully drive.
-##
-## Not in every run. A gate run launched from the command line is over in seconds and polling a
-## drop box during it would let a stray file change what a gate measures — the channel belongs to
-## a session that stays open. `--console` asks for it explicitly, and a window always has it.
+## Opens the command table and the front ends onto it. See `ConsoleSession`.
 func _open_console() -> void:
-    commands = ConsoleTable.new(self)
-    if not (args.has_flag("play") or args.has_flag("console")):
-        return
-    channel = AgentChannel.new()
-    channel.name = "AgentChannel"
-    channel.setup(self, commands)
-    add_child(channel)
-    print("HARNESS_CONSOLE " + JSON.stringify({
-        "in": HarnessCapture.resolve_dir(AgentChannel.IN_DIR),
-        "out": HarnessCapture.resolve_dir("").path_join(AgentChannel.OUT_FILE),
-        "commands": commands.names().size(),
-    }))
+    var opened: Dictionary = ConsoleSession.open(self)
+    commands = opened["table"] as ConsoleTable
+    channel = opened["channel"] as AgentChannel
+    console = opened["console"] as ConsoleUi
 
 
 ## --------------------------------------------------------------------------------

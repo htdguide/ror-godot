@@ -1,6 +1,11 @@
 extends GateBase
 ## Every front end of the console reaches the same command table, and gets the same answer.
 ##
+## Three of them: the table called directly, the agent's watched drop box, and the keyboard's
+## drop-down console. The third is driven through its own submit path — the one a keystroke
+## reaches — rather than by calling the table it sits on, for the same reason as the second: the
+## part that can drift is the part in between.
+##
 ## PLAN 0.8 says the keyboard, the agent's watched drop box and `tools/gate.sh` all dispatch into
 ## one command table, so that anything the user can type the agent can run and neither has a
 ## capability the other lacks. That is a claim about wiring, and wiring claims rot silently: a
@@ -33,12 +38,14 @@ const REPLY_TIMEOUT_S: float = 10.0
 ## What one command may cost the agent to read back. A JSONL line carrying a one-sentence detail
 ## and a small result sits far under this; a line carrying a log or a frame cannot.
 const MAX_LINE_BYTES: int = 2048
+## How many front ends must reach the table: called directly, the agent's drop box, the console.
+const FRONT_ENDS: int = 3
 
 
 static func meta() -> Dictionary:
     return {
         "name": "console_fronts_agree",
-        "proves": "the keyboard's console and the agent's channel dispatch into one command table and return the same result, and one command costs the agent one line",
+        "proves": "the keyboard's console, the agent's channel and a direct call all dispatch into one command table and return the same result, and one command costs the agent one line",
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
             "%d commands, identical ok and detail through both front ends, each reply one JSONL"
@@ -96,6 +103,29 @@ func run(harness: Node) -> Dictionary:
             lines.size()
         )
 
+    # Front end three: the keyboard's console, through the submit path a keystroke reaches.
+    var ui: ConsoleUi = ConsoleUi.new()
+    harness.add_child(ui)
+    ui.setup(table)
+    for command: String in COMMANDS:
+        await ui.submit(command)
+    var typed_lines: PackedStringArray = table.transcript()
+    ui.queue_free()
+    # The console dispatched into the same table, so the table's own transcript has to show each
+    # command three times: once per front end. A console that had grown its own dispatcher would
+    # leave a third of them missing.
+    for command: String in COMMANDS:
+        var seen: int = 0
+        for line: String in typed_lines:
+            if line == command:
+                seen += 1
+        if seen != FRONT_ENDS:
+            return fail(
+                "'%s' reached the table %d times for %d front ends: one of them is not"
+                % [command, seen, FRONT_ENDS] + " dispatching into it",
+                seen
+            )
+
     var widest: int = 0
     for index: int in COMMANDS.size():
         var line: String = lines[index]
@@ -127,8 +157,8 @@ func run(harness: Node) -> Dictionary:
             widest
         )
     return ok(
-        "%d commands identical through both front ends; widest reply %d bytes of %d"
-        % [COMMANDS.size(), widest, MAX_LINE_BYTES],
+        "%d commands identical through %d front ends; widest reply %d bytes of %d"
+        % [COMMANDS.size(), FRONT_ENDS, widest, MAX_LINE_BYTES],
         widest
     )
 

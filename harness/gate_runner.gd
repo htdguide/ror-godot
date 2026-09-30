@@ -13,6 +13,14 @@ extends RefCounted
 ## the harness exposes are reset around it. A gate that leaks fails itself rather than the gate
 ## that runs after it.
 
+## Emitted as each gate finishes, before the next one opens its container.
+##
+## A suite run is minutes long and a summary printed at the end of it tells a person nothing
+## while they wait. The console shows these as they arrive; the agent's channel deliberately
+## does not, and still gets one line for the whole command — the two front ends want opposite
+## things from the same run and a signal is how both get what they want from one runner.
+signal gate_finished(row: Dictionary)
+
 const GATE_DIR: String = "res://harness/gates"
 ## Exit codes, matching `Harness`'s own so a caller sees one set.
 const OK: int = 0
@@ -135,6 +143,7 @@ func _run_one_gate(harness: Node, name: String) -> int:
         row["leaked"] = leaked
         row["detail"] = "%s [container leak: %s]" % [row["detail"], leaked]
     print("HARNESS_GATE_RESULT " + JSON.stringify(row))
+    gate_finished.emit(row)
     return OK if row["pass"] else FAIL
 
 
