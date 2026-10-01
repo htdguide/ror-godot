@@ -135,7 +135,9 @@ func run(harness: Node) -> Dictionary:
             % [fill, MIN_PROJECTED_FILL, shot["png"]],
             fill
         )
-    var second: String = harness.setup_for(SECOND_PRESET)
+    # The camera moves; the world and the vehicle in it stay. `setup_for` would rebuild both and
+    # leave this photographing an empty field.
+    var second: String = harness.use_camera(SECOND_PRESET)
     if second == "":
         var second_shot: Dictionary = await harness.capture_shot("vehicle_rear", "static", 6)
         if second_shot["error"] != "":

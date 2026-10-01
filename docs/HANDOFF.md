@@ -295,10 +295,19 @@ gates need a real window, and `tools/gate.sh` refuses to run while one is open.
 
 ## Facts that cost time to establish — do not re-derive them
 
-They have their own document, because there are now sixty of them and this one has a size cap:
-**`docs/guides/hard-won-facts.md`**. Read it before changing anything in the solver, the
-compatibility shim, the terrain or the lighting. Every entry is something that was measured, and
-most of them were measured twice because the first answer was wrong.
+They have their own documents, because there are now over seventy of them and every file here has
+a size cap:
+
+- **`docs/guides/hard-won-facts.md`** — the solver, the file formats, the terrain, and the
+  discipline the gates are held to.
+- **`docs/guides/hard-won-facts-light.md`** — light, colour, exposure and anything that measures a
+  picture. Split out when the first file hit its cap, and the larger half of the two by effort:
+  this is the area the project has been wrong about most often, usually by trusting an instrument
+  nobody had checked.
+
+Read the relevant one before changing anything in the solver, the compatibility shim, the terrain
+or the lighting. Every entry is something that was measured, and most of them were measured twice
+because the first answer was wrong.
 
 ## Licence
 

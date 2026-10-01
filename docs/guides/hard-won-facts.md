@@ -4,6 +4,9 @@ Audience: anyone changing the solver, the compatibility shim, the terrain, the r
 gates. Every entry here was measured, most of them after a wrong answer, and each one costs an
 afternoon to rediscover.
 
+Light, colour and capture have their own file: `hard-won-facts-light.md`. They were split out when
+this one hit the 400-line cap, and they are the area this project has been wrong about most often.
+
 - **Read the file before believing anything about a rig.** The hero truck states its own node
   masses, its own torque curve by name, its own wheel drive flags and its own beam scale. Four
   separate faults this session were the parser ignoring something the file said, not the
@@ -97,101 +100,6 @@ afternoon to rediscover.
   that drift, with the reasoning written down beside it, and the reasoning was wrong — so the
   loosening hid a real bug for two commits. A tolerance widened to fit an unexplained measurement
   is a bug with a comment on it. It is 1e-5 now.
-- **"The terrain takes a smaller share of its light from the sky than anything standing on it"
-  was never true.** It stood in this project's docs for a long time, measured at 21%, then 13.6%,
-  then 111%, then 22.6%, moving with whatever else had changed — and it was a roughness mismatch
-  inside `terrain_takes_the_light` itself. Its reference patch used
-  `TerrainWorld.COLOUR_MAP_ROUGHNESS`, 0.6, which is *one term* of Terrain3D's roughness
-  (`(color_map.a - 0.5) * 2 + normal_rough.a` plus a per-asset modifier) and not the result. The
-  per-asset modifier is `RorTerrainSkin.ROUGHNESS`, 0.9. A smoother patch takes more of its light
-  from the sky's specular than rougher ground does, so the gate was comparing two different
-  materials and calling the difference a property of the ground. **Matched, they agree to 0.0%.**
-  A comparison gate is only as good as the sameness of the two things it compares, and "same
-  albedo" is not the same as "same material".
-- **Godot's sky ambient does not follow the sun within a capture.** `daylight_shadows_are_readable`
-  took its shaded sample by swinging the sun 180°, which with a `PhysicalSkyMaterial` drags the
-  atmosphere below the horizon and measures night rather than shade. Replacing that with
-  `sky_mode = SKY_ONLY` — same sun, same sky, direct light off — gave a **bit-identical** result,
-  which is the interesting part: the ambient did not change when the sun moved, though it does
-  change with turbidity. The radiance map that feeds `ambient_light_sky_contribution` is not
-  regenerated per frame at `Sky.PROCESS_MODE_AUTOMATIC`. The method was wrong in principle and
-  right by accident; it is correct by construction now.
-- **A physically-proportioned daylight ratio and this project's shadow gates are in direct
-  conflict, and it is a design decision rather than a bug.** Calibrating the sky to a measured
-  10.7:1 sun-to-sky (against clear daylight's 10:1 to 18:1) cannot simultaneously satisfy
-  `shadows_are_not_black`'s floor of 0.085 displayed shadow *and* its ceiling of 4x displayed
-  sunlit-to-shadow — except by compressing highlights so hard that the image goes flat, which is
-  what exposure 3.4 did. Removing the fill light makes it worse: shadows fall to 0.0221. The
-  gate's own reasoning cites print holding about 1:8, so its 4x is stricter than the figure it
-  argues from. **Nothing here was changed to resolve it.**
-- **Photograph a step wedge, not a grey card.** Six patches a stop apart found two faults in one
-  run that a single mid-grey patch could not have shown, because both were *additive* and an
-  offset bends a measurement most where the subject is darkest. The brightest patch was 1% high
-  and the darkest 9% high — one patch anywhere on that wedge would have read "about right".
-- **`use_measurement_environment` was never dark.** It set the ambient colour to black and the
-  ambient energy to zero and left `ambient_light_sky_contribution` at 1.0 — and at 1.0 the ambient
-  comes from the sky whatever the colour says. It also left **fog** on, which adds a constant to
-  every pixel in the frame. Every gate that ever measured something "in the dark" had both. Both
-  are off now, along with `reflected_light_source`.
-- **With the room actually dark, the lighting path is exact.** A photographed wedge is linear in
-  reflectance to **0.00%**, doubling a light is a factor of two to **0.00%**, and a two-light
-  ratio measures 6.80:1 against 6.80:1. So nothing is wrong with the renderer's lights or with
-  the capture — which places the remaining sun-to-sky puzzle squarely in the **sky ambient**
-  path, and nowhere else.
-- **Lambert's cosine law will correct your expectation before it corrects the renderer.** The
-  lighting-ratio check first compared a photograph against 20000/5000 = 4:1 and the photograph
-  said 6.80:1 — a 70% error that was entirely the gate's. The fill arrives at 54 degrees, so
-  cos(54) = 0.588 of it lands and 20000 / (5000 x 0.588) is 6.80 exactly. A photographer aims an
-  incident meter at the camera for the same reason.
-- **A capture can carry light, and it takes one flag.** `SubViewport.use_hdr_2d` makes the
-  viewport texture `FORMAT_RGBAH` and linear, so values above white survive: an unshaded quad at
-  albedo 4.0 reads 25.312 through it and 1.000 without it. 25.312 is `srgb_to_linear(4.0)`, which
-  is also the reminder that `StandardMaterial3D.albedo_color` is sRGB on the way in — to inject a
-  known linear value you need a shader uniform straight into `ALBEDO`, not a material colour.
-  `Image.save_exr` then writes it. `captures_carry_real_light` calibrates the path end to end:
-  0.25, 0.75, 2.0 and 8.0 read back within 0.24%.
-- **Calibrating the instrument did not settle the sun-to-sky question, and that is itself the
-  finding.** Measured through the HDR capture the ratio is **6.4:1** — the first trustworthy
-  figure — but it still moves with exposure: 6.4:1 at ISO 32, 2.7:1 at 64, 19.2:1 at 16, on one
-  unchanged scene, with a capture proven linear to 0.24% up to a value of 8. A gain cannot change
-  a ratio, so the non-linearity is in the *render*, not the capture. The suspicion is that under
-  physical light units the sky's ambient contribution and the direct light do not share an
-  exposure normalisation. **Two instruments have now been wrong in a row on this question; the
-  lesson is to calibrate before measuring, not after being surprised.**
-- **A ratio read off an 8-bit PNG is not a ratio of light, and it cannot be fixed by dividing.**
-  `daylight_shadows_are_readable` reads its "scene-referred" samples out of a captured PNG, which
-  is 8-bit and display-encoded. Turning on physical light units exposed it: the *same scene* gave
-  1.3:1 at ISO 100, 3.4:1 at 25, 12.2:1 at 12 and 38.6:1 at 6. **A gain cannot change a ratio**,
-  so the measurement is not linear — the sunlit sample saturates at the top and the shaded one
-  quantises toward zero at the bottom, and only a narrow exposure window is valid at all. Undoing
-  the sRGB transfer does not rescue it (1.8, 3.6, 9.4, 28.8 across the same sweep). **Every
-  sun-to-sky figure this project has recorded came from this measurement** — 3:1, 4:1, 10.7:1 —
-  and none of them is a light ratio. Measuring a 10:1 scene needs an HDR capture path; until there
-  is one, no number from this gate should be compared against a physical illuminance figure.
-- **Physical light units do not make the exposure fall out for free.** With
-  `use_physical_light_units`, the sun at 100 klx and `CameraAttributesPhysical` doing the
-  exposure, the ISO still ended up being chosen by a *shadow* gate rather than by the sun: above
-  ISO 40 La Paz's pale ground bleaches, below 32 the shadow drops under
-  `shadows_are_not_black`'s 0.085 floor, and the window between them is half a stop wide. The
-  gates' thresholds were calibrated when the scene was brighter than daylight, and they now bound
-  the exposure from both sides.
-- **A fill light cannot lift a shadow it is itself shadowed by.** Raising `FILL_LUX` from 6 000 to
-  20 000 moved the measured shadow from 0.0479 to 0.0578 against a floor of 0.085 — a three-fold
-  increase buying a fifth of what was needed, because the fill casts shadows too and the region
-  being measured is in both. Exposure is what moves a shadow floor; a fill moves the sides.
-- **A config flag can claim a thing the code does not do, and nothing will catch it.**
-  `weather_cfg.gd` carried `physical_sky: true` for every daylight preset while `_build_sky`
-  built a two-colour `ProceduralSkyMaterial` gradient. No gate could see it: every lighting gate
-  was graded against whatever sky was actually being built, so the name being a lie cost nothing
-  and was invisible until somebody read both files. A flag named after a technique is worth
-  checking against the technique.
-- **An atmosphere model is dimmer than a gradient tuned to look right, and that is the point.**
-  Switching the clear presets to `PhysicalSkyMaterial` moved sun-to-sky from 3.2:1 to 4.1:1 —
-  toward clear daylight's ~14:1 — and darkened the whole frame, so
-  `daylight_shadows_are_readable` failed on its own readability floor with exactly the right
-  diagnosis: *"the light is there and the grading is burying it."* Exposure is the control for
-  that, and it went 0.7 to 1.05 to put the displayed shaded surface back at 0.066 where it had
-  been. Fixing it with sky energy instead would have undone the ratio it was meant to improve.
 - **A terrain with no traction map grips like gravel, not like the first ground model.** Upstream
   keeps two defaults (`Collisions.cpp:134-135`): `defaultgm` is concrete and is for collision
   meshes, `defaultgroundgm` is gravel and is what the ground uses when landuse is absent or
@@ -329,49 +237,11 @@ afternoon to rediscover.
   normals, tyres buried 0.34 m in the ground, and a door hanging a metre off its hinges all
   passed every check that existed at the time, because each measured nodes and the nodes were
   right. When the user reports something, believe them and go find the number that shows it.
-- **A sky's energy is not in the lux a light is stated in.** `DirectionalLight3D.light_intensity_lux`
-  takes its value literally under physical light units; a sky's `energy_multiplier` never goes
-  through that conversion. Measured against a key light of stated lux in a dark room, one unit of
-  uniform sky radiance delivers **98,325.74 lx** to a facing surface — reproducible to ten
-  significant digits, invariant to the sky's radiance over a 16x range, to the panorama's
-  resolution (16x8 and 256x128 agree exactly) and to the radiance map's size. It sits 1.70% under
-  1e5 and that gap is unexplained. So a sky left at `energy_multiplier = 1.0` is worth roughly as
-  much illuminance as the noon sun, which is why no amount of turning the sun up or the turbidity
-  down ever brought the sun-to-sky balance near clear daylight's figure.
-- **Sky ambient *is* exposed like a light.** One stop gains a key light by 2.0000x and a uniform
-  sky by 2.0000x, 0.00% apart. The exposure-dependent sun-to-sky ratio that prompted four rounds
-  of measurement — 6.4:1 at ISO 32, 2.7:1 at 64, 19.2:1 at 16 — was the old uncalibrated
-  instrument, fog and leaked sky ambient, and not the sky path at all.
 - **A negative control that does not fire is not a control, even when it is the right idea.**
   Re-enabling fog was the obvious break for a sky-ambient gate, since fog is additive and fog had
   already been caught bending a wedge once. At chart distance it moved the measurement 0.42% and
   left linearity at 0.00%, so it proved nothing and was thrown out rather than counted. Lifting
   the chart shader's black by 0.02 fired at 46.2%.
-- **Under physical light units a light has a colour temperature, and no temperature is neutral.**
-  `Light3D.light_temperature` defaults to 6500 K and photographs as (1.0, 0.9419, 0.9919) once the
-  brightest channel is normalised — a 6% green deficit, constant across a thirty-fold brightness
-  range, on top of whatever `light_color` says. Sweeping the temperature moves the cast but never
-  through neutral: measured at 5000 K it is (1.0, 0.790, 0.629) and at 9000 K (0.674, 0.741, 1.0),
-  and red-equals-blue and green-equals-red cross at different temperatures. The cause is which
-  locus the conversion walks: 6500 K on the Planckian locus sits below the daylight locus that
-  sRGB's white point is on. So every light in this project carries a slight cast, and a colour
-  measurement has to white balance off a known patch rather than assume the light is white.
-- **A colour measurement cannot go through a luminance.** A channel swap, a doubled transfer
-  function or a tinted tonemapper all leave luminance plausible, so every luma-based gate in this
-  suite is blind to them by construction. Measured: swapping red and blue in the chart shader
-  costs 113 delta E on the worst patch and 41.5 on average while a luminance reading barely moves.
-- **White balancing off a reference patch buys accuracy and costs a whole fault class.** It is the
-  only honest way to measure colour under a light that is not neutral, and it makes a tinted light
-  undetectable — measured, a green light at (0.8, 1.0, 0.8) leaves the chart gate green at 0.029
-  delta E. Three degrees of freedom spent on the white card still leaves fifty-four values and the
-  six published grey luminances to predict, so the method is not weak; it is specifically blind.
-- **A `Sky` left at its default `process_mode` does not render the same picture twice.** The
-  radiance map is approximated across frames, and anything rough enough to take its specular from
-  that map inherits the approximation: measured on the hero truck's drop, a band of distant ground
-  alternated between 0.6703 and 0.9906 luminance on alternate frames — the far half of the checker
-  washing to pure white and back — with the camera bolted down and the truck long since at rest.
-  Two discrete values flipping, not noise. `Sky.PROCESS_MODE_QUALITY` fixes it and the band then
-  holds to 0.000000. Grazing angles take it worst, which is why it was the distance that flickered.
 - **The suite can be 85-for-85 green while the picture visibly flickers.** Every gate measured a
   number out of a single frame, and a flicker lives *between* frames, so nothing in the suite could
   see it. The user saw it first. Frame-to-frame determinism is also what every golden-image gate
@@ -398,3 +268,15 @@ afternoon to rediscover.
   is worse than one that fails to compile. Same stale-root trap as `res://` and
   `HarnessCapture.artifact_root`; that is three times now, and the lesson is to check where a
   build artifact actually lands before believing a native change took effect.
+- **`setup_for` used to add a world beside the old one, so a second setup measured the first
+  scene.** Nothing errored. Two completely different weather presets produced byte-identical
+  captures — peak, histogram bins and sampled mean agreeing to six decimals — because the viewport
+  held two environments, two suns and two cameras, and the camera that entered first stays
+  current. `vehicle_renders` had been writing a `vehicle_rear` artifact that was the front view
+  for as long as it existed. The wrong answer was stable, repeatable and order-independent, so the
+  determinism and order-independence checks could not see it: those prove a measurement is
+  consistent, never that it is of the right thing.
+- **A structural check that matches on a node's name is not a structural check.** Godot renames a
+  node whose name is taken, so the leaked second `BlockoutWorld` arrived as `@Node3D@2` and a
+  check looking for the name counted one world and passed with the bug deliberately restored.
+  Identify a node by what it contains — here, its `WorldEnvironment` — not by what it is called.

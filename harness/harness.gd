@@ -62,11 +62,11 @@ func begin(main: Node) -> void:
         _die(EXIT_USAGE, "argument error: " + args.error)
         return
     if args.has_flag("list"):
-        _print_inventory()
+        HarnessReport.print_inventory(GATE_DIR)
         _quit(EXIT_OK)
         return
     if args.has_flag("chain"):
-        _print_chain()
+        HarnessReport.print_chain()
         _quit(EXIT_OK)
         return
     _apply_determinism()
@@ -116,6 +116,19 @@ func _build_world(scenario: String, weather: String) -> String:
         return "unknown scenario '%s'; known: %s" % [scenario, Scenarios.names()]
     if not WeatherCfg.has(weather):
         return "unknown weather preset '%s'" % weather
+    # The previous world goes first, and this is not housekeeping.
+    #
+    # `setup_for` can be called more than once in a gate — a second weather, a second camera
+    # preset — and this used to add the new world beside the old one rather than replacing it.
+    # Two worlds in one viewport means two environments, two suns and two cameras, and the camera
+    # that entered first stays current: the picture never changed. Measured, two completely
+    # different skies produced byte-identical captures, mean luminance agreeing to six decimals.
+    # `vehicle_renders` has been writing a "rear" artifact that is the front view because of it.
+    var previous: Node3D = world
+    if previous != null and is_instance_valid(previous):
+        if previous.get_parent() != null:
+            previous.get_parent().remove_child(previous)
+        previous.queue_free()
     # Clouds in a window, the stated gradient in a gate: see `BlockoutWorld._clouds`.
     world = BlockoutWorld.build(
         WeatherCfg.get_preset(weather),
@@ -133,6 +146,33 @@ func _build_world(scenario: String, weather: String) -> String:
         container.camera = camera
     metrics = HarnessMetrics.new()
     metrics.begin(render_viewport())
+    return ""
+
+
+## Moves to another camera preset without rebuilding the world.
+##
+## Changing where the camera stands is no reason to throw the scene away, and treating it as one
+## bit twice in opposite directions: a second `setup_for` first gave two worlds and the *front*
+## view, then — once the stale world was freed — the rear view of an empty field, the vehicle
+## having been parented to the world just freed. `make_current` is explicit because a viewport
+## keeps whichever camera entered first, which is how that stayed invisible. See
+## `hard-won-facts.md`.
+func use_camera(shot: String) -> String:
+    if world == null or not is_instance_valid(world):
+        return "there is no world to put a camera in; call setup_for first"
+    var err: String = _resolve_preset(shot)
+    if err != "":
+        return err
+    var fresh: Camera3D = PhysicalCamera.build(preset)
+    if camera != null and is_instance_valid(camera):
+        if camera.get_parent() != null:
+            camera.get_parent().remove_child(camera)
+        camera.queue_free()
+    camera = fresh
+    world.add_child(camera)
+    camera.make_current()
+    if container != null:
+        container.camera = camera
     return ""
 
 
@@ -344,33 +384,6 @@ func setup_for(shot: String, weather: String = "") -> String:
 
 ## --------------------------------------------------------------------------------
 ## Plumbing
-
-
-## The gate graph, for the runner to schedule from: which gates build on which, and what tier
-## that puts each one in. Printed rather than computed in the runner because the edges are
-## declared in the gates themselves and nothing outside the engine can read them.
-func _print_chain() -> void:
-    var graph: Dictionary = GateChain.load_graph()
-    print("HARNESS_CHAIN " + JSON.stringify({
-        "gates": graph,
-        "order": GateChain.order(graph),
-        "roots": GateChain.roots(graph),
-        "problems": GateChain.problems(graph),
-    }))
-
-
-func _print_inventory() -> void:
-    var gates: PackedStringArray = PackedStringArray()
-    var dir: DirAccess = DirAccess.open(GATE_DIR)
-    if dir != null:
-        for file: String in dir.get_files():
-            if file.ends_with(".gd"):
-                gates.append(file.get_basename())
-    print("HARNESS_INVENTORY " + JSON.stringify({
-        "gates": gates,
-        "presets": CameraCfg.names(),
-        "scenarios": Scenarios.names(),
-    }))
 
 
 func _die(code: int, message: String) -> void:
