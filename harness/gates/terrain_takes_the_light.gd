@@ -68,10 +68,11 @@ const MAX_ALBEDO_SCALE: float = 8.0
 
 ## How far the terrain's sun response may sit from the patch's, as a share of the patch's.
 ##
-## Measured, the terrain responds to the sun *more* than the patch does, which means it is taking
-## a smaller share of its light from the sky. That gap is real and is a named finding rather than
-## a tolerance chosen to make a number pass: it is why a shaded slope reads darker than anything
-## standing on it, and it is the M2 ground material's to close,
+## The bound is wide for history rather than need: the gap it was sized for was a roughness
+## mismatch in this gate's own patch, not a property of the ground, and matched surfaces agree to
+## 0.4%. It is left wide because what it is for is catching a terrain that stops taking sky light
+## altogether, which reads in the hundreds of per cent — it is not a claim that 30% is acceptable.
+## Kept here for the record: this used to say the gap belonged to
 ## since that replaces Terrain3D's shading with a shader this project owns. Roughness, the normal
 ## map's depth, the texture's brightness and the asset's albedo colour were each tried and none of
 ## them moved the picture at all — Terrain3D draws the ground from the colour map and the
@@ -271,11 +272,21 @@ func _patch(at: Vector3) -> MeshInstance3D:
     material.albedo_color = Color(
         PATCH_ALBEDO_START, PATCH_ALBEDO_START, PATCH_ALBEDO_START
     )
-    # The roughness the terrain is actually drawn with, which is the one written into the colour
-    # map's alpha channel rather than the per-surface value in SurfaceCfg: Terrain3D reads it from
-    # there. Specular is left on, because a patch with no specular lobe responds to the sun
-    # differently from one with, and the comparison is with the terrain as it is drawn.
-    material.roughness = TerrainWorld.COLOUR_MAP_ROUGHNESS
+    # The roughness the terrain is actually drawn with. Specular is left on, because a patch with
+    # no specular lobe responds to the sun differently from one with, and the comparison is with
+    # the terrain as it is drawn.
+    #
+    # **This was the finding.** It used to be `TerrainWorld.COLOUR_MAP_ROUGHNESS`, 0.6, which is
+    # the value written into the colour map's alpha — one term of Terrain3D's roughness, not the
+    # result. Terrain3D composes `(color_map.a - 0.5) * 2 + normal_rough.a` plus a per-asset
+    # modifier, and the modifier is `RorTerrainSkin.ROUGHNESS`. So the patch was smoother than the
+    # ground and took more of its light from the sky's specular, and the difference was recorded
+    # for a long time as "the terrain takes a smaller share of its light from the sky than
+    # anything standing on it does" — at 21%, then 13.6%, then 111%, then 22.6%, moving with
+    # whatever else had changed. **Matched, they agree to 0.4%.** The terrain is lit like any
+    # other surface of the same albedo and roughness; the measurement had been comparing two
+    # different materials.
+    material.roughness = RorTerrainSkin.ROUGHNESS
     var plane: PlaneMesh = PlaneMesh.new()
     plane.size = Vector2(PATCH_SIZE, PATCH_SIZE)
     var instance: MeshInstance3D = MeshInstance3D.new()

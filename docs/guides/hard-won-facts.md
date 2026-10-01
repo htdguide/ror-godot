@@ -97,6 +97,33 @@ afternoon to rediscover.
   that drift, with the reasoning written down beside it, and the reasoning was wrong — so the
   loosening hid a real bug for two commits. A tolerance widened to fit an unexplained measurement
   is a bug with a comment on it. It is 1e-5 now.
+- **"The terrain takes a smaller share of its light from the sky than anything standing on it"
+  was never true.** It stood in this project's docs for a long time, measured at 21%, then 13.6%,
+  then 111%, then 22.6%, moving with whatever else had changed — and it was a roughness mismatch
+  inside `terrain_takes_the_light` itself. Its reference patch used
+  `TerrainWorld.COLOUR_MAP_ROUGHNESS`, 0.6, which is *one term* of Terrain3D's roughness
+  (`(color_map.a - 0.5) * 2 + normal_rough.a` plus a per-asset modifier) and not the result. The
+  per-asset modifier is `RorTerrainSkin.ROUGHNESS`, 0.9. A smoother patch takes more of its light
+  from the sky's specular than rougher ground does, so the gate was comparing two different
+  materials and calling the difference a property of the ground. **Matched, they agree to 0.0%.**
+  A comparison gate is only as good as the sameness of the two things it compares, and "same
+  albedo" is not the same as "same material".
+- **Godot's sky ambient does not follow the sun within a capture.** `daylight_shadows_are_readable`
+  took its shaded sample by swinging the sun 180°, which with a `PhysicalSkyMaterial` drags the
+  atmosphere below the horizon and measures night rather than shade. Replacing that with
+  `sky_mode = SKY_ONLY` — same sun, same sky, direct light off — gave a **bit-identical** result,
+  which is the interesting part: the ambient did not change when the sun moved, though it does
+  change with turbidity. The radiance map that feeds `ambient_light_sky_contribution` is not
+  regenerated per frame at `Sky.PROCESS_MODE_AUTOMATIC`. The method was wrong in principle and
+  right by accident; it is correct by construction now.
+- **A physically-proportioned daylight ratio and this project's shadow gates are in direct
+  conflict, and it is a design decision rather than a bug.** Calibrating the sky to a measured
+  10.7:1 sun-to-sky (against clear daylight's 10:1 to 18:1) cannot simultaneously satisfy
+  `shadows_are_not_black`'s floor of 0.085 displayed shadow *and* its ceiling of 4x displayed
+  sunlit-to-shadow — except by compressing highlights so hard that the image goes flat, which is
+  what exposure 3.4 did. Removing the fill light makes it worse: shadows fall to 0.0221. The
+  gate's own reasoning cites print holding about 1:8, so its 4x is stricter than the figure it
+  argues from. **Nothing here was changed to resolve it.**
 - **A config flag can claim a thing the code does not do, and nothing will catch it.**
   `weather_cfg.gd` carried `physical_sky: true` for every daylight preset while `_build_sky`
   built a two-colour `ProceduralSkyMaterial` gradient. No gate could see it: every lighting gate

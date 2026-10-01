@@ -7,10 +7,21 @@ extends GateBase
 ## it is, and the tonemapper and exposure are burying what it gives — a grading choice. So both
 ## are measured, on the same surface, in one run.
 ##
-## The subject is one quad of neutral albedo, captured twice: once with the sun on it and once
-## with the sun behind it, so the only thing that changes between the two is whether direct light
-## reaches the surface. Nothing about the valley enters, which is deliberate — this is about the
-## light, and a terrain would bring its own albedo, its own normals and its own shadow map.
+## The subject is one quad of neutral albedo, captured twice: once with the sun lighting it and
+## once with the sun contributing to the sky but not to the scene, so the only thing that changes
+## between the two is whether direct light reaches the surface. Nothing about the terrain enters,
+## which is deliberate — this is about the light, and a terrain would bring its own albedo, its
+## own normals and its own shadow map.
+##
+## **The second sample is taken with `sky_mode = SKY_ONLY`, not by swinging the sun 180°.** It
+## used to swing it, which was correct for as long as the sky was a fixed two-colour gradient:
+## the sky stayed put and only the direct light went away. `PhysicalSkyMaterial` takes its sun
+## direction from this same light, so swinging it drags the whole atmosphere with it and puts the
+## sun **below the horizon** — and the measurement silently became "daylight against night"
+## rather than "sunlit against skylit". It read 4.1:1 and nothing moved it: not the fill light,
+## not the ambient energy, not turbidity, because what it was measuring was a night sky. Four
+## negative results in a row are worth more than one positive one; they are what said the model
+## of the measurement was wrong rather than the numbers in it.
 ##
 ## The bound on the ratio is a sanity range rather than a physical claim, and the reason is worth
 ## recording. Clear-sky daylight is measured physics: a surface facing a midday sun receives about
@@ -99,14 +110,14 @@ func run(harness: Node) -> Dictionary:
     var exposure: float = environment.tonemap_exposure
     environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
     environment.tonemap_exposure = 1.0
-    var lit_scene: float = await _sample(harness, sun, SUN_ON, "linear_sunlit")
-    var shaded_scene: float = await _sample(harness, sun, -SUN_ON, "linear_shaded")
+    var lit_scene: float = await _sample(harness, sun, true, "linear_sunlit")
+    var shaded_scene: float = await _sample(harness, sun, false, "linear_shaded")
 
     # Then as the project actually grades it.
     environment.tonemap_mode = tonemap as Environment.ToneMapper
     environment.tonemap_exposure = exposure
-    var lit_display: float = await _sample(harness, sun, SUN_ON, "graded_sunlit")
-    var shaded_display: float = await _sample(harness, sun, -SUN_ON, "graded_shaded")
+    var lit_display: float = await _sample(harness, sun, true, "graded_sunlit")
+    var shaded_display: float = await _sample(harness, sun, false, "graded_shaded")
     quad.queue_free()
 
     if shaded_scene <= 0.0:
@@ -143,10 +154,18 @@ func run(harness: Node) -> Dictionary:
 
 
 ## Puts the sun in a direction and measures the quad's mean luma.
+## One capture, with the sun either lighting the scene or only lighting the sky.
+##
+## `SKY_ONLY` leaves the atmosphere exactly as it was — same sun position, same scattering, same
+## ambient from the sky — and removes only the direct contribution. That is the difference
+## between a surface in shadow and a surface at night, and it is the whole measurement.
 func _sample(
-    harness: Node, sun: DirectionalLight3D, toward: Vector3, name: String
+    harness: Node, sun: DirectionalLight3D, direct: bool, name: String
 ) -> float:
-    sun.look_at_from_position(Vector3.ZERO, -toward.normalized(), Vector3.UP)
+    sun.sky_mode = (
+        DirectionalLight3D.SKY_MODE_LIGHT_AND_SKY if direct
+        else DirectionalLight3D.SKY_MODE_SKY_ONLY
+    )
     var shot: Dictionary = await harness.capture_shot("daylight/%s" % name, "static", SETTLE_FRAMES)
     if (shot["error"] as String) != "":
         return -1.0
