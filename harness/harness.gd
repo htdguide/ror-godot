@@ -13,6 +13,9 @@ extends Node
 const EXIT_OK: int = 0
 const EXIT_FAIL: int = 1
 const EXIT_USAGE: int = 2
+## Extra frames after switching the render target to HDR. Reallocating it is not instant and a
+## capture taken too early comes from the old target, which is the 8-bit one.
+const HDR_SETTLE_FRAMES: int = 4
 const GATE_DIR: String = "res://harness/gates"
 
 var args: HarnessArgs
@@ -220,6 +223,31 @@ func render_viewport() -> Viewport:
     return container.viewport if container != null else get_viewport()
 
 
+## Captures the frame as linear light rather than as display pixels: an OpenEXR, unclipped, with
+## no sRGB transfer on it.
+##
+## The viewport is switched to an HDR render target for the capture and switched back after, so
+## every other gate keeps the 8-bit display-referred capture it was written against. Opt-in
+## deliberately: an HDR target changes what a PNG written from it would mean, and most gates are
+## asking about the displayed image and are right to.
+##
+## Returns {"error", "exr", "image"}. `image` is the float image, which is what a measurement
+## should read; the file is for a person and for tooling.
+func capture_hdr(out_dir: String, scenario: String, converge: int) -> Dictionary:
+    var viewport: Viewport = render_viewport()
+    var was_hdr: bool = viewport.use_hdr_2d
+    viewport.use_hdr_2d = true
+    # The render target is reallocated, so the frame that matters is a later one.
+    await advance_frames(maxi(converge, 2) + HDR_SETTLE_FRAMES, scenario, "hdr")
+    var texture: ViewportTexture = viewport.get_texture()
+    var image: Image = texture.get_image() if texture != null else null
+    var path: String = "%s/%s.exr" % [HarnessCapture.resolve_dir(out_dir), preset_name]
+    var error: String = HarnessCapture.capture_exr(viewport, path)
+    viewport.use_hdr_2d = was_hdr
+    await advance_frames(1, scenario, "hdr")
+    return {"error": error, "exr": path, "image": image}
+
+
 ## Renders exactly `count` frames, sampling metrics on each. Frame-accurate: gates
 ## depend on the frame index, so this must never skip or coalesce a frame.
 func advance_frames(count: int, scenario: String, tag: String) -> void:
@@ -261,32 +289,10 @@ func _run_command(line: String) -> void:
 ## Plumbing
 
 
-## Puts the world into a state where numbers encoded into pixels survive to the capture:
-## linear tonemapping, a black background and no ambient light.
-##
-## Both parts matter. A tonemapper desaturates and lifts, so a value written into one
-## channel is not the value read back. And a lit background puts bright pixels all over
-## the frame, which a threshold test counts as though they were geometry — the sky alone
-## produced nearly two hundred thousand false positives before this existed.
+## Puts the world into a state where numbers encoded into pixels survive to the capture.
+## See `HarnessCapture.use_measurement_environment` for why both halves of it matter.
 func use_measurement_environment() -> void:
-    var holder: WorldEnvironment = world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
-    if holder == null or holder.environment == null:
-        return
-    var environment: Environment = holder.environment
-    environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
-    environment.tonemap_exposure = 1.0
-    environment.background_mode = Environment.BG_COLOR
-    environment.background_color = Color.BLACK
-    environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    environment.ambient_light_color = Color.BLACK
-    environment.ambient_light_energy = 0.0
-    var ground: MeshInstance3D = world.get_node_or_null(^"Ground") as MeshInstance3D
-    if ground != null:
-        ground.visible = false
-
-
-## Loads a vehicle into the current world, for human sessions and ad-hoc shots. The path
-## is a mod directory and a vehicle file, separated by a colon.
+    HarnessCapture.use_measurement_environment(world)
 func _load_vehicle(spec: String) -> String:
     var parts: PackedStringArray = spec.split(":")
     if parts.size() != 2:

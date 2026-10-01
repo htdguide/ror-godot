@@ -23,6 +23,20 @@ extends GateBase
 ## negative results in a row are worth more than one positive one; they are what said the model
 ## of the measurement was wrong rather than the numbers in it.
 ##
+## **The ratio is measured through an HDR capture now and it reads 6.4:1** — the first figure
+## here taken with a calibrated instrument. Every earlier one came off an 8-bit display-encoded
+## PNG and was not a ratio of light at all: 3:1, 4:1, 10.7:1, all of them artefacts of clipping
+## at the bright end and quantisation at the dark end. `captures_carry_real_light` is what makes
+## this number mean something.
+##
+## **It still moves with exposure, and that is now a question about the renderer rather than
+## about this gate.** 6.4:1 at ISO 32, 2.7:1 at 64, 19.2:1 at 16, on one unchanged scene and
+## with a capture proven linear to 0.24% up to a value of 8. A gain cannot change a ratio, so
+## something in the lighting is not scaling with the camera — the suspicion is that under
+## physical light units the sky's ambient contribution and the direct light do not share an
+## exposure normalisation. Until that is understood, no single number from here should be
+## compared against a daylight illuminance figure, and the band below stays wide.
+##
 ## The bound on the ratio is a sanity range rather than a physical claim, and the reason is worth
 ## recording. Clear-sky daylight is measured physics: a surface facing a midday sun receives about
 ## 100 klx of direct light plus 15–20 klx of skylight, and the same surface turned away receives
@@ -104,16 +118,19 @@ func run(harness: Node) -> Dictionary:
         SUN_ON.normalized() * QUAD_SIZE * 1.6, Vector3.ZERO, Vector3.UP
     )
 
-    # Scene-referred first: linear tonemapping at unit exposure, so what is measured is the light
-    # itself rather than the grade laid over it.
+    # Scene-referred first, through an HDR capture: linear, unclipped, float. This used to be a
+    # linearly-tonemapped PNG, which is 8-bit and display-encoded, so the "scene-referred" ratio
+    # it produced was neither — it saturated at the bright end, quantised at the dark end, and
+    # moved with the exposure. See `captures_carry_real_light`, which calibrates the instrument.
     var tonemap: int = environment.tonemap_mode
     var exposure: float = environment.tonemap_exposure
     environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
     environment.tonemap_exposure = 1.0
-    var lit_scene: float = await _sample(harness, sun, true, "linear_sunlit")
-    var shaded_scene: float = await _sample(harness, sun, false, "linear_shaded")
+    var lit_scene: float = await _sample_hdr(harness, sun, true, "linear_sunlit")
+    var shaded_scene: float = await _sample_hdr(harness, sun, false, "linear_shaded")
 
-    # Then as the project actually grades it.
+    # Then as the project actually grades it: an 8-bit capture, which is the right instrument
+    # for a question about what a person sees.
     environment.tonemap_mode = tonemap as Environment.ToneMapper
     environment.tonemap_exposure = exposure
     var lit_display: float = await _sample(harness, sun, true, "graded_sunlit")
@@ -159,6 +176,38 @@ func run(harness: Node) -> Dictionary:
 ## `SKY_ONLY` leaves the atmosphere exactly as it was — same sun position, same scattering, same
 ## ambient from the sky — and removes only the direct contribution. That is the difference
 ## between a surface in shadow and a surface at night, and it is the whole measurement.
+## The same sample, taken as linear light instead of as display pixels.
+func _sample_hdr(
+    harness: Node, sun: DirectionalLight3D, direct: bool, name: String
+) -> float:
+    sun.sky_mode = (
+        DirectionalLight3D.SKY_MODE_LIGHT_AND_SKY if direct
+        else DirectionalLight3D.SKY_MODE_SKY_ONLY
+    )
+    var shot: Dictionary = await harness.capture_hdr(
+        "daylight/%s" % name, "static", SETTLE_FRAMES
+    )
+    if (shot["error"] as String) != "":
+        return -1.0
+    var image: Image = shot["image"] as Image
+    if image == null:
+        return -1.0
+    return _window_mean(image)
+
+
+## Mean luminance of the middle third, which the quad fills.
+func _window_mean(image: Image) -> float:
+    var size: Vector2i = image.get_size()
+    var total: float = 0.0
+    var counted: int = 0
+    for y: int in range(size.y / 3, size.y * 2 / 3):
+        for x: int in range(size.x / 3, size.x * 2 / 3):
+            var colour: Color = image.get_pixel(x, y)
+            total += colour.r * 0.2126 + colour.g * 0.7152 + colour.b * 0.0722
+            counted += 1
+    return total / float(counted)
+
+
 func _sample(
     harness: Node, sun: DirectionalLight3D, direct: bool, name: String
 ) -> float:

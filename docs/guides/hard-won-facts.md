@@ -124,6 +124,21 @@ afternoon to rediscover.
   what exposure 3.4 did. Removing the fill light makes it worse: shadows fall to 0.0221. The
   gate's own reasoning cites print holding about 1:8, so its 4x is stricter than the figure it
   argues from. **Nothing here was changed to resolve it.**
+- **A capture can carry light, and it takes one flag.** `SubViewport.use_hdr_2d` makes the
+  viewport texture `FORMAT_RGBAH` and linear, so values above white survive: an unshaded quad at
+  albedo 4.0 reads 25.312 through it and 1.000 without it. 25.312 is `srgb_to_linear(4.0)`, which
+  is also the reminder that `StandardMaterial3D.albedo_color` is sRGB on the way in — to inject a
+  known linear value you need a shader uniform straight into `ALBEDO`, not a material colour.
+  `Image.save_exr` then writes it. `captures_carry_real_light` calibrates the path end to end:
+  0.25, 0.75, 2.0 and 8.0 read back within 0.24%.
+- **Calibrating the instrument did not settle the sun-to-sky question, and that is itself the
+  finding.** Measured through the HDR capture the ratio is **6.4:1** — the first trustworthy
+  figure — but it still moves with exposure: 6.4:1 at ISO 32, 2.7:1 at 64, 19.2:1 at 16, on one
+  unchanged scene, with a capture proven linear to 0.24% up to a value of 8. A gain cannot change
+  a ratio, so the non-linearity is in the *render*, not the capture. The suspicion is that under
+  physical light units the sky's ambient contribution and the direct light do not share an
+  exposure normalisation. **Two instruments have now been wrong in a row on this question; the
+  lesson is to calibrate before measuring, not after being surprised.**
 - **A ratio read off an 8-bit PNG is not a ratio of light, and it cannot be fixed by dividing.**
   `daylight_shadows_are_readable` reads its "scene-referred" samples out of a captured PNG, which
   is 8-bit and display-encoded. Turning on physical light units exposed it: the *same scene* gave
