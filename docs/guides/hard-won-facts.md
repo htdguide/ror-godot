@@ -329,3 +329,21 @@ afternoon to rediscover.
   normals, tyres buried 0.34 m in the ground, and a door hanging a metre off its hinges all
   passed every check that existed at the time, because each measured nodes and the nodes were
   right. When the user reports something, believe them and go find the number that shows it.
+- **A sky's energy is not in the lux a light is stated in.** `DirectionalLight3D.light_intensity_lux`
+  takes its value literally under physical light units; a sky's `energy_multiplier` never goes
+  through that conversion. Measured against a key light of stated lux in a dark room, one unit of
+  uniform sky radiance delivers **98,325.74 lx** to a facing surface — reproducible to ten
+  significant digits, invariant to the sky's radiance over a 16x range, to the panorama's
+  resolution (16x8 and 256x128 agree exactly) and to the radiance map's size. It sits 1.70% under
+  1e5 and that gap is unexplained. So a sky left at `energy_multiplier = 1.0` is worth roughly as
+  much illuminance as the noon sun, which is why no amount of turning the sun up or the turbidity
+  down ever brought the sun-to-sky balance near clear daylight's figure.
+- **Sky ambient *is* exposed like a light.** One stop gains a key light by 2.0000x and a uniform
+  sky by 2.0000x, 0.00% apart. The exposure-dependent sun-to-sky ratio that prompted four rounds
+  of measurement — 6.4:1 at ISO 32, 2.7:1 at 64, 19.2:1 at 16 — was the old uncalibrated
+  instrument, fog and leaked sky ambient, and not the sky path at all.
+- **A negative control that does not fire is not a control, even when it is the right idea.**
+  Re-enabling fog was the obvious break for a sky-ambient gate, since fog is additive and fog had
+  already been caught bending a wedge once. At chart distance it moved the measurement 0.42% and
+  left linearity at 0.00%, so it proved nothing and was thrown out rather than counted. Lifting
+  the chart shader's black by 0.02 fired at 46.2%.
