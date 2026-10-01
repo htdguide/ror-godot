@@ -88,16 +88,30 @@ static func _build_sky(weather: Dictionary, clouds: bool) -> Sky:
     if clouds and RenderCfg.CLOUDS_ENABLED:
         var clouded: ShaderMaterial = SkyClouds.material(weather)
         if clouded != null:
-            var cloud_sky: Sky = Sky.new()
-            cloud_sky.sky_material = clouded
-            cloud_sky.radiance_size = RenderCfg.SKY_RADIANCE_SIZE as Sky.RadianceSize
-            return cloud_sky
-    var sky: Sky = Sky.new()
-    sky.radiance_size = RenderCfg.SKY_RADIANCE_SIZE as Sky.RadianceSize
-    sky.sky_material = (
+            return _new_sky(clouded)
+    return _new_sky(
         _physical_sky(weather) if bool(weather.get("physical_sky", false))
         else _gradient_sky(weather)
     )
+
+
+## A sky with its radiance map built once and built properly.
+##
+## **`process_mode` is the whole of this function's reason to exist.** Left at its default the
+## radiance map is approximated across frames, and a scene that is not moving at all then renders
+## two different images on alternate frames: measured on the hero truck's drop, a band of distant
+## ground alternated between 0.6703 and 0.9906 luminance — the far half of the checker washing to
+## pure white and back, every other frame, long after the truck had come to rest. The ground is
+## rough and takes its specular from the sky's radiance map, so an unconverged map lands there
+## first and lands hardest at grazing angles, which is why it was the distance that flickered.
+##
+## It was reported by eye before any gate caught it, and both skies had the same omission — the
+## clouded one built its own `Sky` — which is why they now share one constructor.
+static func _new_sky(material: Material) -> Sky:
+    var sky: Sky = Sky.new()
+    sky.process_mode = Sky.PROCESS_MODE_QUALITY
+    sky.radiance_size = RenderCfg.SKY_RADIANCE_SIZE as Sky.RadianceSize
+    sky.sky_material = material
     return sky
 
 

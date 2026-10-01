@@ -365,3 +365,20 @@ afternoon to rediscover.
   undetectable — measured, a green light at (0.8, 1.0, 0.8) leaves the chart gate green at 0.029
   delta E. Three degrees of freedom spent on the white card still leaves fifty-four values and the
   six published grey luminances to predict, so the method is not weak; it is specifically blind.
+- **A `Sky` left at its default `process_mode` does not render the same picture twice.** The
+  radiance map is approximated across frames, and anything rough enough to take its specular from
+  that map inherits the approximation: measured on the hero truck's drop, a band of distant ground
+  alternated between 0.6703 and 0.9906 luminance on alternate frames — the far half of the checker
+  washing to pure white and back — with the camera bolted down and the truck long since at rest.
+  Two discrete values flipping, not noise. `Sky.PROCESS_MODE_QUALITY` fixes it and the band then
+  holds to 0.000000. Grazing angles take it worst, which is why it was the distance that flickered.
+- **The suite can be 85-for-85 green while the picture visibly flickers.** Every gate measured a
+  number out of a single frame, and a flicker lives *between* frames, so nothing in the suite could
+  see it. The user saw it first. Frame-to-frame determinism is also what every golden-image gate
+  quietly assumes, so it was load-bearing and untested at the same time.
+- **Two miswired negative controls in a row, on the same gate.** A determinism gate on a genuinely
+  still scene passed with the bug still in the code, because a static scene settles its radiance
+  map once and never shows the fault. The second version added a moving box and "failed" — but the
+  only pixels that moved were the box's own, so it proved a moving box moves. Both gates looked
+  entirely reasonable and both were worth nothing. What reproduces the fault is a real vehicle
+  being re-posed every frame, measured on ground the vehicle never touches.
