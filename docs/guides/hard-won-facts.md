@@ -97,6 +97,19 @@ afternoon to rediscover.
   that drift, with the reasoning written down beside it, and the reasoning was wrong — so the
   loosening hid a real bug for two commits. A tolerance widened to fit an unexplained measurement
   is a bug with a comment on it. It is 1e-5 now.
+- **A config flag can claim a thing the code does not do, and nothing will catch it.**
+  `weather_cfg.gd` carried `physical_sky: true` for every daylight preset while `_build_sky`
+  built a two-colour `ProceduralSkyMaterial` gradient. No gate could see it: every lighting gate
+  was graded against whatever sky was actually being built, so the name being a lie cost nothing
+  and was invisible until somebody read both files. A flag named after a technique is worth
+  checking against the technique.
+- **An atmosphere model is dimmer than a gradient tuned to look right, and that is the point.**
+  Switching the clear presets to `PhysicalSkyMaterial` moved sun-to-sky from 3.2:1 to 4.1:1 —
+  toward clear daylight's ~14:1 — and darkened the whole frame, so
+  `daylight_shadows_are_readable` failed on its own readability floor with exactly the right
+  diagnosis: *"the light is there and the grading is burying it."* Exposure is the control for
+  that, and it went 0.7 to 1.05 to put the displayed shaded surface back at 0.066 where it had
+  been. Fixing it with sky energy instead would have undone the ratio it was meant to improve.
 - **A terrain with no traction map grips like gravel, not like the first ground model.** Upstream
   keeps two defaults (`Collisions.cpp:134-135`): `defaultgm` is concrete and is for collision
   meshes, `defaultgroundgm` is gravel and is what the ground uses when landuse is absent or

@@ -26,7 +26,16 @@ const AUTO_EXPOSURE: bool = false
 ## Scene-referred exposure applied before the tonemapper. The physical sky and a sun of
 ## unit energy together put the scene well above the range AgX maps to display white, and
 ## without this the sky washes out to grey and the ground blows out entirely.
-const EXPOSURE: float = 0.7
+## Raised from 0.7 to 1.05 when the sky became physical.
+##
+## Not a taste change. An atmosphere model puts less total irradiance in the scene than the
+## two-colour gradient did — it is also better balanced, 4.1:1 sun-to-sky against 3.2:1 — so the
+## whole frame got darker and `daylight_shadows_are_readable` failed on its own readability floor
+## with the message "the light is there and the grading is burying it". Exposure is the control
+## for exactly that. 1.05 puts the displayed shaded surface at 0.066 against a floor of 0.05,
+## which is where it sat before the sky changed, with the sunlit side at 0.373 against a ceiling
+## of 0.92.
+const EXPOSURE: float = 1.05
 
 ## The sun's own angular size, in degrees, and what it does to a shadow's edge. The real sun is
 ## 0.53 degrees across and gives an edge that is sharp at the contact and soft a few metres away.
@@ -66,6 +75,30 @@ const SUN_CURVE: float = 0.08
 
 const GROUND_COLOR: Color = Color(0.15, 0.14, 0.13)
 const SKY_ENERGY: float = 1.0
+
+## The atmosphere, for `PhysicalSkyMaterial`. Rayleigh scattering is what makes a clear sky blue
+## and the horizon pale; Mie is the forward-scattering haze around the sun. These are Godot's own
+## defaults except where noted, because they are a fit to real daylight and this project has no
+## better measurement of the sky than the model does.
+##
+## Why a physical sky rather than the two-colour gradient this project used: the gradient's
+## irradiance is whatever its colours happen to integrate to, so the balance between sun and sky
+## was a pair of numbers somebody chose. `daylight_shadows_are_readable` measured the consequence
+## — the scene ran at about 3:1 sun-to-sky where clear daylight is nearer 14:1, so its shadows
+## were filled by roughly three times too much skylight. An atmosphere model produces that ratio
+## instead of being told it.
+const RAYLEIGH_COEFFICIENT: float = 2.0
+const RAYLEIGH_COLOR: Color = Color(0.26, 0.41, 0.58)
+const MIE_COEFFICIENT: float = 0.005
+const MIE_ECCENTRICITY: float = 0.8
+const MIE_COLOR: Color = Color(0.63, 0.77, 0.92)
+## Clear air. Turbidity is the haze dial: 2 is a clean day, 10 is industrial murk, and it moves
+## the sun-to-sky ratio directly because haze is what fills a shadow.
+const TURBIDITY: float = 2.0
+const SUN_DISK_SCALE: float = 1.0
+## What the sky sees below the horizon. Not black: a sky dome whose lower half is black halves
+## the ambient a surface receives, and the ground does reflect.
+const SKY_GROUND_COLOR: Color = Color(0.1, 0.07, 0.034)
 
 ## --- Clouds -----------------------------------------------------------------------------------
 ##

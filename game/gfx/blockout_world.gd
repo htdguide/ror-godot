@@ -92,6 +92,44 @@ static func _build_sky(weather: Dictionary, clouds: bool) -> Sky:
             cloud_sky.sky_material = clouded
             cloud_sky.radiance_size = RenderCfg.SKY_RADIANCE_SIZE as Sky.RadianceSize
             return cloud_sky
+    var sky: Sky = Sky.new()
+    sky.radiance_size = RenderCfg.SKY_RADIANCE_SIZE as Sky.RadianceSize
+    sky.sky_material = (
+        _physical_sky(weather) if bool(weather.get("physical_sky", false))
+        else _gradient_sky(weather)
+    )
+    return sky
+
+
+## A clear sky from an atmosphere model: Rayleigh scattering for the blue and the pale horizon,
+## Mie for the haze around the sun, turbidity for how clean the air is.
+##
+## This is what `physical_sky` in a weather preset has always claimed and did not do — the flag
+## selected a two-colour gradient. The difference that matters is not the look, it is where the
+## irradiance comes from: a gradient's is whatever its colours integrate to, so the sun-to-sky
+## balance was two numbers somebody chose, and it came out around 3:1 where clear daylight is
+## nearer 14:1. A model produces the ratio rather than being told it.
+##
+## The sun direction is not set here. `PhysicalSkyMaterial` takes it from the first
+## `DirectionalLight3D` in the world, which is `_build_sun`'s, so the sky and the sun agree about
+## where the sun is by construction instead of by two configs matching.
+static func _physical_sky(weather: Dictionary) -> PhysicalSkyMaterial:
+    var material: PhysicalSkyMaterial = PhysicalSkyMaterial.new()
+    material.rayleigh_coefficient = RenderCfg.RAYLEIGH_COEFFICIENT
+    material.rayleigh_color = RenderCfg.RAYLEIGH_COLOR
+    material.mie_coefficient = RenderCfg.MIE_COEFFICIENT
+    material.mie_eccentricity = RenderCfg.MIE_ECCENTRICITY
+    material.mie_color = RenderCfg.MIE_COLOR
+    material.turbidity = float(weather.get("turbidity", RenderCfg.TURBIDITY))
+    material.sun_disk_scale = RenderCfg.SUN_DISK_SCALE
+    material.ground_color = RenderCfg.SKY_GROUND_COLOR
+    material.energy_multiplier = float(weather.get("sky_energy", RenderCfg.SKY_ENERGY))
+    return material
+
+
+## The two-colour gradient, kept for the presets that are not a clear daylight sky — a night or a
+## stated-colour preset has no atmosphere to model and a gradient is the honest way to say so.
+static func _gradient_sky(weather: Dictionary) -> ProceduralSkyMaterial:
     var material: ProceduralSkyMaterial = ProceduralSkyMaterial.new()
     material.sky_top_color = weather.get("sky_top", RenderCfg.SKY_TOP) as Color
     material.sky_horizon_color = weather.get("sky_horizon", RenderCfg.SKY_HORIZON) as Color
@@ -101,10 +139,7 @@ static func _build_sky(weather: Dictionary, clouds: bool) -> Sky:
     material.sun_angle_max = RenderCfg.SUN_ANGLE_MAX_DEG
     material.sun_curve = RenderCfg.SUN_CURVE
     material.energy_multiplier = float(weather.get("sky_energy", RenderCfg.SKY_ENERGY))
-    var sky: Sky = Sky.new()
-    sky.sky_material = material
-    sky.radiance_size = RenderCfg.SKY_RADIANCE_SIZE as Sky.RadianceSize
-    return sky
+    return material
 
 
 static func _build_sun(weather: Dictionary) -> DirectionalLight3D:
