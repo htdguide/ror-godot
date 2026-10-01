@@ -123,7 +123,7 @@ func _build_world(scenario: String, weather: String) -> String:
     # environment and probes out of the next one's frame.
     var host: Node = container.viewport if container != null else _main
     host.add_child(world)
-    camera = _build_camera(preset)
+    camera = PhysicalCamera.build(preset)
     world.add_child(camera)
     if container != null:
         container.world = world
@@ -131,26 +131,6 @@ func _build_world(scenario: String, weather: String) -> String:
     metrics = HarnessMetrics.new()
     metrics.begin(render_viewport())
     return ""
-
-
-## The camera is physical: depth of field then follows from the lens instead of being
-## dialled by hand, and exposure is comparable between weather presets.
-func _build_camera(from_preset: Dictionary) -> Camera3D:
-    var attributes: CameraAttributesPhysical = CameraAttributesPhysical.new()
-    attributes.frustum_focal_length = float(from_preset.get("focal_mm", 35.0))
-    attributes.exposure_aperture = float(from_preset.get("f_stop", 8.0))
-    attributes.exposure_shutter_speed = 1.0 / maxf(float(from_preset.get("shutter_s", 0.008)), 0.000001)
-    attributes.auto_exposure_enabled = false
-    var cam: Camera3D = Camera3D.new()
-    cam.name = "HarnessCamera"
-    cam.attributes = attributes
-    cam.position = from_preset.get("pos", Vector3.ZERO) as Vector3
-    cam.look_at_from_position(
-        from_preset.get("pos", Vector3.ZERO) as Vector3,
-        from_preset.get("look_at", Vector3.ZERO) as Vector3,
-        Vector3.UP
-    )
-    return cam
 
 
 func _resolve_preset(name: String) -> String:

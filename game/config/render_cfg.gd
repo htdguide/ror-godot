@@ -23,19 +23,13 @@ const WHITE: float = 12.0
 ## how many frames preceded it. Each camera preset carries a fixed exposure instead.
 const AUTO_EXPOSURE: bool = false
 
-## Scene-referred exposure applied before the tonemapper. The physical sky and a sun of
-## unit energy together put the scene well above the range AgX maps to display white, and
-## without this the sky washes out to grey and the ground blows out entirely.
-## Raised from 0.7 to 1.05 when the sky became physical.
+## A trim on the tonemapper, and it is 1.0 because it has nothing left to do.
 ##
-## Not a taste change. An atmosphere model puts less total irradiance in the scene than the
-## two-colour gradient did — it is also better balanced, 4.1:1 sun-to-sky against 3.2:1 — so the
-## whole frame got darker and `daylight_shadows_are_readable` failed on its own readability floor
-## with the message "the light is there and the grading is burying it". Exposure is the control
-## for exactly that. 1.05 puts the displayed shaded surface at 0.066 against a floor of 0.05,
-## which is where it sat before the sky changed, with the sunlit side at 0.373 against a ceiling
-## of 0.92.
-const EXPOSURE: float = 1.05
+## It used to be the exposure: 0.7, then 1.05, then 3.4 as the sky changed under it, each value
+## compensating for a scene whose lights were in arbitrary units. With physical light units the
+## exposure is the camera's — aperture, shutter, ISO — and this stays at unity unless something
+## genuinely wants a grade on top. A number here that is not 1.0 means the camera is wrong.
+const EXPOSURE: float = 1.0
 
 ## The sun's own angular size, in degrees, and what it does to a shadow's edge. The real sun is
 ## 0.53 degrees across and gives an edge that is sharp at the contact and soft a few metres away.
@@ -74,6 +68,40 @@ const SUN_ANGLE_MAX_DEG: float = 12.0
 const SUN_CURVE: float = 0.08
 
 const GROUND_COLOR: Color = Color(0.15, 0.14, 0.13)
+## Real-world illuminance, now that lights are in physical units.
+##
+## A surface facing a clear midday sun receives about 100 klx; the same scene at golden dusk is
+## a tenth of that and redder. These are measurements of daylight, not dials: the sun-to-sky
+## balance that `daylight_shadows_are_readable` checks should now fall out of the atmosphere
+## model rather than being set by hand, because `PhysicalSkyMaterial` scatters a sun whose
+## intensity is finally in the same units the sky is calibrated against.
+const SUN_LUX_NOON: float = 100000.0
+const SUN_LUX_DUSK: float = 12000.0
+## The fill light, which is not physical. Daylight has no second sun; this exists because
+## `shadows_are_not_black` found one side of everything reading as black.
+##
+## It did **not** shrink when the sun and sky became real, which was the hope. Measured at ISO 25,
+## raising it from 6 000 to 20 000 lux moved the shadow from 0.0479 to 0.0578 against a floor of
+## 0.085 — it cannot reach the floor at any value, because the fill casts its own shadow and so
+## barely lights the region the gate measures. What actually meets the floor is exposure, which
+## is why `CAMERA_ISO` ended up being set by a shadow gate rather than by the sun.
+const FILL_LUX: float = 12000.0
+
+## How sensitive the camera is, in ISO. With physical light units the exposure comes from the
+## aperture, the shutter and this — the three numbers a photographer would set — rather than from
+## a multiplier on the tonemapper.
+## 32, and it is lower than a photographer would expect for daylight because `EXPOSURE` is no
+## longer doing half the job: with physical light units the aperture, the shutter and this are
+## the whole of the exposure. f/8 at 1/125 and ISO 32 is about EV 14.6, roughly half a stop under
+## the sunny-16 rule, which is what a bright desert wants.
+##
+## It is also the tightest of three constraints rather than a free choice, and the constraints do
+## not all point the same way. `shadows_are_not_black` wants the shadow at or above 0.085
+## displayed; above ISO 40 La Paz's pale ground bleaches; and `daylight_shadows_are_readable`
+## wants the shaded surface above 0.05. 32 satisfies all three with the shadow at 0.0950 and 3.5x
+## displayed contrast against a 4x ceiling — tight, and the tightness is the finding below.
+const CAMERA_ISO: float = 32.0
+
 const SKY_ENERGY: float = 1.0
 
 ## The atmosphere, for `PhysicalSkyMaterial`. Rayleigh scattering is what makes a clear sky blue

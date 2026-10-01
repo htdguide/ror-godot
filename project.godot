@@ -24,4 +24,8 @@ gdscript/warnings/return_value_discarded=0
 [rendering]
 
 renderer/rendering_method="forward_plus"
+; Lights are in real units: a directional light in lux, a lamp in lumens, and exposure from the
+; camera's own aperture, shutter and ISO. Everything in game/config/render_cfg.gd that used to
+; balance a sun against a sky by hand exists because this was off. See PLAN M2.
+lights_and_shadows/use_physical_light_units=true
 textures/default_filters/anisotropic_filtering_level=3

@@ -124,6 +124,27 @@ afternoon to rediscover.
   what exposure 3.4 did. Removing the fill light makes it worse: shadows fall to 0.0221. The
   gate's own reasoning cites print holding about 1:8, so its 4x is stricter than the figure it
   argues from. **Nothing here was changed to resolve it.**
+- **A ratio read off an 8-bit PNG is not a ratio of light, and it cannot be fixed by dividing.**
+  `daylight_shadows_are_readable` reads its "scene-referred" samples out of a captured PNG, which
+  is 8-bit and display-encoded. Turning on physical light units exposed it: the *same scene* gave
+  1.3:1 at ISO 100, 3.4:1 at 25, 12.2:1 at 12 and 38.6:1 at 6. **A gain cannot change a ratio**,
+  so the measurement is not linear — the sunlit sample saturates at the top and the shaded one
+  quantises toward zero at the bottom, and only a narrow exposure window is valid at all. Undoing
+  the sRGB transfer does not rescue it (1.8, 3.6, 9.4, 28.8 across the same sweep). **Every
+  sun-to-sky figure this project has recorded came from this measurement** — 3:1, 4:1, 10.7:1 —
+  and none of them is a light ratio. Measuring a 10:1 scene needs an HDR capture path; until there
+  is one, no number from this gate should be compared against a physical illuminance figure.
+- **Physical light units do not make the exposure fall out for free.** With
+  `use_physical_light_units`, the sun at 100 klx and `CameraAttributesPhysical` doing the
+  exposure, the ISO still ended up being chosen by a *shadow* gate rather than by the sun: above
+  ISO 40 La Paz's pale ground bleaches, below 32 the shadow drops under
+  `shadows_are_not_black`'s 0.085 floor, and the window between them is half a stop wide. The
+  gates' thresholds were calibrated when the scene was brighter than daylight, and they now bound
+  the exposure from both sides.
+- **A fill light cannot lift a shadow it is itself shadowed by.** Raising `FILL_LUX` from 6 000 to
+  20 000 moved the measured shadow from 0.0479 to 0.0578 against a floor of 0.085 — a three-fold
+  increase buying a fifth of what was needed, because the fill casts shadows too and the region
+  being measured is in both. Exposure is what moves a shadow floor; a fill moves the sides.
 - **A config flag can claim a thing the code does not do, and nothing will catch it.**
   `weather_cfg.gd` carried `physical_sky: true` for every daylight preset while `_build_sky`
   built a two-colour `ProceduralSkyMaterial` gradient. No gate could see it: every lighting gate

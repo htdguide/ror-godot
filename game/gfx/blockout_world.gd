@@ -149,6 +149,9 @@ static func _build_sun(weather: Dictionary) -> DirectionalLight3D:
     # is a thing anyone can reason about; the pitch and yaw that produce it are not.
     var toward_sun: Vector3 = (weather.get("sun_from", Vector3.UP) as Vector3).normalized()
     sun.look_at_from_position(Vector3.ZERO, -toward_sun, Vector3.UP)
+    # Real illuminance. `light_energy` stays as a trim on top, which is what a weather preset's
+    # `sun_energy` now is: how much of a clear midday sun this hour gets.
+    sun.light_intensity_lux = float(weather.get("sun_lux", RenderCfg.SUN_LUX_NOON))
     sun.light_energy = float(weather.get("sun_energy", 1.0))
     sun.light_color = weather.get("sun_color", Color.WHITE) as Color
     sun.shadow_enabled = true
@@ -182,6 +185,7 @@ static func _build_fill(weather: Dictionary) -> DirectionalLight3D:
     var toward_fill: Vector3 = Vector3(-toward_sun.x, maxf(toward_sun.y * 0.45, 0.2),
         -toward_sun.z).normalized()
     fill.look_at_from_position(Vector3.ZERO, -toward_fill, Vector3.UP)
+    fill.light_intensity_lux = float(weather.get("fill_lux", RenderCfg.FILL_LUX))
     fill.light_energy = energy
     fill.light_color = weather.get("fill_colour", RenderCfg.FILL_COLOUR) as Color
     # The fill casts shadows too, and that is not a luxury: a shadowless directional light shines
