@@ -347,3 +347,21 @@ afternoon to rediscover.
   already been caught bending a wedge once. At chart distance it moved the measurement 0.42% and
   left linearity at 0.00%, so it proved nothing and was thrown out rather than counted. Lifting
   the chart shader's black by 0.02 fired at 46.2%.
+- **Under physical light units a light has a colour temperature, and no temperature is neutral.**
+  `Light3D.light_temperature` defaults to 6500 K and photographs as (1.0, 0.9419, 0.9919) once the
+  brightest channel is normalised — a 6% green deficit, constant across a thirty-fold brightness
+  range, on top of whatever `light_color` says. Sweeping the temperature moves the cast but never
+  through neutral: measured at 5000 K it is (1.0, 0.790, 0.629) and at 9000 K (0.674, 0.741, 1.0),
+  and red-equals-blue and green-equals-red cross at different temperatures. The cause is which
+  locus the conversion walks: 6500 K on the Planckian locus sits below the daylight locus that
+  sRGB's white point is on. So every light in this project carries a slight cast, and a colour
+  measurement has to white balance off a known patch rather than assume the light is white.
+- **A colour measurement cannot go through a luminance.** A channel swap, a doubled transfer
+  function or a tinted tonemapper all leave luminance plausible, so every luma-based gate in this
+  suite is blind to them by construction. Measured: swapping red and blue in the chart shader
+  costs 113 delta E on the worst patch and 41.5 on average while a luminance reading barely moves.
+- **White balancing off a reference patch buys accuracy and costs a whole fault class.** It is the
+  only honest way to measure colour under a light that is not neutral, and it makes a tinted light
+  undetectable — measured, a green light at (0.8, 1.0, 0.8) leaves the chart gate green at 0.029
+  delta E. Three degrees of freedom spent on the white card still leaves fifty-four values and the
+  six published grey luminances to predict, so the method is not weak; it is specifically blind.

@@ -64,6 +64,25 @@ static func build_wedge() -> Array[MeshInstance3D]:
     return out
 
 
+## One patch of stated linear reflectance, at a stated place.
+##
+## Takes a `Vector3` rather than a `Color` so that a reflectance is never mistaken for a display
+## colour on its way in — which is the whole reason `chart_patch.gdshader` exists.
+static func build_patch(name: String, reflectance: Vector3, at: Vector3) -> MeshInstance3D:
+    var plane: PlaneMesh = PlaneMesh.new()
+    plane.size = Vector2(PATCH_SIZE, PATCH_SIZE)
+    plane.orientation = PlaneMesh.FACE_Z
+    var material: ShaderMaterial = ShaderMaterial.new()
+    material.shader = load("res://game/shaders/chart_patch.gdshader") as Shader
+    material.set_shader_parameter("reflectance", reflectance)
+    var instance: MeshInstance3D = MeshInstance3D.new()
+    instance.name = name
+    instance.mesh = plane
+    instance.material_override = material
+    instance.position = at
+    return instance
+
+
 ## A light of stated illuminance, aimed at the chart from a direction.
 static func build_light(name: String, from: Vector3, lux: float) -> DirectionalLight3D:
     var light: DirectionalLight3D = DirectionalLight3D.new()
@@ -130,6 +149,25 @@ static func window(image: Image, centre: Vector2) -> float:
                 continue
             var colour: Color = image.get_pixel(x, y)
             total += colour.r * LUMA.x + colour.g * LUMA.y + colour.b * LUMA.z
+            counted += 1
+    return total / float(maxi(counted, 1))
+
+
+## The same window, read per channel rather than as one luminance.
+##
+## A colour measurement cannot go through a luminance: a renderer that swaps two channels or
+## tints the whole frame produces the same luminance and a completely different colour, so a
+## gate measuring colour through `window` would be blind to exactly what it is looking for.
+static func window_rgb(image: Image, centre: Vector2) -> Vector3:
+    var size: Vector2i = image.get_size()
+    var total: Vector3 = Vector3.ZERO
+    var counted: int = 0
+    for y: int in range(int(centre.y) - WINDOW_PX, int(centre.y) + WINDOW_PX):
+        for x: int in range(int(centre.x) - WINDOW_PX, int(centre.x) + WINDOW_PX):
+            if x < 0 or y < 0 or x >= size.x or y >= size.y:
+                continue
+            var colour: Color = image.get_pixel(x, y)
+            total += Vector3(colour.r, colour.g, colour.b)
             counted += 1
     return total / float(maxi(counted, 1))
 

@@ -1037,8 +1037,16 @@ geometric normals only; authored normals come with re-textured hero assets.
    diff below threshold. This is an AI-free oracle for the BRDF and the IBL path.
 2. Tonemap curve gate `tonemap_curve`: sample the rendered value of a synthetic exposure wedge and
    compare numerically against the published AgX / ACES transfer values. Tolerance stated in the gate.
-3. Grey-chart gate: a MacBeth chart under a 6500 K light renders within a stated ΔE of its reference
-   values.
+3. **Done** — `a_colour_chart_survives_the_renderer`: the 24 ColorChecker patches, built from
+   Field (1990) / Poynton (2008) colorimetry under Illuminant C (see `THIRD_PARTY.md`), photographed
+   and measured back in CIELAB. Worst ΔE 0.035, mean 0.014, and the published grey ladder within
+   0.008 L*. Cyan is outside sRGB's gamut and is excluded rather than clipped and scored.
+   Two things this turned up. The light is **not** 6500 K neutral: `light_temperature` photographs
+   as (1.0, 0.9419, 0.9919) and no temperature is neutral, because the conversion walks the
+   Planckian locus while sRGB's white sits on the daylight one. And white balancing off a reference
+   patch — the only honest answer to that — makes a tinted light undetectable, measured at 0.029 ΔE
+   for a green light. Catching a tinted light needs an illuminant colour that is independently
+   published, which is a separate gate and a sourced locus value.
 4. No HDR clipping: the 16-bit render target histogram from the night and sun-backlit presets shows
    no clamped channel before tonemap.
 5. Perf: ≤ 16.6 ms at 1080p on the dev Mac with one truck + terrain, draw calls logged.

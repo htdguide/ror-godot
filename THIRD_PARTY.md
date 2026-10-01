@@ -123,6 +123,27 @@ has no corresponding record under `LICENSES/`.
 - Attribution: any build that ships it must credit La Paz and Klink on its own credits page,
   and the Rigs of Rods project for the formats and the physics.
 
+### ColorChecker reference colorimetry (reference data, no files)
+- Local path: `harness/reference/colorchecker.gd` — the numbers, transcribed into source
+- Source: Wikipedia, *ColorChecker*, https://en.wikipedia.org/wiki/ColorChecker — the table
+  captioned "Table from Field (1990); CIE data for Illuminant C from Poynton (2008)". Retrieved
+  2026-10-01 via `Special:Export`, so the retrieval is reproducible and dated.
+- Upstream sources the table cites: Gary G. Field, *Color Scanning and Imaging Systems* (Graphic
+  Arts Technical Foundation, 1990, ISBN 0-88362-120-7); Poynton (2008) for the CIE data under
+  Illuminant C; the patch colours as described by McCamy et al. (1976). The manufacturer's sRGB
+  column cites X-Rite's own `ColorData-1p_EN.pdf`.
+- Licence: Wikipedia text is **CC BY-SA 4.0**. Attribution is this entry. The underlying
+  measurements are published colorimetric facts rather than a creative work, and no file from any
+  of these sources is redistributed — only 24 chromaticity triples, typed into a source file.
+- Why this and not our own values: a gate may not write its own expectation, and colour is the
+  easiest place in a renderer to break that rule. Published values are widely quoted, so quoting
+  them from memory would feel like sourcing them while in fact being a self-written expectation
+  with a citation stapled on. These were retrieved verbatim from one stated table.
+- Also recorded: the sRGB primaries and white point (IEC 61966-2-1) from Wikipedia's *sRGB*
+  article, same licence and same retrieval date, used in `harness/colorimetry.gd` to **derive**
+  the RGB-to-XYZ matrix rather than transcribe it — nine numbers are easy to get subtly wrong
+  and impossible to notice; eight chromaticities can be checked against the standard at a glance.
+
 ## Rejected
 
 - Unreal Engine marketplace and Quixel/Megascans content. Licensed for use in Unreal Engine only. The
