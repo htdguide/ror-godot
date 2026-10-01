@@ -146,12 +146,18 @@ metallic-roughness and clearcoat, derived roughness for legacy assets, and the K
 `pbr_spheres` oracle — an AI-free check of the BRDF and the IBL path against the reference image
 shipped with `glTF-Sample-Assets`.
 
-**What M2 no longer has to do:** replace Terrain3D's shading with
-`res://shaders/terrain3d_override.gdshader` to make the ground draw its author's textures. It
-already does — `the_ground_draws_its_own_textures` holds it, and darkening one splat layer to a
-third moves the rendered ground 0.2384 luma. The override is still the right seam for a PBR
-ground material that does more than Terrain3D's own, but it is no longer a prerequisite for
-anything.
+**What M2 no longer has to do:** write a ground material at all. Terrain3D's own shader is
+metallic-roughness, and with the blank-texture bug fixed it draws the author's albedo and normal
+maps and takes per-surface roughness as a real shader input.
+`the_ground_draws_its_own_textures` holds both halves — darkening one splat layer to a third moves
+the ground 0.2384 luma, and sweeping roughness mirror-to-matte moves it 0.0996. Nothing in the
+Rigs of Rods `.otc` format carries roughness, so a single constant is the honest choice rather
+than a number this project invents. `res://shaders/terrain3d_override.gdshader` is no longer a
+prerequisite for anything.
+
+**One of the four old findings was not collateral**, and it is worth not re-chasing: La Paz ships
+`blank_NRM.dds` for all four layers, so its normal maps really are flat. "Normal depth to zero
+changed nothing" was true.
 
 Also measured and still open: `daylight_shadows_are_readable` records that the scene's sun-to-sky
 balance is about 3:1 where clear-sky daylight is nearer 14:1 — the sky is roughly three times too

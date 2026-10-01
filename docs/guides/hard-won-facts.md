@@ -126,6 +126,21 @@ afternoon to rediscover.
     not need to.
   **Prefer `image.duplicate()` to rebuilding an image from its own bytes**, and if you must
   rebuild one, pass `image.has_mipmaps()`.
+- **Three of the four findings above were one bug; the fourth was a correct measurement.** Worth
+  separating, because the fourth looks like collateral and is not. La Paz ships `blank_NRM.dds` for
+  **all four** of its splat layers — its normal maps really are flat. "Taking the normal map's
+  depth to zero changed nothing" was a true statement about a blank normal map. When a batch of
+  findings turns out to share a cause, the ones that survive are the ones to check individually.
+- **Per-surface roughness does reach Terrain3D's picture**, and the claim that it did not was
+  untestable rather than wrong. Terrain3D composes roughness as
+  `(color_map.a - 0.5) * 2 + normal_rough.a` plus `_texture_roughness_mod_array[id]`, so the
+  per-asset value is a shader input — but `RorTerrainSkin` sets all four of La Paz's assets to the
+  same 0.9, so there was no difference to observe even with working textures. Swept across all
+  assets it moves the rendered ground 0.0996 luma, mirror to matte.
+- **Nothing in the Rigs of Rods terrain format carries roughness.** An `.otc` layer is
+  `tile_m, albedo, normal, blendmap, channel, alpha` and that is all. So any per-surface roughness
+  is this project's invention, which is exactly what it refuses to multiply over an author's
+  imagery elsewhere. A single constant is the defensible choice until a format carries better.
 - **Terrain3D turns its checkerboard on when a texture array is empty, and this project switched
   it off two lines later.** `Terrain3DMaterial::_update_texture_arrays` calls
   `set_show_checkered(true)` when `get_texture_count() == 0`; `TerrainWorld._show_surfaces` sets

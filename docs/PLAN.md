@@ -1006,7 +1006,14 @@ Scope:
 - Derived-map generation for legacy assets (§4): roughness from diffuse luma through a
   material-class LUT; metallic default 0 with a chrome allowlist; **no derived normal maps**.
 - One `ReflectionProbe` per actor for local specular, low update rate.
-- **The scene, v2** — the milestone where it first looks good: PBR ground, rock and bark
+- **The scene, v2** — the milestone where it first looks good. **The ground part of this is
+  essentially done, 2026-10-01**, and not by writing a shader: Terrain3D's own material is
+  metallic-roughness, and once the blank-texture bug was fixed it draws the author's albedo and
+  normal maps with per-surface roughness as a real shader input —
+  `the_ground_draws_its_own_textures` holds both. Nothing in the Rigs of Rods terrain format
+  carries roughness, so a single constant is the honest choice and
+  `res://shaders/terrain3d_override.gdshader` is no longer a prerequisite for anything. What is
+  left of this item: PBR rock and bark
   materials through the Terrain3D shader override; vegetation tier 1 via `Terrain3DInstancer`; the
   staged water plane (sky reflection, refraction, depth fade, shoreline term, scrolling normals) on the
   river and lake; distance haze and valley-floor fog.

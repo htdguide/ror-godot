@@ -1,5 +1,5 @@
 extends GateBase
-## The terrain's ground is drawn from the textures its author shipped.
+## The terrain's ground is drawn from the material parameters its author shipped.
 ##
 ## This is a finding turned into a gate, and it currently fails. Written down in
 ## `docs/guides/hard-won-facts.md` and in PLAN §0.5: **Terrain3D is drawing the ground from the
@@ -18,6 +18,22 @@ extends GateBase
 ## not move is the finding and a render that moves by the amount the change implies is the fix.
 ## Nothing here asserts what the ground should *look* like — only that it is drawn from the
 ## author's pixels rather than in spite of them.
+##
+## Two parameters are checked, because two findings were recorded against this same blank
+## foundation and only one of them was collateral:
+##
+## - **Albedo**, the one above.
+## - **Roughness.** "The per-surface values in `SurfaceCfg` reach the texture assets and,
+##   measured, do not reach the picture." Terrain3D composes roughness as
+##   `(color_map.a - 0.5) * 2 + normal_rough.a` plus a per-asset modifier
+##   (`_texture_roughness_mod_array`), so the per-asset value *is* a shader input. It could not
+##   have been seen before: all four of La Paz's assets are set to the same 0.9, so there was no
+##   difference to observe even with working textures.
+##
+## **Normal maps are not checked, and that is not an omission.** La Paz ships `blank_NRM.dds` for
+## all four of its layers — its normals really are flat. "Taking the normal map's depth to zero
+## changed nothing" was a correct measurement of a blank normal map, not a symptom of the texture
+## bug. A gate that perturbed it would be asserting that changing nothing changes something.
 
 const TERRAIN_DIR: String = "assets/terrains/lapaz2"
 const PRESET: String = "hero_3q"
@@ -32,12 +48,17 @@ const DARKEN: float = 0.33
 ## large change; this is set well below it so the gate is about whether the textures reach the
 ## picture at all, not about matching a predicted luma.
 const MIN_LUMA_SHIFT: float = 0.02
+## And how much a roughness sweep has to move it. Far smaller, because roughness changes the
+## specular lobe rather than the diffuse albedo, and under a sky-dominated light a whole-terrain
+## roughness sweep is a small fraction of the frame's luma. It is set to catch "nothing at all",
+## which is what was recorded, not to assert a predicted amount.
+const MIN_ROUGHNESS_SHIFT: float = 0.0005
 
 
 static func meta() -> Dictionary:
     return {
         "name": "the_ground_draws_its_own_textures",
-        "proves": "changing a terrain's own splat texture changes the rendered ground, so the author's imagery reaches the picture",
+        "proves": "changing a terrain's own splat texture or its per-surface roughness changes the rendered ground, so the author's material parameters reach the picture",
         "builds_on": ["surfaces_are_visible"],
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
@@ -117,12 +138,56 @@ func run(harness: Node) -> Dictionary:
             % [before["luma"] as float, after["luma"] as float, before["png"] as String],
             shift
         )
+    # Roughness, on the same frame, from the same direction: all assets to mirror, then all to
+    # fully rough. A change either way means the per-asset value is a shader input.
+    #
+    # Measured on the terrain the albedo change left behind, deliberately: both halves of this
+    # comparison see the same albedo, so the only thing that differs between them is roughness.
+    # Restoring the albedo first would make the two numbers in the result read more naturally
+    # and would add a state nothing else needs.
+    var rough_shift: String = _set_roughness(terrain, 0.0)
+    if rough_shift != "":
+        return fail(rough_shift)
+    await harness.advance_frames(2, "static", "terrain")
+    var mirror: Dictionary = await _luma(harness, "ground_textures/mirror")
+    if (mirror["error"] as String) != "":
+        return fail(mirror["error"] as String)
+    rough_shift = _set_roughness(terrain, 1.0)
+    if rough_shift != "":
+        return fail(rough_shift)
+    await harness.advance_frames(2, "static", "terrain")
+    var matte: Dictionary = await _luma(harness, "ground_textures/matte")
+    if (matte["error"] as String) != "":
+        return fail(matte["error"] as String)
+    var roughness_moved: float = absf(
+        (mirror["luma"] as float) - (matte["luma"] as float)
+    )
+    if roughness_moved < MIN_ROUGHNESS_SHIFT:
+        return fail(
+            "roughness from mirror to matte moved the ground %.5f luma (%.4f to %.4f), under"
+            % [roughness_moved, mirror["luma"] as float, matte["luma"] as float]
+            + " %.5f: the per-asset roughness is not a shader input" % MIN_ROUGHNESS_SHIFT,
+            roughness_moved
+        )
     return ok(
-        "layer %d's albedo at %.2f moved the ground %.4f luma, %.4f to %.4f: the author's"
+        "layer %d's albedo at %.2f moved the ground %.4f luma (%.4f to %.4f), and roughness from"
         % [layer, DARKEN, shift, before["luma"] as float, after["luma"] as float]
-        + " textures reach the picture",
+        + " mirror to matte moved it %.5f (%.4f to %.4f): the author's material parameters reach"
+        % [roughness_moved, mirror["luma"] as float, matte["luma"] as float]
+        + " the picture",
         shift
     )
+
+
+## Sets every layer's roughness modifier and repacks, the same way the albedo change does.
+func _set_roughness(terrain: Node3D, roughness: float) -> String:
+    var assets: Object = terrain.get("assets")
+    if assets == null:
+        return "the terrain has no asset set to change"
+    for asset: Object in assets.get("texture_list") as Array:
+        asset.set("roughness", roughness)
+    assets.call("update_texture_list")
+    return ""
 
 
 ## Mean luma of a captured frame.
