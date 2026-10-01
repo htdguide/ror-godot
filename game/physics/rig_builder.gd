@@ -68,6 +68,10 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
     _configure_engine(solver, truck)
     solver.set_gravity(GRAVITY)
     _add_drag(solver, truck)
+    # The rig as built, kept so `place` can put a damaged one back this way. Taken last, after
+    # the bounds and the limits have set every strength the file asks for: a snapshot taken
+    # earlier would "repair" a rig to a weaker state than it was ever driven in.
+    solver.snapshot_undamaged()
     return {"error": "", "solver": solver, "masses": masses}
 
 
@@ -129,6 +133,11 @@ static func from_file(mod_dir: String, truck_file: String, drop_height_m: float 
 static func place(
     solver: RefCounted, truck: TruckParser, origin: Vector3, heading: float, clearance: float
 ) -> void:
+    # Undamaged first, and this is the part that was missing. Resetting positions and rest
+    # lengths undoes a bend but not a break, so a rig put back on its wheels kept every beam it
+    # had snapped and shed its doors and wheels again on the next step. Reported from the window:
+    # "after pressing R car is resetting but it is broken, doors and wheels fall of".
+    solver.repair()
     var upright: Basis = Basis(Vector3.UP, heading)
     var lowest: float = INF
     for node: Vector3 in truck.nodes:

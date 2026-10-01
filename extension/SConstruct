@@ -9,11 +9,16 @@
 
 env = SConscript("../vendor/godot-cpp/SConstruct")
 
+# `../bin`, not `../game/bin`. The binary `bin/rorbridge.gdextension` actually loads sits at the
+# repository root, and this said `game/bin` from back when the project lived in `game/` — so a
+# rebuild wrote a fresh library somewhere nothing reads and the old one stayed loaded. The same
+# stale-root trap is recorded for `res://` in docs/guides/hard-won-facts.md.
+
 env.Append(CPPPATH=["src/"])
 sources = Glob("src/*.cpp")
 
 library = env.SharedLibrary(
-    "../game/bin/librorbridge{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
+    "../bin/librorbridge{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
     source=sources,
 )
 

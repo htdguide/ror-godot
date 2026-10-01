@@ -382,3 +382,19 @@ afternoon to rediscover.
   only pixels that moved were the box's own, so it proved a moving box moves. Both gates looked
   entirely reasonable and both were worth nothing. What reproduces the fault is a real vehicle
   being re-posed every frame, measured on ground the vehicle never touches.
+- **Damage to a rig is six beam fields and a per-node count, not one.** A hit changes a beam's
+  `rest_length` (the bend), both yield stresses, the recomputed `minmax_stress`, the `strength`
+  where upstream softens a beam instead of snapping it, and `broken` — and breaking a beam also
+  decrements `active_beams` on both of its nodes, which upstream consults before it will break the
+  last beams holding a cab node. `RigBuilder.place` restored node positions, velocities and rest
+  lengths and its own documentation called that "undeformed": true of bends, false of breaks. A
+  reset truck came back on its wheels still holding every snapped beam and shed its doors and
+  wheels again on the next step. Measured: a crash leaves 45 of 1995 beams broken and 500 bent.
+  Repair restores a snapshot of the beams as built rather than recomputing them — recomputing
+  would be a second implementation of rig building, free to drift from the first.
+- **`extension/SConstruct` wrote its library to `../game/bin` while the engine loads `bin/`.** The
+  path dated from when the project lived in `game/`, so a rebuild produced a fresh binary
+  somewhere nothing reads and the old one stayed loaded — a C++ change that silently does nothing
+  is worse than one that fails to compile. Same stale-root trap as `res://` and
+  `HarnessCapture.artifact_root`; that is three times now, and the lesson is to check where a
+  build artifact actually lands before believing a native change took effect.

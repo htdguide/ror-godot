@@ -126,6 +126,11 @@ public:
     bool beam_broken(int beam) const;
     float beam_strength(int beam) const;
     int broken_beam_count() const;
+    // Taking the rig as built, and putting it back that way. Damage is spread over six beam
+    // fields and a per-node count, so repairing it means restoring a snapshot rather than
+    // recomputing values that building already worked out. See ror_repair.cpp.
+    void snapshot_undamaged();
+    void repair();
     // Marks a node as part of a collision triangle, which upstream protects from losing its
     // last beams.
     void set_node_cab(int node, bool is_cab);
@@ -200,6 +205,11 @@ public:
 private:
     NodeArray m_nodes;
     BeamArray m_beams;
+    // The beams as the rig was built, and the active-beam count each node started with. Empty
+    // until `snapshot_undamaged` is called, which makes `repair` a no-op on a rig built by code
+    // that predates it rather than half-repairing one.
+    BeamArray m_undamaged_beams;
+    std::vector<int> m_undamaged_active_beams;
     RorWheelSet m_wheels;
     RorDrivetrain m_drivetrain;
     RorSteering m_steering;

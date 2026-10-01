@@ -244,6 +244,8 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("beam_broken", "beam"), &RorSolver::beam_broken);
     ClassDB::bind_method(D_METHOD("beam_strength", "beam"), &RorSolver::beam_strength);
     ClassDB::bind_method(D_METHOD("broken_beam_count"), &RorSolver::broken_beam_count);
+    ClassDB::bind_method(D_METHOD("snapshot_undamaged"), &RorSolver::snapshot_undamaged);
+    ClassDB::bind_method(D_METHOD("repair"), &RorSolver::repair);
     ClassDB::bind_method(D_METHOD("set_node_cab", "node", "is_cab"), &RorSolver::set_node_cab);
     ClassDB::bind_method(D_METHOD("set_beam_bounds", "beam", "bound_type", "short_bound",
                                   "long_bound", "bound_spring", "bound_damp", "precompression"),

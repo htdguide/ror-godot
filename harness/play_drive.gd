@@ -104,9 +104,10 @@ func on_key(keycode: Key) -> bool:
         KEY_G:
             _set_selector(1)
         KEY_R:
-            # Recover, because that is what a person reaches for after rolling a truck. The
-            # gears moved to make room: B backs it up, H is neutral.
-            _recover()
+            # Back to where the map starts the vehicle, undamaged — what a person means by
+            # "reset". Recovery in place, which this used to do, is on Enter. The gears moved to
+            # make room: B backs it up, H is neutral.
+            _respawn()
         KEY_I:
             if solver.engine_running():
                 solver.stop_engine()
