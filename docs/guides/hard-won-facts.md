@@ -124,6 +124,25 @@ afternoon to rediscover.
   what exposure 3.4 did. Removing the fill light makes it worse: shadows fall to 0.0221. The
   gate's own reasoning cites print holding about 1:8, so its 4x is stricter than the figure it
   argues from. **Nothing here was changed to resolve it.**
+- **Photograph a step wedge, not a grey card.** Six patches a stop apart found two faults in one
+  run that a single mid-grey patch could not have shown, because both were *additive* and an
+  offset bends a measurement most where the subject is darkest. The brightest patch was 1% high
+  and the darkest 9% high — one patch anywhere on that wedge would have read "about right".
+- **`use_measurement_environment` was never dark.** It set the ambient colour to black and the
+  ambient energy to zero and left `ambient_light_sky_contribution` at 1.0 — and at 1.0 the ambient
+  comes from the sky whatever the colour says. It also left **fog** on, which adds a constant to
+  every pixel in the frame. Every gate that ever measured something "in the dark" had both. Both
+  are off now, along with `reflected_light_source`.
+- **With the room actually dark, the lighting path is exact.** A photographed wedge is linear in
+  reflectance to **0.00%**, doubling a light is a factor of two to **0.00%**, and a two-light
+  ratio measures 6.80:1 against 6.80:1. So nothing is wrong with the renderer's lights or with
+  the capture — which places the remaining sun-to-sky puzzle squarely in the **sky ambient**
+  path, and nowhere else.
+- **Lambert's cosine law will correct your expectation before it corrects the renderer.** The
+  lighting-ratio check first compared a photograph against 20000/5000 = 4:1 and the photograph
+  said 6.80:1 — a 70% error that was entirely the gate's. The fill arrives at 54 degrees, so
+  cos(54) = 0.588 of it lands and 20000 / (5000 x 0.588) is 6.80 exactly. A photographer aims an
+  incident meter at the camera for the same reason.
 - **A capture can carry light, and it takes one flag.** `SubViewport.use_hdr_2d` makes the
   viewport texture `FORMAT_RGBAH` and linear, so values above white survive: an unshaded quad at
   albedo 4.0 reads 25.312 through it and 1.000 without it. 25.312 is `srgb_to_linear(4.0)`, which

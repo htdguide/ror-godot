@@ -121,6 +121,21 @@ static func use_measurement_environment(world: Node3D) -> void:
     environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
     environment.ambient_light_color = Color.BLACK
     environment.ambient_light_energy = 0.0
+    # And the sky, which is where the ambient was actually coming from. Setting the colour to
+    # black and the energy to zero leaves `ambient_light_sky_contribution` at 1.0, and at 1.0 the
+    # ambient is the sky's regardless of what the colour says — so this "measurement environment"
+    # was never dark. A photographed step wedge found it: every patch carried a constant 0.0017
+    # on top of its reflectance, which is a floor, and a floor is a light nobody turned off.
+    environment.ambient_light_sky_contribution = 0.0
+    # Specular from the sky, for the same reason.
+    environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
+    # And fog, which adds a constant to every pixel in the frame — an offset, not a scale, so it
+    # bends a measurement most where the subject is darkest. A photographed step wedge is what
+    # found it: every patch carried a clean +0.0020 over its reflectance, and the darkest patch
+    # was 9% high because of it while the brightest was 1%. A gate measuring one mid-grey card
+    # would never have seen it, which is the argument for a wedge.
+    environment.fog_enabled = false
+    environment.volumetric_fog_enabled = false
     var ground: MeshInstance3D = world.get_node_or_null(^"Ground") as MeshInstance3D
     if ground != null:
         ground.visible = false
