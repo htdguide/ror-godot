@@ -19,7 +19,18 @@ done: the §0.7 folder mirror, the one-window container runner, order independen
 the path CI uses is the path a person uses, and `tools/gate.sh --cmd "<line>"` runs any console
 command from a shell.
 
-**M2 is next** — PBR ground and HDRI sky. It is also what closes the one red gate.
+**M2 is next** — PBR ground and HDRI sky.
+
+**Two sections were decided on 2026-10-01 and nothing in them is built.** §0.10 is now
+client-authoritative state replication on this project's own wire at 64 players, and **RoRnet
+compatibility is retired** — it records the oracle that cost and the four things that have to
+replace it. §0.12 is the scale design: float32 gives 11.9 mm at 100 km and beam forces are
+differences of positions, so the fix is per-actor frames that follow the actor, with islands,
+sleeping, and a causality bound from a 1000 km/h v_max. **Its first prerequisite does not exist: a
+hard node-velocity clamp.** Without one the bound is an assumption rather than a theorem. Read
+§0.12's order-of-work before starting any of it — step 2 is two cheap measurements that decide
+whether the rest is urgent at all, because at La Paz scale the relative beam error is ~5e-4, which
+is coarser than this project's own tolerances.
 
 **The console.** `tools/play.sh` and `--console` open it; ` or F1 drops it down over whatever is
 running, without pausing it. `help` lists the twelve commands, Tab completes and cycles, Up

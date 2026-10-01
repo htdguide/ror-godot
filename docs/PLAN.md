@@ -517,34 +517,71 @@ Rules, fixed now rather than at implementation time:
 
 ---
 
-## 0.10 Multiplayer — the transport seam
+## 0.10 Multiplayer — client-authoritative state replication
 
-Last, and structurally simple as long as one decision is honoured: **the simulation never learns
-which transport it is on.**
+**Decided 2026-10-01, and it supersedes this section's first version, which was RoRnet-first.**
 
-```
-game/network/
-  i_transport.gd / .h      connect, disconnect, register stream, send, poll
-  rornet_transport         RoRnet as upstream defines it. First and primary.
-  native_transport         later, optional
-```
+| | |
+| --- | --- |
+| Authority | **client-authoritative per vehicle.** Each client simulates its own actor and publishes its state. What RoR effectively does. |
+| Model | **state replication.** No lockstep, no cross-machine determinism requirement. |
+| Players | **64**, which is RoR's own scale. |
+| Persistence | the **driven vehicle and its damage** persist. Nothing else. |
+| World | **immutable.** |
+| Wire | this project's own. **RoRnet compatibility is retired.** |
 
-- **RoRnet is a wire contract, not an interface to design.** `source/main/network/RoRnet.h` defines
-  fixed-size structs and a version string, and the server's handshake rejects a client whose version
-  does not match. That version is pinned from the submodule, so a submodule bump that changes it is
-  a change this project has to notice.
-- **It is state replication, not lockstep.** RoRnet registers a stream per actor and sends node
-  state; it does not send inputs and it does not require two clients to compute the same result.
-  That is the reason multiplayer does not depend on solver determinism, and it is why this milestone
-  can come after the solver's own divergence question rather than before it.
-- **The outside oracle is a live server with other clients on it**, which is the strongest oracle
-  in this entire plan and the reason RoRnet comes before any native protocol. A native transport
-  with no players has no oracle at all.
-- **Real RoR clients on the same server are the fidelity check**: if this client's actor looks and
-  moves right in their windows, the streams are right.
+### What retiring RoRnet costs, recorded as a debt and not as a footnote
+
+This section used to say that a live server with real clients on it was *the strongest oracle in
+this entire plan*, and that is what is being given up. Netcode becomes a subsystem with no outside
+judge, which is the condition this project distrusts everywhere else. The replacement is four
+things, and they are part of C5 rather than optional:
+
+- **Deterministic replay** — record inputs, replay, assert the same outcome.
+- **An adversarial transport** — injected loss, reorder, duplication, latency and jitter, as a
+  gate rather than as a manual test.
+- **A soak test** — 64 simulated clients against one server; assert convergence and bounded
+  bandwidth.
+- **A second implementation of the protocol written from the specification, not from the code.**
+  The only outside oracle that can still be manufactured here, and the reason the wire format has
+  to be specified in prose before it is written in GDScript.
+
+The `ITransport` seam stays. It costs nothing, and it is the difference between *choosing* not to
+speak RoRnet and *not being able to*.
+
+### Why RoRnet could not have been kept anyway
+
+Its struct layout and broadcast model are fixed, and the scale target in §0.12 is not something it
+can express. Keeping it would have pinned the wire to a design from a different era and made the
+frame work in §0.12 negotiable with every other client on the server.
+
+### The replication design
+
+**Send the rigid frame often and the deformation rarely**, because a vehicle is mostly rigid most
+of the time:
+
+| scheme | per actor | 64 actors |
+| --- | --- | --- |
+| every node, 250 x 12 B at 10 Hz | 30 KB/s | 1.9 MB/s — 15 Mbps down |
+| rigid frame at 20 Hz + quantised deviations at 2 Hz | ~1.2 KB/s | 75 KB/s — 0.6 Mbps |
+
+25x, and the cost scales with how deformed a vehicle actually *is*: cruising on asphalt is nearly
+free and a crash pays. It falls out of the per-actor frames in §0.12 rather than needing anything
+of its own. Interest management cuts it again — only actors a client could perceive are sent, which
+is Source's PVS idea and the largest single scaling lever in network code.
+
+Also from the Source/Quake lineage, and all applicable: delta compression against the last
+acknowledged snapshot, per-field quantisation, sub-tick input timestamps (CS2's), and dead
+reckoning — send position, velocity and acceleration, extrapolate on the receiver, correct only
+past an error threshold. That last one is the formal version of "check the numbers more rarely"
+and it is a DIS standard.
+
+**What client authority buys:** no server-side prediction of a 250-node softbody, and no
+reconciliation of one. It also makes the seam in §0.12 nearly free. What it costs: trivial
+cheating, which is the accepted trade for a game of this kind, and a persistence layer that must
+not trust a client for anything that outlives a session.
 
 ---
-
 
 ## 0.11 UI design — Rigs of Rods, refreshed, and the instruments under glass
 
@@ -590,6 +627,192 @@ glass may cost that gate. Inertia moves the housing, never the value.
 
 ---
 
+## 0.12 Scale — precision, interaction, and the seam between servers
+
+**The requirement: performance-bound, not design-bound.** A faster machine should reach further
+and simulate more, with no constant in the code deciding where the world stops. Nothing here is
+built; this section is the design the work will be measured against.
+
+### The problem, stated correctly
+
+float32 has a 24-bit significand, so position resolution is about `distance x 2^-23`: 0.48 mm at
+4 km, 11.9 mm at 100 km, 119 mm at 1000 km.
+
+For beam physics that table is not the problem. **Every beam force begins with a difference of two
+node positions**, and differencing two nearby large numbers is catastrophic cancellation: two nodes
+0.3 m apart at 100 km each carry ~12 mm of quantisation, so their separation carries up to 24 mm of
+error — **8% on the length**, from positions individually "accurate to 12 mm". At 3.4 MN/m, which is
+this project's own measured rim-hoop stiffness, 24 mm of phantom stretch is 81 kN on a 2.03 kg
+node. That is 40 000 m/s^2, and the rig is gone in one substep.
+
+So the quantity to protect is **beam length error relative to beam length**, not position error
+relative to the world. Precision loss is caused by coordinates being far from the *origin*, never
+by objects being far from *each other*.
+
+### Per-actor frames
+
+Each actor's nodes are stored relative to **its own origin**, which follows it:
+
+- `RorSolver` holds `m_frame_origin` as double x/z. **Y stays global** — only x/z grow large, and a
+  global Y keeps `ground_height_at` directly comparable to `node.position.y` with no conversion.
+- Public accessors convert, so `get_node_position` still returns world and **gates, the render path,
+  `ActorFrame` and the HUD need no change**. The frame is an implementation detail.
+- The origin is re-quantised when the reference node leaves a **power-of-two radius** — 64 m or
+  256 m. Local coordinates then never exceed that, so the ULP is **7.6 µm at 64 m regardless of
+  world size**, and beam error stops being a function of where you are.
+- The rebase is exact: an integral power-of-two shift at those magnitudes introduces nothing.
+  Velocities and forces are deltas and do not rebase at all.
+- **A frame fixed at spawn would buy nothing.** La Paz starts the truck at x = 3915.8 and it can
+  drive 4 km from there, so local coordinates reach the same magnitude as world ones. The frame
+  following the actor is the mechanism, not an optimisation of it.
+
+**Store the heightfield origin and the obstacle boxes frame-local too**, and shift them on rebase.
+Then the hot path — hundreds of nodes at 2 kHz through `ror_ground` and `ror_obstacles` — never
+sees a world coordinate, and the only world-space value in the solver is the frame origin itself.
+Without this the beams become exact while `RorHeightfield::height_at` keeps doing its arithmetic at
+world magnitude.
+
+**Actor-to-actor contact** converts one actor into the other's frame for that contact only: bounded
+error, no shared state, no merge event. Free today, because actors do not collide with each other
+yet — `contacters` is unparsed.
+
+### The causality bound
+
+**v_max = 1000 km/h = 277.8 m/s**, so a closing bound of 555.6 m/s and **0.278 m of possible
+closure per 0.5 ms substep**. A pair separated by more than that cannot touch this step, and the
+certificate holds for `distance / 555.6` seconds:
+
+| separation | safe for | substeps skipped |
+| --- | --- | --- |
+| 100 m | 0.18 s | 360 |
+| 1 km | 1.8 s | 3 600 |
+| 10 km | 18 s | 36 000 |
+| 100 km | 3 min | 360 000 |
+
+This is a **proof, not a heuristic**, and it has a name in four fields: conservative advancement
+(Mirtich 1996), kinetic data structures (Basch/Guibas/Hershberger 1997), lookahead in IEEE 1516
+HLA time management, and Time Warp in parallel discrete event simulation (Jefferson 1985).
+
+Two conditions, and the plan is wrong without them:
+
+1. **A hard node-velocity clamp has to exist and the bound must be derived from it.** There is none
+   today. A bad collision launches nodes far above any vehicle's top speed — `drive_route.gd` uses
+   60 m/s as an *explosion* threshold, so nodes do exceed it. Without a clamp the guarantee fails
+   exactly when physics misbehaves, and a missed collision from a violated bound is not
+   reproducible. **This is the first prerequisite of everything in this section**, and it is a small
+   change with a gate attached.
+2. **Per-object-class v_max, not a world constant.** A parked truck is 0 until something hits it; a
+   jet is 277.8. One global constant prices every pair at the jet rate and throws away most of the
+   win.
+
+Every teleport breaks a certificate — respawn, `R` recover, spawn, a dragged debug camera. Each has
+to invalidate explicitly.
+
+### Islands and sleeping, rather than merged frames
+
+A dynamic "blob" of nearby actors sharing one frame was considered and **rejected**: the topology
+would depend on the history of who was near whom, which is exactly the order-dependence D0 spent a
+milestone eliminating; hysteresis to stop it thrashing is what makes it history-dependent; and a
+blob has one origin, so a 2 km convoy that is one blob by its own rule is back to 0.25 mm.
+
+**Constraint islands** are the version that works, and every production physics engine has them:
+partition the contact graph into connected components **recomputed fresh each step**, and solve each
+independently. Derived, not maintained — so no hysteresis, no history, deterministic. Islands are
+also the natural unit of parallelism, which is the concrete mechanism for "gains equally with
+performance": more cores, more islands at once.
+
+**Sleeping** is the "stable versus potential interactor" state: a body below a velocity threshold
+for N steps deactivates and its island is skipped entirely; contact wakes it. A parked truck costs
+nothing.
+
+For the aggregate idea — distant groups replaced by their summary rather than their members — the
+name is Barnes-Hut and the Fast Multipole Method, which for contact degenerates to a BVH plus the
+certificates above.
+
+### Rendering at 100 km
+
+Required: correct if a player is there. float32 ULP at 100 km is 11.9 mm, which is visible vertex
+jitter on a vehicle.
+
+- **`precision=double`** build of Godot, godot-cpp, `rorbridge` **and** Terrain3D. All four, or the
+  ABI breaks — `Vector3` changes size. It gives camera-relative render transforms for free, and
+  incidentally makes `RorNode::position` double.
+- **Depth**: reverse-Z with a float depth buffer, or logarithmic depth. Verify what Godot 4.7
+  provides rather than assuming.
+- **Shaders stay float32 and the build flag does not reach them.** Two in this tree are already
+  wrong at that distance and both need a frame-local position passed in instead:
+  `game/shaders/foliage.gdshader` phases its sway by world position, and Terrain3D derives its UVs
+  from world position.
+
+### The seam between servers
+
+A **void corridor** joins two servers. A client entering it keeps simulating — it is already the
+authority for its own vehicle — while the destination loads, and arrives when the corridor ends.
+The corridor is as long as the load takes, and **it belongs to the client**: it replaces the loading
+screen rather than being a place on a server.
+
+**Client authority removes the hard part.** There is no authority to migrate, because the client
+always had it. What moves is *relay and interest*, not simulation state, which is the entire class
+of bug that makes this difficult elsewhere.
+
+**The precedent to read is Second Life / OpenSim region crossing** — 256 m regions, one process
+each, and a vehicle in motion crossing a border. The same problem, and the documented failures are
+thrown, lost and duplicated vehicles. Their mitigation is the one this design arrived at
+independently: *child agents*, a pre-connection to the neighbour before arrival, so the handoff
+promotes an existing connection instead of opening a new one. The corridor is that, given a shape.
+
+**The algorithm to copy is live VM migration** (vMotion, KVM): pre-copy while the source keeps
+running, then a brief final delta, then resume on the destination.
+
+**The correctness primitive is a lease with a fencing token.** Two servers both believing they own
+a vehicle duplicates it; neither owning it loses it. A monotonic token the destination presents and
+the source refuses to act after. Standard, and the reason to write it down now is that improvising
+it later produces a bug nobody can reproduce.
+
+**The corridor's real value is not hiding the load.** It is a region with no terrain and no
+contacts, so a handoff failure there is *recoverable* — nothing to fall through, nothing to collide
+with, no world state to reconcile. The riskiest operation happens in the cheapest possible place,
+and that property is worth keeping even if loading were instant. It also wants the corridor to stay
+contactless by construction, which answers "who arbitrates two players in there": nobody.
+
+**What still has to be checked:** the destination validates exit continuity — position, velocity and
+elapsed time against the corridor's geometry and v_max. Client authority plus a client-owned
+corridor is otherwise a window to claim an arbitrary exit. One validation function, not an
+architecture.
+
+### What the world not mutating buys
+
+Terrain, objects and surfaces are immutable shared data. No server-authoritative world state to
+replicate, no reconciliation, and the heightfield and obstacle lists can be shared read-only across
+actors instead of copied per solver. Most of what makes a persistent world hard is simply absent.
+
+### Order of work, and the measurement that decides it
+
+1. **A node-velocity clamp, gated.** Prerequisite for the causality bound to be a theorem.
+2. **Measure before designing further.** Two gates that do not exist and are cheap: the hero truck
+   settled at 50 m and at 3915 m from the origin, same probe — does the tyre ring change? And the
+   same rig at 1 km, 100 km and 10 000 km — what breaks first, beams, the ground query, vertex
+   jitter or depth? Today the order is a guess; one gate makes it a list.
+3. Per-actor frames, with the heightfield and obstacles frame-local.
+4. Islands and sleeping.
+5. Certificates.
+6. The `precision=double` build and the two world-space shaders.
+7. The seam.
+
+Steps 3 to 7 are each worth their own milestone and none is scheduled yet. **Step 2 comes before
+any of them**, because on a 4 km map the relative beam error is ~5e-4, which is coarser than this
+project's own tolerances — so it is entirely possible that none of this is urgent and all of it is a
+large-world prerequisite.
+
+### Splitscreen, as the test for all of it
+
+**Two vehicles in one window, one on WASD and one on the arrow keys.** The cheapest honest test of
+everything above that does not need a network: two actors, two frames, two islands, contact between
+them, and a human able to drive one into the other. It exercises the multi-actor paths long before
+C5 and it is how a person judges whether any of this feels right.
+
+---
+
 ## 1. Milestone plan
 
 **Re-ordered 2026-09-30 for the client scope.** Two prerequisites still come ahead of everything
@@ -608,12 +831,18 @@ local milestone, then the two networked ones.
 | M3–M8 | The rest of the renderer | motion vectors, TAA, FSR, GI, AO, shadow overhaul, volumetrics, SSR, wetness, particles, FFT water, terrain VT |
 | C3 | Airplanes and boats | two further physics subsystems: aerofoils, turbojets, turboprops, screwprops, wings, autopilot, buoyancy |
 | C4 | The online repository (§0.9) | second to last. Networked, and the only milestone that writes to a service other people depend on. |
-| C5 | Multiplayer (§0.10) | last. RoRnet behind `ITransport`; a live server with other clients on it is the oracle. |
+| C5 | Multiplayer (§0.10) | last. **Client-authoritative state replication, this project's own wire, 64 players. RoRnet retired 2026-10-01**, and §0.10 records the oracle that retirement costs and the four things that replace it. |
+| S1-S7 | Scale (§0.12) | **not scheduled.** A node-velocity clamp, then the two measurements that decide whether any of the rest is urgent, then per-actor frames, islands, certificates, the `precision=double` build, and the seam. §0.12 has the order and the reason step 2 comes before steps 3 to 7. |
 
 Not yet placed in a milestone, and each needs one before it is forgotten: input remapping and force
 feedback, settings persistence, skins and dashboards, content management at archive scale, character
 and walking mode, save and replay, localization, user-facing capture. Input and settings are the two
 that C1 will run into immediately.
+
+**Splitscreen belongs with C1's input work.** Two vehicles in one window, one on WASD and one on
+the arrow keys, is the cheapest honest test of §0.12's multi-actor paths — two frames, two islands,
+contact between them — and it needs no network. It also forces the input remapping question
+immediately, which is why it sits with C1 rather than with the scale work it exercises.
 
 **Local first, and the reason is gating.** Every milestone through C3 can be checked on one machine
 against content that is already on disk. Both networked milestones depend on a service this project
