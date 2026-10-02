@@ -286,9 +286,27 @@ func _read_surfaces() -> String:
         return traction["error"] as String
     for cfg: String in traction["ground_model_configs"] as PackedStringArray:
         models.add_config(directory.path_join(cfg))
-    _traction_image = Image.load_from_file(directory.path_join(traction["texture"] as String))
+    # Through the extension's reader, not Godot's loader.
+    #
+    # A traction map is a texture like any other and a terrain is free to ship it compressed:
+    # NhelensGrass ships a 1024x1024 DXT1 with eleven mipmaps, and `Image.load_from_file` does not
+    # read DDS at run time, so that whole terrain failed to load over its ground types. Every
+    # other texture in this project already goes through `DdsReader`; this one was the exception.
+    _traction_image = RorTerrainSkin.image_of(
+        directory.path_join(traction["texture"] as String),
+        ClassDB.instantiate("DdsReader") as RefCounted
+    )
     if _traction_image == null:
         return "the traction map image %s could not be read" % traction["texture"]
+    # And then decompressed, because this one is read back a pixel at a time rather than handed
+    # to the GPU: `surface_at` asks it what colour the ground is under a point, and `get_pixelv`
+    # on a block-compressed image returns nothing useful.
+    if _traction_image.is_compressed():
+        if _traction_image.decompress() != OK:
+            return (
+                "the traction map image %s is compressed in a format that cannot be read back"
+                % traction["texture"]
+            )
     for index: int in models.size():
         _surface_indices[models.name_of(index)] = index
     # The landuse config's own `defaultuse` for a colour it does not name, and gravel again when

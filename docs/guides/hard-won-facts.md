@@ -322,3 +322,18 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   gate run built its own full-window `TextureRect` and left it in the tree — three nodes, under a
   slack of eight, invisible for as long as it existed. Adding two more nodes per run took it to
   nine and the container leak check caught the whole thing at once.
+- **A Rigs of Rods vehicle is not always a `.truck`.** The extension says what the actor is meant
+  to be — `.car`, `.load`, `.airplane`, `.boat`, `.trailer`, `.train`, `.fixed` — and the format
+  inside is identical. Measured across four packs from the repository: `mazda626gf` ships only
+  `mazda626sd18i-mt.car`, Starling Island ships five actors as `.truck` and `.boat`, NhelensGrass
+  ships a bridge and a crane as `.fixed`. A library looking for trucks finds a third of them.
+- **One content folder is routinely several maps and several vehicles, and it does not respect the
+  root it was unpacked into.** Starling Island is four `.terrn2` and five actors in one download;
+  the Chevy pack is four variations of one truck. Both content roots have to be searched for both
+  kinds, or six of this checkout's nine downloaded actors are invisible — unpacked under
+  `assets/terrains/` because the same folder also ships maps.
+- **`Image.load_from_file` does not read DDS at run time.** Godot's DDS support is an import-time
+  path, and every texture in this project already goes through the extension's `DdsReader` — the
+  traction map was the one exception, so NhelensGrass failed to load at all over a 1024x1024 DXT1
+  with eleven mipmaps. A traction map also has to be *decompressed* after loading, unlike every
+  other texture here, because it is read back a pixel at a time rather than handed to the GPU.
