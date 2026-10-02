@@ -387,3 +387,10 @@ this one hit the 400-line cap, and they are the area this project has been wrong
 - **A flexbody wheel's tyre is a mesh, not a material.** A mesh wheel names a material and the
   tyre is swept procedurally and painted with it; a flexbody wheel names two meshes, rim and tyre.
   Treating the second as a material leaves the tyre white with nothing in the log.
+- **A flexbody wheel is a two-ring rig, not a mesh wheel with different fields.** Upstream builds
+  it with `num_rays * 4` nodes and `num_rays * 20` beams — rim 8, tyre 10, support 2 per ray —
+  against a mesh wheel's `num_rays * 2` and `num_rays * 8` (`ActorSpawner.cpp` spawn budget). The
+  rim ring and the tyre ring are separate and the tyre is sprung against the rim, which is why the
+  row states two spring/damping pairs. Parsed as a mesh wheel it gets half the nodes and two
+  fifths of the beams: the wheel wobbles and does not sit on its suspension. Reading the row
+  correctly is not the same as building the rig correctly, and only the first is done.

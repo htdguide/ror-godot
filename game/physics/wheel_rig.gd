@@ -32,6 +32,19 @@ const RIM_DAMP_FALLBACK: float = 150.0
 ## four-wheel drive, brakes all round, and a reference arm node per wheel for the reaction
 ## torque to push against. Dropped, every wheel rolls freely and no amount of engine makes
 ## the rig move.
+## **A `flexbodywheels` row parses here, but its rig is not built here yet, and the difference is
+## structural.** Upstream gives a flexbody wheel `num_rays * 4` nodes and `num_rays * 20` beams —
+## eight rim beams, ten tyre beams and two support beams per ray — against a mesh wheel's
+## `num_rays * 2` nodes and `num_rays * 8` beams (`ActorSpawner.cpp`, the spawn budget). It is a
+## two-ring structure: a rim ring and a tyre ring, with the tyre sprung against the rim, which is
+## why the row carries two spring and damping pairs instead of one.
+##
+## Built as a mesh wheel it gets half the nodes and two fifths of the beams, and what that looks
+## like from the driver's seat is a wheel that wobbles and does not sit on its suspension —
+## reported from the window exactly that way. Parsing the row correctly is what lets such a
+## vehicle have wheels at all; giving it the right rig is a port of
+## `BuildWheelObjectAndNodes` and its flexbody variant, and it has not been done.
+##
 ## **`flexbodywheels` is not the same row, and reading it as one is a quiet disaster.** The two
 ## agree for the first eleven fields and then diverge: a mesh wheel carries
 ## `spring, damping, side, mesh, material` where a flexbody wheel carries
