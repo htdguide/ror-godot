@@ -179,3 +179,11 @@ See `hard-won-facts.md` for the solver, the terrain, the formats and the gate di
   declares four of its lights this way — naming `mazda626gf-sd-lights.dds` while shipping
   `mazda626gf-sd-lights_0.dds` and `_1.dds` — and all four drew untextured. The first frame is
   what a still picture should show.
+- **Rigs of Rods resolves content by name, not by path, and the base content was never missing.**
+  Ogre's resource groups pool every registered directory, so a mod may name `seat.mesh` or the
+  material `tracks/master` and get the game's own copy without saying where it is. This project
+  looked only in the folder a mod was unpacked into, so 56 named meshes across the library
+  resolved to nothing and 48 object surfaces drew untextured — and every one of those files was
+  already in the checkout, under `vendor/rigs-of-rods/resources`, in a submodule that has been
+  pinned since the beginning. Searching the mod's own directory first and the game's after took
+  the library from 345 drawn parts and 47 textures to 405 and 89.

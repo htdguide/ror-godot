@@ -80,7 +80,9 @@ static func material_for(
 
     var files: PackedStringArray = declared["textures"] as PackedStringArray
     if files.size() > 0:
-        var albedo: Texture2D = _texture(mod_dir.path_join(files[0]), dds_reader, textures)
+        var albedo: Texture2D = _texture(
+            RorContentPath.find(files[0], mod_dir), dds_reader, textures
+        )
         if albedo != null:
             material.albedo_texture = albedo
             material.albedo_color = Color.WHITE
@@ -88,7 +90,7 @@ static func material_for(
     # class default stands in where it does not.
     if files.size() > 2:
         var roughness: Texture2D = _roughness_texture(
-            mod_dir.path_join(files[2]), dds_reader, textures
+            RorContentPath.find(files[2], mod_dir), dds_reader, textures
         )
         if roughness != null:
             material.roughness_texture = roughness

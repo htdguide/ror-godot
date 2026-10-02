@@ -29,7 +29,7 @@ static func named_mesh(
 ) -> ArrayMesh:
     if name == "":
         return null
-    var path: String = mod_dir.path_join(name)
+    var path: String = RorContentPath.find(name, mod_dir)
     if not FileAccess.file_exists(path):
         return null
     var result: Dictionary = mesh_reader.read_file(path)

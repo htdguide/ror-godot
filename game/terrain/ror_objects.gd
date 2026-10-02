@@ -138,7 +138,7 @@ static func state(terrain: RorTerrain) -> Dictionary:
     return {
         "definitions": {},
         "meshes": {},
-        "materials": OgreMaterial.read_directory(terrain.directory),
+        "materials": RorContentPath.materials(terrain.directory),
         "textures": {},
         "reader": ClassDB.instantiate("OgreMeshReader") as RefCounted,
         "dds": ClassDB.instantiate("DdsReader") as RefCounted,
@@ -208,7 +208,7 @@ static func mesh_of(terrain: RorTerrain, file: String, state: Dictionary) -> Arr
     var cache: Dictionary = state["meshes"] as Dictionary
     if cache.has(file):
         return cache[file] as ArrayMesh
-    var path: String = terrain.directory.path_join(file)
+    var path: String = RorContentPath.find(file, terrain.directory)
     var read: Dictionary = (state["reader"] as RefCounted).read_file(path)
     if (read.get("error", "") as String) != "":
         push_warning("%s: %s" % [file, read.get("error", "")])
@@ -270,7 +270,8 @@ static func _material(
         var textures: PackedStringArray = declared["textures"] as PackedStringArray
         if textures.size() > 0:
             var texture: Texture2D = RorTerrainSkin.texture_of(
-                terrain.directory.path_join(textures[0]), state["dds"] as RefCounted
+                RorContentPath.find(textures[0], terrain.directory),
+                state["dds"] as RefCounted
             )
             if texture != null:
                 material.albedo_texture = texture

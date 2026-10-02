@@ -41,12 +41,12 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
     # A vehicle declares some materials in its own file and the rest in an Ogre `.material`
     # script beside it. Read once here and handed down, because a mesh does not know which of
     # the two its material came from and should not have to.
-    var scripts: Dictionary = OgreMaterial.read_directory(mod_dir)
+    var scripts: Dictionary = RorContentPath.materials(mod_dir)
     var built: int = 0
     var skipped: PackedStringArray = PackedStringArray()
 
     for entry: Dictionary in truck.flexbodies:
-        var mesh_path: String = mod_dir.path_join(entry["mesh"] as String)
+        var mesh_path: String = RorContentPath.find(entry["mesh"] as String, mod_dir)
         if not FileAccess.file_exists(mesh_path):
             skipped.append("%s (missing)" % entry["mesh"])
             continue

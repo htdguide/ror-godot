@@ -94,6 +94,17 @@ has no corresponding record under `LICENSES/`.
 - Consequence: gates that need it must skip cleanly when it is absent, so a fresh clone
   still runs the suite green.
 
+### Rigs of Rods base resources (meshes, materials and textures the game itself ships)
+- Location: `vendor/rigs-of-rods/resources` — part of the pinned Rigs of Rods submodule above
+- Licence: **GPL-3.0-or-later**, as the rest of that repository
+- Why: Rigs of Rods resolves content by name through Ogre's resource groups, so a mod may say
+  `seat.mesh` or ask for the material `tracks/master` without shipping either — the game's own
+  copy is found. Reading only the folder a mod was unpacked into left 56 named meshes unresolved
+  across this checkout's packs and 48 object surfaces untextured. These directories are now
+  searched after the mod's own, which is what upstream does.
+- Attribution: already carried by the Rigs of Rods entry above; any build that ships these must
+  credit the project and remain GPL-3.0-or-later.
+
 ### Rigs of Rods base content (shipped default map and vehicles)
 - Local path: `vendor/rigs-of-rods/content` — a submodule of the `rigs-of-rods` submodule
 - Source: https://github.com/RigsOfRods/content, pinned at `34fefdd`
