@@ -265,3 +265,13 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   them all as objects counts things that were never meant to be drawn: 13 of Russia's 38
   "placements" and 63 of Starling Island's 1502. Harmless to the picture, and it makes every
   count of what a terrain holds wrong.
+- **Blender's Ogre exporter names a material after its own texture.**
+  `Material.005/TEXFACE/asphaltshingles.dds` — no `.material` script declares it, because the name
+  *is* the declaration. Starling Island ships meshes using those and they drew untextured beside
+  houses that were fine.
+- **What is left untextured on a loaded terrain is mostly content that is not installed.** After
+  the TEXFACE names resolve, Starling Island still has 48 bare object surfaces, and they ask for
+  `Material`, `Material.001`, `Material.004`, `default` and `tracks/master` — names declared in no
+  file in this checkout. `tracks/master` is Rigs of Rods base content, the same gap as the
+  `seat.mesh` several of its vehicles want. Not a loader fault, and worth knowing before anybody
+  goes looking for one.

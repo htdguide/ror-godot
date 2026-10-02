@@ -33,6 +33,9 @@ const MAX_OUTSIDE_M: float = 6000.0
 ## small enough that a tile is a meaningful thing to cull. Grass uses 32 m; scenery is sparser and
 ## larger, so its tiles are too.
 const TILE_M: float = 256.0
+## What Blender's Ogre exporter puts between a material's name and the texture it was painted
+## with.
+const TEXFACE_MARK: String = "/TEXFACE/"
 
 
 ## Builds every object in a terrain. Returns a node holding them, and never null.
@@ -114,6 +117,18 @@ static func unbuilt(terrain: RorTerrain) -> Dictionary:
         var odef: Dictionary = definition(terrain, placement["name"] as String, caches)
         boxes += odef.get("boxes", 0) as int
     return {"grass": grass, "collision_boxes": boxes, "unread_lines": unread}
+
+
+## A material named after its own texture, as Blender's Ogre exporter writes them, or empty.
+static func _texface(name: String) -> Dictionary:
+    var at: int = name.rfind(TEXFACE_MARK)
+    if at < 0:
+        return {}
+    var file: String = name.substr(at + TEXFACE_MARK.length())
+    if file.is_empty():
+        return {}
+    return {"textures": PackedStringArray([file]), "alpha": false, "lit": true,
+            "scale": Vector2.ONE}
 
 
 ## The caches one build shares: definitions, meshes and the directory's materials. Shared with
@@ -245,6 +260,12 @@ static func _material(
     var material: StandardMaterial3D = StandardMaterial3D.new()
     material.albedo_color = Color(0.72, 0.70, 0.68)
     var declared: Dictionary = (state["materials"] as Dictionary).get(name, {}) as Dictionary
+    if declared.is_empty():
+        # Blender's Ogre exporter names a material after the texture it was painted with:
+        # `Material.005/TEXFACE/asphaltshingles.dds`. No `.material` script declares those — the
+        # name *is* the declaration — and Starling Island ships meshes that use them, which drew
+        # untextured while the houses beside them were fine.
+        declared = _texface(name)
     if not declared.is_empty():
         var textures: PackedStringArray = declared["textures"] as PackedStringArray
         if textures.size() > 0:
