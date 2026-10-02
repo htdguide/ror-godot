@@ -93,16 +93,52 @@ static func material_for(
         # such key, and only the Ogre scripts beside it carry one.
         material.albedo_color = declared["diffuse"] as Color
     # A specular map is authored data, so it is used where the mod supplies one and the
-    # class default stands in where it does not.
-    if files.size() > 2:
+    # class default stands in where it does not. **Which slot it is in depends on the effect** —
+    # see `_specular_slot`.
+    var slot: int = _specular_slot(declared.get("effect", "") as String)
+    if slot >= 0 and files.size() > slot:
         var roughness: Texture2D = _roughness_texture(
-            RorContentPath.find(files[2], mod_dir), dds_reader, textures
+            RorContentPath.find(files[slot], mod_dir), dds_reader, textures
         )
         if roughness != null:
             material.roughness_texture = roughness
             material.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
             material.roughness = 1.0
     return material
+
+
+## Which of a managed material's textures is its specular map.
+##
+## The slot is not fixed: upstream reads a different argument per effect —
+## `RigDef_Parser.cpp`, `ParseManagedMaterials`:
+##
+##     if (managed_mat.type == MESH_STANDARD || managed_mat.type == MESH_TRANSPARENT)
+##     {
+##         if (m_num_args > 3) { managed_mat.specular_map = this->GetArgManagedTex(3); }
+##     }
+##     else if (... FLEXMESH_STANDARD || ... FLEXMESH_TRANSPARENT)
+##     {
+##         if (m_num_args > 3) { managed_mat.damaged_diffuse_map = this->GetArgManagedTex(3); }
+##         if (m_num_args > 4) { managed_mat.specular_map        = this->GetArgManagedTex(4); }
+##     }
+##
+## A flexmesh carries a damaged diffuse between the two and a mesh does not, so counted from the
+## first texture the specular map is at 2 for one and **1** for the other. This project read 2 for
+## both, so every `mesh_standard` material in the library lost its specular map: the hero truck's
+## rims, its steering wheel, its tacho, its speedo and its flares all drew as flat matte shapes,
+## which is what "the rims are black plate caps" looks like. 11 materials across this library
+## declare one that way.
+##
+## An Ogre `.material` script has no such convention — its textures are whatever `texture_unit`
+## lines it holds, in order — so nothing is assumed for one. 95 scripts here name three or more
+## textures and what the third is differs by author.
+static func _specular_slot(effect: String) -> int:
+    var kind: String = effect.to_lower()
+    if kind.begins_with("flexmesh_"):
+        return 2
+    if kind.begins_with("mesh_"):
+        return 1
+    return -1
 
 
 ## What class a material would be given, without building anything. For gates and tools.

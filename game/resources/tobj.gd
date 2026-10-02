@@ -13,14 +13,38 @@ extends RefCounted
 ## Keyword lines this recognises. Everything else that is not six numbers and a name is reported
 ## as unread rather than dropped silently.
 const VEGETATION: Array[String] = ["grass", "grass2"]
+## An object line's seventh field is a name, and what follows it on the same line is a type and
+## an instance name — upstream reads all three with one `sscanf`, `TObjFileFormat.cpp`:
+##
+##     sscanf(m_cur_line, "%f, %f, %f, %f, %f, %f, %s %s %s",
+##         &pos.x, &pos.y, &pos.z, &rot.x, &rot.y, &rot.z,
+##         odef.GetBuffer(), type.GetBuffer(), instance_name.GetBuffer());
+##
+## Taking the whole field as the name asked for an object definition called
+## `marina sale Marina_Wells`, which no file is.
+##
+## Some of those names are not object definitions at all. Upstream sorts them before anything
+## else is done with them — `IsActor()` and `IsRoad()` over the same list:
+const ACTOR_NAMES: Array[String] = ["truck", "truck2", "load", "machine", "boat"]
+const ROAD_NAMES: Array[String] = [
+    "road", "roadborderleft", "roadborderright", "roadborderboth",
+    "roadbridgenopillar", "roadbridge",
+]
+## And a block of road points, which are not object lines however much they look like them: six
+## numbers, then more numbers. 374 of Port Starling's 1502 "objects" were points inside one of
+## these, asking for definitions named `0`, `8` and `10`.
+const ROADS_BEGIN: String = "begin_procedural_roads"
+const ROADS_END: String = "end_procedural_roads"
 
 
-## Reads a .tobj. Returns {"error", "objects", "grass", "unread"}.
+## Reads a .tobj. Returns {"error", "objects", "grass", "actors", "roads", "unread"}.
 static func read(path: String) -> Dictionary:
     var out: Dictionary = {
         "error": "",
         "objects": [] as Array[Dictionary],
         "grass": [] as Array[Dictionary],
+        "actors": [] as Array[Dictionary],
+        "roads": [] as Array[Dictionary],
         "unread": PackedStringArray(),
     }
     var text: String = RorText.read(path)
@@ -29,12 +53,21 @@ static func read(path: String) -> Dictionary:
         return out
     var objects: Array[Dictionary] = []
     var grass: Array[Dictionary] = []
+    var actors: Array[Dictionary] = []
+    var roads: Array[Dictionary] = []
     var unread: PackedStringArray = PackedStringArray()
+    var in_roads: bool = false
     for raw_line: String in text.split("\n"):
         var line: String = RorText.strip_comment(raw_line)
         if line.is_empty():
             continue
         var keyword: String = line.get_slice(" ", 0).to_lower()
+        if keyword == ROADS_BEGIN:
+            in_roads = true
+            continue
+        if keyword == ROADS_END:
+            in_roads = false
+            continue
         if VEGETATION.has(keyword):
             grass.append(_grass(line))
             continue
@@ -42,7 +75,7 @@ static func read(path: String) -> Dictionary:
         if fields.size() < 7 or not fields[0].is_valid_float():
             unread.append(line)
             continue
-        objects.append({
+        var entry: Dictionary = {
             "position": Vector3(
                 fields[0].to_float(), fields[1].to_float(), fields[2].to_float()
             ),
@@ -51,9 +84,20 @@ static func read(path: String) -> Dictionary:
             "rotation": Vector3(
                 fields[3].to_float(), fields[4].to_float(), fields[5].to_float()
             ),
-            "name": fields[6].strip_edges(),
-        })
+            # The name alone. A type and an instance name may follow it on the same line.
+            "name": fields[6].strip_edges().get_slice(" ", 0),
+            "type": fields[6].strip_edges().get_slice(" ", 1),
+        }
+        var named: String = (entry["name"] as String).to_lower()
+        if in_roads or ROAD_NAMES.has(named):
+            roads.append(entry)
+        elif ACTOR_NAMES.has(named):
+            actors.append(entry)
+        else:
+            objects.append(entry)
     out["objects"] = objects
+    out["actors"] = actors
+    out["roads"] = roads
     out["grass"] = grass
     out["unread"] = unread
     return out

@@ -108,20 +108,27 @@ static func placements(terrain: RorTerrain) -> Array[Dictionary]:
 
 
 ## What the terrain asks for and this does not draw yet, as a line for a gate or a session to
-## report: vegetation, and collision boxes on object definitions.
+## report: vegetation, procedural roads, actor spawns, and collision boxes on object definitions.
 static func unbuilt(terrain: RorTerrain) -> Dictionary:
     var grass: int = 0
     var unread: int = 0
+    var roads: int = 0
+    var actors: int = 0
     for file: String in terrain.config["objects"] as PackedStringArray:
         var parsed: Dictionary = Tobj.read(terrain.directory.path_join(file))
         grass += (parsed["grass"] as Array[Dictionary]).size()
         unread += (parsed["unread"] as PackedStringArray).size()
+        roads += (parsed["roads"] as Array[Dictionary]).size()
+        actors += (parsed["actors"] as Array[Dictionary]).size()
     var boxes: int = 0
     var caches: Dictionary = state(terrain)
     for placement: Dictionary in placements(terrain):
         var odef: Dictionary = definition(terrain, placement["name"] as String, caches)
         boxes += odef.get("boxes", 0) as int
-    return {"grass": grass, "collision_boxes": boxes, "unread_lines": unread}
+    return {
+        "grass": grass, "collision_boxes": boxes, "unread_lines": unread,
+        "road_points": roads, "actor_spawns": actors,
+    }
 
 
 ## A material named after its own texture, as Blender's Ogre exporter writes them, or empty.
@@ -203,7 +210,15 @@ static func definition(terrain: RorTerrain, name: String, state: Dictionary) -> 
     var cache: Dictionary = state["definitions"] as Dictionary
     if cache.has(name):
         return cache[name] as Dictionary
-    var parsed: Dictionary = Odef.read(terrain.directory.path_join("%s.odef" % name))
+    # Through the content path, not the terrain's own folder. An object definition is content
+    # like any other and a terrain may name one it does not ship: Port Starling places
+    # `road-slab` 189 times, `road-park` 139, and signs, traffic lights and dock sections besides,
+    # every one of them in `resources/meshes` and none of them in the pack. Looked for only
+    # beside the terrain, 835 of its 1502 placements -- 56% of the map -- drew nothing at all,
+    # which is most of its roads.
+    var parsed: Dictionary = Odef.read(
+        RorContentPath.find("%s.odef" % name, terrain.directory)
+    )
     cache[name] = parsed
     return parsed
 

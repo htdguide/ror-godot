@@ -61,12 +61,23 @@ func run(_harness: Node) -> Dictionary:
     var listed: int = _object_lines(terrain)
     if listed == 0:
         return fail("%s lists no objects at all" % (terrain.config["objects"] as PackedStringArray))
+    # Every six-number line is accounted for, as one of the three things it can be. A `.tobj`
+    # mixes scenery with road points and actor spawns, and upstream sorts them before anything is
+    # done with them — `TObjFileFormat.cpp`'s `IsRoad()` and `IsActor()`. Counting only the
+    # scenery against every line would demand that road points be buildings; counting them all as
+    # scenery is what made 374 of Port Starling's lines ask for object definitions named `0`, `8`
+    # and `10`. So the sum is what has to match, and the split is reported.
     var placements: Array[Dictionary] = RorObjects.placements(terrain)
-    if placements.size() != listed:
+    var sorted: Dictionary = RorObjects.unbuilt(terrain)
+    var accounted: int = (
+        placements.size()
+        + (sorted["road_points"] as int) + (sorted["actor_spawns"] as int)
+    )
+    if accounted != listed:
         return fail(
-            "the object files hold %d object lines and the reader found %d"
-            % [listed, placements.size()],
-            placements.size() - listed
+            "the object files hold %d object lines and the reader accounted for %d"
+            % [listed, accounted],
+            accounted - listed
         )
 
     # Objects are drawn as `MultiMeshInstance3D` batches — one per mesh per tile — so what is
@@ -105,11 +116,11 @@ func run(_harness: Node) -> Dictionary:
     var built: int = places.size()
     root.queue_free()
 
-    var share: float = float(built) / float(maxi(listed, 1))
+    var share: float = float(built) / float(maxi(placements.size(), 1))
     if share < MIN_BUILT_SHARE:
         return fail(
             "%d of %d objects resolved to geometry (%.0f%%): the chain from the object file to a"
-            % [built, listed, share * 100.0] + " mesh is broken somewhere",
+            % [built, placements.size(), share * 100.0] + " mesh is broken somewhere",
             share
         )
     if triangles < MIN_TRIANGLES:
@@ -128,12 +139,12 @@ func run(_harness: Node) -> Dictionary:
             % built,
             textured
         )
-    var left: Dictionary = RorObjects.unbuilt(terrain)
     return ok(
         "%d of %d objects built, %d textured, %d triangles; not drawn yet: %d vegetation layers,"
-        % [built, listed, textured, triangles, left["grass"] as int]
-        + " %d collision boxes, %d unread lines"
-        % [left["collision_boxes"] as int, left["unread_lines"] as int],
+        % [built, placements.size(), textured, triangles, sorted["grass"] as int]
+        + " %d collision boxes, %d road points, %d actor spawns, %d unread lines"
+        % [sorted["collision_boxes"] as int, sorted["road_points"] as int,
+           sorted["actor_spawns"] as int, sorted["unread_lines"] as int],
         built
     )
 

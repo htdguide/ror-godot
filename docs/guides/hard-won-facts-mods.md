@@ -254,3 +254,43 @@ See `hard-won-facts.md` for the solver, the terrain, the formats and the gate di
   `S1024.dds` declares eleven levels in a file exactly one level long. It does not matter for an
   uncompressed image, which can have its mipmaps generated, which is why only block-compressed
   files are held to their header.
+- **An object definition is content like any other, and must be looked for the way all content
+  is.** `.odef` lookup went to the terrain's own folder alone, and a map names a great many it
+  does not ship: Port Starling places `road-slab` 189 times and `road-park` 139, plus signs,
+  traffic lights and dock sections, every one of them in `resources/meshes`. That alone is why
+  "some of the roads are visible and some are not".
+- **A `.tobj` is not a list of buildings.** It mixes scenery with actor spawn points and with
+  blocks of procedural road points, and upstream sorts them before anything else happens —
+  `TObjFileFormat.cpp` reads each line as `odef`, `type`, `instance_name` with one `sscanf`
+  (`"%f, %f, %f, %f, %f, %f, %s %s %s"`), then asks `IsRoad()` and `IsActor()` over its own name
+  lists: `truck`, `truck2`, `load`, `machine`, `boat` are actors; `road`, `roadborderleft/right/
+  both`, `roadbridge`, `roadbridgenopillar` are roads. Read as scenery, a road point asks for an
+  object definition named `0`, `8` or `10`, and a marina asks for one named `marina sale
+  Marina_Wells`.
+- **Together those two cost 56% of Port Starling.** 835 of its 1502 placements drew nothing: 374
+  road points inside `begin_procedural_roads` blocks, 8 actor spawns written with a type and an
+  instance name, and the rest definitions the map names and does not ship. 1117 draw now, and the
+  27 still missing are `2af11UID-mc_tree01`, whose `.odef` the tree pack does not contain while it
+  ships `mc_tree02` through `mc_tree06` — upstream draws nothing for it either, `FetchODef`
+  returns null.
+- **A managed material's specular map is not always in the same slot.** `RigDef_Parser.cpp`:
+  `mesh_standard` and `mesh_transparent` read it from argument 3, `flexmesh_standard` and
+  `flexmesh_transparent` from argument 4, because a flexmesh carries a damaged diffuse between the
+  two. Counted from the first texture that is slot 1 and slot 2. This project read 2 for both, so
+  every `mesh_standard` material lost its specular map — 11 across this library, among them the
+  hero truck's rims, steering wheel, tacho, speedo and flares, which drew as flat matte shapes.
+  Reported as "the rims are just black plate caps": the rim texture really is near-black, 128 x 64
+  of dark steel with two bolt heads, so the colour was right and the highlight was missing.
+- **A mesh file can simply be truncated.** NhelensGrass's `a1da0UID-kwhale.mesh` declares 110,924
+  bytes in its own M_MESH chunk and is 106,944 bytes long: 3,980 short. It reads as 988 shared
+  vertices and no submeshes. That is a broken file, not a misread line, and the two look identical
+  from the outside — which is why `every_object_line_is_read_as_what_it_is` counts them apart.
+- **A specular map read for the first time is a specular map that has never been decompressed.**
+  Putting `mesh_standard`'s specular map in the slot upstream puts it in meant those maps reached
+  `roughness_from_specular` for the first time, block-compressed, and `get_pixel` on a compressed
+  image returns black and logs "Can't get_pixel() on compressed image, sorry." — **per pixel**. A
+  single 512-square map is a quarter of a million lines; one suite run wrote 72 MB of it and bash
+  died collecting the output with `xrealloc: cannot allocate 18446744071562067968 bytes`, which is
+  a negative 32-bit size cast to `size_t`. The derived roughness would have been uniformly wrong
+  rather than absent, which no gate asking "is there a roughness texture" can see. Decompress
+  first.

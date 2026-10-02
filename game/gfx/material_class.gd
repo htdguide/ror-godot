@@ -66,6 +66,15 @@ static func apply(material: StandardMaterial3D, class_name_key: String) -> void:
 ## measured reflectance, and taken literally they produce mirror-finish panels next to
 ## chalk.
 static func roughness_from_specular(specular: Image) -> Image:
+    # A block-compressed source has to be decompressed first. `get_pixel` on one returns black
+    # and logs "Can't get_pixel() on compressed image, sorry." — per pixel, which for a single
+    # 512-square map is a quarter of a million lines. Reading a `mesh_standard` material's
+    # specular map from the slot upstream puts it in meant these maps arrived here compressed for
+    # the first time, and one suite run wrote 72 MB of that before bash gave up allocating.
+    if specular.is_compressed():
+        specular = specular.duplicate() as Image
+        if specular.decompress() != OK:
+            return Image.create(1, 1, false, Image.FORMAT_R8)
     var out: Image = Image.create(
         specular.get_width(), specular.get_height(), false, Image.FORMAT_R8
     )
