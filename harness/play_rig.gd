@@ -273,8 +273,14 @@ func _apply_weather(name: String) -> void:
 
 
 func _screenshot() -> void:
+    # Named by the clock, not by a counter that restarts with the session.
+    #
+    # `play-0.png` was overwritten by every new window, so a screenshot taken to report a bug was
+    # destroyed by the next session opened to look at it — which happened: three shots of a
+    # reported fault came back as one, and the other two were from hours earlier.
+    var stamp: String = Time.get_datetime_string_from_system(false, false).replace(":", "")
     var path: String = HarnessCapture.resolve_dir("human").path_join(
-        "play-%d.png" % _shots
+        "play-%s-%d.png" % [stamp.replace("T", "-"), _shots]
     )
     var error: String = HarnessCapture.capture_png(get_viewport(), path)
     if error != "":

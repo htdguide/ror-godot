@@ -347,3 +347,16 @@ this one hit the 400-line cap, and they are the area this project has been wrong
 - **A wheel section is not always `meshwheels`.** The Mazda's wheels are all `flexbodywheels`,
   which carries the same row as `meshwheels2` and differs only in that its tyre deforms with the
   body. Unparsed, the vehicle built 14 parts and zero wheels and sat on the road looking flat.
+- **The flexbody rotation order is an open question, and upstream's answer is not the answer.**
+  Upstream composes Z, then Y, then X (`FlexFactory.cpp:91-93`, and `ActorSpawner.cpp:1681-1683`
+  for props); this project uses `Basis.from_euler`, whose default is YXZ. They agree whenever only
+  one axis is turned, which covers the hero truck. Changing to upstream's order was tried and
+  reverted: it does not fix the Mazda 626 — whose `270, 180, 180` draws along the wrong axis under
+  either order — and it breaks the hero truck, whose steering column stops pointing down and fails
+  `props_sit_in_the_vehicle`. So a second convention in this pipeline cancels YXZ, and finding it
+  is the real task. Measured: the Mazda's nodes span 4.54 x 1.62 x 1.70 m, which is a car; its
+  drawn meshes span 4.26 x 2.33 x 4.54 under YXZ and 4.26 x 1.76 x 5.85 under ZYX. Every flexbody
+  frame has determinant +1, so it is not the mirrored-basis fault.
+- **A screenshot key that counts from zero destroys the evidence it was pressed to capture.**
+  `play-0.png` was overwritten by every new session, so three shots of a reported fault came back
+  as one and two stale ones from hours earlier. Named by the clock now.

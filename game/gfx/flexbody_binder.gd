@@ -45,6 +45,26 @@ static func placement(nodes: PackedVector3Array, entry: Dictionary) -> Transform
     return Transform3D(axes * authored, position)
 
 
+## **An open question, with the evidence so far, because the obvious answer is wrong.**
+##
+## Upstream composes the authored rotation Z, then Y, then X — `FlexFactory.cpp:91-93` for
+## flexbodies and `ActorSpawner.cpp:1681-1683` for props, both the same order. `Basis.from_euler`
+## above uses Godot's default, which is YXZ. The two agree whenever only one axis is turned, which
+## is true of every rotation in the hero truck except one.
+##
+## Changing it to upstream's order was tried and reverted. It does **not** fix the vehicle that
+## prompted it — the Mazda 626, which states `270, 180, 180` on every flexbody and draws with its
+## length along the wrong axis under either order — and it **breaks** one that works: the hero
+## truck's steering column stops pointing downwards and `props_sit_in_the_vehicle` fails.
+##
+## So there is a second convention somewhere in this pipeline that the YXZ order happens to
+## cancel, and finding it is the actual task. Measured, for whoever picks this up: the Mazda's
+## nodes span 4.54 x 1.62 x 1.70 m, which is a car; its drawn meshes span 4.26 x 2.33 x 4.54 under
+## YXZ and 4.26 x 1.76 x 5.85 under ZYX, and neither is a car. The flexbody frames are proper
+## rotations in both cases — every determinant is +1, so this is not the mirrored-basis fault that
+## bit this project before.
+
+
 ## Returns {"triads": int, "vertices": int, "shared": float} for one placed mesh.
 ## `shared` is the average number of vertices per triad, which is what decides whether
 ## bone-per-triad is cheaper than streaming vertices.
