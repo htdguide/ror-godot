@@ -93,7 +93,16 @@ static func _shape_of(
     if shapes.has(name):
         return shapes[name] as Array[Dictionary]
     var points: PackedVector3Array = PackedVector3Array()
-    for file: String in definition["meshes"] as PackedStringArray:
+    # The hull the author shipped, where there is one. An `.odef`'s `beginmesh` block is a
+    # collision mesh — upstream puts it in `collision_meshes` and never draws it — so Starling
+    # Island's `firehousebox.mesh` and `haus5Kol.mesh` are a statement about what is solid, made
+    # by the person who built the building. Falling back to the visual mesh is this project's own
+    # addition and the reason it exists: La Paz declares neither a box nor a hull for anything, and
+    # its roadside poles were scenery a truck drove through.
+    var from: PackedStringArray = definition["collision_meshes"] as PackedStringArray
+    if from.is_empty():
+        from = definition["meshes"] as PackedStringArray
+    for file: String in from:
         var mesh: ArrayMesh = RorObjects.mesh_of(terrain, file, state)
         if mesh == null:
             continue

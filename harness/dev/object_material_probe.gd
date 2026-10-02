@@ -33,12 +33,18 @@ func _report(wanted: String, terrain: RorTerrain) -> void:
     # material name -> how many surfaces of it came out bare.
     var bare: Dictionary = {}
     var seen_meshes: Dictionary = {}
+    # mesh file -> the material names of its own bare surfaces, so a half-textured building can
+    # be named rather than counted.
+    var by_mesh: Dictionary = {}
+    # mesh file -> how many surfaces it has, textured or not.
+    var surfaces: Dictionary = {}
     for placement: Dictionary in RorObjects.placements(terrain):
         var odef: Dictionary = RorObjects.definition(
             terrain, placement["name"] as String, caches
         )
         if (odef.get("error", "") as String) != "":
             continue
+        # Drawn geometry only: a `beginmesh` hull is collision and is never rendered.
         for mesh_file: String in odef["meshes"] as PackedStringArray:
             if seen_meshes.has(mesh_file):
                 continue
@@ -56,6 +62,7 @@ func _report(wanted: String, terrain: RorTerrain) -> void:
             for submesh: Dictionary in read["submeshes"] as Array:
                 if (submesh["positions"] as PackedVector3Array).is_empty():
                     continue
+                surfaces[mesh_file] = (surfaces.get(mesh_file, 0) as int) + 1
                 var name: String = submesh["material"] as String
                 # The loader's own material, so this reports what the game draws rather than
                 # what this script thinks the game ought to draw.
@@ -64,6 +71,12 @@ func _report(wanted: String, terrain: RorTerrain) -> void:
                     textured += 1
                     continue
                 bare[name] = (bare.get(name, 0) as int) + 1
+                if not by_mesh.has(mesh_file):
+                    by_mesh[mesh_file] = PackedStringArray()
+                var listed: PackedStringArray = by_mesh[mesh_file] as PackedStringArray
+                if not listed.has(name):
+                    listed.append(name)
+                    by_mesh[mesh_file] = listed
 
     var bare_total: int = 0
     for count: int in bare.values():
@@ -81,6 +94,12 @@ func _report(wanted: String, terrain: RorTerrain) -> void:
         print("    %4d x  %-40s %s" % [bare[name], name, _why(name, terrain, declared)])
     if names.size() > WORST:
         print("    ... and %d more material names" % (names.size() - WORST))
+    for mesh_file: String in by_mesh.keys():
+        var listed: PackedStringArray = by_mesh[mesh_file] as PackedStringArray
+        print(
+            "    %-34s %d of %d surfaces bare: %s"
+            % [mesh_file, listed.size(), surfaces.get(mesh_file, 0), ", ".join(listed)]
+        )
 
 
 ## Why one material name came out with no texture, in the terms the loader itself works in.

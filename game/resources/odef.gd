@@ -2,20 +2,33 @@ class_name Odef
 extends RefCounted
 ## Reads a Rigs of Rods object definition: which meshes a named object is, and how big.
 ##
-## The format is positional at the top — mesh filename, then a scale triple — and then a series
-## of small blocks: `beginmesh`/`endmesh` adds another mesh to the same object, `beginbox`/
-## `endbox` gives it a collision box, and a handful of one-word lines set flags.
+## The format is positional at the top — an optional obsolete `LOD` line, a mesh filename, then a
+## scale triple — and then a series of small blocks: `beginbox`/`endbox` gives the object a
+## collision box, `beginmesh`/`endmesh` gives it a collision **mesh**, and a handful of one-word
+## lines set flags.
 ##
-## Only the geometry is read here. Collision boxes are reported so that a terrain's solid parts
-## can be counted honestly and left for the work that will hand them to the solver; the flags
-## are not read at all.
+## **`beginmesh` is not more geometry to draw.** Upstream puts it straight into
+## `collision_meshes` — `ODefFileFormat.cpp`, at `endmesh`:
+##
+##     m_def->collision_meshes.emplace_back(
+##         m_ctx.cbox_mesh_name, m_ctx.header_scale, m_ctx.cbox_groundmodel_name);
+##
+## so the only thing an object draws is its header mesh. Read as drawn geometry instead, those
+## hulls were rendered: Starling Island's `firehousebox.mesh`, `store02box.mesh`,
+## `townhouse01box.mesh`, `haus5Kol.mesh` and `haus6Kol.mesh` stood over their buildings as
+## untextured shells — a house with no texture, or half a one where the hull covered part of it —
+## and every building on the map paid for a second mesh it should never have drawn.
+##
+## Only the geometry is read here. Collision boxes are counted so that a terrain's solid parts can
+## be counted honestly; the flags are not read at all.
 
 
-## Reads an .odef. Returns {"error", "meshes", "scale", "boxes"}.
+## Reads an .odef. Returns {"error", "meshes", "collision_meshes", "scale", "boxes"}.
 static func read(path: String) -> Dictionary:
     var out: Dictionary = {
         "error": "",
         "meshes": PackedStringArray(),
+        "collision_meshes": PackedStringArray(),
         "scale": Vector3.ONE,
         "boxes": 0,
     }
@@ -24,6 +37,7 @@ static func read(path: String) -> Dictionary:
         out["error"] = "the object definition at %s could not be read" % path
         return out
     var meshes: PackedStringArray = PackedStringArray()
+    var hulls: PackedStringArray = PackedStringArray()
     var boxes: int = 0
     var seen: int = 0
     var in_mesh: bool = false
@@ -52,7 +66,7 @@ static func read(path: String) -> Dictionary:
                 continue
             "mesh":
                 if in_mesh:
-                    meshes.append(line.substr(line.find(" ") + 1).strip_edges())
+                    hulls.append(line.substr(line.find(" ") + 1).strip_edges())
                 continue
         if seen == 0:
             meshes.append(line)
@@ -62,6 +76,7 @@ static func read(path: String) -> Dictionary:
             out["scale"] = RorText.vector3(line)
             seen += 1
     out["meshes"] = _drawable(meshes)
+    out["collision_meshes"] = _drawable(hulls)
     out["boxes"] = boxes
     if (out["meshes"] as PackedStringArray).is_empty():
         out["error"] = "%s names no mesh" % path.get_file()

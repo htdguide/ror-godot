@@ -217,3 +217,21 @@ See `hard-won-facts.md` for the solver, the terrain, the formats and the gate di
   block; it is read by nothing here either. It is the first thing to reach for in PLAN 0.13, because
   it is distance geometry that already belongs to the content rather than something this project
   would have to invent.
+- **An `.odef`'s `beginmesh` block is a collision mesh, not more geometry to draw.** Upstream puts
+  it straight into `collision_meshes` — `ODefFileFormat.cpp`, at `endmesh`:
+  `m_def->collision_meshes.emplace_back(m_ctx.cbox_mesh_name, m_ctx.header_scale,
+  m_ctx.cbox_groundmodel_name);` — so the only thing an object renders is its header mesh. Read as
+  drawn geometry, those hulls were rendered: Starling Island's `firehousebox.mesh`,
+  `store02box.mesh`, `townhouse01box.mesh`, `haus5Kol.mesh` and `haus6Kol.mesh` stood over their
+  buildings as untextured shells, which is a house with no texture, or half of one where the hull
+  covered only part. 522 of Port Starling's 1189 object instances were hulls; La Paz drew 99 of
+  them, one per pole. Their materials are `Material.001`, `Material.004` and `default` — Blender's
+  defaults, declared in no script, because nobody was ever meant to see them, and chasing those
+  names through the material scripts was chasing a texture that does not exist for a surface that
+  should not be drawn.
+- **Those hulls are the right collision geometry.** They are the building author's own statement
+  about what is solid, which is strictly better than voxelising the visual mesh, and taking them
+  where they exist cut La Paz from 396 derived boxes to 297 while the 70 km/h crash test stopped
+  0.53 m short of the far side instead of 0.91 m. The fallback to the visual mesh stays, because
+  La Paz declares neither a box nor a hull for anything and its poles were scenery a truck drove
+  through.
