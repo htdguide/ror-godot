@@ -11,13 +11,14 @@ extends Node
 ## the tree under GPL and therefore present on any clone.
 const DEFAULT_MAP: String = "simple2"
 
-const HUD_MARGIN: int = 12
-const HUD_FONT_SIZE: int = 15
 const HUD_REFRESH_FRAMES: int = 10
 
 var _camera: Camera3D
 var _world: Node3D
 var _hud: Label
+## What is loaded now, so the menu can mark it and a map change knows what to rebuild.
+var _map_name: String = ""
+var _vehicle_name: String = ""
 var _weather_names: Array[String] = []
 var _weather_index: int = 0
 var _looking: bool = false
@@ -44,8 +45,11 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
     for key: String in WeatherCfg.PRESETS.keys():
         _weather_names.append(key)
     _weather_index = maxi(0, _weather_names.find(weather))
-    _hud = _build_hud()
+    _map_name = Harness.args.get_string("terrain-dir", DEFAULT_MAP)
+    _hud = PlayHud.build(self)
     if not vehicle.is_empty():
+        # `--vehicle <dir>:<file>` is how a session names one; the library keys on the basename.
+        _vehicle_name = Harness.args.get_string("vehicle", "").get_slice(":", 1).get_basename()
         var drive: PlayDrive = PlayDrive.new()
         var error: String = drive.setup(vehicle)
         if error != "":
@@ -137,7 +141,8 @@ func _grow_vegetation(loaded: RorTerrain) -> void:
 ## content — or a path to a directory holding one. A terrain that will not load is reported and
 ## the library is listed, rather than opening a window onto nothing.
 func _load_terrain() -> RorTerrain:
-    var wanted: String = Harness.args.get_string("terrain-dir", DEFAULT_MAP)
+    # The map the menu last asked for, or the one the command line named.
+    var wanted: String = _map_name
     var loaded: Dictionary = RorTerrainLibrary.load_named(wanted)
     if (loaded["error"] as String) != "":
         printerr("PLAY  %s" % loaded["error"])
@@ -145,21 +150,6 @@ func _load_terrain() -> RorTerrain:
             printerr("PLAY    %s (%s)" % [summary["name"], summary["title"]])
         return null
     return loaded["terrain"] as RorTerrain
-
-
-func _build_hud() -> Label:
-    var layer: CanvasLayer = CanvasLayer.new()
-    layer.name = "HUD"
-    var label: Label = Label.new()
-    label.name = "HudText"
-    label.position = Vector2(HUD_MARGIN, HUD_MARGIN)
-    label.add_theme_font_size_override("font_size", HUD_FONT_SIZE)
-    label.add_theme_color_override("font_shadow_color", Color.BLACK)
-    label.add_theme_constant_override("shadow_offset_x", 1)
-    label.add_theme_constant_override("shadow_offset_y", 1)
-    layer.add_child(label)
-    add_child(layer)
-    return label
 
 
 func _print_help() -> void:
@@ -188,7 +178,7 @@ func _process(delta: float) -> void:
         _view.fly(delta)
     _frames += 1
     if _hud.visible and _frames % HUD_REFRESH_FRAMES == 0:
-        _hud.text = _hud_text()
+        _hud.text = PlayHud.text(get_viewport(), _weather_names[_weather_index], _footer())
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -294,33 +284,6 @@ func _screenshot() -> void:
     print("PLAY  wrote " + path)
 
 
-func _hud_text() -> String:
-    var viewport_rid: RID = get_viewport().get_viewport_rid()
-    return (
-        "%s | %s | %s\n%.1f fps  %.2f ms\ndraw calls %d  primitives %d\nvideo %.0f MB  texture %.0f MB\n%s"
-        % [
-            RenderingServer.get_video_adapter_name(),
-            RenderingServer.get_current_rendering_driver_name(),
-            _weather_names[_weather_index],
-            Performance.get_monitor(Performance.TIME_FPS),
-            Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
-            RenderingServer.viewport_get_render_info(
-                viewport_rid,
-                RenderingServer.VIEWPORT_RENDER_INFO_TYPE_VISIBLE,
-                RenderingServer.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME
-            ),
-            RenderingServer.viewport_get_render_info(
-                viewport_rid,
-                RenderingServer.VIEWPORT_RENDER_INFO_TYPE_VISIBLE,
-                RenderingServer.VIEWPORT_RENDER_INFO_PRIMITIVES_IN_FRAME
-            ),
-            Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0,
-            Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0,
-            _footer(),
-        ]
-    )
-
-
 func _footer() -> String:
     var keys: String = (
         "click to look  WASD move  Q/E down/up  Shift boost  F1 hud  F2 weather"
@@ -346,6 +309,83 @@ func _build_menu(weather: String) -> PlayMenu:
         _camera,
         weather,
         func(name: String) -> void: _apply_weather(name),
-        func() -> void: get_tree().quit(0)
+        func() -> void: get_tree().quit(0),
+        func(name: String) -> void: _change_map(name),
+        func(name: String) -> void: _change_vehicle(name)
     )
+    menu.set_loaded(_map_name, _vehicle_name)
     return menu
+
+
+## Puts another vehicle on the map, where this one is standing.
+##
+## The map stays: a session changing cars is comparing them on the same ground, and reloading a
+## terrain to do it would cost seconds and lose where the person was standing. The new vehicle
+## takes over the old one's place and heading, and **that place becomes its spawn**, so the reset
+## key puts it back here rather than at the map's start — which is what a person means when they
+## pick a car at the top of a hill.
+func _change_vehicle(name: String) -> void:
+    var entry: Dictionary = RorVehicleLibrary.find(name)
+    if entry.is_empty():
+        printerr("PLAY  no vehicle named " + name)
+        return
+    var built: Dictionary = VehicleBuilder.build(
+        entry["directory"] as String, entry["file"] as String
+    )
+    if (built.get("error", "") as String) != "":
+        printerr("PLAY  %s cannot be built: %s" % [name, built["error"]])
+        return
+
+    # Where the old one was, before anything is taken apart. With no vehicle yet, the terrain's
+    # own start is the only place there is.
+    var at: Vector3 = _drive.spawn if _drive != null else Vector3.ZERO
+    var heading: float = _drive.spawn_heading if _drive != null else 0.0
+    if _drive != null:
+        at = ActorFrame.of(_drive.solver.get_positions(), _drive.truck.camera_nodes).origin
+        heading = RigBuilder.heading_of(
+            _drive.solver.get_positions(), _drive.truck.camera_nodes
+        )
+        var old_root: Node3D = _drive.vehicle_root()
+        if old_root != null and is_instance_valid(old_root):
+            _world.remove_child(old_root)
+            old_root.queue_free()
+
+    var drive: PlayDrive = PlayDrive.new()
+    _world.add_child(built["root"] as Node3D)
+    var error: String = drive.setup(built)
+    if error != "":
+        printerr("PLAY  %s cannot be driven: %s" % [name, error])
+        return
+    _drive = drive
+    _drive.spawn = at
+    _drive.spawn_heading = heading
+    _vehicle_name = name
+    _view.set_mode(PlayCamera.Mode.CHASE)
+    if _terrain != null and _terrain.get("data") != null:
+        error = _drive.use_terrain(_terrain.get("data"))
+        if error != "":
+            printerr("PLAY  the terrain could not be handed to %s: %s" % [name, error])
+    else:
+        _drive.respawn()
+    if _menu != null:
+        _menu.set_loaded(_map_name, _vehicle_name)
+    print("PLAY  driving %s" % name)
+
+
+## Loads another map, keeping the vehicle. The terrain, its scenery and its grass all go.
+func _change_map(name: String) -> void:
+    if name == _map_name:
+        return
+    _map_name = name
+    for child: Node in _world.get_children():
+        if child.name.begins_with("RorObjects") or child == _terrain:
+            _world.remove_child(child)
+            child.queue_free()
+    if _vegetation != null:
+        _vegetation.clear()
+        _vegetation = null
+    _terrain = null
+    _build_terrain()
+    if _menu != null:
+        _menu.set_loaded(_map_name, _vehicle_name)
+    print("PLAY  loading %s" % name)

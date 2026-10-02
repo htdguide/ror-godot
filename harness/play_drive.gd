@@ -45,6 +45,17 @@ func setup(built: Dictionary) -> String:
     return ""
 
 
+## The node this vehicle draws through, for a session swapping one vehicle for another.
+func vehicle_root() -> Node3D:
+    return _built.get("root", null) as Node3D
+
+
+## Puts the rig back at its spawn. The menu changes vehicles by placing the new one where the old
+## one stood and calling this, so a swap and a reset are the same operation.
+func respawn() -> void:
+    _respawn()
+
+
 ## The driver's eye in the vehicle's own local frame, for a camera to sit at. The cinecam is in
 ## rig space, and the vehicle is drawn in its own, so the frame it was built with converts.
 func eye() -> Vector3:

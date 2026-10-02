@@ -128,6 +128,17 @@ func _ring(at: Vector3) -> Dictionary:
 
 
 ## How far vegetation is drawn now, and a way to change it while a session runs.
+## Takes every tile down. A session changing maps keeps the vegetation object and refills it from
+## the new terrain, because the layers, the ranges and the budget belong to the session rather
+## than to the map it happens to be showing.
+func clear() -> void:
+    for key: Vector2i in _tiles.keys():
+        var node: Node = _tiles[key] as Node
+        if node != null and is_instance_valid(node):
+            node.queue_free()
+    _tiles.clear()
+
+
 func range_m() -> float:
     return minf(_range_m(), _range_limit_m)
 

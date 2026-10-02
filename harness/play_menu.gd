@@ -1,7 +1,12 @@
 class_name PlayMenu
 extends CanvasLayer
-## The settings panel: everything about the world a person wants to change while driving, in one
+## The pause panel: what to drive, where to drive it, and everything about the world, in one
 ## place, opened with Esc.
+##
+## Three tabs, because they are three different questions. **Drive** is the vehicle list, **World**
+## is the map list, and **Settings** is everything about the scene a session can retune. The
+## content tabs are built by `ContentBrowser` from what is actually on the disk; this file owns
+## the panel they sit in and nothing about what is in them.
 ##
 ## Weather, gravity, the sun, the sky, how far you can see, the fog that closes it, the grass, the
 ## vehicle's lamps. Everything here changes the world the vehicle is in rather than the vehicle
@@ -36,6 +41,8 @@ const PANEL_MAX_HEIGHT: int = 720
 
 var _panel: PanelContainer
 var _rows: VBoxContainer
+var _vehicle_rows: VBoxContainer = null
+var _map_rows: VBoxContainer = null
 var _environment: Environment
 var _sun: DirectionalLight3D
 var _drive: PlayDrive
@@ -45,6 +52,13 @@ var _weather_names: PackedStringArray = PackedStringArray()
 var _weather_index: int = 0
 var _on_weather: Callable
 var _on_quit: Callable
+var _on_map: Callable
+var _on_vehicle: Callable
+## What is loaded now, so the lists can mark it. Set by the session, which is the only thing that
+## knows: the panel is told rather than guessing from the scene.
+var _current_map: String = ""
+var _current_vehicle: String = ""
+var _tabs: TabContainer = null
 
 
 ## Builds the panel, hidden. `on_weather` is called with a preset name when the weather changes,
@@ -57,7 +71,9 @@ func setup(
     camera: Camera3D,
     weather: String,
     on_weather: Callable,
-    on_quit: Callable
+    on_quit: Callable,
+    on_map: Callable = Callable(),
+    on_vehicle: Callable = Callable()
 ) -> void:
     _environment = environment
     _sun = sun
@@ -65,6 +81,8 @@ func setup(
     _camera = camera
     _on_weather = on_weather
     _on_quit = on_quit
+    _on_map = on_map
+    _on_vehicle = on_vehicle
     for name: String in WeatherCfg.PRESETS.keys():
         _weather_names.append(name)
     _weather_index = maxi(0, _weather_names.find(weather))
@@ -81,6 +99,8 @@ func set_vegetation(vegetation: RorVegetation) -> void:
 
 func toggle() -> void:
     _panel.visible = not _panel.visible
+    if _panel.visible:
+        _rebuild_content()
     # The mouse has to come back before anything can be clicked: a captured cursor is how a
     # driver looks around, and a panel nobody can click is a panel nobody can use.
     if _panel.visible:
@@ -113,15 +133,13 @@ func _build() -> void:
         margin.add_theme_constant_override("margin_%s" % side, 16)
     _panel.add_child(margin)
 
-    var scroll: ScrollContainer = ScrollContainer.new()
-    scroll.custom_minimum_size = Vector2(PANEL_WIDTH, PANEL_MAX_HEIGHT)
-    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-    margin.add_child(scroll)
+    _tabs = TabContainer.new()
+    _tabs.custom_minimum_size = Vector2(PANEL_WIDTH, PANEL_MAX_HEIGHT)
+    margin.add_child(_tabs)
 
-    _rows = VBoxContainer.new()
-    _rows.add_theme_constant_override("separation", 6)
-    _rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    scroll.add_child(_rows)
+    _vehicle_rows = _tab("Drive")
+    _map_rows = _tab("World")
+    _rows = _tab("Settings")
 
     _title()
     _world_section()
@@ -133,6 +151,49 @@ func _build() -> void:
             close()
         elif _on_quit.is_valid():
             _on_quit.call()
+    )
+
+
+## One scrolling tab, and the rows inside it.
+func _tab(title: String) -> VBoxContainer:
+    var scroll: ScrollContainer = ScrollContainer.new()
+    scroll.name = title
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    _tabs.add_child(scroll)
+    var rows: VBoxContainer = VBoxContainer.new()
+    rows.add_theme_constant_override("separation", 6)
+    rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    scroll.add_child(rows)
+    return rows
+
+
+## Says what is loaded now and rebuilds the two content lists around it.
+##
+## Rebuilt rather than updated, and rebuilt every time the panel opens: content is the filesystem,
+## so a pack unpacked while the window was running should appear without restarting the session.
+## Nineteen buttons is not worth the machinery of keeping a list in step with a directory.
+func set_loaded(map_name: String, vehicle_name: String) -> void:
+    _current_map = map_name
+    _current_vehicle = vehicle_name
+    _rebuild_content()
+
+
+func _rebuild_content() -> void:
+    if _vehicle_rows == null or _map_rows == null:
+        return
+    for rows: VBoxContainer in [_vehicle_rows, _map_rows]:
+        for child: Node in rows.get_children():
+            rows.remove_child(child)
+            child.queue_free()
+    ContentBrowser.vehicles(_vehicle_rows, _current_vehicle, func(name: String) -> void:
+        if _on_vehicle.is_valid():
+            _on_vehicle.call(name)
+        close()
+    )
+    ContentBrowser.maps(_map_rows, _current_map, func(name: String) -> void:
+        if _on_map.is_valid():
+            _on_map.call(name)
+        close()
     )
 
 

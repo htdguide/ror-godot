@@ -212,7 +212,13 @@ func _parse_row(line: String) -> void:
             _parse_prop(line)
         "managedmaterials":
             _parse_managed_material(line)
-        "meshwheels2", "meshwheels":
+        # `flexbodywheels` carries the same row as `meshwheels2` — radius, rim radius, width,
+        # rays, two nodes, a reference node, braked, propulsed, an arm node, mass, the tyre and
+        # rim rates, a side and two mesh names — and differs in that its tyre deforms with the
+        # body rather than being a rigid mesh. The rows are read the same way; what upstream does
+        # differently with them is a flex question and not a parsing one. Without this the Mazda
+        # 626, whose wheels are all `flexbodywheels`, built 14 parts and no wheels at all.
+        "meshwheels2", "meshwheels", "flexbodywheels":
             _parse_mesh_wheel(line)
         "cameras":
             _cameras.read_cameras(TruckLexer.fields(line))

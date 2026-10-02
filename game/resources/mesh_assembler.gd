@@ -104,7 +104,8 @@ static func _roughness_texture(
         cache[key] = null
         return null
     var image: Image = MaterialClass.roughness_from_specular(source)
-    image.generate_mipmaps()
+    if not image.is_compressed():
+        image.generate_mipmaps()
     var texture: ImageTexture = ImageTexture.create_from_image(image)
     cache[key] = texture
     return texture
@@ -130,7 +131,15 @@ static func _texture(path: String, dds_reader: RefCounted, cache: Dictionary) ->
     if image == null:
         cache[path] = null
         return null
-    image.generate_mipmaps()
+    # A block-compressed image already carries whatever mipmaps it shipped with, and Godot
+    # refuses to generate more: "Cannot generate mipmaps from compressed image formats".
+    #
+    # Asking anyway is not harmless. It is how the Mazda 626 arrived with no bodywork — a `.car`
+    # whose textures are DXT, where every one of them errored here and the panels drew untextured
+    # while the seats and the dash, which are not, came out fine. `RorTerrainSkin` has guarded
+    # this for as long as it has existed; the vehicle path never did.
+    if not image.is_compressed():
+        image.generate_mipmaps()
     var texture: ImageTexture = ImageTexture.create_from_image(image)
     cache[path] = texture
     return texture

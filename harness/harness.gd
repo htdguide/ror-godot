@@ -89,8 +89,17 @@ func begin(main: Node) -> void:
     # pull the keyboard away from whatever was being typed into, which is worse than it sounds:
     # the text goes to the game, and the game is listening for keys.
     if args.has_flag("play"):
+        # The flag has to be *cleared*, not just worked around.
+        #
+        # `no_focus` is a window flag the OS honours: while it is set the window cannot become
+        # the key window, so it never receives keyboard input and macOS beeps at every keystroke
+        # it cannot deliver. Moving it to the front and calling `grab_focus` does not help —
+        # `grab_focus` is Godot's own control focus inside the window, which is a different thing
+        # from the window being focused by the system. Reported as: cursor disappears, buttons do
+        # nothing, and a click sound on every key.
+        DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, false)
         DisplayServer.window_move_to_foreground()
-        get_window().grab_focus()
+        DisplayServer.window_request_attention()
     _open_console()
     # `--console` on its own is a session that exists to be driven: it holds the process open,
     # serving the agent's channel and the keyboard, until something tells it to quit. Without

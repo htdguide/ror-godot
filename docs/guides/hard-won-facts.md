@@ -337,3 +337,13 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   traction map was the one exception, so NhelensGrass failed to load at all over a 1024x1024 DXT1
   with eleven mipmaps. A traction map also has to be *decompressed* after loading, unlike every
   other texture here, because it is read back a pixel at a time rather than handed to the GPU.
+- **`generate_mipmaps` on a block-compressed image fails, and the failure is silent to the
+  player.** Godot refuses with "Cannot generate mipmaps from compressed image formats" and the
+  material ends up without its texture. `RorTerrainSkin` has guarded this since it was written;
+  `MeshAssembler` and `FlareBuilder` never did, so the Mazda 626 — a `.car` whose textures are all
+  DXT — arrived with no bodywork while its seats and dash, which are not compressed, looked fine.
+  One guarded path and one unguarded path for the same operation is the shape of this bug, and it
+  is the third time in this project: the traction map was the same.
+- **A wheel section is not always `meshwheels`.** The Mazda's wheels are all `flexbodywheels`,
+  which carries the same row as `meshwheels2` and differs only in that its tyre deforms with the
+  body. Unparsed, the vehicle built 14 parts and zero wheels and sat on the road looking flat.

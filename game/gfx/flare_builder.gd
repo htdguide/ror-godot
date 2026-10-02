@@ -258,7 +258,8 @@ static func _glow_texture() -> Texture2D:
             var halo: float = pow(clampf(1.0 - away, 0.0, 1.0), 3.0)
             var value: float = clampf(core + halo * GLOW_HALO, 0.0, 1.0)
             image.set_pixel(x, y, Color(value, value, value, value))
-    image.generate_mipmaps()
+    if not image.is_compressed():
+        image.generate_mipmaps()
     _glow_sprite = ImageTexture.create_from_image(image)
     return _glow_sprite
 
