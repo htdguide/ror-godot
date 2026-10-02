@@ -23,9 +23,13 @@ protected:
     static void _bind_methods();
 
 public:
-    // Returns { error, width, height, format, data }, where `format` is an Image.Format
-    // value ready for Image.create_from_data. Only the top mip level is returned: Godot
-    // regenerates the rest more cheaply than they can be parsed out.
+    // Returns { error, width, height, format, mipmaps, data }, where `format` is an
+    // Image.Format value ready for Image.create_from_data and `data` holds every mip level the
+    // file ships, one after another, in the order Godot expects them.
+    //
+    // It used to return the top level alone, on the grounds that Godot could regenerate the
+    // rest. It cannot: `generate_mipmaps` fails on a block-compressed image, so every DXT
+    // texture in the project had exactly one level and aliased badly at any distance.
     godot::Dictionary read_file(const godot::String &path);
 };
 

@@ -188,16 +188,8 @@ static func image_of(path: String, reader: RefCounted) -> Image:
         if plain != null:
             plain.generate_mipmaps()
         return plain
-    if reader == null:
-        return null
-    var result: Dictionary = reader.read_file(path)
-    if (result.get("error", "") as String) != "":
-        return null
-    var image: Image = Image.create_from_data(
-        int(result["width"]), int(result["height"]), false,
-        int(result["format"]) as Image.Format, result["data"] as PackedByteArray
-    )
-    if image != null and not image.is_compressed():
+    var image: Image = DdsImage.read(path, reader)
+    if image != null and not image.is_compressed() and not image.has_mipmaps():
         image.generate_mipmaps()
     return image
 

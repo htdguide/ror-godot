@@ -235,3 +235,22 @@ See `hard-won-facts.md` for the solver, the terrain, the formats and the gate di
   0.53 m short of the far side instead of 0.91 m. The fallback to the visual mesh stays, because
   La Paz declares neither a box nor a hull for anything and its poles were scenery a truck drove
   through.
+- **A block-compressed image cannot have its mipmaps regenerated, and the DDS reader was throwing
+  away the ones the files ship.** Godot's `generate_mipmaps` fails on a compressed image — "Cannot
+  generate mipmaps from compressed image formats" — and the extension's reader returned only level
+  0, on the written-down grounds that "Godot regenerates the rest more cheaply than they can be
+  parsed out". It cannot. Every DXT texture in the project had exactly one level, and no filter
+  makes a single 256×256 level look right on a wall 500 m away: Starling Island's distant brickwork
+  aliased into speckle and its roofs dissolved into the sky. The authors stored the levels — 217 of
+  that terrain's 248 DDS files carry a full chain, and `2af11UID-mc_tree1.dds` is an 87,536-byte
+  file of which 65,536 bytes were being read. 429 compressed files across the checkout were
+  affected.
+- **It looked like a transparency fault and was a sampling one.** The first guesses were alpha
+  scissor, a corrupt alpha channel, a material wrongly marked transparent — all of them wrong, and
+  all of them plausible from the picture. What settled it was reading `dwMipMapCount` out of the
+  file header and comparing it against what the reader returned, which is what
+  `a_texture_keeps_the_chain_its_file_ships` now does on every DDS in the checkout.
+- **An uncompressed file's header may claim a chain it does not contain.** The hero truck's
+  `S1024.dds` declares eleven levels in a file exactly one level long. It does not matter for an
+  uncompressed image, which can have its mipmaps generated, which is why only block-compressed
+  files are held to their header.

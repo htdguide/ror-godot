@@ -136,15 +136,7 @@ static func _roughness_texture(
 
 ## Decodes a DDS to an Image, without building a texture from it.
 static func _image(path: String, dds_reader: RefCounted) -> Image:
-    if not FileAccess.file_exists(path):
-        return null
-    var result: Dictionary = dds_reader.read_file(path)
-    if (result.get("error", "") as String) != "":
-        return null
-    return Image.create_from_data(
-        int(result["width"]), int(result["height"]), false,
-        int(result["format"]) as Image.Format, result["data"] as PackedByteArray
-    )
+    return DdsImage.read(path, dds_reader)
 
 
 static func _texture(path: String, dds_reader: RefCounted, cache: Dictionary) -> Texture2D:

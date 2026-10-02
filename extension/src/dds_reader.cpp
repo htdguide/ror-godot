@@ -65,6 +65,7 @@ Dictionary DdsReader::read_file(const String &path) {
 
     const uint32_t height = u32_at(d, 12);
     const uint32_t width = u32_at(d, 16);
+    const uint32_t mip_count = u32_at(d, 28);
     const uint32_t pf_flags = u32_at(d, PIXELFORMAT_AT + 4);
     const uint32_t four_cc = u32_at(d, PIXELFORMAT_AT + 8);
     const uint32_t rgb_bits = u32_at(d, PIXELFORMAT_AT + 12);
@@ -96,14 +97,27 @@ Dictionary DdsReader::read_file(const String &path) {
             out["error"] = String("unsupported DDS fourCC '") + String(cc) + String("'");
             return out;
         }
-        const int64_t blocks = ((width + 3) / 4) * ((height + 3) / 4);
-        const int64_t size = blocks * block_bytes;
+        // Every level the file ships, not only the first.
+        //
+        // A block-compressed image cannot have its mipmaps regenerated -- Godot's
+        // `generate_mipmaps` fails on one -- so a reader that returns level 0 alone leaves every
+        // DXT texture in the project with no mip chain at all, however many levels the author
+        // stored. 217 of Starling Island's 248 DDS files carry one, and without it a distant
+        // building's brickwork aliases into speckle and the roof dissolves into the sky.
+        const int64_t levels = mip_count > 0 ? static_cast<int64_t>(mip_count) : 1;
+        int64_t size = 0;
+        for (int64_t level = 0; level < levels; ++level) {
+            const int64_t w = (width >> level) > 0 ? (width >> level) : 1;
+            const int64_t h = (height >> level) > 0 ? (height >> level) : 1;
+            size += ((w + 3) / 4) * ((h + 3) / 4) * block_bytes;
+        }
         if (bytes.size() < HEADER_SIZE + size) {
             out["error"] = String("DDS payload is shorter than its own header claims");
             return out;
         }
         out["error"] = String();
         out["format"] = format;
+        out["mipmaps"] = static_cast<int>(levels);
         out["data"] = bytes.slice(HEADER_SIZE, HEADER_SIZE + size);
         return out;
     }
@@ -140,6 +154,7 @@ Dictionary DdsReader::read_file(const String &path) {
         dst[i * 4 + 3] = (a_at >= 0 && a_at < pixel_bytes) ? p[a_at] : 255;
     }
     out["error"] = String();
+    out["mipmaps"] = 1;
     out["format"] = static_cast<int>(Image::FORMAT_RGBA8);
     out["data"] = rgba;
     return out;
