@@ -42,9 +42,18 @@ static func assets(terrain: RorTerrain) -> Object:
     if layers.is_empty():
         return null
     var reader: RefCounted = ClassDB.instantiate("DdsReader") as RefCounted
+    # Every texture in a Terrain3D array has to be the same size, and a terrain's layers routinely
+    # are not: La Paz ships four 512-square layers and works, Russia ships 640s beside 512s and
+    # Starling Island a 2048 beside a 512, and both render as flat white ground — the array is
+    # rejected whole, so no layer gets a texture rather than the odd one out being dropped.
+    #
+    # Ogre has no such rule, so the mods are correct and the constraint is this renderer's. Every
+    # layer is brought to one size, the largest, so the sharpest texture a terrain ships is the
+    # one that sets the standard rather than being thrown away by the smallest.
+    var size: Vector2i = _common_size(layers, terrain.directory, reader)
     var textures: Array = []
     for index: int in layers.size():
-        textures.append(_asset(index, layers[index], terrain.directory, reader))
+        textures.append(_asset(index, layers[index], terrain.directory, reader, size))
     var out: Object = ClassDB.instantiate("Terrain3DAssets")
     out.set("texture_list", textures)
     return out
@@ -52,19 +61,34 @@ static func assets(terrain: RorTerrain) -> Object:
 
 ## One layer as a Terrain3D texture asset: the mod's albedo, its normal map, and the tiling the
 ## page file states in metres.
+## The size every layer is brought to: the largest any of them ships.
+static func _common_size(
+    layers: Array[Dictionary], directory: String, reader: RefCounted
+) -> Vector2i:
+    var size: Vector2i = Vector2i.ZERO
+    for layer: Dictionary in layers:
+        for key: String in ["albedo", "normal"]:
+            var image: Image = image_of(directory.path_join(layer[key] as String), reader)
+            if image == null:
+                continue
+            size.x = maxi(size.x, image.get_width())
+            size.y = maxi(size.y, image.get_height())
+    return size
+
+
 static func _asset(
-    index: int, layer: Dictionary, directory: String, reader: RefCounted
+    index: int, layer: Dictionary, directory: String, reader: RefCounted, size: Vector2i
 ) -> Object:
     var asset: Object = ClassDB.instantiate("Terrain3DTextureAsset")
     asset.set("id", index)
     asset.set("name", (layer["albedo"] as String).get_file().get_basename())
     var albedo: Texture2D = tiling_texture_of(
-        directory.path_join(layer["albedo"] as String), reader
+        directory.path_join(layer["albedo"] as String), reader, size
     )
     if albedo != null:
         asset.set("albedo_texture", albedo)
     var normal: Texture2D = tiling_texture_of(
-        directory.path_join(layer["normal"] as String), reader
+        directory.path_join(layer["normal"] as String), reader, size
     )
     if normal != null:
         asset.set("normal_texture", normal)
@@ -83,10 +107,18 @@ static func _asset(
 ## Rolling needs pixels, so a block-compressed texture is decompressed first and kept that way.
 ## Four 512-square layers is a megabyte each and it is the only way the markings land where the
 ## terrain's author painted them.
-static func tiling_texture_of(path: String, reader: RefCounted) -> Texture2D:
+static func tiling_texture_of(
+    path: String, reader: RefCounted, size: Vector2i = Vector2i.ZERO
+) -> Texture2D:
     var image: Image = image_of(path, reader)
     if image == null:
         return null
+    # Brought to the array's size before anything else. Resizing needs pixels, so a
+    # block-compressed texture is decompressed first — which the roll below does anyway.
+    if size != Vector2i.ZERO and image.get_size() != size:
+        if image.is_compressed() and image.decompress() != OK:
+            return ImageTexture.create_from_image(image)
+        image.resize(size.x, size.y, Image.INTERPOLATE_LANCZOS)
     if is_zero_approx(UV_PHASE):
         return ImageTexture.create_from_image(image)
     if image.is_compressed() and image.decompress() != OK:

@@ -253,3 +253,15 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   `rays * 4` and `rays * 20` for a flexbody one — so a gate can check the shape of a rig against
   somebody else's arithmetic rather than against this project's opinion. What a beam is worth is
   a separate question; how many there are is not.
+- **Every texture in a Terrain3D array has to be the same size, and a terrain's layers routinely
+  are not.** La Paz ships four 512-square layers and renders correctly; Russia ships 640s beside
+  512s and Starling Island a 2048 beside a 512, and both rendered as flat white ground. The array
+  is rejected whole rather than dropping the odd one out, so *no* layer gets a texture — which is
+  why the symptom is a uniformly white terrain and not one wrong-looking surface. Ogre has no such
+  rule, so the mods are correct and the constraint belongs to this renderer. Every layer is
+  brought to the largest size any of them ships.
+- **A `.tobj` line is not always an object.** The format carries vehicle spawns (`truck`,
+  `truck2`, `load`, `boat`) and zones (`spawnZone_...`) alongside object placements, and reading
+  them all as objects counts things that were never meant to be drawn: 13 of Russia's 38
+  "placements" and 63 of Starling Island's 1502. Harmless to the picture, and it makes every
+  count of what a terrain holds wrong.
