@@ -298,8 +298,11 @@ gates need a real window, and `tools/gate.sh` refuses to run while one is open.
 They have their own documents, because there are now over seventy of them and every file here has
 a size cap:
 
-- **`docs/guides/hard-won-facts.md`** — the solver, the file formats, the terrain, and the
+- **`docs/guides/hard-won-facts.md`** — the solver, the terrain, the file formats, and the
   discipline the gates are held to.
+- **`docs/guides/hard-won-facts-mods.md`** — how a vehicle is read, built and drawn. Almost all
+  of it was learned the day a second and third pack arrived, and the pattern behind nearly every
+  entry is that one test vehicle calibrates the loader to itself.
 - **`docs/guides/hard-won-facts-light.md`** — light, colour, exposure and anything that measures a
   picture. Split out when the first file hit its cap, and the larger half of the two by effort:
   this is the area the project has been wrong about most often, usually by trusting an instrument

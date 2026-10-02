@@ -7,22 +7,9 @@ afternoon to rediscover.
 Light, colour and capture have their own file: `hard-won-facts-light.md`. They were split out when
 this one hit the 400-line cap, and they are the area this project has been wrong about most often.
 
-- **Read the file before believing anything about a rig.** The hero truck states its own node
-  masses, its own torque curve by name, its own wheel drive flags and its own beam scale. Four
-  separate faults this session were the parser ignoring something the file said, not the
-  physics being wrong. `game/tools/rig_report.gd` prints what a file actually declares.
-- **Axle nodes must be ordered so the first has the smaller z**, which upstream does at spawn
-  and files do not. Stated outer-node-first on both sides — as the hero truck does — the axis
-  vector points outward on one side of the rig and inward on the other, so the same torque
-  drives the left wheels forward and the right wheels backward. It cost 4.70 m of travel with
-  3.41 m of it sideways; ordered, the same run does 105 m straight.
-- **A directive keyword has to end at a separator.** `set_beam_defaults_scale` begins with
-  `set_beam_defaults`, and matched on the prefix it was read as one, with `_scale` as its
-  first argument — which parses as a spring of 0 N/m.
-- **A lone bare word is not always a section header.** The hero truck's `torquecurve` body is
-  the single word `gas`, naming one of upstream's predefined models; `author`, `fileinfo` and
-  `guid` are keywords belonging to no section at all. Its `guid` line, read as a `globals`
-  row, parsed as a cargo mass of 4.1e147 kg.
+Vehicles and their mods have their own file: `hard-won-facts-mods.md` — how a truck, car, wheel,
+mesh or material is read and built. Split out when this one hit the 400-line cap.
+
 - **Winding.** The OGRE reader reverses every triangle and leaves the vertex normals exactly as
   authored. Measured in the file, index order and the authored normals agree on 99–100% of
   triangles, which reads as "do not touch it" — but in file order the vehicle is culled from
@@ -31,23 +18,9 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   first place to look. Do not negate the normals to "match" the reversal: `body_blocks_sun`
   measures 2.13× with them as authored and 0.73× negated, which is the sun appearing to shine
   through the bodywork.
-- **The vehicle renders in rig space.** `VehicleBuilder.build` computes the actor frame and puts
-  it on the root, and poses bones in actor-local space, so the two compose back to rig space.
-  Wiring the frame through properly makes two wheels render out on open ground; see the comment
-  in `vehicle_builder.gd` and `docs/architecture/bridge.md`. Mixing the two spaces is what put
-  the interior camera outside the cab.
-- **The hero truck's `cab`/`submesh` sections are collision only** — zero `texcoords`, material
-  `tracks/trans`, every triangle flagged `c`. ADR 0003's FlexObj path is not what is missing
-  here, and the cab roof that looked absent was the lit-through bodywork instead.
 - **Directives are not section rows.** `set_node_defaults` and friends carry no section header
   and were being read as data, inventing five phantom nodes and two cinecams — one of them a
   spring value. `TruckParser.DIRECTIVES` exists to stop that.
-- **A rig declares several cinecams** and only some are inside the cab. The hero truck's first
-  is 0.22 m above its own roof; its second is the driver's eye.
-- **Steering wheel rake is 121°, not upstream's −59°.** The mesh's thinnest axis is the column
-  and on this wheel it runs along the stalk rather than the face, so flipping the sign trades
-  one fault for the other. 121 = 180 − 59: the 180 is this project's prop chain differing from
-  upstream's by a handedness, the sign is the stalk. `game/tools/prop_axis_probe.gd` measures it.
 - **A surface map is stored row by row, z outer and x inner**, because that is the order the
   solver reads a heightfield in. Stored the other way round it is transposed, and a transposed
   map is not obviously wrong: the right surfaces appear, in the wrong places, and the first
@@ -81,10 +54,6 @@ this one hit the 400-line cap, and they are the area this project has been wrong
 - **A `SubViewport` isolates a gate only with `own_world_3d` set.** Without it the viewport draws
   into the parent's `World3D` and the container contains nothing: one gate's `DirectionalLight3D`
   lights the next gate's frame.
-- **Orphan count is the exact leak signal; node count is not.** The engine adds nodes of its own
-  during a run — overlay and tooltip scaffolding — so a container that leaves a few nodes behind
-  has not necessarily leaked. A node with no parent that did not exist before has no innocent
-  explanation, so that is the counter with no slack on it.
 - **A gate that renders animated geometry has no deterministic frame, and "renderer warm-up" is
   the wrong explanation to reach for.** `ror_terrain_photoset` drifted in its fourth decimal and
   it was written off as shader compilation and probe timing warming across a process. Running
@@ -144,18 +113,6 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   `tile_m, albedo, normal, blendmap, channel, alpha` and that is all. So any per-surface roughness
   is this project's invention, which is exactly what it refuses to multiply over an author's
   imagery elsewhere. A single constant is the defensible choice until a format carries better.
-- **Terrain3D turns its checkerboard on when a texture array is empty, and this project switched
-  it off two lines later.** `Terrain3DMaterial::_update_texture_arrays` calls
-  `set_show_checkered(true)` when `get_texture_count() == 0`; `TerrainWorld._show_surfaces` sets
-  it to false unconditionally, with a comment explaining that the checkerboard is a placeholder
-  for missing textures. It was not a placeholder, it was the diagnosis, and turning it off hid
-  the blank textures for as long as they existed. A debug view a dependency turns on by itself is
-  worth reading before switching off.
-- **Terrain3D packs its textures into an array when its asset list is initialised, and a change
-  to an asset afterwards is invisible until the array is repacked.** `update_texture_list()` is
-  the call it makes itself and it is exposed to script. Reassigning a whole new `Terrain3DAssets`
-  is *not* equivalent and silently does nothing: `Terrain3D::set_assets` reinitialises only while
-  the node is inside a world, and an array that is already packed stays packed.
 - **A patch compared with the terrain has to be matched in albedo even when the measurement is a
   ratio.** The ratio cancels diffuse albedo but not specular, which does not scale with it: a
   fixed 0.18 grey moved the patch's own sun response from 2.12 to 1.71 with nothing else changed.
@@ -166,23 +123,12 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   suspension travel. Two of its dampers were breaking while the rig settled onto its own springs,
   before anything had been driven, and the third went on the next landing — reported in a session
   as recovering the truck breaking a wheel.
-- **An unshaded material draws its albedo and ignores emission**, so a lamp built that way is the
-  same brightness on and off. And a lens standing proud of the bodywork as a lit quad is a square
-  on the front of the truck, which is what a session called an ugly rectangle. Lamps are additive
-  sprites with a radial falloff now, which is also what upstream draws: off adds nothing.
-- **A QuadMesh faces its own +Z**, and a lamp holder is built with -Z along the lamp's normal, so
-  a lens added without a half turn shows its back to the world: culled from outside the vehicle,
-  visible from inside it.
 - **Soft ground is a separate branch of upstream's contact law and it is most of what makes sand
   sand.** A ground model with a non-zero `solid ground level` has a power-law fluid above it —
   drag, buoyancy, anisotropy — and the solid law only applies below that depth. Without it La
   Paz's desert braked and cornered within a few per cent of its asphalt. With the friction
   numbers reaching the wheels, a rig leaned on at 0.7 g slides 5.41 m on the dirt against 3.88 m
   on the road.
-- **Braking distance does not separate two surfaces on this rig**: the brakes run out before the
-  tyres do, so both stop in the same distance. Cornering does not either — the outside wheels
-  load up enough to grip on both. Leaning on a parked rig with tilted gravity does, and it is the
-  same test `surfaces_change_grip` uses for a single node.
 - **The sky a session sees and the sky the gates measure are not the same sky, on purpose.** A
   window gets the marched clouds; a gate gets the stated gradient. Swapping the cloud sky under
   the gates took the hero truck from 2.27x brighter lit from the front to 1.02x and stopped the
@@ -193,26 +139,11 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   `GateBase.clear_fog` takes it away for gates that measure light or framing: with it on, a body
   lit from the front and one lit from behind wash to the same number, and distant ground takes
   the colour of the sky and counts as sky.
-- **A rig's aerodynamics depend on one section in its file.** Upstream drags a rig that declares
-  `fusedrag` as a single flat plate from the fuselage's width, and every other rig node by node
-  with a turbulent model. Given the wrong one the hero truck stopped accelerating at 63 km/h in
-  fourth gear at full throttle; given its own — a 0.1 m fuselage, which is almost no drag — it
-  reaches 288 km/h in top gear. Upstream's own fuselage code also sets the fuselage's back node
-  to its front node, which zeroes the airfoil term; the port keeps that.
 - **Terrain3D's `uv_scale` is two over the tiling distance, not one over it**, and it samples at
   `world.xz * uv_scale - 0.5`. Measured on La Paz's road, whose texture is a 10.1 m cross-section:
   at 1/10.1 it tiled over 20.2 m, and the half-tile offset put the double yellow line at the kerb.
   Ground textures are rolled half a tile to cancel it — measured 0.35 m from the middle of the
   asphalt, against 5.10 m before.
-- **A cab's cluster belongs on the steering wheel, not on the dashboard prop or the eye.** The
-  eye is a cinecam and hangs where a camera hangs; the hero truck's dashboard prop is a 0.8 mm
-  placeholder because its dashboard is painted into the cab mesh. The wheel is the one thing in
-  a cab that is always where the cab is.
-- **A steering wheel turns about y after its rake** — upstream's chain is
-  `Quaternion(rake, UNIT_X) * Quaternion(steer, UNIT_Y)` — and the mesh agrees: 0.207 m through
-  the column against a 0.371 m rim. Composed as a single Euler triple it turns about an axis that
-  is not the column, and an Euler *reading* of the result drifts with the rake: 175.71 degrees
-  for a turn of 175.
 - **Every odef object is pitched -90 degrees about its own x axis**, unconditionally, for every
   object on every terrain (upstream's `TerrainObjectManager::LoadTerrainObject`). Object meshes
   in this library are authored z-up. Without that turn La Paz's 99 roadside poles lie on their
@@ -223,16 +154,6 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   `WorldSizeX / (PageSize - 1)` metres. The oracle for all of it is the terrain's own
   `StartPosition`: La Paz says a vehicle starts at 7.375 m and the decoded heightmap is 7.375 m
   there. With the rows flipped it is 4.4 m out, with the bytes swapped 33 m.
-- **An imported terrain's textures must not be tinted by this project's palette.** Terrain3D
-  multiplies a texture's `albedo_color` over the colour map, and drawing La Paz's asphalt
-  through this project's idea of asphalt (0.20 grey) rendered its roads pure black beside
-  ground that was correct. A loaded terrain's colour map is white and its surfaces are neutral.
-- **A Terrain3D control map id with no texture behind it renders pure black.** A loaded terrain
-  names surfaces upstream's ground models have never heard of — La Paz adds `dirt` and
-  `softsand` — and the texture set has to cover every index the world can write.
-- **Ogre's `texture_unit scale` scales the texture, not the coordinates.** A stated 0.04 means
-  the texture tiles twenty-five times across what the mesh's UVs cover. La Paz's ground skirt is
-  one 20 km quad; without it the horizon is a beige wall.
 - **Every gate in the suite can be green while something is visibly broken.** Missing vertex
   normals, tyres buried 0.34 m in the ground, and a door hanging a metre off its hinges all
   passed every check that existed at the time, because each measured nodes and the nodes were
@@ -252,16 +173,6 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   only pixels that moved were the box's own, so it proved a moving box moves. Both gates looked
   entirely reasonable and both were worth nothing. What reproduces the fault is a real vehicle
   being re-posed every frame, measured on ground the vehicle never touches.
-- **Damage to a rig is six beam fields and a per-node count, not one.** A hit changes a beam's
-  `rest_length` (the bend), both yield stresses, the recomputed `minmax_stress`, the `strength`
-  where upstream softens a beam instead of snapping it, and `broken` — and breaking a beam also
-  decrements `active_beams` on both of its nodes, which upstream consults before it will break the
-  last beams holding a cab node. `RigBuilder.place` restored node positions, velocities and rest
-  lengths and its own documentation called that "undeformed": true of bends, false of breaks. A
-  reset truck came back on its wheels still holding every snapped beam and shed its doors and
-  wheels again on the next step. Measured: a crash leaves 45 of 1995 beams broken and 500 bent.
-  Repair restores a snapshot of the beams as built rather than recomputing them — recomputing
-  would be a second implementation of rig building, free to drift from the first.
 - **`extension/SConstruct` wrote its library to `../game/bin` while the engine loads `bin/`.** The
   path dated from when the project lived in `game/`, so a rebuild produced a fresh binary
   somewhere nothing reads and the old one stayed loaded — a C++ change that silently does nothing
@@ -322,21 +233,6 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   gate run built its own full-window `TextureRect` and left it in the tree — three nodes, under a
   slack of eight, invisible for as long as it existed. Adding two more nodes per run took it to
   nine and the container leak check caught the whole thing at once.
-- **A Rigs of Rods vehicle is not always a `.truck`.** The extension says what the actor is meant
-  to be — `.car`, `.load`, `.airplane`, `.boat`, `.trailer`, `.train`, `.fixed` — and the format
-  inside is identical. Measured across four packs from the repository: `mazda626gf` ships only
-  `mazda626sd18i-mt.car`, Starling Island ships five actors as `.truck` and `.boat`, NhelensGrass
-  ships a bridge and a crane as `.fixed`. A library looking for trucks finds a third of them.
-- **One content folder is routinely several maps and several vehicles, and it does not respect the
-  root it was unpacked into.** Starling Island is four `.terrn2` and five actors in one download;
-  the Chevy pack is four variations of one truck. Both content roots have to be searched for both
-  kinds, or six of this checkout's nine downloaded actors are invisible — unpacked under
-  `assets/terrains/` because the same folder also ships maps.
-- **`Image.load_from_file` does not read DDS at run time.** Godot's DDS support is an import-time
-  path, and every texture in this project already goes through the extension's `DdsReader` — the
-  traction map was the one exception, so NhelensGrass failed to load at all over a 1024x1024 DXT1
-  with eleven mipmaps. A traction map also has to be *decompressed* after loading, unlike every
-  other texture here, because it is read back a pixel at a time rather than handed to the GPU.
 - **`generate_mipmaps` on a block-compressed image fails, and the failure is silent to the
   player.** Godot refuses with "Cannot generate mipmaps from compressed image formats" and the
   material ends up without its texture. `RorTerrainSkin` has guarded this since it was written;
@@ -344,64 +240,14 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   DXT — arrived with no bodywork while its seats and dash, which are not compressed, looked fine.
   One guarded path and one unguarded path for the same operation is the shape of this bug, and it
   is the third time in this project: the traction map was the same.
-- **A wheel section is not always `meshwheels`.** The Mazda's wheels are all `flexbodywheels`,
-  which carries the same row as `meshwheels2` and differs only in that its tyre deforms with the
-  body. Unparsed, the vehicle built 14 parts and zero wheels and sat on the road looking flat.
-- **The flexbody rotation order is an open question, and upstream's answer is not the answer.**
-  Upstream composes Z, then Y, then X (`FlexFactory.cpp:91-93`, and `ActorSpawner.cpp:1681-1683`
-  for props); this project uses `Basis.from_euler`, whose default is YXZ. They agree whenever only
-  one axis is turned, which covers the hero truck. Changing to upstream's order was tried and
-  reverted: it does not fix the Mazda 626 — whose `270, 180, 180` draws along the wrong axis under
-  either order — and it breaks the hero truck, whose steering column stops pointing down and fails
-  `props_sit_in_the_vehicle`. So a second convention in this pipeline cancels YXZ, and finding it
-  is the real task. Measured: the Mazda's nodes span 4.54 x 1.62 x 1.70 m, which is a car; its
-  drawn meshes span 4.26 x 2.33 x 4.54 under YXZ and 4.26 x 1.76 x 5.85 under ZYX. Every flexbody
-  frame has determinant +1, so it is not the mirrored-basis fault.
 - **A screenshot key that counts from zero destroys the evidence it was pressed to capture.**
   `play-0.png` was overwritten by every new session, so three shots of a reported fault came back
   as one and two stale ones from hours earlier. Named by the clock now.
-- **One test vehicle calibrates the loader to itself.** The hero truck's flexbody rotation is
-  `180, -90, 0`, for which upstream's Z-Y-X composition and Godot's default YXZ are *identical* —
-  measured in the engine, not argued. So the order could be wrong for every mod ever made and
-  that truck would never say so. The Mazda's `270, 180, 180` differ by exactly 180 degrees about
-  X, which is why it loaded upside down. Three loader faults surfaced the day a second and third
-  pack arrived, all silent: no error, no warning, just less vehicle than the file describes.
 - **`global_transform` on a detached node lies, and it lied twice in one session.** First the
   flexbody direction comparison, then a "uniform offset" of every drawn part from the node box —
   reported, chased, and non-existent. Measured in the tree, the hero truck's worst part sits
   2.18 m from the centre of its own node box, which is half a 4.5 m car: a bumper is at the end.
   Compare transforms in the tree, and pick a reference that means something.
-- **Not every vehicle draws, and the reasons differ.** NhelensGrass's bridge, crane and monorail
-  and the Daf semi trailer have their geometry in `submesh` sections, which this project reads
-  for collision and never renders. Starling Island's vehicles name `seat.mesh` and
-  `dashboard-small.mesh` from Rigs of Rods base content that is not installed here. A gate that
-  demands geometry from either is demanding a feature or inventing an asset; both are reported
-  and neither fails.
-- **`flexbodywheels` is not a `meshwheels2` row.** They share eleven fields and then diverge: a
-  mesh wheel carries `spring, damping, side, mesh, material`, a flexbody wheel carries
-  `tyre spring, tyre damp, rim spring, rim damp, side, rim mesh, tyre mesh`
-  (`RigDef_Parser.cpp`: `_ParseBaseMeshWheel` against `ParseFlexBodyWheel`). Read with the wrong
-  layout the Mazda took its side from a rim stiffness of 320000, its rim mesh from a damping of
-  40, and its material from the letter `l` — white tyres, no rims, and a car on its bump stops.
-  Three symptoms, one misread row, and the row was misread by this project rather than by the mod.
-- **A flexbody wheel's tyre is a mesh, not a material.** A mesh wheel names a material and the
-  tyre is swept procedurally and painted with it; a flexbody wheel names two meshes, rim and tyre.
-  Treating the second as a material leaves the tyre white with nothing in the log.
-- **A flexbody wheel is a two-ring rig, not a mesh wheel with different fields.** Upstream builds
-  it with `num_rays * 4` nodes and `num_rays * 20` beams — rim 8, tyre 10, support 2 per ray —
-  against a mesh wheel's `num_rays * 2` and `num_rays * 8` (`ActorSpawner.cpp` spawn budget). The
-  rim ring and the tyre ring are separate and the tyre is sprung against the rim, which is why the
-  row states two spring/damping pairs. Parsed as a mesh wheel it gets half the nodes and two
-  fifths of the beams: the wheel wobbles and does not sit on its suspension. Reading the row
-  correctly is not the same as building the rig correctly, and only the first is done.
-- **A flexbody wheel is a rim ring sprung inside a tyre ring, and the port is structural.**
-  Upstream's `ProcessFlexBodyWheel` lays `rays * 4` nodes — rim outer, rim inner, tyre outer, tyre
-  inner, each ring stepped half a ray so they interleave — and `rays * 20` beams: eight rim (axle
-  to rim both ways, plus the rim ring's hoop and diagonals), ten tyre (each rim node to three
-  tyre nodes, reaching back one ray, which is the sidewall; plus four tread beams at the rig's
-  *structural* rates rather than the tyre's), and two support beams from the axle to the tread
-  that carry nothing until the tyre is squashed to within 5% of the rim radius. Every rim-to-tyre
-  beam gets half the stated tyre rate because each tyre node is held by two of them.
 - **Counting is a real oracle when the source states the count.** Upstream computes its spawn
   budget before allocating — `rays * 2` nodes and `rays * 8` beams for a mesh wheel against
   `rays * 4` and `rays * 20` for a flexbody one — so a gate can check the shape of a rig against

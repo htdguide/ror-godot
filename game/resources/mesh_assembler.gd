@@ -9,12 +9,16 @@ extends RefCounted
 
 
 ## Builds an ArrayMesh from a read OGRE mesh, with a material per submesh.
+## `scripts` is the pack's Ogre `.material` declarations, from `OgreMaterial.read_directory`.
+## Passed in rather than read here, and rather than cached on the class: a cache on the class is
+## process-global state, which `static_state` exists to refuse.
 static func mesh_from(
     result: Dictionary,
     truck: TruckParser,
     mod_dir: String,
     dds_reader: RefCounted,
-    textures: Dictionary
+    textures: Dictionary,
+    scripts: Dictionary = {}
 ) -> ArrayMesh:
     var mesh: ArrayMesh = ArrayMesh.new()
     var surfaces: int = 0
@@ -36,7 +40,9 @@ static func mesh_from(
         mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
         mesh.surface_set_material(
             surfaces,
-            material_for(submesh["material"] as String, truck, mod_dir, dds_reader, textures)
+            material_for(
+                submesh["material"] as String, truck, mod_dir, dds_reader, textures, scripts
+            )
         )
         surfaces += 1
     return null if surfaces == 0 else mesh
@@ -53,10 +59,19 @@ static func material_for(
     truck: TruckParser,
     mod_dir: String,
     dds_reader: RefCounted,
-    textures: Dictionary
+    textures: Dictionary,
+    scripts: Dictionary = {}
 ) -> StandardMaterial3D:
     var material: StandardMaterial3D = StandardMaterial3D.new()
     var declared: Dictionary = truck.managed_materials.get(material_name, {}) as Dictionary
+    if declared.is_empty():
+        # A vehicle declares some of its materials in the truck file and the rest in an Ogre
+        # `.material` script beside it, and a mesh does not know or care which. The Mazda 626
+        # declares thirteen in `managedmaterials` and ten more in `mazda626gf.material` — its
+        # paint, its headlights, its indicators, its brake and fog lights — and every mesh that
+        # asked for one of those got a plain grey material with no texture on it. Terrain objects
+        # have read these scripts since they were written; vehicles never did.
+        declared = scripts.get(material_name, {}) as Dictionary
     var classified: Dictionary = MaterialClass.classify(material_name, declared)
     MaterialClass.apply(material, classified["class"] as String)
     material.albedo_color = Color(0.7, 0.7, 0.72)

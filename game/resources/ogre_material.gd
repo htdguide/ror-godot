@@ -68,6 +68,17 @@ static func _take(material: Dictionary, line: String) -> void:
                 var textures: PackedStringArray = material["textures"] as PackedStringArray
                 textures.append(words[1])
                 material["textures"] = textures
+        # `anim_texture <base> <frames> <duration>` names a flipbook, and the base is **not a
+        # file**: Ogre expands it to `base_0.ext`, `base_1.ext` and so on. The Mazda 626 declares
+        # its headlights, indicators, brake and fog lights this way, naming
+        # `mazda626gf-sd-lights.dds` while shipping `mazda626gf-sd-lights_0.dds` and `_1.dds`, so
+        # taking the name as written finds nothing and the lamp draws untextured. The first frame
+        # is what a still picture should show.
+        "anim_texture":
+            if words.size() > 2:
+                var textures: PackedStringArray = material["textures"] as PackedStringArray
+                textures.append("%s_0.%s" % [words[1].get_basename(), words[1].get_extension()])
+                material["textures"] = textures
         "scene_blend":
             if words.size() > 1 and ALPHA_BLENDS.has(words[1].to_lower()):
                 material["alpha"] = true

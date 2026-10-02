@@ -38,6 +38,10 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
     var render_frame: Transform3D = actor
     var parts: Array[SkinnedFlexbody] = []
     var textures: Dictionary = {}
+    # A vehicle declares some materials in its own file and the rest in an Ogre `.material`
+    # script beside it. Read once here and handed down, because a mesh does not know which of
+    # the two its material came from and should not have to.
+    var scripts: Dictionary = OgreMaterial.read_directory(mod_dir)
     var built: int = 0
     var skipped: PackedStringArray = PackedStringArray()
 
@@ -51,7 +55,7 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
             skipped.append("%s (%s)" % [entry["mesh"], result["error"]])
             continue
         var part: SkinnedFlexbody = _build_skinned_flexbody(
-            root, result, truck, entry, render_frame, mod_dir, dds_reader, textures
+            root, result, truck, entry, render_frame, mod_dir, dds_reader, textures, scripts
         )
         if part == null:
             skipped.append("%s (no geometry)" % entry["mesh"])
@@ -62,7 +66,7 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
     var prop_nodes: Array[Node3D] = []
     for entry: Dictionary in truck.props:
         var node: Node3D = _build_prop(
-            entry, truck, render_frame, mod_dir, mesh_reader, dds_reader, textures
+            entry, truck, render_frame, mod_dir, mesh_reader, dds_reader, textures, scripts
         )
         if node == null:
             skipped.append("prop %s" % entry["mesh"])
@@ -77,8 +81,8 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
     var wheel_nodes: Array[Node3D] = []
     for index: int in truck.wheels.size():
         var wheel: Dictionary = truck.wheels[index]
-        var node: Node3D = _build_wheel(
-            wheel, truck, render_frame, mod_dir, mesh_reader, dds_reader, textures
+        var node: Node3D = VehicleWheels.build(
+            wheel, truck, render_frame, mod_dir, mesh_reader, dds_reader, textures, scripts
         )
         if node == null:
             skipped.append("wheel %s" % wheel["mesh"])
@@ -210,7 +214,8 @@ static func _build_skinned_flexbody(
     actor: Transform3D,
     mod_dir: String,
     dds_reader: RefCounted,
-    textures: Dictionary
+    textures: Dictionary,
+    scripts: Dictionary
 ) -> SkinnedFlexbody:
     var placement: Transform3D = FlexbodyBinder.placement(truck.nodes, entry, true)
     var vertices: PackedVector3Array = PackedVector3Array()
@@ -240,7 +245,7 @@ static func _build_skinned_flexbody(
             )
         if material == null:
             material = MeshAssembler.material_for(
-                submesh["material"] as String, truck, mod_dir, dds_reader, textures
+                submesh["material"] as String, truck, mod_dir, dds_reader, textures, scripts
             )
     if vertices.is_empty():
         return null
@@ -273,22 +278,24 @@ static func _build_prop(
     mod_dir: String,
     mesh_reader: RefCounted,
     dds_reader: RefCounted,
-    textures: Dictionary
+    textures: Dictionary,
+    scripts: Dictionary
 ) -> Node3D:
     var holder: Node3D = Node3D.new()
     holder.transform = render_frame.affine_inverse() * FlexbodyBinder.placement(
         truck.nodes, entry
     )
-    var body: MeshInstance3D = _prop_mesh(
-        entry["mesh"] as String, truck, mod_dir, mesh_reader, dds_reader, textures
+    var body: MeshInstance3D = VehicleWheels.mesh_node(
+        entry["mesh"] as String, truck, mod_dir, mesh_reader, dds_reader, textures, scripts
     )
     if body != null:
         body.name = "Mesh"
         holder.add_child(body)
     # A dashboard carries the steering wheel as a second mesh, placed in the dashboard's
     # own space and turned about its column.
-    var steering: MeshInstance3D = _prop_mesh(
-        entry["steering_mesh"] as String, truck, mod_dir, mesh_reader, dds_reader, textures
+    var steering: MeshInstance3D = VehicleWheels.mesh_node(
+        entry["steering_mesh"] as String, truck, mod_dir, mesh_reader, dds_reader, textures,
+        scripts
     )
     if steering != null:
         steering.name = "SteeringWheel"
@@ -305,85 +312,18 @@ static func _build_prop(
     return holder
 
 
-static func _prop_mesh(
-    mesh_name: String,
-    truck: TruckParser,
-    mod_dir: String,
-    mesh_reader: RefCounted,
-    dds_reader: RefCounted,
-    textures: Dictionary
-) -> MeshInstance3D:
-    if mesh_name.is_empty():
-        return null
-    var path: String = mod_dir.path_join(mesh_name)
-    if not FileAccess.file_exists(path):
-        return null
-    var result: Dictionary = mesh_reader.read_file(path)
-    if (result.get("error", "") as String) != "":
-        return null
-    var mesh: ArrayMesh = MeshAssembler.mesh_from(result, truck, mod_dir, dds_reader, textures)
-    if mesh == null:
-        return null
-    var instance: MeshInstance3D = MeshInstance3D.new()
-    instance.mesh = mesh
-    return instance
-
-
-## A wheel is a rim mesh posed by the axle nodes plus a tyre swept around them.
-static func _build_wheel(
-    wheel: Dictionary,
-    truck: TruckParser,
-    render_frame: Transform3D,
-    mod_dir: String,
-    mesh_reader: RefCounted,
-    dds_reader: RefCounted,
-    textures: Dictionary
-) -> Node3D:
-    var holder: Node3D = Node3D.new()
-    holder.transform = render_frame.affine_inverse() * WheelBuilder.rim_transform(
-        truck.nodes, wheel
-    )
-
-    var rim_path: String = mod_dir.path_join(wheel["mesh"] as String)
-    if FileAccess.file_exists(rim_path):
-        var result: Dictionary = mesh_reader.read_file(rim_path)
-        if (result.get("error", "") as String) == "":
-            var rim: MeshInstance3D = MeshInstance3D.new()
-            rim.name = "Rim"
-            rim.mesh = MeshAssembler.mesh_from(result, truck, mod_dir, dds_reader, textures)
-            if rim.mesh != null:
-                holder.add_child(rim)
-
-    # A flexbody wheel ships its tyre as a mesh; a mesh wheel has one swept and painted.
-    var tyre_mesh_name: String = wheel.get("tyre_mesh", "") as String
-    var tyre: MeshInstance3D = MeshInstance3D.new()
-    tyre.name = "Tyre"
-    if tyre_mesh_name != "":
-        var tyre_path: String = mod_dir.path_join(tyre_mesh_name)
-        if FileAccess.file_exists(tyre_path):
-            var tyre_result: Dictionary = mesh_reader.read_file(tyre_path)
-            if (tyre_result.get("error", "") as String) == "":
-                tyre.mesh = MeshAssembler.mesh_from(
-                    tyre_result, truck, mod_dir, dds_reader, textures
-                )
-    if tyre.mesh == null:
-        tyre.mesh = WheelBuilder.build_tyre(truck.nodes, wheel)
-        tyre.material_override = MeshAssembler.material_for(
-            wheel["material"] as String, truck, mod_dir, dds_reader, textures
-        )
-    holder.add_child(tyre)
-    return holder
-
-
+## One named mesh from the pack, or null when it is not named or not there. Every part that hangs
+## a mesh off the rig — a prop, a rim, a flexbody tyre — reads it through here.
 static func _build_flexbody(
     result: Dictionary,
     truck: TruckParser,
     entry: Dictionary,
     mod_dir: String,
     dds_reader: RefCounted,
-    textures: Dictionary
+    textures: Dictionary,
+    scripts: Dictionary
 ) -> MeshInstance3D:
-    var mesh: ArrayMesh = MeshAssembler.mesh_from(result, truck, mod_dir, dds_reader, textures)
+    var mesh: ArrayMesh = MeshAssembler.mesh_from(result, truck, mod_dir, dds_reader, textures, scripts)
     if mesh == null:
         return null
     var node: MeshInstance3D = MeshInstance3D.new()
