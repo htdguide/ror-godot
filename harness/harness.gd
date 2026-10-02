@@ -18,6 +18,18 @@ const EXIT_USAGE: int = 2
 const HDR_SETTLE_FRAMES: int = 4
 const GATE_DIR: String = "res://harness/gates"
 
+## How many gates are running right now, one per level of nesting.
+##
+## A gate may run gates — `console_fronts_agree` dispatches `gate run` through the console, and
+## `the_console_reports_a_run_as_it_happens` runs two real gates to watch the reporting. Each of
+## those emits a result line of its own, indistinguishable from a top-level one, and the order
+## check pairs lines by name: measured, `gate_metadata` and `static_state` produced four lines
+## each across two passes, so both of pass one's lines were paired against each other and pass
+## two was discarded. Two gates were not being order-checked at all.
+##
+## Held on the harness rather than in a `static var` so it is a property of this run and not of
+## the process, which is what `static_state` exists to enforce.
+var gate_depth: int = 0
 var args: HarnessArgs
 var metrics: HarnessMetrics
 var rng: RandomNumberGenerator
@@ -70,6 +82,15 @@ func begin(main: Node) -> void:
         _quit(EXIT_OK)
         return
     _apply_determinism()
+    # A window a person asked for comes to the front; a gate window never does.
+    #
+    # `display/window/size/no_focus` is a creation-time flag, so every window this project opens
+    # starts unfocused and the one case that wants focus asks for it here. A suite run used to
+    # pull the keyboard away from whatever was being typed into, which is worse than it sounds:
+    # the text goes to the game, and the game is listening for keys.
+    if args.has_flag("play"):
+        DisplayServer.window_move_to_foreground()
+        get_window().grab_focus()
     _open_console()
     # `--console` on its own is a session that exists to be driven: it holds the process open,
     # serving the agent's channel and the keyboard, until something tells it to quit. Without
@@ -202,7 +223,7 @@ func _run_capture() -> void:
         return
     var vehicle_path: String = args.get_string("vehicle", "")
     if vehicle_path != "":
-        var loaded: String = _load_vehicle(vehicle_path)
+        var loaded: String = VehicleSession.load_into(self, vehicle_path)
         if loaded != "":
             _die(EXIT_USAGE, loaded)
             return
@@ -333,38 +354,6 @@ func _run_command(line: String) -> void:
 ## See `HarnessCapture.use_measurement_environment` for why both halves of it matter.
 func use_measurement_environment() -> void:
     HarnessCapture.use_measurement_environment(world)
-func _load_vehicle(spec: String) -> String:
-    var parts: PackedStringArray = spec.split(":")
-    if parts.size() != 2:
-        return "expected --vehicle <mod dir>:<truck file>, got '%s'" % spec
-    var mod_dir: String = parts[0]
-    if not mod_dir.is_absolute_path():
-        mod_dir = SourceScan.repo_root().path_join(mod_dir)
-    # The blockout scale props exist to give an empty frame something to measure. With a
-    # vehicle loaded they are just obstacles for it to sit inside.
-    for prop: Node in world.get_children():
-        if str(prop.name).begins_with("Box") or str(prop.name) == "Sphere":
-            prop.queue_free()
-
-    var built: Dictionary = VehicleBuilder.build(mod_dir, parts[1])
-    if (built.get("error", "") as String) != "":
-        return built["error"] as String
-    var root: Node3D = built["root"] as Node3D
-    world.add_child(root)
-    var bounds: AABB = VehicleBuilder.world_bounds(root)
-    # Stand it on the ground, where a person expects to find it. A driving session skips
-    # this: the solver spawns the rig above the ground itself and every pose after that
-    # carries the rig's own position, so shifting it here would offset it twice.
-    if not args.has_flag("play"):
-        root.position += Vector3(
-            -bounds.get_center().x, -bounds.position.y, -bounds.get_center().z
-        )
-    vehicle = built
-    print("HARNESS_VEHICLE " + JSON.stringify({
-        "parts": int(built["built"]), "wheels": int(built["wheels"]),
-        "size": "%.2f x %.2f x %.2f" % [bounds.size.x, bounds.size.y, bounds.size.z],
-    }))
-    return ""
 
 
 ## Builds the world a gate asked for. Gates never construct scenes themselves.

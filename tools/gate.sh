@@ -335,23 +335,39 @@ print(' '.join(gates))
     echo "order check: $(list_gates | wc -l | tr -d ' ') gates, twice, in ONE session (seed $seed)" >&2
     output="$(run_engine --command "exec $script" 2>&1)"
     rm -f "$script"
+    # The raw session is kept, because when this check fails it is the only evidence there is.
+    # Everything below reduces 180-odd result lines to a verdict, and a failure that says "ran in
+    # only one of the two passes" is unactionable without the lines it was reduced from.
+    mkdir -p "$ARTIFACTS/order-check"
+    printf '%s\n' "$output" > "$ARTIFACTS/order-check/session.txt"
     printf '%s\n' "$output" | python3 -c '
 import json, sys
 
-# Two passes over every gate in one process: the first line for a gate is pass one, the second
-# is pass two. A gate that runs gates emits lines of its own, so only the first two for each
-# name are taken -- a third line for one gate would silently shift every comparison after it.
-first, second = {}, {}
+# Two passes over every gate in one process: the first line for a gate is pass one, the second is
+# pass two. A gate that runs gates emits lines of its own and they carry a `nested` mark, so they
+# are skipped here. Before that mark existed, gate_metadata and static_state emitted four lines
+# each across the two passes, so both lines from pass one were paired against each other and pass
+# two was thrown away -- two gates were not being order-checked at all.
+#
+# A name that still turns up more than twice is reported rather than silently truncated. Quietly
+# keeping the first two is exactly how the previous fault stayed invisible.
+first, second, extra = {}, {}, {}
 for line in sys.stdin:
     if "HARNESS_GATE_RESULT " not in line:
         continue
     row = json.loads(line.split("HARNESS_GATE_RESULT ", 1)[1])
+    if row.get("nested"):
+        continue
     gate = row.get("gate", "?")
     value = ("PASS" if row.get("pass") else "FAIL", repr(row.get("measured")))
     if gate not in first:
         first[gate] = value
     elif gate not in second:
         second[gate] = value
+    else:
+        extra[gate] = extra.get(gate, 2) + 1
+for gate, seen in sorted(extra.items()):
+    sys.stderr.write("order check: %s produced %d top-level results, expected 2\n" % (gate, seen))
 for table, path in ((first, sys.argv[1]), (second, sys.argv[2])):
     with open(path, "w") as handle:
         for gate in sorted(table):

@@ -21,6 +21,15 @@ gdscript/warnings/unsafe_property_access=1
 gdscript/warnings/unsafe_method_access=1
 gdscript/warnings/return_value_discarded=0
 
+[display]
+
+; Gate windows must not steal focus. A suite run opens a window and starts rendering, and on macOS
+; that pulls the keyboard away from whatever was being typed into — reported from a session where
+; focus jumped mid-sentence and the text went to the game. The flag is read when the window is
+; created, so it cannot be turned on later for gates only; it is off for everybody here and the
+; window a person actually asked for takes focus deliberately instead, in `Harness.begin`.
+window/size/no_focus=true
+
 [rendering]
 
 renderer/rendering_method="forward_plus"

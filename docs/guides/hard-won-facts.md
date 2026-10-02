@@ -305,3 +305,20 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   renders La Paz with no vegetation and no vehicle and reports 116 draw calls; the window, with
   both, reported 135 to 202. Any performance claim has to name which of the two it was measured
   in, and a budget met in the first says nothing about the second.
+- **The order check was comparing two gates against themselves.** It paired result lines by name,
+  taking the first for pass one and the second for pass two — but a gate may run gates, and
+  `the_console_reports_a_run_as_it_happens` runs `gate_metadata` and `static_state` while
+  `console_fronts_agree` asks three times for a gate that does not exist. Measured: four result
+  lines each for those two names and six for the phantom, so both of pass one's lines were paired
+  against each other and pass two was discarded. Two real gates were not order-checked at all and
+  a name that never ran at the top level was. Nested results now say so and are skipped; the check
+  compares 90 names where it used to compare 91, and reports any name that still appears more than
+  twice rather than silently keeping the first two.
+- **Reducing evidence to a verdict before saving it makes a failure unactionable.** The order check
+  turns ~190 result lines into one line and kept none of them, so an intermittent "ran in only one
+  of the two passes" could not be investigated after the fact. It now writes the whole session to
+  `artifacts/order-check/session.txt` every run.
+- **A leak check with slack hides a leak until something else lands on top of it.** Every nested
+  gate run built its own full-window `TextureRect` and left it in the tree — three nodes, under a
+  slack of eight, invisible for as long as it existed. Adding two more nodes per run took it to
+  nine and the container leak check caught the whole thing at once.
