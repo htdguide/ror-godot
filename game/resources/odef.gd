@@ -19,18 +19,28 @@ extends RefCounted
 ## untextured shells — a house with no texture, or half a one where the hull covered part of it —
 ## and every building on the map paid for a second mesh it should never have drawn.
 ##
-## Only the geometry is read here. Collision boxes are counted so that a terrain's solid parts can
-## be counted honestly; the flags are not read at all.
+## **`beginbox` is the collision the author wrote down.** Its `boxcoords` line is six numbers —
+## `minx, maxx, miny, maxy, minz, maxz` — in a Y-up frame, unlike the mesh, which is Z-up and gets
+## pitched -90 degrees when it is placed. `road-slab.odef` is `boxcoords -5.01, 5.01, -3, 0.3,
+## -5.01, 5.01`: a 10 m slab, 3.3 m thick, its top 0.3 m above the object's origin. That is the
+## surface a truck drives on, and counting those boxes without building them is why a visible road
+## had nothing under it. Port Starling places 189 of them and 139 `road-park`.
+##
+## A box marked `virtual` is an event zone and not solid — upstream gates every solid response on
+## `!cbox->virt` — so it is read and marked rather than dropped.
+##
+## The flags beyond that are not read: `event`, `forcecamera`, `direction`, `stdfriction`.
 
 
-## Reads an .odef. Returns {"error", "meshes", "collision_meshes", "scale", "boxes"}.
+## Reads an .odef. Returns {"error", "meshes", "collision_meshes", "scale", "boxes"}, where a box
+## is {"min", "max", "rotation", "virtual"} in the object's own Y-up frame.
 static func read(path: String) -> Dictionary:
     var out: Dictionary = {
         "error": "",
         "meshes": PackedStringArray(),
         "collision_meshes": PackedStringArray(),
         "scale": Vector3.ONE,
-        "boxes": 0,
+        "boxes": [] as Array[Dictionary],
     }
     var text: String = RorText.read(path)
     if text.is_empty():
@@ -38,7 +48,8 @@ static func read(path: String) -> Dictionary:
         return out
     var meshes: PackedStringArray = PackedStringArray()
     var hulls: PackedStringArray = PackedStringArray()
-    var boxes: int = 0
+    var boxes: Array[Dictionary] = []
+    var box: Dictionary = {}
     var seen: int = 0
     var in_mesh: bool = false
     for raw_line: String in text.split("\n"):
@@ -62,7 +73,33 @@ static func read(path: String) -> Dictionary:
                 in_mesh = false
                 continue
             "beginbox":
-                boxes += 1
+                box = {
+                    "min": Vector3.ZERO, "max": Vector3.ZERO,
+                    "rotation": Vector3.ZERO, "virtual": false,
+                }
+                continue
+            "endbox":
+                if not box.is_empty():
+                    boxes.append(box)
+                box = {}
+                continue
+            "boxcoords":
+                if not box.is_empty():
+                    # minx, maxx, miny, maxy, minz, maxz — paired by axis, not by corner.
+                    var n: PackedStringArray = (
+                        line.substr(line.find(" ") + 1).replace(",", " ").split(" ", false)
+                    )
+                    if n.size() >= 6:
+                        box["min"] = Vector3(n[0].to_float(), n[2].to_float(), n[4].to_float())
+                        box["max"] = Vector3(n[1].to_float(), n[3].to_float(), n[5].to_float())
+                continue
+            "rotate":
+                if not box.is_empty():
+                    box["rotation"] = RorText.vector3(line.substr(line.find(" ") + 1))
+                continue
+            "virtual":
+                if not box.is_empty():
+                    box["virtual"] = true
                 continue
             "mesh":
                 if in_mesh:

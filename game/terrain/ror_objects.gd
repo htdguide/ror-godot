@@ -124,7 +124,7 @@ static func unbuilt(terrain: RorTerrain) -> Dictionary:
     var caches: Dictionary = state(terrain)
     for placement: Dictionary in placements(terrain):
         var odef: Dictionary = definition(terrain, placement["name"] as String, caches)
-        boxes += odef.get("boxes", 0) as int
+        boxes += (odef["boxes"] as Array[Dictionary]).size()
     return {
         "grass": grass, "collision_boxes": boxes, "unread_lines": unread,
         "road_points": roads, "actor_spawns": actors,

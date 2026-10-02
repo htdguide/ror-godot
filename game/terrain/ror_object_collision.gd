@@ -65,6 +65,17 @@ static func boxes(terrain: RorTerrain) -> Array[Dictionary]:
         var definition: Dictionary = RorObjects.definition(terrain, name, state)
         if (definition.get("error", "") as String) != "":
             continue
+        # The author's own boxes first, where there are any. A `beginbox` is a statement about
+        # what is solid, written by the person who placed the object, and it is right where this
+        # method's approximation is weakest: a road slab is flat, so its derived columns fall
+        # under the obstacle threshold and it gets nothing at all, which is a visible road a
+        # truck drives straight through. `road-slab.odef` says `boxcoords -5.01, 5.01, -3, 0.3,
+        # -5.01, 5.01` — a 10 m slab 3.3 m thick, top 0.3 m up — and Port Starling places 189 of
+        # them.
+        var authored: Array[Dictionary] = _authored_boxes(placement, definition)
+        if not authored.is_empty():
+            out.append_array(authored)
+            continue
         var local: Array[Dictionary] = _shape_of(terrain, name, definition, state, shapes)
         if local.is_empty():
             continue
@@ -79,6 +90,54 @@ static func boxes(terrain: RorTerrain) -> Array[Dictionary]:
                 "half": (cell["half"] as Vector3) * scale.abs(),
                 "name": name,
             })
+    return out
+
+
+## The collision boxes an object definition declares, placed in the world.
+##
+## **A box is not in the mesh's frame.** Upstream turns the visual node by the placement's
+## rotation and then pitches it -90 degrees because object meshes are authored Z-up
+## (`TerrainObjectManager::LoadTerrainObject`); the box gets the placement's rotation and **no
+## pitch** (`Collisions::addCollisionBox`), so `boxcoords` is read Y-up. `road-slab`'s
+## `-3 .. 0.3` is its thickness, which only makes sense that way round.
+##
+## The scale multiplies the coordinates in the box's own axes before the rotation — upstream's
+## `coll_box.relo = l * sc` — which is the same thing a scene node's local scale does.
+##
+## A `virtual` box is an event zone: upstream gates every solid response on `!cbox->virt`.
+static func _authored_boxes(
+    placement: Dictionary, definition: Dictionary
+) -> Array[Dictionary]:
+    var out: Array[Dictionary] = []
+    var scale: Vector3 = definition["scale"] as Vector3
+    var degrees: Vector3 = placement["rotation"] as Vector3
+    var frame: Basis = (
+        Basis(Vector3.RIGHT, deg_to_rad(degrees.x))
+        * Basis(Vector3.UP, deg_to_rad(degrees.y))
+        * Basis(Vector3.BACK, deg_to_rad(degrees.z))
+    )
+    for box: Dictionary in definition["boxes"] as Array[Dictionary]:
+        if box["virtual"] as bool:
+            continue
+        var low: Vector3 = (box["min"] as Vector3) * scale
+        var high: Vector3 = (box["max"] as Vector3) * scale
+        var half: Vector3 = ((high - low) * 0.5).abs()
+        if half.x <= 0.0 or half.y <= 0.0 or half.z <= 0.0:
+            continue
+        var self_rotation: Vector3 = box["rotation"] as Vector3
+        var spun: Basis = (
+            Basis(Vector3.RIGHT, deg_to_rad(self_rotation.x))
+            * Basis(Vector3.UP, deg_to_rad(self_rotation.y))
+            * Basis(Vector3.BACK, deg_to_rad(self_rotation.z))
+        )
+        var centre: Vector3 = (low + high) * 0.5
+        out.append({
+            "transform": Transform3D(
+                frame * spun, (placement["position"] as Vector3) + frame * centre
+            ),
+            "half": half,
+            "name": placement["name"],
+        })
     return out
 
 

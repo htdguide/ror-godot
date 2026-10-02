@@ -294,3 +294,25 @@ See `hard-won-facts.md` for the solver, the terrain, the formats and the gate di
   a negative 32-bit size cast to `size_t`. The derived roughness would have been uniformly wrong
   rather than absent, which no gate asking "is there a roughness texture" can see. Decompress
   first.
+- **`beginbox` is the collision the author wrote down, and it was counted and thrown away.** Its
+  `boxcoords` line is six numbers paired by axis — `minx, maxx, miny, maxy, minz, maxz` — so
+  `road-slab.odef`'s `-5.01, 5.01, -3, 0.3, -5.01, 5.01` is a 10 m slab 3.3 m thick whose top is
+  0.3 m above the object's origin. Collision for scenery was derived instead by voxelising the
+  visual mesh into columns, discarding any column under half a metre as drawn detail rather than
+  structure — right for wires and kerb lips, exactly wrong for a road, whose whole shape is flat.
+  Every raised road on every map was drawn and not solid. Port Starling: 358 placements declare
+  boxes, 357 of them solid, and its scenery went from 2365 solid parts to 4595.
+- **A collision box is not in the mesh's frame.** Upstream turns an object's visual node by the
+  placement rotation and then pitches it -90 degrees because object meshes are authored Z-up
+  (`TerrainObjectManager::LoadTerrainObject`); the box gets the placement rotation and **no pitch**
+  (`Collisions::addCollisionBox`). So `boxcoords` reads Y-up, which is the only way `road-slab`'s
+  `-3 .. 0.3` is a thickness rather than a 10 m wall. The header scale multiplies the coordinates
+  in the box's own axes before the rotation — upstream's `coll_box.relo = l * sc`.
+- **A `virtual` box is an event zone, not a solid.** Every solid response upstream is gated on
+  `!cbox->virt`. Port Starling declares 31 of them and Russia 8, all of them spawn and sale zones,
+  and making them solid would put invisible walls across the map.
+- **A drop test has to land on the middle of what it is testing.** The first run of
+  `a_raised_road_holds_a_vehicle_up` dropped the truck on the placement's origin, which on a crane
+  whose box starts a metre away left most of the rig hanging over the edge, and read as 0.91 m of
+  penetration into a box that was working perfectly. Dropped on the box's own centre it rests at
+  exactly the declared top — the same figure, to a centimetre, as it rests on open ground.
