@@ -186,6 +186,36 @@ func _world_section() -> void:
             if _sun != null:
                 _sun.shadow_enabled = on
     )
+    # The fill, which until now could not be touched from here at all.
+    #
+    # It is a second directional light, it is a cool blue against a warm sun, and unlike most
+    # fills it casts a shadow of its own with half the sun's range. That makes it the first thing
+    # to try when something on the ground looks like a region rather than a shape — a reported
+    # rectangle under the vehicle is what showed there was no way to test it.
+    var fill: DirectionalLight3D = _fill()
+    MenuWidgets.slider(
+        _rows, "Fill brightness", 0.0, 4.0, fill.light_energy if fill != null else 0.0,
+        func(value: float) -> void:
+            var light: DirectionalLight3D = _fill()
+            if light != null:
+                light.light_energy = value
+    )
+    MenuWidgets.check(
+        _rows, "Fill shadows", fill != null and fill.shadow_enabled,
+        func(on: bool) -> void:
+            var light: DirectionalLight3D = _fill()
+            if light != null:
+                light.shadow_enabled = on
+    )
+
+
+## The fill light, found through the sun rather than passed in: both are built by
+## `BlockoutWorld` into the same world, and a second parameter through four call sites to reach a
+## sibling node is worse than asking the sun where it lives.
+func _fill() -> DirectionalLight3D:
+    if _sun == null or _sun.get_parent() == null:
+        return null
+    return _sun.get_parent().get_node_or_null(^"Fill") as DirectionalLight3D
 
 
 ## The sky: how bright it is, how it is graded, and what is in it.

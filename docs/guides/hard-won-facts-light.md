@@ -157,3 +157,23 @@ See `hard-won-facts.md` for the solver, the file formats, the terrain and the ga
   hero truck, peaked at 1.376, and read that as missing headroom. There was no sun in the shot:
   the brightest thing in a three-quarter view of a truck is the sky. Aim at the light the preset
   actually places rather than lowering the threshold to fit the picture that missed it.
+- **A `ReflectionProbe` lights everything inside its box, not just the object it was added for.**
+  `ActorProbe` gave each vehicle a probe sized to the bodywork plus a 1.5 m margin, so the probe
+  claimed a ring of road and lit it from a capture taken once, when the vehicle was built. Cycling
+  the weather left that road holding daylight while everything outside the box went blue: a hard,
+  world-axis-aligned rectangle around the truck, reported twice from the window. Measured on a
+  uniform test road, 403.8% colour difference between road inside the box and open road.
+- **A probe's box is its influence; `max_distance` is its capture.** The 1.5 m margin existed "so
+  the probe captures the ground under the vehicle", which is not what the box does. Shrinking the
+  box to 0.2 m keeps every ground reflection — capture range is unchanged — and takes the road
+  difference to 4.5%. A gate had encoded the same confusion and demanded the larger margin.
+- **The probe's ambient term is the larger half of that fault, and `intensity` does not touch it.**
+  `ambient_mode` defaults to contributing ambient light, frozen with the capture. Disabling it
+  alone took 403.8% to 135.1%. Setting the probe's intensity to zero — the probe contributing no
+  visible reflection at all — still measured 243.4%, because intensity scales the reflection and
+  not the ambient. A probe that is "off" can still be lighting the scene.
+- **Comparing one surface under two lights needs one pixel mask.** `body_blocks_sun` averaged each
+  frame over its own above-floor pixels, so the darker frame's mean was taken over only its
+  brightest survivors and the ratio was pulled towards one. It had been reporting 1.18 against a
+  1.25 bar; with the lit frame's mask applied to both, the same scene reads 8.93. A segmentation
+  that moves with the thing being measured is not a measurement.

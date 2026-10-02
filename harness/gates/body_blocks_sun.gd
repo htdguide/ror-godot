@@ -96,7 +96,14 @@ func run(harness: Node) -> Dictionary:
     if (back["error"] as String) != "":
         return fail(back["error"] as String)
 
-    var pixels: int = mini(front["pixels"] as int, back["pixels"] as int)
+    # Framing is geometry, so it is measured on the lit frame.
+    #
+    # This used to take the smaller of the two counts, which conflates "is the vehicle in shot"
+    # with "is this side of it lit". Body pixels are those above a luminance floor in a darkroom,
+    # so the back-lit frame's count is a lighting measurement wearing a framing check's clothes —
+    # and it collapsed the moment the vehicle stopped being lit by a reflection probe's stale
+    # ambient, which is a bug being fixed rather than light this gate should ever have had.
+    var pixels: int = front["pixels"] as int
     if pixels < MIN_BODY_PIXELS:
         return fail(
             "only %d body pixels in frame, under %d: the camera is not framing the"
@@ -104,8 +111,18 @@ func run(harness: Node) -> Dictionary:
             + " vehicle, so brightness here would not be a statement about the bodywork",
             pixels
         )
-    var lit: float = front["luma"] as float
-    var unlit: float = back["luma"] as float
+    # Both frames averaged over the *same* pixels: the ones the lit frame says are bodywork.
+    #
+    # Each frame used to be averaged over its own above-floor pixels, which is not a comparison of
+    # one surface under two lights — it is a comparison of two different surfaces. The darker
+    # frame's set is whatever survived the floor, so its mean is taken over only its brightest
+    # survivors and the ratio is pulled towards one. Measured, that read 1.18 where a shared mask
+    # reads the real figure.
+    var compared: Dictionary = _compare(front["png"] as String, back["png"] as String)
+    if (compared["error"] as String) != "":
+        return fail(compared["error"] as String)
+    var lit: float = compared["lit"] as float
+    var unlit: float = compared["unlit"] as float
     var ratio: float = lit / maxf(unlit, 0.0001)
     if ratio < MIN_LIT_RATIO:
         return fail(
@@ -139,6 +156,34 @@ func _render_lit(
     measured["error"] = ""
     measured["png"] = shot["png"]
     return measured
+
+
+## Averages both frames over one mask: the pixels the lit frame shows as bodywork.
+##
+## Returns {"error", "lit", "unlit"}.
+func _compare(lit_png: String, unlit_png: String) -> Dictionary:
+    var lit_image: Image = Image.load_from_file(lit_png)
+    var unlit_image: Image = Image.load_from_file(unlit_png)
+    if lit_image == null or unlit_image == null:
+        return {"error": "a capture could not be read back", "lit": 0.0, "unlit": 0.0}
+    if lit_image.get_size() != unlit_image.get_size():
+        return {"error": "the two captures are different sizes", "lit": 0.0, "unlit": 0.0}
+    var lit_total: float = 0.0
+    var unlit_total: float = 0.0
+    var count: int = 0
+    for y: int in lit_image.get_height():
+        for x: int in lit_image.get_width():
+            var luma: float = lit_image.get_pixel(x, y).get_luminance()
+            if luma < BODY_LUMA_FLOOR:
+                continue
+            lit_total += luma
+            unlit_total += unlit_image.get_pixel(x, y).get_luminance()
+            count += 1
+    if count == 0:
+        return {"error": "no bodywork pixels in the lit frame", "lit": 0.0, "unlit": 0.0}
+    return {
+        "error": "", "lit": lit_total / float(count), "unlit": unlit_total / float(count),
+    }
 
 
 ## Returns {"luma": float, "pixels": int} over the pixels that are vehicle, not background.

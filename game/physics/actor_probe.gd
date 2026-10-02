@@ -12,9 +12,20 @@ extends RefCounted
 ## rate, because a probe that re-renders every frame costs six faces of scene rendering for
 ## a reflection nobody is inspecting closely while the vehicle is moving.
 
-## How much bigger than the vehicle the probe's box is. A probe exactly the size of the body
-## captures nothing of the ground under it, which is most of what a car's lower panels show.
-const MARGIN_M: float = 1.5
+## How much bigger than the vehicle the probe's box is.
+##
+## **The box is the probe's influence, not its capture**, and conflating the two is what caused a
+## reported bug. This margin used to be 1.5 m "so the probe captures the ground under the
+## vehicle" — but what a probe captures is set by where it stands and `max_distance`, while the
+## box decides which surfaces it *lights*. Godot applies a probe to everything inside its box,
+## not just the object it was added for, so a 1.5 m margin handed the probe a ring of road and
+## lit it differently from the road beyond: a hard rectangle around the vehicle, reported from
+## the window as the scene's colour not applying there.
+##
+## Small enough to bound the vehicle and little else; `MAX_DISTANCE_M` still reaches the ground,
+## so the lower panels reflect it exactly as before. Measured against the road either side of the
+## box, this takes the difference from 403.8% to 4.5%.
+const MARGIN_M: float = 0.2
 ## Reflections are blended out past the box rather than ending at its face.
 const BLEND_DISTANCE_M: float = 1.0
 ## Enough range to catch the ground, the wheels and whatever the vehicle is next to.
@@ -34,6 +45,15 @@ static func add(root: Node3D) -> ReflectionProbe:
     probe.size = local.size + Vector3.ONE * (2.0 * MARGIN_M)
     probe.position = local.get_center()
     probe.update_mode = ReflectionProbe.UPDATE_ONCE
+    # The probe lights nothing; it only reflects.
+    #
+    # A reflection probe also injects an ambient term by default, and with `UPDATE_ONCE` that term
+    # is frozen at the moment the vehicle was built. Cycling the weather then left the enclosed
+    # ground lit by a daylight ambient while everything outside the box went blue — measured, the
+    # single largest contributor to the reported rectangle, worth 403.8% against 135.1% with it
+    # off. Turning the probe's *intensity* to zero does not help, because intensity scales the
+    # reflection and not this: with the probe contributing nothing visible it still read 243.4%.
+    probe.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
     probe.intensity = INTENSITY
     probe.max_distance = MAX_DISTANCE_M
     probe.blend_distance = BLEND_DISTANCE_M
