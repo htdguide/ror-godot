@@ -218,8 +218,11 @@ func _parse_row(line: String) -> void:
         # body rather than being a rigid mesh. The rows are read the same way; what upstream does
         # differently with them is a flex question and not a parsing one. Without this the Mazda
         # 626, whose wheels are all `flexbodywheels`, built 14 parts and no wheels at all.
-        "meshwheels2", "meshwheels", "flexbodywheels":
-            _parse_mesh_wheel(line)
+        "meshwheels2", "meshwheels":
+            _parse_mesh_wheel(line, false)
+        # Same first eleven fields, a different tail: see `WheelRig.parse_row`.
+        "flexbodywheels":
+            _parse_mesh_wheel(line, true)
         "cameras":
             _cameras.read_cameras(TruckLexer.fields(line))
         "minimass":
@@ -286,10 +289,12 @@ func _parse_minimass(line: String) -> void:
         minimass_kg = fields[0].to_float()
 
 
-func _parse_mesh_wheel(line: String) -> void:
+func _parse_mesh_wheel(line: String, flexbody: bool) -> void:
     if line.begins_with("set_"):
         return  # Inline defaults directives, not wheel rows.
-    var row: Dictionary = WheelRig.parse_row(TruckLexer.fields(line), _node_id_to_index)
+    var row: Dictionary = WheelRig.parse_row(
+        TruckLexer.fields(line), _node_id_to_index, flexbody
+    )
     if (row["error"] as String) != "":
         errors.append("meshwheel %s: %s" % [row["error"], line])
         return

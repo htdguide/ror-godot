@@ -377,3 +377,13 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   `dashboard-small.mesh` from Rigs of Rods base content that is not installed here. A gate that
   demands geometry from either is demanding a feature or inventing an asset; both are reported
   and neither fails.
+- **`flexbodywheels` is not a `meshwheels2` row.** They share eleven fields and then diverge: a
+  mesh wheel carries `spring, damping, side, mesh, material`, a flexbody wheel carries
+  `tyre spring, tyre damp, rim spring, rim damp, side, rim mesh, tyre mesh`
+  (`RigDef_Parser.cpp`: `_ParseBaseMeshWheel` against `ParseFlexBodyWheel`). Read with the wrong
+  layout the Mazda took its side from a rim stiffness of 320000, its rim mesh from a damping of
+  40, and its material from the letter `l` — white tyres, no rims, and a car on its bump stops.
+  Three symptoms, one misread row, and the row was misread by this project rather than by the mod.
+- **A flexbody wheel's tyre is a mesh, not a material.** A mesh wheel names a material and the
+  tyre is swept procedurally and painted with it; a flexbody wheel names two meshes, rim and tyre.
+  Treating the second as a material leaves the tyre white with nothing in the log.

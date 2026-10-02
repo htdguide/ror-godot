@@ -32,13 +32,42 @@ const RIM_DAMP_FALLBACK: float = 150.0
 ## four-wheel drive, brakes all round, and a reference arm node per wheel for the reaction
 ## torque to push against. Dropped, every wheel rolls freely and no amount of engine makes
 ## the rig move.
-static func parse_row(fields: PackedStringArray, id_to_index: Dictionary) -> Dictionary:
-    if fields.size() < 16:
-        return {"error": "row has %d fields, expected at least 16" % fields.size()}
+## **`flexbodywheels` is not the same row, and reading it as one is a quiet disaster.** The two
+## agree for the first eleven fields and then diverge: a mesh wheel carries
+## `spring, damping, side, mesh, material` where a flexbody wheel carries
+## `tyre spring, tyre damp, rim spring, rim damp, side, rim mesh, tyre mesh`
+## (`RigDef_Parser.cpp`, `_ParseBaseMeshWheel` against `ParseFlexBodyWheel`).
+##
+## Read with the wrong layout, the Mazda 626 took its side from a rim stiffness of 320000, its rim
+## mesh from a damping figure of 40, and its material from the letter `l`. What that looks like on
+## screen is white tyres with no rims and a car sitting on its bump stops, which is exactly how it
+## was reported — three symptoms, one misread row.
+static func parse_row(
+    fields: PackedStringArray, id_to_index: Dictionary, flexbody: bool = false
+) -> Dictionary:
+    var needed: int = 16 if not flexbody else 16
+    if fields.size() < needed:
+        return {"error": "row has %d fields, expected at least %d" % [fields.size(), needed]}
     var node1: int = int(id_to_index.get(fields[4], -1))
     var node2: int = int(id_to_index.get(fields[5], -1))
     if node1 < 0 or node2 < 0:
         return {"error": "row references an unknown node"}
+    # A flexbody wheel states the tyre and the rim separately; the rim is the stiffer pair and is
+    # what the mesh wheel's single pair corresponds to.
+    var spring: float = fields[11].to_float()
+    var damping: float = fields[12].to_float()
+    var side: String = fields[13].to_lower()
+    var mesh_name: String = fields[14]
+    var material_name: String = fields[15]
+    var tyre_mesh: String = ""
+    if flexbody:
+        side = fields[15].to_lower()
+        mesh_name = fields[16] if fields.size() > 16 else ""
+        # Field 17 is the **tyre mesh**, not a material: a flexbody wheel draws its tyre as
+        # geometry where a mesh wheel sweeps one and paints it. Passing it on as a material name
+        # is what left the Mazda with white tyres after its rims came back.
+        tyre_mesh = fields[17] if fields.size() > 17 else ""
+        material_name = ""
     return {
         "error": "",
         "tire_radius": fields[0].to_float(),
@@ -53,11 +82,12 @@ static func parse_row(fields: PackedStringArray, id_to_index: Dictionary) -> Dic
         # also does: the reaction then has no lever and is skipped rather than misapplied.
         "arm_node": int(id_to_index.get(fields[9], -1)),
         "mass": fields[10].to_float(),
-        "spring": fields[11].to_float(),
-        "damping": fields[12].to_float(),
-        "side": fields[13].to_lower(),
-        "mesh": fields[14],
-        "material": fields[15],
+        "spring": spring,
+        "damping": damping,
+        "side": side,
+        "mesh": mesh_name,
+        "material": material_name,
+        "tyre_mesh": tyre_mesh,
         # Filled in by `generate` once the tread exists.
         "first_tread": -1,
         "tread_count": 0,

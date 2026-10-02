@@ -354,12 +354,23 @@ static func _build_wheel(
             if rim.mesh != null:
                 holder.add_child(rim)
 
+    # A flexbody wheel ships its tyre as a mesh; a mesh wheel has one swept and painted.
+    var tyre_mesh_name: String = wheel.get("tyre_mesh", "") as String
     var tyre: MeshInstance3D = MeshInstance3D.new()
     tyre.name = "Tyre"
-    tyre.mesh = WheelBuilder.build_tyre(truck.nodes, wheel)
-    tyre.material_override = MeshAssembler.material_for(
-        wheel["material"] as String, truck, mod_dir, dds_reader, textures
-    )
+    if tyre_mesh_name != "":
+        var tyre_path: String = mod_dir.path_join(tyre_mesh_name)
+        if FileAccess.file_exists(tyre_path):
+            var tyre_result: Dictionary = mesh_reader.read_file(tyre_path)
+            if (tyre_result.get("error", "") as String) == "":
+                tyre.mesh = MeshAssembler.mesh_from(
+                    tyre_result, truck, mod_dir, dds_reader, textures
+                )
+    if tyre.mesh == null:
+        tyre.mesh = WheelBuilder.build_tyre(truck.nodes, wheel)
+        tyre.material_override = MeshAssembler.material_for(
+            wheel["material"] as String, truck, mod_dir, dds_reader, textures
+        )
     holder.add_child(tyre)
     return holder
 
