@@ -811,67 +811,83 @@ everything above that does not need a network: two actors, two frames, two islan
 them, and a human able to drive one into the other. It exercises the multi-actor paths long before
 C5 and it is how a person judges whether any of this feels right.
 
-### 0.13 Seeing a long way: distant terrain
+### 0.13 Seeing a long way: the whole map, whatever size it is
 
-**Asked for 2026-10-02:** mountains visible far away, faint under haze, cheap — and working with
-existing Rigs of Rods maps with no authoring step.
+**Asked for 2026-10-02, and clarified the same day:** see the far parts of the map — mountains,
+buildings, everything the terrain itself contains — from anywhere in it, faint under haze, cheap.
+Inside the map's own bounds, nothing invented. It must work for a map of any size with no
+authoring step, because every terrain here comes out of somebody's existing files.
 
-**Measured first, because it changes the problem.** The camera's far plane is already 6000 m and
-La Paz is 4000 m across, so the whole map is inside the frustum today. Nothing is being clipped.
-What hides the distance is fog: at `FOG_DENSITY` 0.0006 per metre, the far edge of a 4 km map
-sits at about 9% visibility — the mountains are being drawn and then erased. Terrain3D's
-`mesh_lods` and `mesh_size` are also never set, so its LOD rings are at defaults nobody chose.
+**Measured before designing, and the measurements move the target.**
 
-So for a shipped RoR terrain this is **a fog curve and an LOD extent**, not a streaming system.
-That is worth saying plainly before any of the machinery below gets built: the techniques that
-follow exist for worlds of tens or hundreds of kilometres, and a 4 km map is not one.
+- The camera's far plane is already 6000 m and La Paz is 4000 m across, so the whole map is inside
+  the frustum. Nothing is being clipped.
+- Fog is what hides it: at `FOG_DENSITY` 0.0006 per metre the far edge of a 4 km map sits at about
+  9% visibility. The mountains are drawn and then erased.
+- Terrain3D's `mesh_lods` and `mesh_size` are never set, so its LOD rings are at defaults nobody
+  chose.
+- **Scenery has no distance handling at all.** `RorObjects` builds one node per placed object and
+  nothing in this project sets `visibility_range_begin` or `visibility_range_end` anywhere. Only
+  vegetation is instanced — `RorVegetation` already uses a `MultiMesh` per tile — and
+  `ror_objects.gd` carries a comment saying a terrain with thousands of objects will want the same
+  thing, which it does not yet have.
+- A session on La Paz, from the window's own HUD: **18.79 ms at 135 draw calls** looking along the
+  road, **28.47 ms at 202** in a busier view. M2 asks for 16.6 ms, so this is already over budget
+  on a 4 km map with one truck, before anything distant is added.
 
-**What the industry does, roughly in order of what it costs to adopt:**
+So this is two jobs that happen to share a name, and the second is the one that scales:
 
-- **Height fog with a proper curve, and aerial perspective.** Distance should desaturate towards
-  the sky's own colour rather than a constant grey, and thin with altitude so a peak stands clear
-  of the haze its base sits in. This is what actually makes a mountain read as *far* rather than
-  *faint*, and it is the cheapest item here by a wide margin. Godot's exponential fog has a height
-  term; the physically-derived version is an aerial-perspective LUT from the same atmosphere model
-  the sky already uses, so the haze and the sky agree by construction.
-- **Continuous terrain LOD.** Geometry clipmaps or a quadtree (CDLOD) — concentric rings of mesh
-  at halving resolution, so triangle density falls with distance and the far field costs little.
-  Terrain3D already implements this; the work is configuring its ring count and extent rather than
-  writing one.
-- **A far mesh.** One low-resolution mesh of the entire heightmap, no splat textures, shaded by
-  slope and height alone, drawn beyond the detailed rings. For a 4 km RoR map this is a few
-  thousand triangles for the whole world and needs no streaming at all.
-- **Impostors and painted horizons.** Render the distant world once into a panorama and draw it as
-  a backdrop, refreshed only when the camera moves far enough to matter. This is what most racing
-  games do, and it is how a 1 km map pretends to sit in a mountain range. Many RoR terrains already
-  ship a skybox with painted mountains, which is the same trick by hand.
-- **Depth precision.** At kilometre ranges a 24-bit depth buffer z-fights. Reversed-Z, a
-  logarithmic depth buffer, or a separate far pass with its own near/far planes are the standard
-  answers. Only needed once something is actually drawn out there.
-- **Camera-relative rendering.** Already recorded in §0.12 for a different reason; it is also what
-  keeps distant geometry from shimmering as float precision runs out.
+1. **The terrain's far field** — a fog curve and an LOD extent. For a 4 km map that is close to a
+   settings change; what makes it look right rather than merely visible is aerial perspective.
+2. **The scenery's far field** — culling, instancing and level of detail for placed objects. This
+   is where a huge map is won or lost, and it is untouched.
 
-**Proposed for RoR maps, cheapest first.** Fog curve and aerial perspective, then Terrain3D's LOD
-extent, then a far mesh if the map's own edge still disappoints. Impostors only if a map wants
-scenery beyond its own bounds.
+**What the industry does, in order of what it costs to adopt here:**
 
-**Open questions, for the owner:**
+- **Aerial perspective instead of flat fog.** Distance should desaturate towards the sky's own
+  colour and thin with altitude, so a peak stands clear of the haze its base sits in. That is what
+  makes a mountain read as *far* rather than merely *faint*. Derived from the same atmosphere model
+  the sky already uses, so haze and sky agree by construction rather than by two configs matching.
+- **Continuous terrain LOD.** Concentric rings of mesh at halving resolution — geometry clipmaps or
+  a quadtree. Terrain3D already implements this; the work is choosing its ring count and extent.
+- **Per-object visibility ranges with fade.** Godot's `visibility_range_begin/end` on every placed
+  object, with a hysteresis band so nothing pops. The cheapest large win available, and it is a
+  property set at load from the object's own size: a lamp post earns less distance than a hangar.
+- **Instancing by definition.** A RoR terrain places the same `.odef` many times — La Paz plants 99
+  identical poles. One `MultiMesh` per definition turns those into one draw call, which is exactly
+  what the vegetation path already does and what `ror_objects.gd` says it wants.
+- **Mesh LOD.** Godot generates LODs at import; these meshes are built at runtime from Ogre `.mesh`
+  files, so they have none. `ImporterMesh.generate_lods` is the runtime equivalent and would have
+  to run at load or be cached beside the terrain the way the heightmap already is.
+- **HLOD — merging distant clusters.** Beyond some range, a group of buildings becomes one baked
+  mesh or one impostor card. This is how open-world games draw a skyline for nothing, and it is the
+  first thing that needs a build step rather than a load-time derivation.
+- **Occlusion culling.** A hill in front of a town should stop the town being drawn at all. Godot
+  has occluders; a terrain could bake them from its own heightmap.
+- **Depth precision.** At kilometre ranges a 24-bit depth buffer z-fights. Reversed-Z, a log depth
+  buffer, or a separate far pass. Only needed once something is actually drawn out there.
 
-1. Within the map or beyond it? A RoR terrain is finite — La Paz is 4 km square and there is
-   nothing past the edge. "Mountains far far away" inside the map is a fog and LOD job; mountains
-   *beyond* the map means inventing terrain the physics does not have, which is a different
-   feature with its own rules about what happens when a vehicle drives at them.
-2. If beyond: invented procedurally, mirrored from the map's own heightmap, or a painted backdrop
-   taken from the terrain's own skybox where it ships one?
-3. Is the far field purely visual? Taking it as read that nothing out there collides, and that a
-   vehicle driving towards it meets the map's existing edge.
-4. What budget? M2 asks for 16.6 ms at 1080p with one truck; a far mesh is nearly free, an
-   impostor refresh is a spike that has to be amortised.
+**Order proposed.** Instancing by definition and per-object visibility ranges first, because they
+pay for themselves on a map that is already over budget. Then the fog curve and Terrain3D's LOD
+extent, which is what the request literally asks for. Then mesh LOD, then HLOD and occlusion if a
+map still cannot afford its own scenery.
 
-**Acceptance (draft):** a shipped RoR terrain renders its own far edge at a stated visibility
-rather than a measured 9%; the horizon silhouette is present in a capture from the map's centre;
-no z-fighting anywhere in the far field; and the frame cost of everything beyond the detailed
-rings is stated in milliseconds, measured, not estimated.
+**Everything derived at load from the terrain's own files.** No per-map authoring, no hand-written
+distance tables: a visibility range comes from an object's own bounds, an instance group from its
+`.odef` name, an occluder from the heightmap. A map this project has never seen must benefit the
+day it is dropped in.
+
+**Open question still worth an answer:** how big is "huge"? Terrain3D is region-based and streams,
+but the object and collision paths load a terrain's scenery in one go — La Paz's 396 solid parts
+are built at load. A 16 km map with ten thousand objects wants those streamed by region too, which
+is a larger piece of work than anything above and worth knowing about before, not during.
+
+**Acceptance (draft).** On La Paz and on a synthetic map at least four times its area: the far edge
+of the map renders at a stated visibility rather than a measured 9%; the horizon silhouette is
+present in a capture taken from the map's centre; placed objects are instanced by definition and
+carry visibility ranges, with draw calls and frame time stated before and after; no z-fighting
+anywhere in the far field; and the whole scene holds 16.6 ms at 1080p with one truck — measured in
+the window's own HUD, which is where the 18.79 and 28.47 ms above came from.
 
 ---
 
