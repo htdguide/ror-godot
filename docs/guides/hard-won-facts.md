@@ -360,3 +360,20 @@ this one hit the 400-line cap, and they are the area this project has been wrong
 - **A screenshot key that counts from zero destroys the evidence it was pressed to capture.**
   `play-0.png` was overwritten by every new session, so three shots of a reported fault came back
   as one and two stale ones from hours earlier. Named by the clock now.
+- **One test vehicle calibrates the loader to itself.** The hero truck's flexbody rotation is
+  `180, -90, 0`, for which upstream's Z-Y-X composition and Godot's default YXZ are *identical* —
+  measured in the engine, not argued. So the order could be wrong for every mod ever made and
+  that truck would never say so. The Mazda's `270, 180, 180` differ by exactly 180 degrees about
+  X, which is why it loaded upside down. Three loader faults surfaced the day a second and third
+  pack arrived, all silent: no error, no warning, just less vehicle than the file describes.
+- **`global_transform` on a detached node lies, and it lied twice in one session.** First the
+  flexbody direction comparison, then a "uniform offset" of every drawn part from the node box —
+  reported, chased, and non-existent. Measured in the tree, the hero truck's worst part sits
+  2.18 m from the centre of its own node box, which is half a 4.5 m car: a bumper is at the end.
+  Compare transforms in the tree, and pick a reference that means something.
+- **Not every vehicle draws, and the reasons differ.** NhelensGrass's bridge, crane and monorail
+  and the Daf semi trailer have their geometry in `submesh` sections, which this project reads
+  for collision and never renders. Starling Island's vehicles name `seat.mesh` and
+  `dashboard-small.mesh` from Rigs of Rods base content that is not installed here. A gate that
+  demands geometry from either is demanding a feature or inventing an asset; both are reported
+  and neither fails.
