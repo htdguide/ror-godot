@@ -294,3 +294,14 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   same gate first switched `golden_dusk` to `noon_clear`, which share every environment field it
   compared, so half the gate passed regardless. Switching from `spike_black` — no atmosphere at
   all against a physical sky — is what made the environment half able to fail.
+- **Instancing La Paz's scenery won nothing, and the measurement is the point.** Grouping placed
+  objects into `MultiMesh` batches took 101 nodes to 34 and left peak draw calls at 116 either way
+  (15.98 ms against 16.11). A 4 km map with a hundred objects was never spending its frame on
+  them: a node census of that scene is 34 object batches, one Terrain3D, two meshes and two
+  lights, so the terrain dominates. The change is worth keeping because batch count grows with
+  distinct meshes times occupied tiles rather than with placements, which is what a ten-thousand
+  object map needs — but it is a scalability change and calling it a speedup would be false.
+- **The gate's terrain scene and the session's are not the same scene.** `ror_terrain_photoset`
+  renders La Paz with no vegetation and no vehicle and reports 116 draw calls; the window, with
+  both, reported 135 to 202. Any performance claim has to name which of the two it was measured
+  in, and a budget met in the first says nothing about the second.

@@ -69,29 +69,40 @@ func run(_harness: Node) -> Dictionary:
             placements.size() - listed
         )
 
+    # Objects are drawn as `MultiMeshInstance3D` batches — one per mesh per tile — so what is
+    # counted here is derived from the instance transforms rather than from the number of nodes.
+    # Counting children would count batches, and a batch is not an object: La Paz's 101 objects
+    # come to 34 of them. Derived rather than asked for, so the thing under test is not the thing
+    # reporting on itself.
     var root: Node3D = RorObjects.build(terrain)
-    var built: int = root.get_child_count()
     var triangles: int = 0
     var span: Vector2 = Vector2(
         terrain.geometry["world_x"] as float, terrain.geometry["world_z"] as float
     )
     var outside: PackedStringArray = PackedStringArray()
     var textured: int = 0
+    var places: Dictionary = {}
     for child: Node in root.get_children():
-        var node: Node3D = child as Node3D
-        var at: Vector3 = node.position
-        if (
-            at.x < -MAX_OUTSIDE_M or at.x > span.x + MAX_OUTSIDE_M
-            or at.z < -MAX_OUTSIDE_M or at.z > span.y + MAX_OUTSIDE_M
-        ):
-            outside.append("%s at %v" % [node.name, at])
-        for mesh_child: Node in node.get_children():
-            var instance: MeshInstance3D = mesh_child as MeshInstance3D
-            if instance == null or instance.mesh == null:
-                continue
-            triangles += _triangles(instance.mesh as ArrayMesh)
-            if _is_textured(instance.mesh as ArrayMesh):
-                textured += 1
+        var batch: MultiMeshInstance3D = child as MultiMeshInstance3D
+        if batch == null or batch.multimesh == null or batch.multimesh.mesh == null:
+            continue
+        var mesh: ArrayMesh = batch.multimesh.mesh as ArrayMesh
+        var per_instance: int = _triangles(mesh)
+        var drawn_here: int = batch.multimesh.instance_count
+        triangles += per_instance * drawn_here
+        if _is_textured(mesh):
+            textured += drawn_here
+        for index: int in drawn_here:
+            var at: Vector3 = batch.multimesh.get_instance_transform(index).origin
+            # One object can carry several meshes and so appear in several batches at the same
+            # place; counted by where it stands, it is one object either way.
+            places[Vector3i(roundi(at.x), roundi(at.y), roundi(at.z))] = true
+            if (
+                at.x < -MAX_OUTSIDE_M or at.x > span.x + MAX_OUTSIDE_M
+                or at.z < -MAX_OUTSIDE_M or at.z > span.y + MAX_OUTSIDE_M
+            ):
+                outside.append("%s at %v" % [batch.name, at])
+    var built: int = places.size()
     root.queue_free()
 
     var share: float = float(built) / float(maxi(listed, 1))

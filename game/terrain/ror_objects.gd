@@ -7,9 +7,20 @@ extends RefCounted
 ## file the terrain's author shipped, and following the chain is the whole of this file.
 ##
 ## Meshes and materials are cached by name, so a hundred identical poles are a hundred transforms
-## over one mesh rather than a hundred parses of the same file. Nothing is instanced beyond that
-## yet: a terrain with thousands of objects will want a MultiMesh per definition, and this one has
-## a hundred.
+## over one mesh rather than a hundred parses of the same file.
+##
+## **They are also drawn that way.** Placements are grouped by mesh and by tile and handed to one
+## `MultiMeshInstance3D` each, so La Paz's 99 identical poles cost one draw call per tile they
+## fall in rather than 99 nodes. The same terrain was measured at 135 to 202 draw calls and 18.79
+## to 28.47 ms in a session window, against M2's 16.6 ms budget, which is what made this worth
+## doing before anything that adds more scenery.
+##
+## **The tiles are not an optimisation, they are what keeps the optimisation from backfiring.** A
+## single MultiMesh spanning the whole map has an axis-aligned box covering the whole map, so it
+## is in frustum from everywhere and is drawn whichever way the camera points. Grouping by tile
+## keeps each batch small enough in space that the renderer can still throw most of them away.
+## `RorVegetation` reached the same conclusion for grass and the tiles here are the same idea at a
+## larger size, because a building is rarer and bigger than a tuft of grass.
 ##
 ## What is *not* here: the collision boxes an object definition can carry, and the vegetation the
 ## object file asks for. Both are counted and reported rather than quietly dropped.
@@ -18,6 +29,10 @@ extends RefCounted
 ## ground skirt — and they are drawn like anything else. This is only the sanity bound on how far
 ## outside the map an object may be placed before the file is being read wrong.
 const MAX_OUTSIDE_M: float = 6000.0
+## How big a batch is, in metres. Large enough that a tile holds several objects on a sparse map,
+## small enough that a tile is a meaningful thing to cull. Grass uses 32 m; scenery is sparser and
+## larger, so its tiles are too.
+const TILE_M: float = 256.0
 
 
 ## Builds every object in a terrain. Returns a node holding them, and never null.
@@ -25,11 +40,51 @@ static func build(terrain: RorTerrain) -> Node3D:
     var root: Node3D = Node3D.new()
     root.name = "RorObjects"
     var caches: Dictionary = state(terrain)
+    # `mesh file + tile` to the transforms that want it, and a list of the keys in the order they
+    # were first seen. Insertion order rather than the dictionary's own, because a gate compares
+    # one run against another and a scene built in a different order is a different scene.
+    var batches: Dictionary = {}
+    var order: Array[String] = []
     for placement: Dictionary in placements(terrain):
-        var node: Node3D = _place(terrain, placement, caches)
-        if node != null:
-            root.add_child(node)
+        var name: String = placement["name"] as String
+        var odef: Dictionary = definition(terrain, name, caches)
+        if (odef.get("error", "") as String) != "":
+            continue
+        var at: Transform3D = transform_of(placement, odef["scale"] as Vector3)
+        var tile: Vector2i = tile_of(at.origin)
+        for mesh_file: String in odef["meshes"] as PackedStringArray:
+            var key: String = "%s|%d|%d" % [mesh_file, tile.x, tile.y]
+            if not batches.has(key):
+                batches[key] = ([] as Array[Transform3D])
+                order.append(key)
+            (batches[key] as Array[Transform3D]).append(at)
+    for key: String in order:
+        var mesh_file: String = key.get_slice("|", 0)
+        var mesh: ArrayMesh = mesh_of(terrain, mesh_file, caches)
+        if mesh == null:
+            continue
+        root.add_child(_batch(key, mesh, batches[key] as Array[Transform3D]))
     return root
+
+
+## Which tile a point falls in. Floored, so the tile a point belongs to does not depend on which
+## side of zero it sits.
+static func tile_of(at: Vector3) -> Vector2i:
+    return Vector2i(int(floor(at.x / TILE_M)), int(floor(at.z / TILE_M)))
+
+
+## One mesh, drawn once for every transform that wants it.
+static func _batch(key: String, mesh: ArrayMesh, at: Array[Transform3D]) -> MultiMeshInstance3D:
+    var multimesh: MultiMesh = MultiMesh.new()
+    multimesh.transform_format = MultiMesh.TRANSFORM_3D
+    multimesh.mesh = mesh
+    multimesh.instance_count = at.size()
+    for index: int in at.size():
+        multimesh.set_instance_transform(index, at[index])
+    var node: MultiMeshInstance3D = MultiMeshInstance3D.new()
+    node.name = key.get_slice("|", 0).get_basename()
+    node.multimesh = multimesh
+    return node
 
 
 ## Every object the terrain's object files ask for, as {"position", "rotation", "name"}.
