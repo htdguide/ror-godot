@@ -86,6 +86,12 @@ static func material_for(
         if albedo != null:
             material.albedo_texture = albedo
             material.albedo_color = Color.WHITE
+    elif declared.get("has_diffuse", false) as bool:
+        # A material with no texture and a colour of its own is a flat painted pass, not a
+        # failure, and the loader's placeholder grey is wrong for it. `get` rather than index:
+        # a vehicle's `managedmaterials` lines are parsed by the truck reader, which has no
+        # such key, and only the Ogre scripts beside it carry one.
+        material.albedo_color = declared["diffuse"] as Color
     # A specular map is authored data, so it is used where the mod supplies one and the
     # class default stands in where it does not.
     if files.size() > 2:

@@ -276,6 +276,10 @@ static func _material(
             if texture != null:
                 material.albedo_texture = texture
                 material.albedo_color = Color.WHITE
+        elif declared["has_diffuse"] as bool:
+            # No texture and a colour of its own: a fixed-function pass painted flat. Keeping the
+            # placeholder here is what made Starling Island's dark structures read as light grey.
+            material.albedo_color = declared["diffuse"] as Color
         # Ogre's texture_unit `scale` scales the texture rather than the coordinates, so a
         # scale of 0.04 means the texture tiles twenty-five times across what the mesh's own
         # UVs cover. La Paz's ground skirt is one 20 km quad and states exactly that; without

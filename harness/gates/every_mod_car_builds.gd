@@ -40,10 +40,12 @@ extends GateBase
 ## and reported rather than failed. Rendering submesh bodies is unimplemented, not broken, and a
 ## gate that conflates the two would be demanding a feature by pretending it is a bug.
 ##
-## And a mod may name a mesh that is not installed. Starling Island's vehicles ask for
-## `seat.mesh`, `dashboard-small.mesh` and `lightbar.mesh`, which ship with Rigs of Rods base
-## content this checkout does not have. That is a content problem, not a loader problem, and it
-## is reported rather than failed — the loader is judged on what it does with files that exist.
+## And a mod may name a mesh that is nowhere a mod may name it from. Starling Island's vehicles
+## ask for `seat.mesh`, `dashboard-small.mesh` and `lightbar.mesh`, which are Rigs of Rods base
+## content rather than theirs — and all three resolve, because `RorContentPath` searches the
+## game's own resource directories the way Ogre's resource groups do. A name that resolves in none
+## of them is a content problem rather than a loader problem, and it is reported rather than
+## failed: the loader is judged on what it does with files that exist.
 
 ## Vehicles whose own file declares meshes this project has no reader for are still required to
 ## build what it can; a file that resolves to nothing at all is the failure.
@@ -124,8 +126,8 @@ func run(_harness: Node) -> Dictionary:
         # installed; one that is present and will not read is the loader's problem.
         for dropped: String in built["skipped"] as PackedStringArray:
             var mesh_name: String = dropped.get_slice(" ", 0)
-            if dropped.ends_with("(missing)") or not FileAccess.file_exists(
-                (entry["directory"] as String).path_join(mesh_name)
+            if dropped.ends_with("(missing)") or not RorContentPath.has(
+                mesh_name, entry["directory"] as String
             ):
                 absent += 1
                 continue
@@ -155,15 +157,15 @@ func run(_harness: Node) -> Dictionary:
 
 ## Whether this vehicle names at least one drawable mesh that is actually on the disk.
 ##
-## The condition is "names a mesh **and has it**", not "names a mesh". NhelensGrass's crane
-## declares one prop whose mesh is `seat.mesh` — base content this checkout does not ship — so it
-## names geometry, has none of it installed, and correctly draws nothing. Requiring geometry from
-## a file whose only mesh is absent asks the loader to invent it.
+## The condition is "names a mesh **and has it**", not "names a mesh", and "has it" means anywhere
+## a mod may name it from — the pack's own folder or the game's own resource directories, which is
+## how Rigs of Rods resolves content. Requiring geometry from a file whose only mesh is absent
+## everywhere asks the loader to invent it.
 func _has_installed_mesh(truck: TruckParser, directory: String) -> bool:
     for group: Array[Dictionary] in [truck.flexbodies, truck.props]:
         for entry: Dictionary in group:
             var mesh_name: String = entry.get("mesh", "") as String
-            if mesh_name != "" and FileAccess.file_exists(directory.path_join(mesh_name)):
+            if mesh_name != "" and RorContentPath.has(mesh_name, directory):
                 return true
     return false
 

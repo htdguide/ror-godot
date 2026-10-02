@@ -187,3 +187,33 @@ See `hard-won-facts.md` for the solver, the terrain, the formats and the gate di
   already in the checkout, under `vendor/rigs-of-rods/resources`, in a submodule that has been
   pinned since the beginning. Searching the mod's own directory first and the game's after took
   the library from 345 drawn parts and 47 textures to 405 and 89.
+- **Half the materials in Rigs of Rods' content have no `texture` line.** A managed material is an
+  abstract template that declares the `texture_unit` and leaves the file to the leaf:
+  `resources/managed_materials/managed_mats.material` has `texture_unit Diffuse_Map { texture_alias
+  diffuse_tex }`, and a leaf fills the hole with `set_texture_alias diffuse_tex master.dds`. 328 of
+  the 670 materials in this checkout inherit from one of those templates and 23 are textured only
+  this way — `tracks/master`, and with it RoR's `road`, `road2`, `roadturn`, `roadcross`, `roadtee`,
+  `asphalt`, `runway` and `chp`, which is most of the road surface on every map ever made. The
+  alias name is not a convention to guess at: it is written in the template, in the pinned
+  submodule, which is why `a_materials_own_words_reach_the_surface` reads it from there.
+- **A material with no texture is not a material with no appearance.** A fixed-function Ogre pass
+  may be a flat colour, and 21 materials here are: Starling Island's `rey_si_dark` is `diffuse
+  0.130303` and drew at the loader's placeholder 0.72, five and a half times too bright, which is a
+  large part of what "the map is all white" looked like from the driver's seat. Ogre's alpha lives
+  in the same line's fourth component, so `train_rails`' `invisible` is `diffuse 0 0 0 0` and drew
+  as an opaque grey box standing where nothing should be.
+- **A bare `LOD` line in an `.odef` is obsolete and must be thrown away**, which upstream does
+  explicitly — `ODefFileFormat.cpp`: `if (strcmp(m_cur_line, "LOD") == 0) return true; // 'LOD
+  line' = obsolete`. The header is a name, then a mesh, then a scale, so reading that line as the
+  mesh name shifts everything by one: the mesh became `LOD`, the real mesh was eaten by the scale
+  slot, and seven Starling Island objects — its firehouse, police department, store, warehouse,
+  office block, bus stop and a road sign — drew only their collision box. A skipped mesh warns and
+  the object draws whatever else it had, so nothing in the log said a building was missing. The
+  cheap check that catches the whole class is counting named meshes against the disk:
+  `an_object_definition_names_a_real_mesh` finds 550 and requires all 550 to be there.
+- **Those same files carry the map's own LOD data.** `beginlodmesh` / `endlodmesh` lists a mesh per
+  distance — `300, firehouse_lod1.mesh` — which is upstream's per-object detail reduction, authored
+  by the terrain's author and shipped with the terrain. Upstream's current parser ignores the
+  block; it is read by nothing here either. It is the first thing to reach for in PLAN 0.13, because
+  it is distance geometry that already belongs to the content rather than something this project
+  would have to invent.

@@ -31,6 +31,14 @@ static func read(path: String) -> Dictionary:
         var line: String = RorText.strip_comment(raw_line)
         if line.is_empty():
             continue
+        # A bare `LOD` line before the header. Upstream reads it and throws it away —
+        # `ODefFileFormat.cpp`: `if (strcmp(m_cur_line, "LOD") == 0) return true; // 'LOD line' =
+        # obsolete`. Taken as the header's mesh name instead, it consumed the slot and the real
+        # mesh on the next line was dropped: Starling Island's firehouse, office block and bus
+        # stop drew their collision box and nothing else. 7 objects in this checkout start this
+        # way.
+        if seen == 0 and line.strip_edges() == "LOD":
+            continue
         var word: String = line.get_slice(" ", 0).to_lower()
         match word:
             "beginmesh":
