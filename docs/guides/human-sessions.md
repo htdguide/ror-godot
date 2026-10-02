@@ -40,3 +40,24 @@ headlights; M6 about wetness timing; M7 about particle density.
 
 Human attention is the scarce resource. Spend it on finding new problems — once a
 problem is found, it becomes a replay gate and is never re-checked by hand.
+
+## Screenshots carry their own context
+
+`P` in a session writes `artifacts/human/play-<stamp>-<n>.png` and a `.json` beside it with the
+same name. The sidecar is for whoever has to act on the picture: a `summary` line to read at a
+glance, then the camera's position, bearing, pitch, field of view and height above ground; the
+surface underfoot by the terrain's own ground model; where the view ray meets the ground; the
+vehicle and its HUD line; the frame's own fps, frame time, draw calls and primitives; and the
+commit it was taken on.
+
+The part that earns its place is **`in_frame`**: every object batch with an instance in the
+frustum, sorted by how far off the centre of the frame it is, with how many instances and how far
+away the nearest is. "That house has no texture" used to cost a round trip to establish which
+house; the sidecar names it, because the thing being reported is almost always the thing nearest
+the middle.
+
+`a_screenshot_says_where_it_was_taken` holds it, against La Paz's own object files rather than
+against anything recorded from a run. It found a real fault on its first pass: one mesh is one
+batch per tile, so a map holds several sibling nodes with the same name, and Godot renames the
+duplicates — the sidecar called a La Paz pole `@MultiMeshInstance3D@3`. The loader writes the file
+name onto the node as metadata now, which the scene tree cannot rename.

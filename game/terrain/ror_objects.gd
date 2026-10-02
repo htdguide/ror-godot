@@ -86,6 +86,11 @@ static func _batch(key: String, mesh: ArrayMesh, at: Array[Transform3D]) -> Mult
         multimesh.set_instance_transform(index, at[index])
     var node: MultiMeshInstance3D = MultiMeshInstance3D.new()
     node.name = key.get_slice("|", 0).get_basename()
+    # And the file it came from, written down rather than left to be read back off the node.
+    # One mesh is one batch per tile, so several siblings carry the same name and Godot renames
+    # the duplicates — `@MultiMeshInstance3D@3` is what a screenshot's sidecar called a La Paz
+    # pole when it trusted `name`. The meta survives whatever the scene tree does to the name.
+    node.set_meta("mesh_file", key.get_slice("|", 0))
     node.multimesh = multimesh
     return node
 

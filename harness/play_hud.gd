@@ -7,6 +7,9 @@ extends RefCounted
 ## here knows anything about driving, and everything it reports it reads from the engine — and it
 ## is where the measurements quoted in PLAN 0.13 came from: a session on La Paz reporting 18.79 ms
 ## at 135 draw calls is this text.
+##
+## **What the keys are lives here too**, for the same reason: the footer under the readout and the
+## help printed at startup are the same list, and they had drifted apart once already.
 
 
 ## Where the readout sits and how big it is.
@@ -54,3 +57,27 @@ static func text(viewport: Viewport, weather: String, footer: String) -> String:
             footer,
         ]
     )
+
+
+## The controls, under the readout.
+static func footer(drive: PlayDrive) -> String:
+    var keys: String = (
+        "click to look  WASD move  Q/E down/up  Shift boost  F1 hud  F2 weather"
+        + "  F3 shadows  F4 sun  P shot  Esc settings"
+    )
+    if drive == null:
+        return keys
+    return drive.hud_line() + "\n" + keys + "  F5/F6 chase/free"
+
+
+## The same controls, spelled out once at startup where a terminal will keep them.
+static func print_help(drive: PlayDrive) -> void:
+    print(
+        "PLAY  click to look with the mouse, Esc releases it, Esc again opens the settings\n"
+        + "PLAY  W A S D move, Q/E down/up, hold Shift to boost\n"
+        + "PLAY  F1 toggle HUD, F2 cycle weather, F3 toggle shadows, F4 toggle the sun\n"
+        + "PLAY  Esc or M open the settings: weather, gravity, sun, sky, fog, distance\n"
+        + "PLAY  P save a screenshot and a .json beside it saying where it was taken from"
+    )
+    if drive != null:
+        print(DriveCfg.HELP)

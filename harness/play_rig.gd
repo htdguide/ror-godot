@@ -31,6 +31,9 @@ var _view: PlayCamera = PlayCamera.new()
 var _menu: PlayMenu
 var _terrain: Node3D = null
 var _terrain_pending: bool = false
+## The terrain's own files, kept after the scene is built: a screenshot's sidecar reports the
+## ground height and surface under the camera, and only the loaded terrain knows them.
+var _loaded: RorTerrain = null
 var _vegetation: RorVegetation = null
 
 
@@ -67,7 +70,7 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
             holder.environment, "wind_speed", RenderCfg.CLOUD_WIND_SPEED_PLAYING
         )
     _build_terrain()
-    _print_help()
+    PlayHud.print_help(_drive)
 
 
 ## Adds the world, when this session asked for one and Terrain3D is installed. It cannot be
@@ -93,6 +96,7 @@ func _populate_terrain() -> void:
     var loaded: RorTerrain = _load_terrain()
     if loaded == null:
         return
+    _loaded = loaded
     var error: String = Harness.terrain.populate(_terrain, loaded)
     if error != "":
         printerr("PLAY  the terrain could not be built: " + error)
@@ -152,20 +156,6 @@ func _load_terrain() -> RorTerrain:
     return loaded["terrain"] as RorTerrain
 
 
-func _print_help() -> void:
-    print(
-        (
-            "PLAY  click to look with the mouse, Esc releases it, Esc again opens the settings\n"
-            + "PLAY  W A S D move, Q/E down/up, hold Shift to boost\n"
-            + "PLAY  F1 toggle HUD, F2 cycle weather, F3 toggle shadows, F4 toggle the sun\n"
-            + "PLAY  Esc or M open the settings: weather, gravity, sun, sky, fog, distance\n"
-            + "PLAY  P save a screenshot to artifacts/human"
-        )
-    )
-    if _drive != null:
-        print(DriveCfg.HELP)
-
-
 func _process(delta: float) -> void:
     if _terrain_pending and _frames > 1:
         _populate_terrain()
@@ -178,7 +168,9 @@ func _process(delta: float) -> void:
         _view.fly(delta)
     _frames += 1
     if _hud.visible and _frames % HUD_REFRESH_FRAMES == 0:
-        _hud.text = PlayHud.text(get_viewport(), _weather_names[_weather_index], _footer())
+        _hud.text = PlayHud.text(
+            get_viewport(), _weather_names[_weather_index], PlayHud.footer(_drive)
+        )
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -282,22 +274,25 @@ func _screenshot() -> void:
     var path: String = HarnessCapture.resolve_dir("human").path_join(
         "play-%s-%d.png" % [stamp.replace("T", "-"), _shots]
     )
-    var error: String = HarnessCapture.capture_png(get_viewport(), path)
+    # A picture of a fault is handed over to be acted on, and a picture alone does not say which
+    # of a map's hundreds of objects the untextured thing in the middle of it is. `PlayShot`
+    # writes that down beside it.
+    var error: String = PlayShot.save(path, {
+        "viewport": get_viewport(),
+        "camera": _camera,
+        "world": _world,
+        "terrain": _loaded,
+        "map": _map_name,
+        "vehicle": _vehicle_name,
+        "weather": _weather_names[_weather_index],
+        "mode": PlayCamera.Mode.keys()[_view.mode],
+        "drive": _drive,
+    })
     if error != "":
         printerr("PLAY  screenshot failed: " + error)
         return
     _shots += 1
-    print("PLAY  wrote " + path)
-
-
-func _footer() -> String:
-    var keys: String = (
-        "click to look  WASD move  Q/E down/up  Shift boost  F1 hud  F2 weather"
-        + "  F3 shadows  F4 sun  P shot  Esc settings"
-    )
-    if _drive == null:
-        return keys
-    return _drive.hud_line() + "\n" + keys + "  F5/F6 chase/free"
+    print("PLAY  wrote %s and %s" % [path, path.get_basename() + ".json"])
 
 
 ## The settings panel, built once the vehicle exists so that gravity has a solver to go to.
@@ -391,6 +386,7 @@ func _change_map(name: String) -> void:
         _vegetation.clear()
         _vegetation = null
     _terrain = null
+    _loaded = null
     _build_terrain()
     if _menu != null:
         _menu.set_loaded(_map_name, _vehicle_name)
