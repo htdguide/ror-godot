@@ -212,7 +212,7 @@ static func _build_skinned_flexbody(
     dds_reader: RefCounted,
     textures: Dictionary
 ) -> SkinnedFlexbody:
-    var placement: Transform3D = FlexbodyBinder.placement(truck.nodes, entry)
+    var placement: Transform3D = FlexbodyBinder.placement(truck.nodes, entry, true)
     var vertices: PackedVector3Array = PackedVector3Array()
     var indices: PackedInt32Array = PackedInt32Array()
     var uvs: PackedVector2Array = PackedVector2Array()
@@ -378,7 +378,7 @@ static func _build_flexbody(
     var node: MeshInstance3D = MeshInstance3D.new()
     node.name = (entry["mesh"] as String).get_basename()
     node.mesh = mesh
-    node.transform = FlexbodyBinder.placement(truck.nodes, entry)
+    node.transform = FlexbodyBinder.placement(truck.nodes, entry, true)
     return node
 
 

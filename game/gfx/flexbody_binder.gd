@@ -26,7 +26,11 @@ const FALLBACK_NODE: int = 0
 
 
 ## Rig-space transform for one flexbody entry.
-static func placement(nodes: PackedVector3Array, entry: Dictionary) -> Transform3D:
+## `upstream_rotation` picks how the authored angles are composed. See `authored_rotation`: a
+## flexbody wants upstream's order, a prop does not, and they are not the same question.
+static func placement(
+    nodes: PackedVector3Array, entry: Dictionary, upstream_rotation: bool = false
+) -> Transform3D:
     var origin: Vector3 = nodes[entry["ref"] as int]
     var diff_x: Vector3 = nodes[entry["nx"] as int] - origin
     var diff_y: Vector3 = nodes[entry["ny"] as int] - origin
@@ -38,31 +42,39 @@ static func placement(nodes: PackedVector3Array, entry: Dictionary) -> Transform
     # Upstream builds the orientation from the three axes, then applies the authored
     # rotation. Basis columns are those axes, in the same order.
     var axes: Basis = Basis(ref_x, normal, ref_y)
-    var rot_deg: Vector3 = entry["rot_deg"] as Vector3
-    var authored: Basis = Basis.from_euler(
+    return Transform3D(
+        axes * authored_rotation(entry["rot_deg"] as Vector3, upstream_rotation), position
+    )
+
+
+## The authored angles as a rotation, composed the way the thing being placed expects.
+##
+## **Upstream composes Z, then Y, then X** — `FlexFactory.cpp:91-93` for a flexbody. Measured
+## against `Basis.from_euler`, whose default order is YXZ, the two are **identical** for the hero
+## truck's flexbodies (`180, -90, 0`) and differ by exactly 180 degrees about X for the Mazda 626
+## (`270, 180, 180`). That 180 is the whole of the fault: the Mazda loaded upside down, roof to
+## the road, fully textured and the right way round in every other respect.
+##
+## So this is a loader fix and not a car fix. Any mod whose flexbody rotation turns about more
+## than one axis was being placed by the wrong composition; the hero truck never noticed because
+## its own numbers make the two orders agree, which is exactly how a convention bug survives.
+##
+## **Props keep the old composition, and that is deliberate rather than tidy.** Upstream uses the
+## same Z, Y, X order for them (`ActorSpawner.cpp:1681-1683`) but builds a prop's base frame
+## differently from a flexbody's, so applying the flexbody change to props alone turns the hero
+## truck's steering column to point up and forward instead of down, which
+## `props_sit_in_the_vehicle` catches on a physical expectation. Fixing props properly means
+## porting their own placement, which is a separate piece of work with its own evidence.
+static func authored_rotation(rot_deg: Vector3, upstream: bool) -> Basis:
+    if upstream:
+        return (
+            Basis(Vector3.BACK, deg_to_rad(rot_deg.z))
+            * Basis(Vector3.UP, deg_to_rad(rot_deg.y))
+            * Basis(Vector3.RIGHT, deg_to_rad(rot_deg.x))
+        )
+    return Basis.from_euler(
         Vector3(deg_to_rad(rot_deg.x), deg_to_rad(rot_deg.y), deg_to_rad(rot_deg.z))
     )
-    return Transform3D(axes * authored, position)
-
-
-## **An open question, with the evidence so far, because the obvious answer is wrong.**
-##
-## Upstream composes the authored rotation Z, then Y, then X — `FlexFactory.cpp:91-93` for
-## flexbodies and `ActorSpawner.cpp:1681-1683` for props, both the same order. `Basis.from_euler`
-## above uses Godot's default, which is YXZ. The two agree whenever only one axis is turned, which
-## is true of every rotation in the hero truck except one.
-##
-## Changing it to upstream's order was tried and reverted. It does **not** fix the vehicle that
-## prompted it — the Mazda 626, which states `270, 180, 180` on every flexbody and draws with its
-## length along the wrong axis under either order — and it **breaks** one that works: the hero
-## truck's steering column stops pointing downwards and `props_sit_in_the_vehicle` fails.
-##
-## So there is a second convention somewhere in this pipeline that the YXZ order happens to
-## cancel, and finding it is the actual task. Measured, for whoever picks this up: the Mazda's
-## nodes span 4.54 x 1.62 x 1.70 m, which is a car; its drawn meshes span 4.26 x 2.33 x 4.54 under
-## YXZ and 4.26 x 1.76 x 5.85 under ZYX, and neither is a car. The flexbody frames are proper
-## rotations in both cases — every determinant is +1, so this is not the mirrored-basis fault that
-## bit this project before.
 
 
 ## Returns {"triads": int, "vertices": int, "shared": float} for one placed mesh.
