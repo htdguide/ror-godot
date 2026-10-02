@@ -99,7 +99,9 @@ var errors: PackedStringArray = PackedStringArray()
 var _node_id_to_index: Dictionary = {}
 var _cameras: CameraRows = CameraRows.new()
 var _node_defaults: NodeRows.Defaults = NodeRows.Defaults.new()
-var _beam_defaults: BeamDefaults = BeamDefaults.new()
+## The structural rates in force where the file last set them. Public because a generated
+## flexbody wheel builds its tread at these rather than at the tyre's — tread is carcass.
+var beam_defaults: BeamDefaults = BeamDefaults.new()
 var _section: String = ""
 
 
@@ -188,9 +190,9 @@ func _parse_row(line: String) -> void:
     if directive != "":
         var arguments: PackedStringArray = TruckLexer.directive_fields(line, directive)
         if directive == "set_beam_defaults":
-            _beam_defaults.read_defaults(arguments)
+            beam_defaults.read_defaults(arguments)
         elif directive == "set_beam_defaults_scale":
-            _beam_defaults.read_scale(arguments)
+            beam_defaults.read_scale(arguments)
         elif directive == "set_node_defaults":
             _node_defaults = NodeRows.parse_defaults(arguments, _node_defaults)
         # Every other directive is recognised so that it is not mistaken for data. Acting
@@ -266,7 +268,7 @@ func _node_index(id: String) -> int:
 
 func _parse_beam(line: String) -> void:
     var row: Dictionary = BeamRows.plain(
-        TruckLexer.fields(line), _node_id_to_index, _beam_defaults
+        TruckLexer.fields(line), _node_id_to_index, beam_defaults
     )
     if (row["error"] as String) != "":
         errors.append("beam %s: %s" % [row["error"], line])
@@ -307,8 +309,8 @@ func _parse_mesh_wheel(line: String, flexbody: bool) -> void:
     # Upstream takes a meshwheels2 rim's rate from the beam defaults rather than from the
     # wheel's own spring, which is the tyre's. The hero truck states
     # `set_beam_defaults 4000000, 150` immediately above its wheels for exactly this.
-    row["rim_spring"] = _beam_defaults.spring()
-    row["rim_damp"] = _beam_defaults.damp()
+    row["rim_spring"] = beam_defaults.spring()
+    row["rim_damp"] = beam_defaults.damp()
     wheels.append(row)
 
 
@@ -358,7 +360,7 @@ func _parse_joint(line: String) -> void:
         return
     var fields: PackedStringArray = TruckLexer.fields(line)
     var row: Dictionary = BeamRows.joint(
-        _section, fields, _node_id_to_index, _beam_defaults, _joint_length(fields)
+        _section, fields, _node_id_to_index, beam_defaults, _joint_length(fields)
     )
     if (row["error"] as String) != "":
         errors.append("%s %s: %s" % [_section, row["error"], line])

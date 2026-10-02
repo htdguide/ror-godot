@@ -101,6 +101,9 @@ static func parse_row(
         "mesh": mesh_name,
         "material": material_name,
         "tyre_mesh": tyre_mesh,
+        "flexbody": flexbody,
+        "rim_spring": fields[13].to_float() if flexbody else RIM_SPRING_FALLBACK,
+        "rim_damp": fields[14].to_float() if flexbody else RIM_DAMP_FALLBACK,
         # Filled in by `generate` once the tread exists.
         "first_tread": -1,
         "tread_count": 0,
@@ -143,6 +146,9 @@ static func _order_axis(truck: TruckParser, wheel: Dictionary) -> void:
 static func _generate_one(truck: TruckParser, wheel: Dictionary) -> void:
     var rays: int = wheel["rays"] as int
     if rays < 3:
+        return
+    if bool(wheel.get("flexbody", false)):
+        _generate_flexbody(truck, wheel)
         return
     # The tread nodes are contiguous and alternate between the two axle planes, which is
     # the layout upstream's wheel force code assumes: even nodes brace to the first axle
@@ -196,6 +202,117 @@ static func _generate_one(truck: TruckParser, wheel: Dictionary) -> void:
         _add_beam(truck, o, next_o, rim_spring, rim_damp)
         _add_beam(truck, n, next_n, rim_spring, rim_damp)
         _add_beam(truck, n, next_o, rim_spring, rim_damp)
+
+
+## A flexbody wheel: a rim ring and a tyre ring, with the tyre sprung against the rim.
+##
+## **This is a different rig, not a mesh wheel with different numbers.** Upstream gives it
+## `rays * 4` nodes and `rays * 20` beams — eight rim, ten tyre, two support per ray — against a
+## mesh wheel's `rays * 2` and `rays * 8` (`ActorSpawner.cpp`, the spawn budget, and
+## `ProcessFlexBodyWheel`). Built as a mesh wheel it has half the nodes and two fifths of the
+## beams, and what that looks like from the driver's seat is a wheel that wobbles and will not
+## stay on its suspension, which is how it was reported.
+##
+## The tyre ring is what touches the ground, so it is the ring the solver is told about: the rim
+## ring carries the wheel's stiffness and the tyre ring carries the contact.
+static func _generate_flexbody(truck: TruckParser, wheel: Dictionary) -> void:
+    var rays: int = wheel["rays"] as int
+    var axis_a: int = wheel["node1"] as int
+    var axis_b: int = wheel["node2"] as int
+    var origin_a: Vector3 = truck.nodes[axis_a]
+    var origin_b: Vector3 = truck.nodes[axis_b]
+    var axis: Vector3 = origin_b - origin_a
+    if axis.length_squared() == 0.0:
+        return
+    axis = axis.normalized()
+
+    var rim_radius: float = wheel["rim_radius"] as float
+    var tyre_radius: float = wheel["tire_radius"] as float
+    var step: float = -TAU / float(2 * rays)
+    # Upstream spreads the stated mass over four rings rather than two.
+    var node_mass: float = (wheel["mass"] as float) / float(4 * rays)
+    var friction: float = wheel.get("friction", 1.0) as float
+
+    var rim_outer: PackedInt32Array = PackedInt32Array()
+    var rim_inner: PackedInt32Array = PackedInt32Array()
+    var ray: Vector3 = _perpendicular(axis) * rim_radius
+    for i: int in rays:
+        rim_outer.append(_add_node(truck, origin_a + ray, node_mass, friction))
+        ray = ray.rotated(axis, step)
+        rim_inner.append(_add_node(truck, origin_b + ray, node_mass, friction))
+        ray = ray.rotated(axis, step)
+
+    # The tyre ring starts half a ray round from the rim ring: upstream turns its ray vector once
+    # before the loop, which is what interleaves the two rings instead of stacking them.
+    var tyre_outer: PackedInt32Array = PackedInt32Array()
+    var tyre_inner: PackedInt32Array = PackedInt32Array()
+    ray = (_perpendicular(axis) * tyre_radius).rotated(axis, step)
+    # The tyre ring is the one that meets the ground, so it is the one the solver drives and
+    # brakes through.
+    wheel["first_tread"] = truck.nodes.size()
+    wheel["tread_count"] = 2 * rays
+    for i: int in rays:
+        tyre_outer.append(_add_node(truck, origin_a + ray, node_mass, friction))
+        ray = ray.rotated(axis, step)
+        tyre_inner.append(_add_node(truck, origin_b + ray, node_mass, friction))
+        ray = ray.rotated(axis, step)
+
+    var rim_spring: float = wheel["rim_spring"] as float
+    var rim_damp: float = wheel["rim_damp"] as float
+    # Upstream halves the tyre rate on every rim-to-tyre beam: each tyre node is held by two of
+    # them, so the pair together carry what the row states.
+    var tyre_spring: float = (wheel["spring"] as float) * 0.5
+    var tyre_damp: float = wheel["damping"] as float
+    var tread_spring: float = truck.beam_defaults.spring()
+    var tread_damp: float = truck.beam_defaults.damp()
+    # Where the support beams start to resist, so the tread cannot collapse onto the rim.
+    var support_short_bound: float = 1.0 - (rim_radius / maxf(tyre_radius, 0.0001)) * 0.95
+
+    for i: int in rays:
+        var next: int = (i + 1) % rays
+        var prev: int = (i + rays - 1) % rays
+        # Rim: both axle nodes to both rim nodes, then the rim ring's own hoop and diagonals.
+        _add_beam(truck, axis_a, rim_outer[i], rim_spring, rim_damp)
+        _add_beam(truck, axis_b, rim_inner[i], rim_spring, rim_damp)
+        _add_beam(truck, axis_b, rim_outer[i], rim_spring, rim_damp)
+        _add_beam(truck, axis_a, rim_inner[i], rim_spring, rim_damp)
+        _add_beam(truck, rim_outer[i], rim_inner[i], rim_spring, rim_damp)
+        _add_beam(truck, rim_outer[i], rim_outer[next], rim_spring, rim_damp)
+        _add_beam(truck, rim_inner[i], rim_inner[next], rim_spring, rim_damp)
+        _add_beam(truck, rim_inner[i], rim_outer[next], rim_spring, rim_damp)
+        # Tyre: each rim node to three tyre nodes, reaching back a ray, which is the sidewall.
+        _add_beam(truck, rim_outer[i], tyre_outer[i], tyre_spring, tyre_damp)
+        _add_beam(truck, rim_outer[i], tyre_inner[prev], tyre_spring, tyre_damp)
+        _add_beam(truck, rim_outer[i], tyre_outer[prev], tyre_spring, tyre_damp)
+        _add_beam(truck, rim_inner[i], tyre_outer[i], tyre_spring, tyre_damp)
+        _add_beam(truck, rim_inner[i], tyre_inner[i], tyre_spring, tyre_damp)
+        _add_beam(truck, rim_inner[i], tyre_inner[prev], tyre_spring, tyre_damp)
+        # Tread: the tyre ring's own stiffness, at the rig's structural rates rather than the
+        # tyre's, because it is the carcass rather than the sidewall.
+        _add_beam(truck, tyre_outer[i], tyre_inner[i], tread_spring, tread_damp)
+        _add_beam(truck, tyre_outer[i], tyre_outer[next], tread_spring, tread_damp)
+        _add_beam(truck, tyre_inner[i], tyre_inner[next], tread_spring, tread_damp)
+        _add_beam(truck, tyre_inner[i], tyre_outer[next], tread_spring, tread_damp)
+        # Support: axle to tread, carrying nothing until the tyre is squashed nearly to the rim.
+        _add_support_beam(truck, axis_a, tyre_outer[i], tyre_spring, tyre_damp, support_short_bound)
+        _add_support_beam(truck, axis_b, tyre_inner[i], tyre_spring, tyre_damp, support_short_bound)
+
+
+## A beam that is a plain spring until it is compressed past `short_bound`, then ramps towards
+## the structural rates. Upstream's SHOCK1.
+static func _add_support_beam(
+    truck: TruckParser, a: int, b: int, spring: float, damp: float, short_bound: float
+) -> void:
+    truck.bounded_beams.append({
+        "beam": truck.beams.size() / 2,
+        "bound": BeamRows.BOUND_SHOCK,
+        "short_bound": short_bound,
+        "long_bound": 0.0,
+        "bound_spring": spring,
+        "bound_damp": damp,
+        "precompression": 1.0,
+    })
+    _add_beam(truck, a, b, spring, damp)
 
 
 static func _add_node(

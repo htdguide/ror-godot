@@ -394,3 +394,16 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   row states two spring/damping pairs. Parsed as a mesh wheel it gets half the nodes and two
   fifths of the beams: the wheel wobbles and does not sit on its suspension. Reading the row
   correctly is not the same as building the rig correctly, and only the first is done.
+- **A flexbody wheel is a rim ring sprung inside a tyre ring, and the port is structural.**
+  Upstream's `ProcessFlexBodyWheel` lays `rays * 4` nodes — rim outer, rim inner, tyre outer, tyre
+  inner, each ring stepped half a ray so they interleave — and `rays * 20` beams: eight rim (axle
+  to rim both ways, plus the rim ring's hoop and diagonals), ten tyre (each rim node to three
+  tyre nodes, reaching back one ray, which is the sidewall; plus four tread beams at the rig's
+  *structural* rates rather than the tyre's), and two support beams from the axle to the tread
+  that carry nothing until the tyre is squashed to within 5% of the rim radius. Every rim-to-tyre
+  beam gets half the stated tyre rate because each tyre node is held by two of them.
+- **Counting is a real oracle when the source states the count.** Upstream computes its spawn
+  budget before allocating — `rays * 2` nodes and `rays * 8` beams for a mesh wheel against
+  `rays * 4` and `rays * 20` for a flexbody one — so a gate can check the shape of a rig against
+  somebody else's arithmetic rather than against this project's opinion. What a beam is worth is
+  a separate question; how many there are is not.
