@@ -280,3 +280,17 @@ this one hit the 400-line cap, and they are the area this project has been wrong
   node whose name is taken, so the leaked second `BlockoutWorld` arrived as `@Node3D@2` and a
   check looking for the name counted one world and passed with the bug deliberately restored.
   Identify a node by what it contains — here, its `WorldEnvironment` — not by what it is called.
+- **`global_basis` on a node outside the scene tree reports nothing useful.** A gate built two
+  worlds detached, aimed their lights and compared directions: both read (0, 0, -1) and the
+  comparison passed with the fault deliberately in place. The aiming had worked — once the node is
+  in the tree the direction is correct — it is the *reading* that is meaningless detached. Compare
+  transforms on nodes that are in the tree, or compare local ones.
+- **A gate that compares two code paths cannot see a fault both paths share.** `a_weather_switch_is
+  _a_weather` builds a world two ways and requires them to match, which catches the two drifting
+  apart and nothing else: deleting a line from the function they both call breaks them identically
+  and they still compare equal. Verified rather than assumed. Guarding a seam is not the same as
+  checking a property is applied at all.
+- **Two presets that differ in the ways you are not measuring make a comparison vacuous.** The
+  same gate first switched `golden_dusk` to `noon_clear`, which share every environment field it
+  compared, so half the gate passed regardless. Switching from `spike_black` — no atmosphere at
+  all against a physical sky — is what made the environment half able to fail.

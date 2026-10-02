@@ -26,9 +26,10 @@ static func build(
     root.name = "BlockoutWorld"
     root.add_child(_build_environment(weather, clouds))
     root.add_child(_build_sun(weather))
-    var fill: DirectionalLight3D = _build_fill(weather)
-    if fill != null:
-        root.add_child(fill)
+    # The fill is always built, even where a preset asks for none, and hidden instead. A window
+    # switches weather on a world that already exists, and a light that was never created cannot
+    # be switched back on.
+    root.add_child(_build_fill(weather))
     root.add_child(_build_ground())
     # A shot with a subject of its own wants an empty stage: the scale props are there to
     # give an empty frame something to measure, not to share the frame with a vehicle.
@@ -40,20 +41,7 @@ static func build(
 
 static func _build_environment(weather: Dictionary, clouds: bool) -> WorldEnvironment:
     var env: Environment = Environment.new()
-    if bool(weather.get("physical_sky", false)):
-        env.background_mode = Environment.BG_SKY
-        env.sky = _build_sky(weather, clouds)
-        # The sky lights the scene: diffuse from its irradiance, specular from its
-        # radiance map. This is what makes metal look like metal without a light rig.
-        env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-        env.ambient_light_sky_contribution = RenderCfg.AMBIENT_FROM_SKY
-        env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
-    else:
-        env.background_mode = Environment.BG_COLOR
-        env.background_color = weather.get("bg_color", Color.BLACK) as Color
-        env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-        env.ambient_light_color = weather.get("bg_color", Color.GRAY) as Color
-    env.ambient_light_energy = float(weather.get("ambient_energy", 0.0))
+    _grade_environment(env, weather, clouds)
     # Distance haze, so a 4 km terrain has depth to it and a session can say how far it wants
     # to see. Not volumetric: that is a froxel grid with its own range and cost, and what a
     # driver wants is depth cueing to the horizon.
@@ -68,6 +56,25 @@ static func _build_environment(weather: Dictionary, clouds: bool) -> WorldEnviro
     holder.name = "WorldEnvironment"
     holder.environment = env
     return holder
+
+
+## Everything about the environment that a weather preset decides — the sky above all, which the
+## window never rebuilt, so switching to a clear noon from a dusk kept the dusk's atmosphere.
+static func _grade_environment(env: Environment, weather: Dictionary, clouds: bool) -> void:
+    if bool(weather.get("physical_sky", false)):
+        env.background_mode = Environment.BG_SKY
+        env.sky = _build_sky(weather, clouds)
+        # The sky lights the scene: diffuse from its irradiance, specular from its
+        # radiance map. This is what makes metal look like metal without a light rig.
+        env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+        env.ambient_light_sky_contribution = RenderCfg.AMBIENT_FROM_SKY
+        env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+    else:
+        env.background_mode = Environment.BG_COLOR
+        env.background_color = weather.get("bg_color", Color.BLACK) as Color
+        env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+        env.ambient_light_color = weather.get("bg_color", Color.GRAY) as Color
+    env.ambient_light_energy = float(weather.get("ambient_energy", 0.0))
 
 
 ## Whether this world's sky has weather in it.
@@ -161,24 +168,10 @@ static func _build_sun(weather: Dictionary) -> DirectionalLight3D:
     sun.name = "Sun"
     # Aimed by where the sun is, not by Euler angles. "Up and over the camera's shoulder"
     # is a thing anyone can reason about; the pitch and yaw that produce it are not.
-    var toward_sun: Vector3 = (weather.get("sun_from", Vector3.UP) as Vector3).normalized()
-    sun.look_at_from_position(Vector3.ZERO, -toward_sun, Vector3.UP)
-    # Real illuminance. `light_energy` stays as a trim on top, which is what a weather preset's
-    # `sun_energy` now is: how much of a clear midday sun this hour gets.
-    sun.light_intensity_lux = float(weather.get("sun_lux", RenderCfg.SUN_LUX_NOON))
-    sun.light_energy = float(weather.get("sun_energy", 1.0))
-    sun.light_color = weather.get("sun_color", Color.WHITE) as Color
     sun.shadow_enabled = true
     sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
     sun.directional_shadow_max_distance = SHADOW_MAX_DISTANCE
-    # A sun with an angular size softens its own shadow with distance from the contact, which is
-    # what a shadow does; a point sun draws the same hard line a metre away and a hundred.
-    sun.light_angular_distance = float(
-        weather.get("sun_angular_deg", RenderCfg.SUN_ANGULAR_DEG)
-    )
-    # And the shadow is not a hole. Everything a session looks at lives on the side of the object
-    # the sun is not on, so a shadow that removes all the light removes the subject with it.
-    sun.shadow_opacity = float(weather.get("shadow_opacity", RenderCfg.SHADOW_OPACITY))
+    _grade_sun(sun, weather)
     return sun
 
 
@@ -189,19 +182,9 @@ static func _build_sun(weather: Dictionary) -> DirectionalLight3D:
 ## side of this scene read as black without it. It casts no shadow, so it costs a pass and nothing
 ## else.
 static func _build_fill(weather: Dictionary) -> DirectionalLight3D:
-    var energy: float = float(weather.get("fill_energy", RenderCfg.FILL_ENERGY))
-    if energy <= 0.0:
-        return null
     var fill: DirectionalLight3D = DirectionalLight3D.new()
     fill.name = "Fill"
-    # Opposite the sun and lower, so it reaches the side the sun cannot.
-    var toward_sun: Vector3 = (weather.get("sun_from", Vector3.UP) as Vector3).normalized()
-    var toward_fill: Vector3 = Vector3(-toward_sun.x, maxf(toward_sun.y * 0.45, 0.2),
-        -toward_sun.z).normalized()
-    fill.look_at_from_position(Vector3.ZERO, -toward_fill, Vector3.UP)
-    fill.light_intensity_lux = float(weather.get("fill_lux", RenderCfg.FILL_LUX))
-    fill.light_energy = energy
-    fill.light_color = weather.get("fill_colour", RenderCfg.FILL_COLOUR) as Color
+    _grade_fill(fill, weather)
     # The fill casts shadows too, and that is not a luxury: a shadowless directional light shines
     # straight through a roof, and `tunnel_lighting_changes` caught exactly that — with the fill
     # unshadowed the tunnel's own lamps supplied a quarter of the light inside it instead of
@@ -214,6 +197,71 @@ static func _build_fill(weather: Dictionary) -> DirectionalLight3D:
         weather.get("sun_angular_deg", RenderCfg.SUN_ANGULAR_DEG)
     ) * 2.0
     return fill
+
+
+## Puts a weather preset onto a world that already exists.
+##
+## **The window used to do this itself, and only partly.** `PlayRig._apply_weather` aimed the sun,
+## set its `light_energy` and colour, and changed the environment's ambient colour and energy —
+## and that was all. It never touched `light_intensity_lux`, which is what actually sets a light's
+## brightness under physical units; it never touched the fill, so a 12 000 lux cool light kept
+## burning through a night preset; and it never rebuilt the sky, so the atmosphere stayed at
+## whatever the world was built with. Cycling to a dark preset left a scene lit by three things
+## that had not been told.
+##
+## One function now, called by `build` and by the window, so the two cannot drift. Everything a
+## preset can say is applied here or nowhere.
+static func apply_weather(root: Node3D, weather: Dictionary, clouds: bool = false) -> void:
+    var holder: WorldEnvironment = root.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
+    if holder != null and holder.environment != null:
+        _grade_environment(holder.environment, weather, clouds)
+    var sun: DirectionalLight3D = root.get_node_or_null(^"Sun") as DirectionalLight3D
+    if sun != null:
+        _grade_sun(sun, weather)
+    var fill: DirectionalLight3D = root.get_node_or_null(^"Fill") as DirectionalLight3D
+    if fill != null:
+        _grade_fill(fill, weather)
+
+
+## Everything about the sun that a weather preset decides.
+static func _grade_sun(sun: DirectionalLight3D, weather: Dictionary) -> void:
+    # Aimed by where the sun is, not by Euler angles. "Up and over the camera's shoulder"
+    # is a thing anyone can reason about; the pitch and yaw that produce it are not.
+    var toward_sun: Vector3 = (weather.get("sun_from", Vector3.UP) as Vector3).normalized()
+    sun.look_at_from_position(sun.position, sun.position - toward_sun, Vector3.UP)
+    # Real illuminance. `light_energy` stays as a trim on top, which is what a weather preset's
+    # `sun_energy` now is: how much of a clear midday sun this hour gets. The window used to set
+    # the trim and leave the lux, which changes a sun by a few per cent and looks like nothing.
+    sun.light_intensity_lux = float(weather.get("sun_lux", RenderCfg.SUN_LUX_NOON))
+    sun.light_energy = float(weather.get("sun_energy", 1.0))
+    sun.light_color = weather.get("sun_color", Color.WHITE) as Color
+    # A sun with an angular size softens its own shadow with distance from the contact, which is
+    # what a shadow does; a point sun draws the same hard line a metre away and a hundred.
+    sun.light_angular_distance = float(
+        weather.get("sun_angular_deg", RenderCfg.SUN_ANGULAR_DEG)
+    )
+    # And the shadow is not a hole. Everything a session looks at lives on the side of the object
+    # the sun is not on, so a shadow that removes all the light removes the subject with it.
+    sun.shadow_opacity = float(weather.get("shadow_opacity", RenderCfg.SHADOW_OPACITY))
+
+
+## Everything about the fill that a weather preset decides.
+static func _grade_fill(fill: DirectionalLight3D, weather: Dictionary) -> void:
+    var energy: float = float(weather.get("fill_energy", RenderCfg.FILL_ENERGY))
+    # Hidden rather than absent where a preset wants no fill, so it can come back.
+    fill.visible = energy > 0.0
+    # Opposite the sun and lower, so it reaches the side the sun cannot.
+    var toward_sun: Vector3 = (weather.get("sun_from", Vector3.UP) as Vector3).normalized()
+    var toward_fill: Vector3 = Vector3(-toward_sun.x, maxf(toward_sun.y * 0.45, 0.2),
+        -toward_sun.z).normalized()
+    fill.look_at_from_position(Vector3.ZERO, -toward_fill, Vector3.UP)
+    fill.light_intensity_lux = float(weather.get("fill_lux", RenderCfg.FILL_LUX))
+    fill.light_energy = energy
+    fill.light_color = weather.get("fill_colour", RenderCfg.FILL_COLOUR) as Color
+    fill.shadow_opacity = float(weather.get("shadow_opacity", RenderCfg.SHADOW_OPACITY))
+    fill.light_angular_distance = float(
+        weather.get("sun_angular_deg", RenderCfg.SUN_ANGULAR_DEG)
+    ) * 2.0
 
 
 static func _build_ground() -> MeshInstance3D:

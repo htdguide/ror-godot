@@ -267,18 +267,18 @@ func _cycle_weather() -> void:
 ## Puts one weather preset on the live scene. Shared by F2 and by the environment panel, so the
 ## two cannot drift into applying a preset differently.
 func _apply_weather(name: String) -> void:
-    var preset: Dictionary = WeatherCfg.get_preset(name)
-    var sun: DirectionalLight3D = _world.get_node_or_null(^"Sun") as DirectionalLight3D
-    var env: WorldEnvironment = _world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
-    if sun != null:
-        var toward_sun: Vector3 = (preset.get("sun_from", Vector3.UP) as Vector3).normalized()
-        sun.look_at_from_position(sun.position, sun.position - toward_sun, Vector3.UP)
-        sun.light_energy = float(preset["sun_energy"])
-        sun.light_color = preset["sun_color"] as Color
-    if env != null:
-        env.environment.background_color = preset["bg_color"] as Color
-        env.environment.ambient_light_color = preset["bg_color"] as Color
-        env.environment.ambient_light_energy = float(preset["ambient_energy"])
+    # Everything the preset says, through the same function that builds a world from one.
+    #
+    # This used to aim the sun, set its energy trim and colour, and change two environment
+    # fields. It never set `light_intensity_lux`, which is what actually decides a light's
+    # brightness under physical units, so the sun barely changed; it never touched the fill, so a
+    # 12 000 lux cool light kept burning through a night preset; and it never rebuilt the sky, so
+    # the atmosphere stayed as built. `a_weather_switch_is_a_weather` holds the two paths together.
+    BlockoutWorld.apply_weather(_world, WeatherCfg.get_preset(name), RenderCfg.CLOUDS_ENABLED)
+    # And the index follows the name, whichever way the weather was chosen. Picking one in the
+    # settings panel used to leave this behind, so the HUD kept naming the weather before last —
+    # reported from the window as a night scene labelled `noon_clear`.
+    _weather_index = maxi(0, _weather_names.find(name))
     print("PLAY  weather %s" % name)
 
 
