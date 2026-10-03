@@ -27,11 +27,15 @@ const LISTED: int = 6
 const EPSILON: float = 0.01
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one checks visibility ranges and none of the counts a placement gate checks.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "an_object_draws_its_own_distance_mesh",
         "proves": "every object that declares distance meshes draws them, each over exactly the range its own definition states",
-        "builds_on": ["ror_terrain_objects_are_placed"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": "a batch per level, with the begin and end distances the definition states",
         "why": (

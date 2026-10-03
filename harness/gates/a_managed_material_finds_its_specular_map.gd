@@ -32,11 +32,15 @@ const MIN_DECLARED: int = 3
 const LISTED: int = 8
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one holds one slot of one row and classifies nothing.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "a_managed_material_finds_its_specular_map",
         "proves": "a managedmaterial that declares a specular map builds a material carrying it, whichever slot its effect puts it in",
-        "builds_on": ["material_classification"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": "every declared specular map reaches the built material; mesh_* reads slot 1, flexmesh_* slot 2",
         "why": (

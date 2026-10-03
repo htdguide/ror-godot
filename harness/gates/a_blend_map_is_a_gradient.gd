@@ -35,11 +35,15 @@ const EPSILON: float = 1e-4
 const MIN_PIXELS: int = 4
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one reads a splat map and checks none of a terrain's own figures.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "a_blend_map_is_a_gradient",
         "proves": "a terrain's splat map is read smoothly, so what the ground is painted with never moves faster between two lattice vertices than the map itself moves between two pixels",
-        "builds_on": ["ror_terrain_matches_its_files"],
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": "the map reads at most (its own largest pixel step) x (vertex spacing / metres per pixel) different across one vertex",
         "why": (

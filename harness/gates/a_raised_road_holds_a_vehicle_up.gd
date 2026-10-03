@@ -47,11 +47,15 @@ const MIN_HALF_WIDTH_M: float = 3.0
 const REST_TOLERANCE_M: float = 0.15
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one drops a rig onto one box and counts none of the boxes a scenery gate counts.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "a_raised_road_holds_a_vehicle_up",
         "proves": "an object's own collision box is built and solid, so a road drawn above the ground holds a vehicle up instead of letting it fall through",
-        "builds_on": ["a_terrains_own_scenery_is_solid"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": (
             "the rig rests on the declared box top within %.2f m of how it rests on open ground,"

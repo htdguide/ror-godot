@@ -13,6 +13,10 @@ extends RefCounted
 ## Keyword lines this recognises. Everything else that is not six numbers and a name is reported
 ## as unread rather than dropped silently.
 const VEGETATION: Array[String] = ["grass", "grass2"]
+## A terrain's forests. Read the same way and kept apart, because a tree is a mesh and a blade of
+## grass is a card: Russia asks for two fir species and got neither for as long as `trees` was
+## filed under "lines nothing reads".
+const WOODLAND: String = "trees"
 ## An object line's seventh field is a name, and what follows it on the same line is a type and
 ## an instance name — upstream reads all three with one `sscanf`, `TObjFileFormat.cpp`:
 ##
@@ -49,12 +53,13 @@ const ROADS_BEGIN: String = "begin_procedural_roads"
 const ROADS_END: String = "end_procedural_roads"
 
 
-## Reads a .tobj. Returns {"error", "objects", "grass", "actors", "roads", "unread"}.
+## Reads a .tobj. Returns {"error", "objects", "grass", "trees", "actors", "roads", "unread"}.
 static func read(path: String) -> Dictionary:
     var out: Dictionary = {
         "error": "",
         "objects": [] as Array[Dictionary],
         "grass": [] as Array[Dictionary],
+        "trees": [] as Array[Dictionary],
         "actors": [] as Array[Dictionary],
         "roads": [] as Array[Dictionary],
         "unread": PackedStringArray(),
@@ -65,6 +70,7 @@ static func read(path: String) -> Dictionary:
         return out
     var objects: Array[Dictionary] = []
     var grass: Array[Dictionary] = []
+    var trees: Array[Dictionary] = []
     var actors: Array[Dictionary] = []
     var roads: Array[Dictionary] = []
     var unread: PackedStringArray = PackedStringArray()
@@ -84,6 +90,9 @@ static func read(path: String) -> Dictionary:
             continue
         if VEGETATION.has(keyword):
             grass.append(_grass(line))
+            continue
+        if keyword == WOODLAND:
+            trees.append(_grass(line))
             continue
         var fields: PackedStringArray = RorText.fields(line)
         if fields.size() < 7 or not fields[0].is_valid_float():
@@ -117,6 +126,7 @@ static func read(path: String) -> Dictionary:
     out["actors"] = actors
     out["roads"] = roads
     out["grass"] = grass
+    out["trees"] = trees
     out["unread"] = unread
     return out
 

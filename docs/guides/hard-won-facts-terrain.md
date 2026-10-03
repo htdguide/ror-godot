@@ -143,3 +143,27 @@ Its companion is `hard-won-facts-mods.md`, which covers how a vehicle is read, b
   A monorail's is thin, central, built one segment in five, and skipped where it would stand over
   20 m. The every-fifth counter is per road here rather than per process, because `static_state`
   refuses the other kind — and per road is the behaviour anybody would have expected anyway.
+- **`trees` is a vegetation keyword and this project did not know it.** Six `.tobj` lines across
+  the whole library go unread; three are upstream's debug `grid`, one a collision-triangle count,
+  and the other two are Russia's forests: `trees 0, 360, 0.07, 0.09, 1, 100, 800, fir06_30.mesh
+  none Russia-TreeMesh.png` and the same for `fir14_25.mesh`. Both meshes and the density map were
+  always on the disk. That terrain has been a bare hillside for want of one word in a list of two,
+  and the two lines come to **14,090 trees**.
+- **The line is mixed-format, which is probably why it was missed.** Seven comma-separated numbers
+  — yaw from and to, scale from and to, high density, min and max distance — and then the file
+  names space-separated after them, read by upstream in a single `sscanf`. A comma split alone
+  gives eight fields, the last of which is three filenames in a trench coat.
+- **Placement is a 10 m grid, not a scatter over the map.** `TerrainObjectManager::ProcessTree`
+  walks the grid, asks the density map how much grows at each cell, and drops that many trees
+  inside it; a *positive* grid spacing means one tree per cell at its centre where density is over
+  0.8, and a negative one means the scatter on a grid of that size. The distances on the line are
+  what the forest is drawn to — Russia says 800 m — so no visibility range had to be invented for
+  them.
+- **A position decides its own tree.** Yaw and scale are hashed from where the tree stands, so a
+  terrain is identical on a second build and `no_global_random` has nothing to object to. The two
+  species carry different salts; without that they land on exactly the same spots, because they
+  share a density map and a grid.
+- **A gate that skips when nothing is built is not a gate.** The first draft of
+  `a_terrain_grows_the_forest_it_paints` decided there was nothing to judge from the number of
+  trees it found, so halving the density made it grow zero and report "skipped". It decides from
+  what the terrain asks for now, which is the number that does not move when the builder breaks.

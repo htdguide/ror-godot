@@ -275,3 +275,12 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   file in this checkout. `tracks/master` is Rigs of Rods base content, the same gap as the
   `seat.mesh` several of its vehicles want. Not a loader fault, and worth knowing before anybody
   goes looking for one.
+
+- **`builds_on` is a claim that one gate covers another, and it quietly retires the one it
+  names.** The graph schedules the suite, so an edge marks its target implied and stops running
+  it. Fourteen gates were added in one day with an edge apiece recording only which gate came
+  first — "this is about roads, that is about objects" — and the implied share of the suite went
+  past the 40% `gate_chain` allows. Every one of those edges was false in the sense the graph uses:
+  a gate that drops a rig onto one box does not cover a gate that counts every box on the map.
+  Removing them took the suite from 43 implied to 35, and the fourteen are roots now. The bound is
+  the only thing that noticed; the edges themselves looked reasonable in every individual review.

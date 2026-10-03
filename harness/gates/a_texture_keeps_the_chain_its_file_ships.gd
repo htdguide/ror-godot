@@ -30,11 +30,15 @@ const MIN_FILES: int = 20
 const LISTED: int = 8
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one reads DDS headers and draws no ground.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "a_texture_keeps_the_chain_its_file_ships",
         "proves": "every block-compressed DDS whose own header declares a full mip chain is built into an image that has one",
-        "builds_on": ["the_ground_draws_its_own_textures"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": "every block-compressed file whose dwMipMapCount is over 1, and whose chain is complete, builds an image with mipmaps",
         "why": (

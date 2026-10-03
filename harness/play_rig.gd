@@ -107,6 +107,8 @@ func _populate_terrain() -> void:
     # The roads the terrain draws from a line of points rather than from placed objects. Port
     # Starling describes most of its network that way.
     _world.add_child(RorProceduralRoad.build(loaded))
+    # The forests the terrain paints with a density map. Russia asks for two fir species.
+    _world.add_child(RorTrees.build(loaded))
     _grow_vegetation(loaded)
     if _drive == null:
         return
@@ -359,6 +361,7 @@ func _change_map(name: String) -> void:
         if (
             child.name.begins_with("RorObjects")
             or child.name.begins_with("RorProceduralRoads")
+            or child.name.begins_with("RorTrees")
             or child == _terrain
         ):
             _world.remove_child(child)

@@ -26,11 +26,15 @@ const MIN_CLEARANCE_M: float = 2.0
 const REST_TOLERANCE_M: float = 0.15
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one drops a rig on one deck and checks neither the facing nor the course of the sweep.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "a_swept_road_is_solid",
         "proves": "the carriageway swept from a terrain's road points is solid, so a vehicle rests on a raised road instead of falling through it",
-        "builds_on": ["a_road_of_points_is_swept_into_a_road"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": (
             "the rig rests on the road within %.2f m of how it rests on open ground"

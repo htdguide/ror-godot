@@ -33,11 +33,15 @@ extends GateBase
 const MIN_MESHES: int = 50
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one reads every `.odef` in the checkout and places nothing.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "an_object_definition_names_a_real_mesh",
         "proves": "every mesh named by every .odef in this checkout resolves to a file that exists",
-        "builds_on": ["ror_terrain_objects_are_placed"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": "every named mesh resolves; one that does not is a misread header",
         "why": (

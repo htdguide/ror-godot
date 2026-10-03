@@ -29,11 +29,15 @@ const MAX_OFF_CENTRE_DEG: float = 2.0
 const GROUND_TOLERANCE_M: float = 0.05
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one aims a camera at one batch and checks none of the counts a placement gate checks.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "a_screenshot_says_where_it_was_taken",
         "proves": "the sidecar written beside a session screenshot names the object the camera is pointed at, and its ground figures match the terrain's own files",
-        "builds_on": ["ror_terrain_objects_are_placed"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": (
             "the aimed-at mesh is the most central thing in frame, within %.0f degrees, and the"

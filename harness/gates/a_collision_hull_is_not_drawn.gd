@@ -36,11 +36,15 @@ extends GateBase
 const MIN_DEFINITIONS: int = 20
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one sorts a definition's mesh lists and never asks whether the files exist.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "a_collision_hull_is_not_drawn",
         "proves": "an object's drawn geometry is its header mesh alone, and every mesh named inside a beginmesh block is collision instead",
-        "builds_on": ["an_object_definition_names_a_real_mesh"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": "no mesh named inside a `beginmesh` block appears in the drawn set, and the drawn set is the header mesh",
         "why": (

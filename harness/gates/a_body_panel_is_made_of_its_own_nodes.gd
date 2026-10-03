@@ -29,11 +29,15 @@ const COINCIDENT_M: float = 1e-6
 const LISTED: int = 6
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one builds cab panels alone and not the vehicles around them.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "a_body_panel_is_made_of_its_own_nodes",
         "proves": "every drawable submesh group in the library builds a panel, and every vertex of every panel sits exactly on the node it is made of",
-        "builds_on": ["every_mod_car_builds"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": "every drawable group builds, and every vertex is within 1e-6 m of its node",
         "why": (

@@ -48,11 +48,15 @@ const DIFFUSE_ALIAS: String = "diffuse_tex"
 const MIN_ALIASED: int = 5
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one reads material scripts and builds no terrain objects.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "a_materials_own_words_reach_the_surface",
         "proves": "a material textured only through a managed-material alias gets its texture, and one that states a colour instead of a texture is painted that colour",
-        "builds_on": ["ror_terrain_objects_are_placed"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": (
             "every leaf material that sets the `%s` alias resolves that file as its first"

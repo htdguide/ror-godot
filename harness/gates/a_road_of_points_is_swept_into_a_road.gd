@@ -30,11 +30,15 @@ const HORIZONTAL_DOT: float = 0.7
 const LISTED: int = 6
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one reads road points and no scenery at all.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "a_road_of_points_is_swept_into_a_road",
         "proves": "every procedural road block a terrain describes is swept into geometry that lies along its own points with its surface facing up",
-        "builds_on": ["every_object_line_is_read_as_what_it_is"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": (
             "every block of two or more buildable points builds, every vertex within its own"

@@ -33,11 +33,15 @@ const MIN_TERRAINS: int = 1
 const LISTED: int = 6
 
 
+## **It builds on nothing.** `builds_on` means "running this exercises that, at least as
+## hard", and the graph stops running what it implies — so an edge that only records which
+## gate came first is an edge that silently retires a gate. This one requires every findable definition to build and checks none of the triangle, texture or bounds figures a placement gate checks.
+
+
 static func meta() -> Dictionary:
     return {
         "name": "every_object_line_is_read_as_what_it_is",
         "proves": "every object line of every terrain in the library is read as scenery, a road point or an actor spawn, and every placement whose definition this checkout has builds geometry",
-        "builds_on": ["ror_terrain_objects_are_placed"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": "scenery + road points + actor spawns equals the six-number lines, and every findable definition builds",
         "why": (
