@@ -25,6 +25,18 @@ const MONORAIL_WALL_M: float = 1.4
 const MONORAIL_LIFT_M: float = 2.0
 ## How far under the ground a shoulder's foot is sunk, so it never z-fights the terrain.
 const FOOT_SINK_M: float = 0.01
+## How far a lifted deck is held above the ground, so it is drawn rather than fighting it.
+const DECK_CLEARANCE_M: float = 0.05
+## And how far a deck may be lifted at all.
+##
+## **A metre is authoring slop; a hundred is a different fault wearing its clothes.** On Port
+## Starling 25 of 336 road points want a lift and none wants more than 0.6 m — a spline laid
+## close to the ground and missing it. On North St Helens 601 of 1363 want one and 87 want more
+## than 5 m, the worst 148.9 m, which is not a road that sank into a hillside but a road and a
+## heightmap that disagree about where the world is. Lifting those would hang a road over a
+## mountain and hide the question. They are left where the file puts them and counted by
+## `a_road_rests_on_the_ground_it_crosses`.
+const MAX_LIFT_M: float = 1.0
 ## Every kind this knows how to shape.
 const KINDS: Array[String] = ["flat", "left", "right", "both", "bridge", "monorail", "automatic"]
 ## The kinds that carry a wall and an underside rather than meeting the ground.
@@ -44,6 +56,16 @@ static func points(terrain: RorTerrain, point: Dictionary) -> PackedVector3Array
         at.y += MONORAIL_LIFT_M
     var basis: Basis = frame(point["rotation"] as Vector3)
     var width: float = point["width"] as float
+    # **A road that is not a bridge rests on the ground it crosses.** The deck's height is the
+    # author's own spline and the ground is a heightmap neither of them agreed with: 867 of Port
+    # Starling's 8688 road vertices sit below the terrain, the worst of them 5.26 m down, and a
+    # road under a hillside is a road nobody can see. Reported from a window as "some roads are
+    # missing". Lifted by the most any part of its own deck needs, so a crossing stays level
+    # rather than twisting, and never lowered — where the spline is already clear of the ground
+    # it is left exactly as the file has it. Bridges and monorails are the point of being above
+    # the ground and are not touched.
+    if not RAISED.has(kind):
+        at.y += lift_for(terrain, at, basis, width)
     var bw: float = point["bwidth"] as float
     var bh: float = point["bheight"] as float
     var raised: bool = RAISED.has(kind)
@@ -72,6 +94,36 @@ static func points(terrain: RorTerrain, point: Dictionary) -> PackedVector3Array
         out[0] = foot(terrain, out[1])
         out[7] = foot(terrain, out[6])
     return out
+
+
+## Measured at each sample's own height rather than at the centre's: a banked section's downhill
+## edge sits below its middle, and lifting by what the middle needs leaves that edge in the
+## ground. Two corners on North St Helens, 0.10 and 0.14 m under, found by the gate.
+static func lift_for(terrain: RorTerrain, at: Vector3, basis: Basis, width: float) -> float:
+    var wanted: float = 0.0
+    for across: float in [-0.5, 0.0, 0.5]:
+        var edge: Vector3 = at + basis * Vector3(0.0, 0.0, width * across)
+        var ground: float = terrain.height_at_world(edge.x, edge.z)
+        wanted = maxf(wanted, ground + DECK_CLEARANCE_M - edge.y)
+    # All or nothing. Clamping to the cap was tried and moves a section that wants metres into
+    # the band the gate judges, which makes a gross mismatch look like a near miss; a section one
+    # of whose samples wants more than the cap is a section this rule has nothing to say about.
+    return 0.0 if wanted > MAX_LIFT_M else wanted
+
+
+## What a section would need to clear the ground, uncapped, so a caller can tell a near miss from
+## a mismatch the builder refuses to touch.
+static func lift_wanted(terrain: RorTerrain, point: Dictionary) -> float:
+    var at: Vector3 = point["position"] as Vector3
+    if (point["kind"] as String) == "monorail":
+        at.y += MONORAIL_LIFT_M
+    var basis: Basis = frame(point["rotation"] as Vector3)
+    var width: float = point["width"] as float
+    var wanted: float = 0.0
+    for across: float in [-0.5, 0.0, 0.5]:
+        var edge: Vector3 = at + basis * Vector3(0.0, 0.0, width * across)
+        wanted = maxf(wanted, terrain.height_at_world(edge.x, edge.z) + DECK_CLEARANCE_M - edge.y)
+    return wanted
 
 
 ## How a point is turned. Upstream composes the rotation about x, then y, then z.
