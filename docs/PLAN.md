@@ -859,14 +859,16 @@ So this is two jobs that happen to share a name, and the second is the one that 
 - **Mesh LOD.** Godot generates LODs at import; these meshes are built at runtime from Ogre `.mesh`
   files, so they have none. `ImporterMesh.generate_lods` is the runtime equivalent and would have
   to run at load or be cached beside the terrain the way the heightmap already is.
-- **The maps already ship mesh LODs, and nothing reads them.** Found 2026-10-03 while fixing the
-  `.odef` header: the format has a `beginlodmesh` / `endlodmesh` block listing a mesh per distance,
-  and Starling Island's buildings use it — `300, firehouse_lod1.mesh`, `100,
-  straightroadbusstop_lod1.mesh`, `300, straightroadbusstop_lod2.mesh`. That is per-object detail
-  reduction, at distances the terrain's own author chose, already in the content. Upstream's current
-  parser ignores the block and so does this project. It belongs ahead of `generate_lods` in the
-  order below, because authored LOD geometry is better than derived LOD geometry and it costs a
-  parser change rather than a load-time budget.
+- **The maps already ship mesh LODs. Done 2026-10-03.** The format has a `beginlodmesh` /
+  `endlodmesh` block listing a mesh per distance, and Starling Island ships twelve across ten
+  objects — `300, firehouse_lod1.mesh`, `100, straightroadbusstop_lod1.mesh` and the rest — every
+  one of them on the disk. Upstream's current parser reads the block and does nothing with it.
+  They are drawn now, over the ranges their own definitions state, through
+  `visibility_range_begin/end` with a fade margin: 7788 triangles go at the furthest level, and
+  eight of the levels turn out to be no simpler than the mesh they stand in for, which is the
+  author's decision rather than a fault. `an_object_draws_its_own_distance_mesh` holds it. This
+  was the cheapest item here and it is spent; what remains below is the work that has to be
+  derived rather than read.
 - **HLOD — merging distant clusters.** Beyond some range, a group of buildings becomes one baked
   mesh or one impostor card. This is how open-world games draw a skyline for nothing, and it is the
   first thing that needs a build step rather than a load-time derivation.
@@ -875,11 +877,11 @@ So this is two jobs that happen to share a name, and the second is the one that 
 - **Depth precision.** At kilometre ranges a 24-bit depth buffer z-fights. Reversed-Z, a log depth
   buffer, or a separate far pass. Only needed once something is actually drawn out there.
 
-**Order proposed.** Instancing by definition and per-object visibility ranges first, because they
-pay for themselves on a map that is already over budget. Then the fog curve and Terrain3D's LOD
-extent, which is what the request literally asks for. Then the authored `beginlodmesh` chains,
-which are free geometry. Then generated mesh LOD, then HLOD and occlusion if a map still cannot
-afford its own scenery.
+**Order proposed.** The authored `beginlodmesh` chains are done. Instancing by definition and
+per-object visibility ranges for everything else next, because they pay for themselves on a map
+that is already over budget. Then the fog curve and Terrain3D's LOD extent, which is what the
+request literally asks for. Then generated mesh LOD, then HLOD and occlusion if a map still
+cannot afford its own scenery.
 
 **Everything derived at load from the terrain's own files.** No per-map authoring, no hand-written
 distance tables: a visibility range comes from an object's own bounds, an instance group from its

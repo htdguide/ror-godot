@@ -9,12 +9,20 @@ was paid for once.
 
 Its companion is `hard-won-facts-mods.md`, which covers how a vehicle is read, built and drawn.
 
-- **Those same files carry the map's own LOD data.** `beginlodmesh` / `endlodmesh` lists a mesh per
-  distance — `300, firehouse_lod1.mesh` — which is upstream's per-object detail reduction, authored
-  by the terrain's author and shipped with the terrain. Upstream's current parser ignores the
-  block; it is read by nothing here either. It is the first thing to reach for in PLAN 0.13, because
-  it is distance geometry that already belongs to the content rather than something this project
-  would have to invent.
+- **`beginlodmesh` is distance geometry the terrain's author already made, and upstream throws it
+  away.** A block of `<distance>, <mesh>` lines says which mesh to draw from how far: Starling
+  Island ships twelve across ten objects — firehouse, police department, hospital, three stores,
+  office block, warehouse, bus stop and a road sign — and every one of them is on the disk.
+  Upstream's current parser reads the block and does nothing with it, so nobody has drawn them for
+  years. The header mesh is drawn to the first stated distance, each level from its own to the
+  next, the last to the horizon, and 7788 triangles go at the furthest level.
+- **Eight of those levels are no simpler than the mesh they stand in for.** A fact about the
+  content rather than about the loader, so `an_object_draws_its_own_distance_mesh` counts them
+  instead of failing: a level that costs more than it saves is the author's decision to have made.
+- **`.odef` files are CRLF.** Chasing the LOD meshes, a shell `[ -f ]` test reported eleven of the
+  twelve as missing — the names carried a trailing `\r`. The readers here strip it and the gates
+  prove they do, but a one-off check that does not will lie, and it very nearly got recorded as a
+  fact about the content.
 - **An `.odef`'s `beginmesh` block is a collision mesh, not more geometry to draw.** Upstream puts
   it straight into `collision_meshes` — `ODefFileFormat.cpp`, at `endmesh`:
   `m_def->collision_meshes.emplace_back(m_ctx.cbox_mesh_name, m_ctx.header_scale,

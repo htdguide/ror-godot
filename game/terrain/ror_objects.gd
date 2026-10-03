@@ -36,6 +36,8 @@ const TILE_M: float = 256.0
 ## What Blender's Ogre exporter puts between a material's name and the texture it was painted
 ## with.
 const TEXFACE_MARK: String = "/TEXFACE/"
+## How much of a level's own distance is spent fading into the next one.
+const LOD_FADE: float = 0.1
 
 
 ## Builds every object in a terrain. Returns a node holding them, and never null.
@@ -55,8 +57,10 @@ static func build(terrain: RorTerrain) -> Node3D:
             continue
         var at: Transform3D = transform_of(placement, odef["scale"] as Vector3)
         var tile: Vector2i = tile_of(at.origin)
-        for mesh_file: String in odef["meshes"] as PackedStringArray:
-            var key: String = "%s|%d|%d" % [mesh_file, tile.x, tile.y]
+        for level: Dictionary in _levels(odef):
+            var key: String = "%s|%d|%d|%.0f|%.0f" % [
+                level["mesh"], tile.x, tile.y, level["begin"], level["end"]
+            ]
             if not batches.has(key):
                 batches[key] = ([] as Array[Transform3D])
                 order.append(key)
@@ -68,6 +72,32 @@ static func build(terrain: RorTerrain) -> Node3D:
             continue
         root.add_child(_batch(key, mesh, batches[key] as Array[Transform3D]))
     return root
+
+
+## What an object draws, and from how far away each of it is drawn.
+##
+## **`beginlodmesh` is the author's own distance geometry.** A block of `<distance>, <mesh>` lines
+## says which mesh to draw from how far away, and Starling Island ships twelve of them across ten
+## objects. Upstream's current parser reads the block and does nothing with it, so nobody has
+## drawn them for years; they are the cheapest distance geometry this project can have, because
+## the terrain's author already made it.
+##
+## The header mesh is drawn up to the first stated distance, each level from its own distance to
+## the next, and the last to the horizon. A distance of zero in Godot means "no limit", which is
+## what the far end of the last level wants anyway.
+static func _levels(odef: Dictionary) -> Array[Dictionary]:
+    var lods: Array[Dictionary] = odef.get("lods", [] as Array[Dictionary])
+    var out: Array[Dictionary] = []
+    var first: float = 0.0 if lods.is_empty() else lods[0]["distance"] as float
+    for mesh_file: String in odef["meshes"] as PackedStringArray:
+        out.append({"mesh": mesh_file, "begin": 0.0, "end": first})
+    for index: int in lods.size():
+        out.append({
+            "mesh": lods[index]["mesh"],
+            "begin": lods[index]["distance"] as float,
+            "end": 0.0 if index + 1 >= lods.size() else lods[index + 1]["distance"] as float,
+        })
+    return out
 
 
 ## Which tile a point falls in. Floored, so the tile a point belongs to does not depend on which
@@ -86,6 +116,14 @@ static func _batch(key: String, mesh: ArrayMesh, at: Array[Transform3D]) -> Mult
         multimesh.set_instance_transform(index, at[index])
     var node: MultiMeshInstance3D = MultiMeshInstance3D.new()
     node.name = key.get_slice("|", 0).get_basename()
+    # The distances the object's own definition states, with a margin either side so a building
+    # fades between its levels instead of snapping.
+    node.visibility_range_begin = key.get_slice("|", 3).to_float()
+    node.visibility_range_end = key.get_slice("|", 4).to_float()
+    node.visibility_range_begin_margin = node.visibility_range_begin * LOD_FADE
+    node.visibility_range_end_margin = node.visibility_range_end * LOD_FADE
+    if node.visibility_range_begin > 0.0 or node.visibility_range_end > 0.0:
+        node.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
     # And the file it came from, written down rather than left to be read back off the node.
     # One mesh is one batch per tile, so several siblings carry the same name and Godot renames
     # the duplicates — `@MultiMeshInstance3D@3` is what a screenshot's sidecar called a La Paz

@@ -1,8 +1,9 @@
 extends GateBase
 ## Every mesh an object definition names is a file that is actually there.
 ##
-## Both lists are checked: the mesh the object draws and the collision hulls its `beginmesh`
-## blocks name, because a misread header shifts every line after it too.
+## All three lists are checked: the mesh the object draws, the distance meshes its `beginlodmesh`
+## block names, and the collision hulls its `beginmesh` blocks name — because a misread header
+## shifts every line after it too.
 ##
 ## **The content is the oracle.** An `.odef` is a terrain author's statement about which meshes an
 ## object is made of, and a reader that gets the format right lands on files that exist. One that
@@ -67,6 +68,8 @@ func run(_harness: Node) -> Dictionary:
                 continue
             var both: PackedStringArray = read["meshes"] as PackedStringArray
             both.append_array(read["collision_meshes"] as PackedStringArray)
+            for level: Dictionary in read["lods"] as Array[Dictionary]:
+                both.append(level["mesh"] as String)
             for mesh: String in both:
                 named += 1
                 if not RorContentPath.has(mesh, directory):

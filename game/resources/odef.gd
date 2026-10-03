@@ -7,6 +7,13 @@ extends RefCounted
 ## collision box, `beginmesh`/`endmesh` gives it a collision **mesh**, and a handful of one-word
 ## lines set flags.
 ##
+## **`beginlodmesh` is the author's own distance geometry.** A block of `<distance>, <mesh>`
+## lines says which mesh to draw from how far away, and Starling Island ships twelve of them
+## across ten objects — its firehouse, police department, hospital, stores, office block, bus
+## stop and road sign. Upstream's current parser ignores the block entirely, so nobody has drawn
+## them for years; they are the cheapest distance geometry available to this project because the
+## terrain's author already made it.
+##
 ## **`beginmesh` is not more geometry to draw.** Upstream puts it straight into
 ## `collision_meshes` — `ODefFileFormat.cpp`, at `endmesh`:
 ##
@@ -32,13 +39,15 @@ extends RefCounted
 ## The flags beyond that are not read: `event`, `forcecamera`, `direction`, `stdfriction`.
 
 
-## Reads an .odef. Returns {"error", "meshes", "collision_meshes", "scale", "boxes"}, where a box
-## is {"min", "max", "rotation", "virtual"} in the object's own Y-up frame.
+## Reads an .odef. Returns {"error", "meshes", "collision_meshes", "lods", "scale", "boxes"},
+## where a box is {"min", "max", "rotation", "virtual"} in the object's own Y-up frame and a lod
+## is {"distance", "mesh"}.
 static func read(path: String) -> Dictionary:
     var out: Dictionary = {
         "error": "",
         "meshes": PackedStringArray(),
         "collision_meshes": PackedStringArray(),
+        "lods": [] as Array[Dictionary],
         "scale": Vector3.ONE,
         "boxes": [] as Array[Dictionary],
     }
@@ -48,6 +57,8 @@ static func read(path: String) -> Dictionary:
         return out
     var meshes: PackedStringArray = PackedStringArray()
     var hulls: PackedStringArray = PackedStringArray()
+    var lods: Array[Dictionary] = []
+    var in_lod: bool = false
     var boxes: Array[Dictionary] = []
     var box: Dictionary = {}
     var seen: int = 0
@@ -65,12 +76,29 @@ static func read(path: String) -> Dictionary:
         if seen == 0 and line.strip_edges() == "LOD":
             continue
         var word: String = line.get_slice(" ", 0).to_lower()
+        # `<distance>, <mesh>` inside a `beginlodmesh` block: the mesh to draw from that far
+        # away. Taken before the keyword match because the line is data, not a keyword, and
+        # before the positional header because it would otherwise be read as a scale.
+        if in_lod and word != "endlodmesh":
+            var fields: PackedStringArray = line.split(",")
+            if fields.size() >= 2 and fields[0].strip_edges().is_valid_float():
+                lods.append({
+                    "distance": fields[0].strip_edges().to_float(),
+                    "mesh": fields[1].strip_edges(),
+                })
+            continue
         match word:
             "beginmesh":
                 in_mesh = true
                 continue
             "endmesh":
                 in_mesh = false
+                continue
+            "beginlodmesh":
+                in_lod = true
+                continue
+            "endlodmesh":
+                in_lod = false
                 continue
             "beginbox":
                 box = {
@@ -114,6 +142,10 @@ static func read(path: String) -> Dictionary:
             seen += 1
     out["meshes"] = _drawable(meshes)
     out["collision_meshes"] = _drawable(hulls)
+    lods.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+        return (a["distance"] as float) < (b["distance"] as float)
+    )
+    out["lods"] = lods
     out["boxes"] = boxes
     if (out["meshes"] as PackedStringArray).is_empty():
         out["error"] = "%s names no mesh" % path.get_file()
