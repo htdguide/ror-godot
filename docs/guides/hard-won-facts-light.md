@@ -177,3 +177,17 @@ See `hard-won-facts.md` for the solver, the file formats, the terrain and the ga
   brightest survivors and the ratio was pulled towards one. It had been reporting 1.18 against a
   1.25 bar; with the lit frame's mask applied to both, the same scene reads 8.93. A segmentation
   that moves with the thing being measured is not a measurement.
+
+- **The daylight locus is published and this project now carries it.** Godot's `light_temperature`
+  walks the Planckian locus; sRGB's white point is D65, which is on the daylight locus, a
+  different curve fitted to measured skylight. `DaylightLocus` is CIE 15's cubic in 1/T with the
+  tabulated D50, D55, D65 and D75 chromaticities beside it, and
+  `the_daylight_locus_is_where_the_books_put_it` holds the formula to those four published values:
+  worst 0.000126, at D75.
+- **A gate written to prove a remembered number failed, and the number was wrong.** The D series
+  was named when the second radiation constant was 1.4380e-2 m K and it is 1.4388e-2 now, so D65
+  is 6503.6 K rather than 6500 — and this was written down earlier as putting x out by 0.0008. The
+  real figure is 0.00007: the correction halves an already small residual, from 0.000196 to
+  0.000126, and both are inside any tolerance worth setting. The first draft of the gate *required*
+  the correction to matter and failed on its own claim. It reports both distances now and turns on
+  neither, because a bound drawn between them would be a bound drawn around the answer.

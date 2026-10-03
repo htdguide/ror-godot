@@ -134,6 +134,23 @@ has no corresponding record under `LICENSES/`.
 - Attribution: any build that ships it must credit La Paz and Klink on its own credits page,
   and the Rigs of Rods project for the formats and the physics.
 
+### CIE daylight locus (reference data, no files)
+- Local path: `harness/reference/daylight_locus.gd` — the formula and the published
+  chromaticities, transcribed into source
+- Source: Wikipedia, *Standard illuminant*, https://en.wikipedia.org/wiki/Standard_illuminant —
+  the "Illuminant series D" section, which gives the CIE cubic for x as a function of correlated
+  colour temperature, the quadratic for y, the 1.4388/1.4380 correction from a series name to its
+  temperature, and the tabulated chromaticities of D50, D55, D65 and D75 for the 2 degree
+  observer. Retrieved 2026-10-03.
+- Upstream source the article cites: CIE, *Colorimetry*, 15:2004, and Wyszecki & Stiles, *Color
+  Science* (2nd ed., Wiley 1982).
+- Licence: the text is CC BY-SA 4.0; the chromaticities and the formula are measured and
+  published constants rather than creative work, and only those are used here.
+- Why it is here: Godot converts a colour temperature along the Planckian locus and sRGB's white
+  point is on the daylight locus, so no `light_temperature` in this project is neutral. Catching
+  a tinted light needs an illuminant colour that comes from somewhere other than this project,
+  which `the_daylight_locus_is_where_the_books_put_it` holds the transcription to.
+
 ### ColorChecker reference colorimetry (reference data, no files)
 - Local path: `harness/reference/colorchecker.gd` — the numbers, transcribed into source
 - Source: Wikipedia, *ColorChecker*, https://en.wikipedia.org/wiki/ColorChecker — the table
