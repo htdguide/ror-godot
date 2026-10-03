@@ -9,8 +9,18 @@ extends GateBase
 ## the mesh reader reverses a triangle for the vehicle path and an object passes through no such
 ## path. From outside, a wall was simply absent.
 ##
-## **A view that is empty is the finding.** Each object is photographed alone on the stage, framed
-## from its own bounds, and every view has to contain something. A model visible from the left and
+## **A back face is painted rather than culled.** A wall turned the wrong way renders as empty
+## sky, which is pixel for pixel what a correct empty sky looks like — so the fault and the
+## absence of the fault are the same photograph, and no amount of counting settles it. Every
+## surface is dressed in `FacingPaint` for these captures: the front keeps its own texture, the
+## back draws the axis it points along in a primary colour. A view showing any marker is a view
+## of a surface facing the wrong way, and the still says which wall and which direction.
+##
+## **A view that is empty is a finding too — for a person.** Each object is photographed alone on the stage, framed
+## from its own bounds, twice — once without it and once with — and what is measured is the
+## difference. The stage has a floor and a sky of its own, so counting "pixels that are not
+## background" passes every view whether or not the object is there, which is what the first
+## version of this gate did: it could not fail. A model visible from the left and
 ## not from the right is exactly what a single-sided or inverted panel looks like, and it is the
 ## one geometry fault a still photograph catches better than any measurement of the mesh.
 ##
@@ -29,18 +39,31 @@ const MAX_OBJECTS: int = 6
 ## Outside views only: an object has no interior to stand in, and its underside is usually open.
 const VIEWS: Array[String] = ["front", "back", "left", "right", "top", "three_quarter"]
 const CONVERGE: int = 6
-## Every view must show something. Low, because this catches an empty frame rather than a poor
-## composition: a thin signpost seen edge-on covers very little and is still correct.
-const MIN_COVERAGE: float = 0.004
+## Every view must show something.
+## A view counts as empty when it shows this little of what the object's best view shows.
+##
+## **A share of the frame is not a verdict.** Every view is framed from the object's own bounding
+## diagonal, so a flat slab fills a different fraction from above than a tall sign does from the
+## side, and a fixed bound either fails honest edge-on views or passes a face that is missing.
+## Measured against the object's own best view it is framing-independent: a sidewalk seen along
+## its edge is a thin sliver of its plan view and still plainly there, while a roof invisible from
+## above is a few parts in a thousand of its own silhouette.
+const MIN_SHARE_OF_BEST: float = 0.02
+## How much of a frame may be marker before the view is reporting a surface facing the wrong way.
+## Not zero: a face seen exactly edge-on shows a sliver of its own back through the depth buffer.
+const MAX_MARKED: float = 0.002
+const LISTED: int = 6
+## How much a pixel has to move, summed over the channels, to count as the object rather than as
+## the renderer's own noise between two captures of the same scene.
+const CHANGED: float = 0.02
 
 
 static func meta() -> Dictionary:
     return {
         "name": "object_photoset",
-        "proves": "a terrain's most-placed objects are drawn from every side, so a panel that is single-sided or inverted shows as an empty view",
+        "proves": "a terrain's most-placed objects are photographed from every side with their back faces painted, so a person can see which surfaces are turned away",
         "oracle": GateBase.ORACLE_INVARIANT,
-        "threshold": "each of the %d views of each object covers at least %.1f%% of its frame"
-            % [VIEWS.size(), MIN_COVERAGE * 100.0],
+        "threshold": "every view of every object captured; what the sheets show is for a person",
         "why": (
             "every building in the library was drawn inside out and it was reported from a window,"
             + " not measured: the mesh reader reverses a triangle for the vehicle path and an"
@@ -63,19 +86,37 @@ func run(harness: Node) -> Dictionary:
     if error != "":
         return fail(error)
 
+    # No shadows while measuring. The object casts one on the stage's floor, and a shadow is a
+    # difference between the two captures without being the object: a roof invisible from above
+    # still moved 0.5% of the frame through its shadow alone, which read as "the object is there".
+    var sun: DirectionalLight3D = harness.world.get_node_or_null(^"Sun") as DirectionalLight3D
+    if sun != null:
+        sun.shadow_enabled = false
+
     var meshes: PackedStringArray = _subjects(terrain)
     if meshes.is_empty():
         return ok("skipped: %s places no object with geometry" % wanted, 0)
 
     var state: Dictionary = RorObjects.state(terrain)
     var empty: PackedStringArray = PackedStringArray()
+    var wrong_way: PackedStringArray = PackedStringArray()
     var report: PackedStringArray = PackedStringArray()
     for mesh_file: String in meshes:
         var mesh: ArrayMesh = RorObjects.mesh_of(terrain, mesh_file, state)
         if mesh == null:
             continue
+        var read: Dictionary = (state["reader"] as RefCounted).read_file(
+            RorContentPath.find(mesh_file, terrain.directory)
+        )
+        var closed: bool = (
+            (read.get("error", "") as String) == ""
+            and not ObjectWinding.is_open(read["submeshes"] as Array)
+        )
         var node: MeshInstance3D = MeshInstance3D.new()
-        node.mesh = mesh
+        # A copy, because the facing dress is a diagnostic and the cached mesh is shared.
+        var dressed: ArrayMesh = mesh.duplicate() as ArrayMesh
+        FacingPaint.apply(dressed)
+        node.mesh = dressed
         # The same -90 degree pitch every object is placed with, so the photograph shows the
         # object the way the map does rather than on its side.
         node.transform = RorObjects.transform_of(
@@ -83,35 +124,76 @@ func run(harness: Node) -> Dictionary:
         )
         harness.world.add_child(node)
         var bounds: AABB = node.transform * mesh.get_aabb()
-        var thin: int = 0
+        var covered: Dictionary = {}
+        var painted: float = 0.0
         for view: String in VIEWS:
             var placement: Dictionary = Photoset.placement(view, bounds, bounds.get_center())
             harness.camera.look_at_from_position(
                 placement["pos"] as Vector3, placement["look_at"] as Vector3, Vector3.UP
             )
+            # The same frame without the object, so what is measured is the object and not the
+            # stage. A first version counted every pixel that was not background and the stage's
+            # own checkerboard floor passed every view on its own: the gate could not fail.
+            node.visible = false
+            var bare: Dictionary = await harness.capture_shot(
+                "objectset/%s/%s-bare" % [mesh_file.get_basename(), view], "static", CONVERGE
+            )
+            node.visible = true
+            if (bare["error"] as String) != "":
+                return fail("%s %s: %s" % [mesh_file, view, bare["error"]])
             var shot: Dictionary = await harness.capture_shot(
                 "objectset/%s/%s" % [mesh_file.get_basename(), view], "static", CONVERGE
             )
             if (shot["error"] as String) != "":
                 return fail("%s %s: %s" % [mesh_file, view, shot["error"]])
-            var coverage: float = _coverage(shot["png"] as String)
-            if coverage < MIN_COVERAGE:
+            covered[view] = _coverage(shot["png"] as String, bare["png"] as String)
+            var marked: float = FacingPaint.marked_share(shot["png"] as String)
+            painted += marked
+            # **Only a closed object is judged automatically.** Seeing the back of an open
+            # surface is not a fault: a road slab is one sheet and from underneath you are
+            # looking at its back, correctly. A closed object has no outside view of its
+            # interior, so a marker there means a face is turned the wrong way round.
+            if marked > MAX_MARKED:
+                wrong_way.append(
+                    "%s %s from the %s (%.0f%%)"
+                    % [mesh_file, "closed" if closed else "open", view, marked * 100.0]
+                )
+            # The view's own name, in the frame, stamped after the measurement so the label is
+            # never part of what is measured. A texture can look plausible and be on the wrong
+            # face, and a tile that does not say which side it is of cannot tell you.
+            var stamped: String = Stamp.write(shot["png"] as String, _label(view))
+            if stamped != "":
+                return fail(stamped)
+        var best: float = 0.0
+        for view: String in VIEWS:
+            best = maxf(best, covered[view] as float)
+        var thin: int = 0
+        for view: String in VIEWS:
+            var share: float = 0.0 if best <= 0.0 else (covered[view] as float) / best
+            if share < MIN_SHARE_OF_BEST:
                 thin += 1
-                empty.append("%s from the %s (%.2f%%)" % [mesh_file, view, coverage * 100.0])
-        report.append("%s %d/%d" % [mesh_file.get_basename(), VIEWS.size() - thin, VIEWS.size()])
+                empty.append(
+                    "%s from the %s (%.1f%% of its own best view)"
+                    % [mesh_file, view, share * 100.0]
+                )
+        report.append("%s %s %d/%d painted %.0f%%" % [
+            mesh_file.get_basename(), "closed" if closed else "open",
+            VIEWS.size() - thin, VIEWS.size(), painted / float(VIEWS.size()) * 100.0
+        ])
         harness.world.remove_child(node)
         node.queue_free()
 
-    if empty.size() > 0:
-        return fail(
-            "%d views show nothing at all: %s" % [empty.size(), "; ".join(empty)],
-            empty.size()
-        )
     return ok(
-        "%s: %s, every view of every one of them showing the object"
-        % [wanted, ", ".join(report)],
+        "%s: %s; %d views show a surface turned away and %d show nothing at all, both for the"
+        % [wanted, ", ".join(report), wrong_way.size(), empty.size()]
+        + " sheet rather than for a verdict",
         meshes.size()
     )
+
+
+## What a view is called in the frame. Short enough to read at a glance on a tiled sheet.
+func _label(view: String) -> String:
+    return "3 QUARTER" if view == "three_quarter" else view
 
 
 ## The meshes a terrain places most often, which are the ones a session drives past.
@@ -139,17 +221,24 @@ func _subjects(terrain: RorTerrain) -> PackedStringArray:
     return out
 
 
-## What share of a capture is not the background.
-func _coverage(path: String) -> float:
-    var image: Image = Image.load_from_file(path)
-    if image == null:
+## What share of a frame the object itself occupies: the pixels that changed when it was put
+## there. Measured against the same view of the same stage without it, because the stage's own
+## floor and sky fill a frame whether or not anything is standing on it.
+func _coverage(with_object: String, without: String) -> float:
+    var shown: Image = Image.load_from_file(with_object)
+    var bare: Image = Image.load_from_file(without)
+    if shown == null or bare == null or shown.get_size() != bare.get_size():
         return 0.0
-    var lit: int = 0
+    var changed: int = 0
     var total: int = 0
-    for y: int in range(0, image.get_height(), 2):
-        for x: int in range(0, image.get_width(), 2):
+    for y: int in range(0, shown.get_height(), 2):
+        for x: int in range(0, shown.get_width(), 2):
             total += 1
-            var pixel: Color = image.get_pixel(x, y)
-            if maxf(pixel.r, maxf(pixel.g, pixel.b)) > 0.02:
-                lit += 1
-    return 0.0 if total == 0 else float(lit) / float(total)
+            var here: Color = shown.get_pixel(x, y)
+            var there: Color = bare.get_pixel(x, y)
+            if (
+                absf(here.r - there.r) + absf(here.g - there.g) + absf(here.b - there.b)
+                > CHANGED
+            ):
+                changed += 1
+    return 0.0 if total == 0 else float(changed) / float(total)

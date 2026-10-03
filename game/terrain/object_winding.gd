@@ -30,6 +30,28 @@ const MIN_CLOSED_TRIANGLES: int = 8
 ## particular, so the measure is only trusted when it is a real share of the mesh's own bounding
 ## box, and anything ambiguous is left exactly as its file has it.
 static func is_inside_out(submeshes: Array) -> bool:
+    return enclosed_share(submeshes) > CLOSED_SHARE
+
+
+## Whether a mesh encloses nothing in particular: a wall, a roof, a sign, a road slab.
+##
+## Its signed volume cannot say which way it is wound either. The divergence theorem applies to a
+## closed surface; for an open one the figure depends on where the origin happens to sit, and
+## `haus3.mesh` is two slanted planes that "enclose" 0.66 of their own box. Seeing the back of
+## such a surface is also often correct — a road slab is one sheet and from underneath you are
+## looking at its back — so an open mesh is left exactly as its file has it and judged by a
+## person looking at a photograph rather than by a rule.
+static func is_open(submeshes: Array) -> bool:
+    return absf(enclosed_share(submeshes)) < CLOSED_SHARE
+
+
+## How much of its own bounding box a mesh encloses, signed, in the order the reader hands it
+## over. Near zero for an open shape.
+##
+## The reader has already reversed these, so the sign here is the opposite of the sign the drawn
+## mesh will have: a *positive* volume in the file's own order means the drawn mesh would enclose
+## a negative one.
+static func enclosed_share(submeshes: Array) -> float:
     var volume: float = 0.0
     var low: Vector3 = Vector3.INF
     var high: Vector3 = -Vector3.INF
@@ -46,15 +68,10 @@ static func is_inside_out(submeshes: Array) -> bool:
             ) / 6.0
             triangles += 1
     if triangles < MIN_CLOSED_TRIANGLES:
-        return false
+        return 0.0
     var box: Vector3 = high - low
     var capacity: float = box.x * box.y * box.z
-    if capacity <= 0.0:
-        return false
-    # The reader has already reversed these, so the sign here is the opposite of the sign the
-    # drawn mesh will have: a *positive* volume in the file's own order means the drawn mesh
-    # would enclose a negative one.
-    return volume / capacity > CLOSED_SHARE
+    return 0.0 if capacity <= 0.0 else volume / capacity
 
 
 ## One submesh's geometry, as Godot's array format wants it.

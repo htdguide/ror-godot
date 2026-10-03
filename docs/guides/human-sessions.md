@@ -84,3 +84,31 @@ side nobody was taking.
 
 It catches absent. It cannot catch a wrong texture or a wrong colour, which is why it produces a
 sheet to look at rather than only a verdict.
+
+### Painting the back of a face
+
+`tools/objectset.sh` photographs with every surface dressed in `FacingPaint`: the front of a face
+keeps its own texture, the back draws the axis it points along — red for x, green for y, blue for
+z — unshaded, so the marker reads the same under any light.
+
+**A culled back face is nothing, and nothing is not measurable.** A wall turned the wrong way
+renders as empty sky, which is pixel for pixel what a correct empty sky looks like: the fault and
+the absence of the fault are the same photograph. Painted, `haus3.mesh` is solid blue from the
+left and green from above, and the sheet says which wall and which way it points.
+
+Each view is labelled in the frame — FRONT, BACK, LEFT, RIGHT, TOP, 3 QUARTER — drawn as pixels,
+because Godot's `Label` does not appear in a viewport capture and this build has no ffmpeg
+`drawtext`.
+
+**The gate reports and does not judge, deliberately.** Three bounds were tried and every one of
+them separated nothing:
+
+- *any paint is a fault* — a road slab is one sheet and from underneath you are correctly looking
+  at its back;
+- *paint on a closed object is a fault* — `road-slab.mesh` classifies as closed and paints 58% of
+  its own top view, and no number says whether that is an inversion or a misclassification;
+- *an empty view is a fault* — a cross-card tree is two vertical quads and from directly above it
+  is edge-on and correctly shows nothing.
+
+So the sheet carries the judgement and the gate carries the numbers. A reported measurement with
+no verdict is worth more than a verdict nobody can defend.
