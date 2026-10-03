@@ -291,9 +291,9 @@ static func mesh_of(terrain: RorTerrain, file: String, state: Dictionary) -> Arr
         cache[file] = null
         return null
     var mesh: ArrayMesh = ArrayMesh.new()
-    var flip: bool = ObjectWinding.is_inside_out(read["submeshes"] as Array)
+    var turn: bool = ObjectWinding.is_inside_out(read["submeshes"] as Array)
     for submesh: Dictionary in read["submeshes"] as Array:
-        var arrays: Array = ObjectWinding.arrays(submesh, flip)
+        var arrays: Array = ObjectWinding.arrays(submesh, turn)
         if arrays.is_empty():
             continue
         mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)

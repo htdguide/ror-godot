@@ -1,22 +1,20 @@
 extends GateBase
 ## A terrain object's triangles face the way the normals in its own file say they do.
 ##
-## **The mesh reader reverses every triangle**, and its own note says why it has to for a vehicle
-## and that the reason has never been isolated: loaded in file order a truck is culled from
-## outside and drawn from inside, so something between the reader and the drawn pixel mirrors the
-## geometry. A terrain object passes through no such path — `RorObjects.transform_of` is a
-## rotation and a positive scale — so the same reversal turns a building inside out and it is
-## wound back where the object is built.
-##
 ## **The oracle is the normal the file carries for each vertex.** A triangle's own winding gives a
 ## facing; the author stored one too; they agree or the triangle is drawn backwards. Nothing here
 ## is this project's opinion about which way a wall should face, and that matters, because the
 ## obvious test — "do the triangles face away from the object's centre" — is meaningless for a
 ## sidewalk, a helipad or any other flat thing, and those are a third of a terrain's objects.
 ##
-## Measured before this was fixed: 0.0% of `store08.mesh`'s 160 triangles agreed with their own
-## normals, and the same for `warehouse01.mesh` and `firehouse.mesh`. Reported from a window as
-## walls visible from one side only.
+## **Which sign means "agrees" is not an opinion either, and this gate had it backwards.** Godot
+## winds its front faces clockwise, so a triangle facing the way its normal points satisfies
+## `cross(b - a, c - a) · normal <= 0`. Written the other way round, the gate was green for a year
+## of work while asserting the opposite of the truth, and the loader was changed to satisfy it:
+## every terrain object in the library was turned inside out to pass a test with a sign error in
+## it. `_control` now measures the engine's own `BoxMesh`, `SphereMesh` and `CylinderMesh` first —
+## meshes Godot draws correctly by definition — and refuses to report on content until they score
+## 100%. A convention this gate asserts on its own is a convention nobody checked.
 
 ## What share of a mesh's triangles must agree.
 ##
@@ -31,6 +29,7 @@ const MIN_AGREEING: float = 0.5
 ## Below this a mesh has nothing to measure.
 const MIN_TRIANGLES: int = 8
 const LISTED: int = 6
+
 
 
 static func meta() -> Dictionary:
@@ -52,6 +51,9 @@ static func meta() -> Dictionary:
 
 
 func run(_harness: Node) -> Dictionary:
+    var control: String = _control()
+    if control != "":
+        return fail(control)
     var meshes: int = 0
     var triangles: int = 0
     var worst: float = 1.0
@@ -109,6 +111,34 @@ func run(_harness: Node) -> Dictionary:
     )
 
 
+## The same measure on meshes Godot generates and draws itself, which fixes the sign.
+##
+## `BoxMesh`, `SphereMesh` and `CylinderMesh` are correct by construction: the engine builds them,
+## the engine draws them, and a convention they fail is a convention this file has wrong rather
+## than a fault in them. Measured under the counter-clockwise reading they score 0.0%, which is
+## how the sign error here was found.
+func _control() -> String:
+    # Meshes the engine builds and draws itself, used to fix which winding faces forward.
+    var controls: Dictionary = {
+        "BoxMesh": BoxMesh.new(), "SphereMesh": SphereMesh.new(),
+        "CylinderMesh": CylinderMesh.new(),
+    }
+    for name: String in controls.keys():
+        var mesh: ArrayMesh = ArrayMesh.new()
+        mesh.add_surface_from_arrays(
+            Mesh.PRIMITIVE_TRIANGLES, (controls[name] as PrimitiveMesh).get_mesh_arrays()
+        )
+        var share: float = _agreement(mesh)["share"] as float
+        if share < 1.0:
+            return (
+                "the control fails: Godot's own %s has %.1f%% of its triangles disagreeing with"
+                % [name, (1.0 - share) * 100.0]
+                + " their own normals, so this gate's idea of which winding faces forward is"
+                + " wrong and nothing it says about content means anything"
+            )
+    return ""
+
+
 ## What share of a mesh's triangles are wound to agree with the normals it carries.
 func _agreement(mesh: ArrayMesh) -> Dictionary:
     var agree: int = 0
@@ -128,7 +158,8 @@ func _agreement(mesh: ArrayMesh) -> Dictionary:
             if face.length_squared() <= 0.0:
                 continue
             total += 1
-            if face.dot(normals[a]) >= 0.0:
+            # Clockwise is forward here: see the note on `_control`.
+            if face.dot(normals[a]) <= 0.0:
                 agree += 1
     return {
         "triangles": total,

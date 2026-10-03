@@ -1,18 +1,16 @@
 extends GateBase
 ## No object a terrain places is drawn inside out.
 ##
-## **The content is not consistent and no blanket rule fixes it.** `OgreMeshReader` reverses every
-## triangle, which the vehicle path needs and an object does not, so objects are wound back — and
-## that is right for 79 of Port Starling's 90 distinct meshes and wrong for four. `store02`,
-## `haus3`, `firehouse` and `haus4` are authored the other way round, **and their own vertex
-## normals agree with it**, so a check against the normals passes them while from outside they are
-## a hole. Reported from a window as "the outside texture is facing inside, from outside it looks
-## transparent".
-##
 ## **The oracle is the mesh's own geometry.** The signed volume of a closed triangle soup says
 ## which way it is wound without reference to any normal: sum `a · (b × c) / 6` over its
-## triangles, and a mesh whose faces wind outward encloses a positive volume. Nothing about that
-## is this project's opinion; it is the divergence theorem.
+## triangles. Nothing about that is this project's opinion; it is the divergence theorem.
+##
+## **Which sign is outward is a convention, and this gate had it backwards.** Godot winds its
+## front faces clockwise, so a closed mesh the engine draws solid encloses a *negative* volume by
+## that sum: its own `BoxMesh` scores -1.0 of its bounding box, `SphereMesh` -0.52, `CylinderMesh`
+## -0.78. Asserting the positive sign, this gate was green while the loader turned every building
+## in the library inside out to satisfy it. `_control` measures those three primitives first and
+## refuses to report on content until they come out negative.
 ##
 ## **An open mesh encloses nothing in particular**, so the measure is only read where it is a real
 ## share of the mesh's own bounding box. A sidewalk, a road slab, a sign and a helipad all land
@@ -28,16 +26,17 @@ const MIN_TRIANGLES: int = 8
 const LISTED: int = 6
 
 
+
 static func meta() -> Dictionary:
     return {
         "name": "a_closed_object_encloses_its_own_volume",
         "proves": "every closed object mesh a terrain places is built winding outward, so none of them is drawn inside out",
         "oracle": GateBase.ORACLE_COMPUTED,
-        "threshold": "positive signed volume for every mesh enclosing at least %.0f%% of its own bounding box" % (CLOSED_SHARE * 100.0),
+        "threshold": "negative signed volume — outward, in Godot's clockwise convention — for every mesh enclosing at least %.0f%% of its own bounding box" % (CLOSED_SHARE * 100.0),
         "why": (
-            "four of Port Starling's meshes are authored wound the other way round and their own"
-            + " normals agree with it, so the gate that checks winding against normals passes"
-            + " them while from outside they are a hole. Only the geometry settles it."
+            "a wall wound the wrong way renders as empty sky, which is pixel for pixel what a"
+            + " correct empty sky looks like. Only the geometry settles it, and only against a"
+            + " mesh the engine drew itself does the sign of the geometry mean anything."
         ),
         "budget_s": 300.0,
         "needs_gpu": false,
@@ -46,6 +45,9 @@ static func meta() -> Dictionary:
 
 
 func run(_harness: Node) -> Dictionary:
+    var control: String = _control()
+    if control != "":
+        return fail(control)
     var closed: int = 0
     var open_shapes: int = 0
     var problems: PackedStringArray = PackedStringArray()
@@ -76,7 +78,7 @@ func run(_harness: Node) -> Dictionary:
                     open_shapes += 1
                     continue
                 closed += 1
-                if share < 0.0:
+                if share > 0.0:
                     problems.append(
                         "%s: %s encloses %.2f of its own box, inside out"
                         % [summary["name"], file, share]
@@ -91,10 +93,33 @@ func run(_harness: Node) -> Dictionary:
             problems.size()
         )
     return ok(
-        "%d closed object meshes all enclose a positive volume; %d open shapes left as their"
+        "%d closed object meshes all wind outward; %d open shapes left as their"
         % [closed, open_shapes] + " files have them",
         closed
     )
+
+
+## The same measure on closed meshes the engine builds and draws itself, which fixes the sign.
+func _control() -> String:
+    # Meshes the engine builds and draws itself, used to fix which sign winds outward.
+    var controls: Dictionary = {
+        "BoxMesh": BoxMesh.new(), "SphereMesh": SphereMesh.new(),
+        "CylinderMesh": CylinderMesh.new(),
+    }
+    for name: String in controls.keys():
+        var mesh: ArrayMesh = ArrayMesh.new()
+        mesh.add_surface_from_arrays(
+            Mesh.PRIMITIVE_TRIANGLES, (controls[name] as PrimitiveMesh).get_mesh_arrays()
+        )
+        var share: float = _enclosed_share(mesh)
+        if share >= 0.0:
+            return (
+                "the control fails: Godot's own %s encloses %+.2f of its box, so this gate's"
+                % [name, share]
+                + " idea of which sign winds outward is wrong and nothing it says about content"
+                + " means anything"
+            )
+    return ""
 
 
 ## What share of its own bounding box a mesh encloses, signed. Near zero for an open shape.

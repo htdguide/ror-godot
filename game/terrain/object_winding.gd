@@ -1,10 +1,36 @@
 class_name ObjectWinding
 extends RefCounted
-## Which way round a terrain object's triangles go, and the geometry that decides it.
+## Which way round a terrain object's triangles go.
 ##
-## Split from `RorObjects` when that file went over the source cap, and it is a seam worth having:
-## placing an object on a map and orienting its faces are different questions, and this one is
-## settled by the mesh alone.
+## **Godot's front faces are wound clockwise**, and every rule this file used to carry had that
+## backwards. Measured against the engine's own primitives, which it draws correctly by
+## definition: `BoxMesh`, `SphereMesh` and `CylinderMesh` all score 0.0% under
+## `cross(b - a, c - a) · normal >= 0`, and all three enclose a *negative* signed volume under
+## `a · (b × c) / 6` — -1.0, -0.52 and -0.78 of their own bounding boxes. A mesh that satisfies
+## the counter-clockwise convention is a mesh Godot draws inside out.
+##
+## So `OgreMeshReader`'s reversal is not a vehicle-only workaround. Ogre winds its front faces the
+## other way from Godot, the reader turns every triangle once on the way in, and that is the whole
+## of the conversion — for a truck and for a building alike. Objects were then wound *back* here,
+## on the strength of two measurements that used the wrong sign, and every building in the library
+## has been drawn inside out since. It is what "the outside texture is facing inside, from outside
+## it looks transparent" was, and what the `object_photoset` gate now photographs: 14 of 20 face
+## groups on Port Starling's five most-placed objects showed their backs to a camera standing on
+## the normal their own file carries, while Godot's `BoxMesh` under the same camera showed none.
+##
+## **What is left after that is a handful of meshes whose authors wound them inward.** With the
+## sign fixed, 20 of the library's 433 closed meshes enclose a *positive* volume — `store02`,
+## `firehouse`, `haus3`, `haus4`, Russia's `hall`, La Paz's horizon and ground skirt — and those
+## are inside out in their own files, not because of anything the reader did. They are what
+## "buildings with broken textures which are visible only when being inside of the building"
+## is, and they are turned here, winding and normals together, because turning only the winding
+## would leave them drawn from the right side and lit from the wrong one.
+##
+## The signed volume is what decides it, because it needs no normal: sum `a · (b × c) / 6` over
+## the triangles. An *open* mesh — a sidewalk, a sign, a road slab — encloses nothing in
+## particular and the figure depends on where the origin happens to sit, so it is only read where
+## it is a real share of the mesh's own bounding box, and anything ambiguous is left exactly as
+## its file has it.
 
 ## How much of its own bounding box a mesh has to enclose before its signed volume is taken as a
 ## statement about winding rather than as the noise an open shape produces.
@@ -13,44 +39,13 @@ const CLOSED_SHARE: float = 0.05
 const MIN_CLOSED_TRIANGLES: int = 8
 
 
-## Whether a mesh is wound the wrong way round for the way it is drawn, decided by its own
-## geometry.
-##
-## **The content is not consistent and a blanket rule cannot fix it.** `OgreMeshReader` reverses
-## every triangle, which is right for the vehicle path and wrong for an object, so objects were
-## un-reversed wholesale — and that is right for 75 of Port Starling's 90 distinct meshes and
-## wrong for four of them. `store02`, `haus3`, `firehouse` and `haus4` are authored the other way
-## round: their own vertex normals agree with their reversed winding, so a check against the
-## normals passes them, and from outside they are still a hole. Reported from a window as "the
-## outside texture is facing inside".
-##
-## The signed volume of a closed triangle soup says which way it is wound without reference to any
-## normal: sum `a . (b x c) / 6` over the triangles, and a mesh whose faces wind outward encloses
-## a positive volume. An open mesh — a sidewalk, a sign, a road slab — encloses nothing in
-## particular, so the measure is only trusted when it is a real share of the mesh's own bounding
-## box, and anything ambiguous is left exactly as its file has it.
+## Whether a mesh is wound inward in its own file, decided by its own geometry and no normal.
 static func is_inside_out(submeshes: Array) -> bool:
     return enclosed_share(submeshes) > CLOSED_SHARE
 
 
-## Whether a mesh encloses nothing in particular: a wall, a roof, a sign, a road slab.
-##
-## Its signed volume cannot say which way it is wound either. The divergence theorem applies to a
-## closed surface; for an open one the figure depends on where the origin happens to sit, and
-## `haus3.mesh` is two slanted planes that "enclose" 0.66 of their own box. Seeing the back of
-## such a surface is also often correct — a road slab is one sheet and from underneath you are
-## looking at its back — so an open mesh is left exactly as its file has it and judged by a
-## person looking at a photograph rather than by a rule.
-static func is_open(submeshes: Array) -> bool:
-    return absf(enclosed_share(submeshes)) < CLOSED_SHARE
-
-
 ## How much of its own bounding box a mesh encloses, signed, in the order the reader hands it
-## over. Near zero for an open shape.
-##
-## The reader has already reversed these, so the sign here is the opposite of the sign the drawn
-## mesh will have: a *positive* volume in the file's own order means the drawn mesh would enclose
-## a negative one.
+## over. Near zero for an open shape, negative for one wound outward.
 static func enclosed_share(submeshes: Array) -> float:
     var volume: float = 0.0
     var low: Vector3 = Vector3.INF
@@ -74,8 +69,9 @@ static func enclosed_share(submeshes: Array) -> float:
     return 0.0 if capacity <= 0.0 else volume / capacity
 
 
-## One submesh's geometry, as Godot's array format wants it.
-static func arrays(submesh: Dictionary, keep_reader_order: bool = false) -> Array:
+## One submesh's geometry, as Godot's array format wants it, in the order the reader hands it
+## over — or turned, when the mesh's own geometry says its author wound it inward.
+static func arrays(submesh: Dictionary, turn: bool = false) -> Array:
     var positions: PackedVector3Array = submesh["positions"] as PackedVector3Array
     var indices: PackedInt32Array = submesh["indices"] as PackedInt32Array
     if positions.is_empty() or indices.is_empty():
@@ -85,11 +81,7 @@ static func arrays(submesh: Dictionary, keep_reader_order: bool = false) -> Arra
     arrays[Mesh.ARRAY_VERTEX] = positions
     var normals: PackedVector3Array = submesh["normals"] as PackedVector3Array
     if normals.size() == positions.size():
-        if keep_reader_order:
-            # A mesh whose geometry encloses the wrong sign is inside out in both senses: its
-            # authored normals point the same way its reversed faces do. Turning the faces round
-            # without turning the normals would leave it drawn from the right side and lit from
-            # the wrong one.
+        if turn:
             var turned: PackedVector3Array = PackedVector3Array()
             turned.resize(normals.size())
             for at: int in normals.size():
@@ -99,19 +91,13 @@ static func arrays(submesh: Dictionary, keep_reader_order: bool = false) -> Arra
     var uvs: PackedVector2Array = submesh["uvs"] as PackedVector2Array
     if uvs.size() == positions.size():
         arrays[Mesh.ARRAY_TEX_UV] = uvs
-    # **Wound back the way the file has it.** `OgreMeshReader` reverses every triangle, for a
-    # vehicle: loaded in file order a truck is culled from outside and drawn from inside, and the
-    # reader's own note says something in the pose path mirrors the geometry and has never been
-    # isolated. A terrain object goes through no such path — `transform_of` is a rotation and a
-    # positive scale — so the same reversal turns a building inside out. Measured: after the
-    # reader, 0.0% of `store08.mesh`'s 160 triangles agree with the normals the file carries for
-    # them, and the same for `warehouse01` and `firehouse`. Reported from a window as walls
-    # visible from one side only.
+    if not turn:
+        arrays[Mesh.ARRAY_INDEX] = indices
+        return arrays
     var forward: PackedInt32Array = indices.duplicate()
-    if not keep_reader_order:
-        for at: int in range(0, forward.size() - 2, 3):
-            var swap: int = forward[at + 1]
-            forward[at + 1] = forward[at + 2]
-            forward[at + 2] = swap
+    for at: int in range(0, forward.size() - 2, 3):
+        var swap: int = forward[at + 1]
+        forward[at + 1] = forward[at + 2]
+        forward[at + 2] = swap
     arrays[Mesh.ARRAY_INDEX] = forward
     return arrays

@@ -24,7 +24,12 @@ void fragment() {
     } else {
         // The axis the face points along, as a pure primary. A wall facing x shows red from
         // behind, a floor or a roof facing y shows green, a wall facing z shows blue.
-        vec3 axis = abs(NORMAL);
+        //
+        // **In world space.** `NORMAL` in a fragment shader is a *view-space* normal, so a face
+        // turned towards the camera is (0, 0, 1) there whatever it is in the world — and every
+        // marker in the first set of sheets came out blue, which says only "you are looking at
+        // it" and not which wall it is.
+        vec3 axis = abs((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
         float strongest = max(axis.x, max(axis.y, axis.z));
         vec3 marker = vec3(
             axis.x >= strongest ? 1.0 : 0.0,
