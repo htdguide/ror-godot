@@ -421,9 +421,9 @@
         {
           "area_m2": 0.42,
           "faces": "+Y",
-          "submesh": 0,
-          "triangle": 14,
-          "triangles": 6
+          "submesh": 0.0,
+          "triangle": 14.0,
+          "triangles": 6.0
         }
       ],
       "note": "",
@@ -533,18 +533,10 @@
       "verdict": "pass"
     },
     "sign-warning.mesh": {
-      "at": "2026-10-03 10:21:28Z",
-      "marks": [
-        {
-          "area_m2": 0.42,
-          "faces": "+Y",
-          "submesh": 0.0,
-          "triangle": 14.0,
-          "triangles": 6.0
-        }
-      ],
-      "note": "this side is transparent and broken",
-      "verdict": "fail"
+      "at": "2026-10-03 22:21:24Z",
+      "marks": [],
+      "note": "",
+      "verdict": "pass"
     },
     "store02.mesh": {
       "at": "2026-10-03 09:52:29Z",

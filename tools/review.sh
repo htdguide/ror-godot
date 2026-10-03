@@ -5,6 +5,7 @@
 #   tools/review.sh --map lapaz         another map
 #   tools/review.sh --map lapaz --again offer the ones already judged as well
 #   tools/review.sh --failed            only the ones already on record as failed
+#   tools/review.sh --object haus4.mesh one mesh and nothing else
 #
 # Drag to turn the object over, wheel to come closer, R to reset the view, B to paint the back
 # of every face. P passes, F fails, left and right arrows move without settling anything.

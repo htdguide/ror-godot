@@ -96,7 +96,9 @@ func build(into: Node) -> ReviewPanel:
 
 
 ## What the strip says about the object on screen now.
-func show_object(mesh_file: String, index: int, total: int, verdict: String) -> void:
+func show_object(
+    mesh_file: String, index: int, total: int, verdict: String, said: String = ""
+) -> void:
     name_label.text = mesh_file
     progress_label.text = "%d of %d left to look at" % [index + 1, total]
     if verdict == "":
@@ -104,6 +106,8 @@ func show_object(mesh_file: String, index: int, total: int, verdict: String) -> 
         note_label.modulate = Color(0.75, 0.78, 0.82)
         return
     note_label.text = "already marked %s — pressing again overwrites it" % verdict
+    if said != "":
+        note_label.text += " — you said: %s" % said
     note_label.modulate = (
         Color(0.55, 1.0, 0.6) if verdict == ObjectReview.PASS else Color(1.0, 0.55, 0.5)
     )

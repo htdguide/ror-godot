@@ -110,6 +110,10 @@ func _remaining(again: bool) -> PackedStringArray:
     names.sort_custom(func(a: String, b: String) -> bool:
         return (counts[a] as int) > (counts[b] as int)
     )
+    # `--object <file>` is one mesh and nothing else, for settling an argument about that mesh.
+    var named: String = Harness.args.get_string("object", "")
+    if named != "":
+        return PackedStringArray([named] if counts.has(named) else [])
     # `--failed` is the round after a round: only what is already on record as wrong, so that a
     # list of faults can be gone back over with the reason box and the surface marks.
     var only_failed: bool = Harness.args.has_flag("failed")
@@ -164,10 +168,17 @@ func _show() -> void:
     _centre = bounds.get_center()
     _span = maxf(bounds.size.length(), 0.5)
     _distance = _span * DISTANCE_SCALE
-    var known: Dictionary = ObjectReview.record_of(file)
-    _panel.note_field.text = known.get("note", "") as String
+    # **The box starts empty every time.** Loading the previous note back into it looked helpful
+    # and was a trap: a sign carrying "this side is transparent and broken" from an earlier round
+    # was passed on a second look, and the stale complaint went into the record attached to the
+    # new verdict. What was said before is shown, not re-submitted.
+    _panel.note_field.text = ""
     _panel.show_marks(0)
-    _panel.show_object(file, _at, _subjects.size(), ObjectReview.verdict_of(file))
+    var known: Dictionary = ObjectReview.record_of(file)
+    _panel.show_object(
+        file, _at, _subjects.size(), known.get("verdict", "") as String,
+        known.get("note", "") as String
+    )
     _aim()
 
 
@@ -231,6 +242,10 @@ func _toggle_paint() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+    # Nothing on the stage, nothing to pick. The list empties as verdicts are given, and the
+    # mouse carries on moving over the empty stage afterwards.
+    if _node == null:
+        return
     if event is InputEventMouseButton:
         var click: InputEventMouseButton = event as InputEventMouseButton
         if click.button_index == MOUSE_BUTTON_LEFT:
