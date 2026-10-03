@@ -182,3 +182,27 @@ Its companion is `hard-won-facts-mods.md`, which covers how a vehicle is read, b
   range it inspected was the one the content asked for. `a_batch_stands_among_its_own_instances`
   is the other half — every batch's node inside the bounding box of what it draws, which is true
   by construction when the batch is built right and 1326 m false when it is not.
+- **The mesh reader reverses every triangle, and that is right for a vehicle and wrong for a
+  building.** `OgreMeshReader::read_submesh` flips the winding, with a note admitting the reason
+  has never been isolated: in file order a truck is culled from outside and drawn from inside, so
+  something between the reader and the drawn pixel mirrors the geometry. A terrain object passes
+  through no such path — `transform_of` is a rotation and a positive scale — so the same reversal
+  draws every building inside out. Measured: after the reader, **0.0% of `store08.mesh`'s 160
+  triangles agreed with the normals its own file carries**, and the same for `warehouse01` and
+  `firehouse`. Reported from a window as walls visible from one side only. Objects are wound back
+  where they are built; the real repair is to isolate the mirror in the vehicle path and stop
+  reversing at all.
+- **"Does it face away from its own centre" is not a facing test.** It is meaningless for a
+  sidewalk, a helipad or a road slab, which is a third of a terrain's objects, and a first
+  attempt at this measurement flagged all of them. The normals the file carries are the oracle:
+  the author stored a facing per vertex and the winding either agrees with it or does not.
+- **Real content disagrees with itself by up to 18%.** 9 of 470 object meshes carry between 8%
+  and 18% of their triangles wound against their own normals — `lapaz-pole.mesh` worst — and that
+  is how their authors left them. So `an_object_is_wound_the_way_its_file_is` asks for a majority
+  rather than for all of them: the fault it guards is wholesale, every triangle reversed, and half
+  is the only line that separates the two cases without keeping an exception list.
+- **Ogre scripts are written with tabs as often as spaces.** `texture\tRussia-Grass1.png` split on
+  spaces is one word, matches no keyword, and the material silently has no texture: three of
+  Russia's vegetation materials declared one apiece and this project found none of them, which is
+  "the grass is still white textures". The same fault had already been found and fixed once that
+  day in a gate's own row reader, and not in `OgreMaterial`.

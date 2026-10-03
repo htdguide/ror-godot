@@ -322,7 +322,20 @@ static func _arrays(submesh: Dictionary) -> Array:
     var uvs: PackedVector2Array = submesh["uvs"] as PackedVector2Array
     if uvs.size() == positions.size():
         arrays[Mesh.ARRAY_TEX_UV] = uvs
-    arrays[Mesh.ARRAY_INDEX] = indices
+    # **Wound back the way the file has it.** `OgreMeshReader` reverses every triangle, for a
+    # vehicle: loaded in file order a truck is culled from outside and drawn from inside, and the
+    # reader's own note says something in the pose path mirrors the geometry and has never been
+    # isolated. A terrain object goes through no such path — `transform_of` is a rotation and a
+    # positive scale — so the same reversal turns a building inside out. Measured: after the
+    # reader, 0.0% of `store08.mesh`'s 160 triangles agree with the normals the file carries for
+    # them, and the same for `warehouse01` and `firehouse`. Reported from a window as walls
+    # visible from one side only.
+    var forward: PackedInt32Array = indices.duplicate()
+    for at: int in range(0, forward.size() - 2, 3):
+        var swap: int = forward[at + 1]
+        forward[at + 1] = forward[at + 2]
+        forward[at + 2] = swap
+    arrays[Mesh.ARRAY_INDEX] = forward
     return arrays
 
 

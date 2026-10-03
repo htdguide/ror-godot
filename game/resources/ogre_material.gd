@@ -73,7 +73,11 @@ static func read(path: String) -> Dictionary:
 
 ## One line inside a material block.
 static func _take(material: Dictionary, line: String) -> void:
-    var words: PackedStringArray = line.split(" ", false)
+    # Split on whitespace, not on spaces. Ogre scripts are written with tabs as often as not and
+    # Russia's vegetation uses them throughout: `texture\tRussia-Grass1.png` read as a single
+    # word matched no keyword, so three grass materials declared a texture apiece and this
+    # project found none of them. Reported from a window as "grass is still white textures".
+    var words: PackedStringArray = line.replace("\t", " ").split(" ", false)
     if words.is_empty():
         return
     match words[0].to_lower():

@@ -61,3 +61,26 @@ against anything recorded from a run. It found a real fault on its first pass: o
 batch per tile, so a map holds several sibling nodes with the same name, and Godot renames the
 duplicates — the sidecar called a La Paz pole `@MultiMeshInstance3D@3`. The loader writes the file
 name onto the node as metadata now, which the scene tree cannot rename.
+
+## Photographing a model from every side
+
+`tools/photoset.sh` does the hero vehicle; `tools/objectset.sh` does a terrain's own objects.
+
+    tools/objectset.sh                          the six objects the map places most
+    tools/objectset.sh --terrain-dir Russia     another terrain
+    tools/objectset.sh --object store08.mesh    one object by name
+
+Each object is built alone on the stage, framed from its own bounds, and photographed front,
+back, left, right, top and three-quarter into one sheet per object under `artifacts/`. The gate
+behind it fails any view that is **empty**, which is what a single-sided or inverted panel looks
+like from outside.
+
+That instrument did not exist until a window session reported walls visible from one side only,
+and the suite had nothing to say: every building in the library was being drawn inside out,
+because the mesh reader reverses a triangle for the vehicle path and a terrain object passes
+through no such path. The measurement that settles *that* is a gate — the winding against the
+normals the file carries — but what made it visible in the first place is a photograph from a
+side nobody was taking.
+
+It catches absent. It cannot catch a wrong texture or a wrong colour, which is why it produces a
+sheet to look at rather than only a verdict.
