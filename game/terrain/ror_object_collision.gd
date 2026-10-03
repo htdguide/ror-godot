@@ -160,12 +160,12 @@ static func road_boxes(terrain: RorTerrain) -> Array[Dictionary]:
     var out: Array[Dictionary] = []
     for group: Array[Dictionary] in RorProceduralRoad.groups(terrain):
         for index: int in range(1, group.size()):
-            var here: Dictionary = RorProceduralRoad.resolved(terrain, group[index])
-            var last: Dictionary = RorProceduralRoad.resolved(terrain, group[index - 1])
-            if not RorProceduralRoad.BUILT_KINDS.has(here["kind"]) or not RorProceduralRoad.BUILT_KINDS.has(last["kind"]):
+            var here: Dictionary = RoadSection.resolved(terrain, group[index])
+            var last: Dictionary = RoadSection.resolved(terrain, group[index - 1])
+            if not RoadSection.KINDS.has(here["kind"]) or not RoadSection.KINDS.has(last["kind"]):
                 continue
             var box: Dictionary = _road_segment_box(
-                RorProceduralRoad.section(terrain, here), RorProceduralRoad.section(terrain, last)
+                RoadSection.points(terrain, here), RoadSection.points(terrain, last)
             )
             if not box.is_empty():
                 out.append(box)

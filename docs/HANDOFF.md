@@ -303,6 +303,10 @@ a size cap:
 - **`docs/guides/hard-won-facts-mods.md`** — how a vehicle is read, built and drawn. Almost all
   of it was learned the day a second and third pack arrived, and the pattern behind nearly every
   entry is that one test vehicle calibrates the loader to itself.
+- **`docs/guides/hard-won-facts-terrain.md`** — how a terrain's own files become a world: object
+  definitions, object lists, the collision its author wrote down, splat maps, and roads described
+  as a line of points. Split from the mods guide when that hit its cap, and the pattern behind
+  most of it is that a terrain ships far more than a heightmap and this project read half of it.
 - **`docs/guides/hard-won-facts-light.md`** — light, colour, exposure and anything that measures a
   picture. Split out when the first file hit its cap, and the larger half of the two by effort:
   this is the area the project has been wrong about most often, usually by trusting an instrument

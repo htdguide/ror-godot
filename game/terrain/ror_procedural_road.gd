@@ -35,20 +35,26 @@ const BAND_SIDE_FAR_LEFT: Vector2 = Vector2(0.001, 0.036)
 const BAND_SIDE_LEFT: Vector2 = Vector2(0.036, 0.072)
 const BAND_SIDE_RIGHT: Vector2 = Vector2(0.423, 0.458)
 const BAND_SIDE_FAR_RIGHT: Vector2 = Vector2(0.458, 0.493)
+const BAND_UNDERSIDE: Vector2 = Vector2(0.496, 0.745)
+## A pillar is as wide as it is tall, over thirty, and never wider than this.
+const PILLAR_SLENDERNESS: float = 30.0
+const PILLAR_MAX_HALF_M: float = 5.0
+const PILLAR_MIN_HALF_M: float = 0.2
+## A monorail's pillars are thin, stand in the middle, and are built one segment in five.
+const MONORAIL_PILLAR_HALF_M: float = 0.2
+const MONORAIL_PILLAR_EVERY: int = 5
+const MONORAIL_PILLAR_MAX_M: float = 20.0
+## How far below the ground a pillar is sunk, so it never ends in mid-air on a slope.
+const PILLAR_FOOT_M: float = 5.0
+## A pillar short of this stands in the middle; a taller one leans to whichever side is higher.
+const PILLAR_SHORT_M: float = 10.0
 ## A wall's coordinates come from its height rather than from a band.
 const WALL_V: float = 0.746
 const WALL_SCALE: float = 0.25 / 4.5
 ## How many metres of road one repeat of the atlas covers along the way.
 const METRES_PER_REPEAT: float = 10.0
-## What `automatic` compares the drop either side against, from `ProceduralRoad::addBlock`.
-const AUTOMATIC_WIDTH_M: float = 10.0
-const AUTOMATIC_BORDER_W_M: float = 1.4
-const AUTOMATIC_BORDER_H_M: float = 0.2
-const AUTOMATIC_MAX_DROP_M: float = 4.0
-## How far under the ground a shoulder's foot is sunk, so it never z-fights the terrain.
-const FOOT_SINK_M: float = 0.01
-## The kinds this builds. Everything else is reported.
-const BUILT_KINDS: Array[String] = ["flat", "left", "right", "both", "automatic"]
+## The kinds this builds. Everything `RoadSection` can shape, which is all of them.
+const BUILT_KINDS: Array[String] = RoadSection.KINDS
 
 
 ## Every procedural road of a terrain, as one `MeshInstance3D` per block. Null children are not
@@ -116,12 +122,19 @@ static func _mesh(
     var vertices: PackedVector3Array = PackedVector3Array()
     var uvs: PackedVector2Array = PackedVector2Array()
     var indices: PackedInt32Array = PackedInt32Array()
+    # Which raised segment this is, so a monorail's every-fifth pillar is counted per road
+    # rather than per process. Upstream's counter is a file-scope `static int`, which is exactly
+    # the kind of state this project refuses.
+    var segments: int = 0
     for index: int in range(1, group.size()):
-        var here: Dictionary = resolved(terrain, group[index])
-        var last: Dictionary = resolved(terrain, group[index - 1])
+        var here: Dictionary = RoadSection.resolved(terrain, group[index])
+        var last: Dictionary = RoadSection.resolved(terrain, group[index - 1])
         if not BUILT_KINDS.has(here["kind"]) or not BUILT_KINDS.has(last["kind"]):
             continue
         _sweep(terrain, here, last, vertices, uvs, indices)
+        if RoadSection.RAISED.has(here["kind"]):
+            segments += 1
+            _pillar(terrain, here, last, segments, vertices, uvs, indices)
     if indices.is_empty():
         return null
     var arrays: Array = []
@@ -146,8 +159,8 @@ static func _sweep(
     uvs: PackedVector2Array,
     indices: PackedInt32Array
 ) -> void:
-    var a: PackedVector3Array = section(terrain, here)
-    var b: PackedVector3Array = section(terrain, last)
+    var a: PackedVector3Array = RoadSection.points(terrain, here)
+    var b: PackedVector3Array = RoadSection.points(terrain, last)
     var at: Vector3 = here["position"] as Vector3
     var from: Vector3 = last["position"] as Vector3
     var flat: bool = (here["kind"] as String) == "flat" and (last["kind"] as String) == "flat"
@@ -170,81 +183,10 @@ static func _sweep(
     )
     _wall(a[1], b[1], b[0], a[0], at, from, vertices, uvs, indices)
     _wall(b[6], a[6], a[7], b[7], at, from, vertices, uvs, indices)
-
-
-## The eight points of one cross-section, in world space.
-static func section(terrain: RorTerrain, point: Dictionary) -> PackedVector3Array:
-    var at: Vector3 = point["position"] as Vector3
-    var degrees: Vector3 = point["rotation"] as Vector3
-    var basis: Basis = (
-        Basis(Vector3.RIGHT, deg_to_rad(degrees.x))
-        * Basis(Vector3.UP, deg_to_rad(degrees.y))
-        * Basis(Vector3.BACK, deg_to_rad(degrees.z))
-    )
-    var width: float = point["width"] as float
-    var bw: float = point["bwidth"] as float
-    var bh: float = point["bheight"] as float
-    var kind: String = point["kind"] as String
-    # A kerb rises by its own height; a shoulder falls away by it. Which side does which is what
-    # the kind names.
-    var left_up: bool = kind == "both" or kind == "right"
-    var right_up: bool = kind == "both" or kind == "left"
-    var out: PackedVector3Array = PackedVector3Array()
-    out.resize(8)
-    out[1] = at + basis * Vector3(0.0, bh if left_up else -bh, bw + width * 0.5)
-    out[2] = at + basis * Vector3(
-        0.0, bh if left_up else -bh * 0.25,
-        width * 0.5 if left_up else bw / 3.0 + width * 0.5
-    )
-    out[3] = at + basis * Vector3(0.0, 0.0, width * 0.5)
-    out[4] = at + basis * Vector3(0.0, 0.0, -width * 0.5)
-    out[5] = at + basis * Vector3(
-        0.0, bh if right_up else -bh * 0.25,
-        -width * 0.5 if right_up else -bw / 3.0 - width * 0.5
-    )
-    out[6] = at + basis * Vector3(0.0, bh if right_up else -bh, -bw - width * 0.5)
-    out[0] = _foot(terrain, out[1])
-    out[7] = _foot(terrain, out[6])
-    return out
-
-
-## Where a shoulder meets the ground: the heightmap, or just under the road where the road is
-## already below it.
-static func _foot(terrain: RorTerrain, p: Vector3) -> Vector3:
-    var y: float = terrain.height_at_world(p.x, p.z) - FOOT_SINK_M
-    if y > p.y:
-        y = p.y - FOOT_SINK_M
-    return Vector3(p.x, y, p.z)
-
-
-## `automatic` resolved the way upstream resolves it: by how far the ground falls away either
-## side of where the road would go.
-static func resolved(terrain: RorTerrain, point: Dictionary) -> Dictionary:
-    if (point["kind"] as String) != "automatic":
-        return point
-    var out: Dictionary = point.duplicate()
-    out["width"] = AUTOMATIC_WIDTH_M
-    out["bwidth"] = AUTOMATIC_BORDER_W_M
-    out["bheight"] = AUTOMATIC_BORDER_H_M
-    var at: Vector3 = point["position"] as Vector3
-    var reach: float = AUTOMATIC_BORDER_W_M + AUTOMATIC_WIDTH_M * 0.5
-    var left: float = at.y - terrain.height_at_world(at.x, at.z + reach)
-    var right: float = at.y - terrain.height_at_world(at.x, at.z - reach)
-    var lip: float = AUTOMATIC_BORDER_H_M + 0.1
-    var left_clear: bool = left >= lip and left < AUTOMATIC_MAX_DROP_M
-    var right_clear: bool = right >= lip and right < AUTOMATIC_MAX_DROP_M
-    if left < lip and right < lip:
-        out["kind"] = "flat"
-    elif left < lip and right_clear:
-        out["kind"] = "left"
-    elif left_clear and right < lip:
-        out["kind"] = "right"
-    elif left_clear and right_clear:
-        out["kind"] = "both"
-    else:
-        # Upstream builds a bridge here, which this does not build yet.
-        out["kind"] = "bridge"
-    return out
+    # A bridge and a monorail hang in the air, so they carry a floor as well as walls. Without
+    # it the deck is a sheet seen from below and the map has a hole in it.
+    if RoadSection.RAISED.has(here["kind"]) or RoadSection.RAISED.has(last["kind"]):
+        _quad(a[7], b[7], b[0], a[0], BAND_UNDERSIDE, at, from, vertices, uvs, indices)
 
 
 ## One quad, with its coordinates taken from a band of the atlas along the way travelled.
@@ -336,3 +278,70 @@ static func _material(terrain: RorTerrain) -> StandardMaterial3D:
         out.albedo_texture = texture
         out.albedo_color = Color.WHITE
     return out
+
+
+## The column under a raised segment, from the deck's underside to below the ground.
+##
+## Upstream builds one per segment and says so in a comment it is not proud of. The column leans
+## to whichever side the ground is higher on where it is short enough for that to matter, stands
+## in the middle where it is tall, and is as wide as it is tall over thirty. A monorail's is thin,
+## central, and built one segment in five — and skipped entirely where it would be over 20 m,
+## because a monorail on stilts that high is not what its author drew.
+static func _pillar(
+    terrain: RorTerrain,
+    here: Dictionary,
+    last: Dictionary,
+    segment: int,
+    vertices: PackedVector3Array,
+    uvs: PackedVector2Array,
+    indices: PackedInt32Array
+) -> void:
+    var monorail: bool = (here["kind"] as String) == "monorail"
+    if monorail and segment % MONORAIL_PILLAR_EVERY != 0:
+        return
+    var a: PackedVector3Array = RoadSection.points(terrain, here)
+    var b: PackedVector3Array = RoadSection.points(terrain, last)
+    var far: Vector3 = (b[0] + a[1]) * 0.5
+    var near: Vector3 = (b[7] + a[6]) * 0.5
+    var at: Vector3 = here["position"] as Vector3
+    var share: float = 0.5
+    if not monorail and at.y - terrain.height_at_world(
+        (far.x + near.x) * 0.5, (far.z + near.z) * 0.5
+    ) < PILLAR_SHORT_M:
+        var left: float = terrain.height_at_world(far.x, far.z)
+        var right: float = terrain.height_at_world(near.x, near.z)
+        share = 0.8 if left >= right else 0.2
+    var middle: Vector3 = b[0] - (far - near) * share
+    var length: float = (
+        middle.y - terrain.height_at_world(middle.x, middle.z) + PILLAR_FOOT_M
+    )
+    if monorail and length > MONORAIL_PILLAR_MAX_M:
+        return
+    var half: float = (
+        MONORAIL_PILLAR_HALF_M if monorail
+        else minf(length / PILLAR_SLENDERNESS, PILLAR_MAX_HALF_M)
+    )
+    if half < PILLAR_MIN_HALF_M or length <= 0.0:
+        return
+    var top: Vector3 = middle
+    var foot: Vector3 = middle - Vector3(0.0, length, 0.0)
+    for side: int in 4:
+        # The four walls of the column, each a quad from its foot to the deck.
+        var a_corner: Vector3 = _corner(half, side)
+        var b_corner: Vector3 = _corner(half, (side + 1) % 4)
+        _quad(
+            foot + a_corner, top + a_corner, top + b_corner, foot + b_corner,
+            BAND_UNDERSIDE, top, top + Vector3(0.0, 0.0, 1.0), vertices, uvs, indices
+        )
+
+
+## One corner of a square column, going round.
+static func _corner(half: float, index: int) -> Vector3:
+    match index:
+        0:
+            return Vector3(-half, 0.0, -half)
+        1:
+            return Vector3(half, 0.0, -half)
+        2:
+            return Vector3(half, 0.0, half)
+    return Vector3(-half, 0.0, half)

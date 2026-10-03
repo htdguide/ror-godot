@@ -130,7 +130,7 @@ func _judge(node: MeshInstance3D, terrain: RorTerrain, group: Array[Dictionary])
     var allowed: float = 0.0
     var line: PackedVector3Array = PackedVector3Array()
     for point: Dictionary in group:
-        var here: Dictionary = RorProceduralRoad.resolved(terrain, point)
+        var here: Dictionary = RoadSection.resolved(terrain, point)
         line.append(here["position"] as Vector3)
         allowed = maxf(
             allowed, (here["width"] as float) * 0.5 + (here["bwidth"] as float)
@@ -166,8 +166,8 @@ func _from_the_line(at: Vector3, line: PackedVector3Array) -> float:
 func _buildable(terrain: RorTerrain, group: Array[Dictionary]) -> int:
     var count: int = 0
     for point: Dictionary in group:
-        var here: Dictionary = RorProceduralRoad.resolved(terrain, point)
-        if RorProceduralRoad.BUILT_KINDS.has(here["kind"]):
+        var here: Dictionary = RoadSection.resolved(terrain, point)
+        if RoadSection.KINDS.has(here["kind"]):
             count += 1
     return count
 

@@ -101,11 +101,11 @@ func _highest_deck(terrain: RorTerrain) -> Dictionary:
     var clearest: float = -INF
     for group: Array[Dictionary] in RorProceduralRoad.groups(terrain):
         for index: int in range(1, group.size()):
-            var here: Dictionary = RorProceduralRoad.resolved(terrain, group[index])
-            var last: Dictionary = RorProceduralRoad.resolved(terrain, group[index - 1])
-            if not RorProceduralRoad.BUILT_KINDS.has(here["kind"]):
+            var here: Dictionary = RoadSection.resolved(terrain, group[index])
+            var last: Dictionary = RoadSection.resolved(terrain, group[index - 1])
+            if not RoadSection.KINDS.has(here["kind"]):
                 continue
-            if not RorProceduralRoad.BUILT_KINDS.has(last["kind"]):
+            if not RoadSection.KINDS.has(last["kind"]):
                 continue
             var at: Vector3 = (
                 (here["position"] as Vector3) + (last["position"] as Vector3)
