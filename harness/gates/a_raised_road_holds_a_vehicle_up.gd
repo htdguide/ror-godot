@@ -27,13 +27,11 @@ extends GateBase
 ## no pitch (`Collisions::addCollisionBox`), so `boxcoords` reads Y-up. `road-slab`'s `-3 .. 0.3`
 ## is its thickness, which only makes sense that way round.
 ##
-## **The test is a drop, not a crash, and it is measured against the rig itself.** The gate finds
-## the placement in the terrain's own object file whose box top stands furthest above the
-## heightmap, puts the hero truck a little above it, and lets go. How high a resting truck's
-## lowest node sits is the truck's business — tyre radius, suspension, how far the wheels sink —
-## so the gate measures that on open ground first and then requires the same figure on the slab.
-## Nothing here is a clearance this project decided a vehicle should have, and the alternative
-## outcome is metres lower.
+## **The test is a drop, not a crash, and it is measured against the rig itself** — `RestDrop`,
+## shared with the gate that asks the same question of a swept road. How high a resting truck's
+## lowest node sits is the truck's business, so it is measured on open ground first and the slab
+## has to match it. Nothing here is a clearance this project decided a vehicle should have, and
+## the alternative outcome is metres lower.
 
 ## The terrain to drop on, and the vehicle to drop.
 const TERRAIN_DIR: String = "assets/terrains/Starling-Island"
@@ -44,10 +42,6 @@ const TRUCK: String = "S10offroad.truck"
 const MIN_CLEARANCE_M: float = 2.0
 ## How much box there has to be either side of its centre for a truck to sit on it.
 const MIN_HALF_WIDTH_M: float = 3.0
-## How far above the slab to let go from, and how long to let it settle.
-const DROP_M: float = 0.5
-const SETTLE_FRAMES: int = 240
-const SUBSTEP_HZ: float = 2000.0
 ## How far the rig's rest on the slab may differ from its rest on open ground. A hand's width:
 ## the two surfaces are flat and the alternative outcome is metres lower.
 const REST_TOLERANCE_M: float = 0.15
@@ -94,35 +88,13 @@ func run(_harness: Node) -> Dictionary:
             % [clearance, MIN_CLEARANCE_M], clearance
         )
 
-    var rig: Dictionary = RigBuilder.from_file(mod_dir, TRUCK, 0.0)
-    if (rig["error"] as String) != "":
-        return fail(rig["error"] as String)
-    var truck: TruckParser = rig["truck"] as TruckParser
-    var solver: RefCounted = rig["solver"] as RefCounted
-    _give_terrain(solver, terrain)
-    var solid: int = RorObjectCollision.apply(terrain, solver)
-    solver.set_ground(0.0, true)
-
-    # What resting looks like, measured on this terrain's own open ground with the same rig. The
-    # answer is the truck's, not this gate's: a tyre's radius and how far the suspension settles
-    # under its own weight decide how high the lowest node ends up, and neither is written down
-    # anywhere this gate could read.
-    var start: Vector3 = terrain.start_position()
-    var on_ground: float = _rest_offset(
-        solver, truck, Vector3(start.x, 0.0, start.z), DROP_M,
-        terrain.height_at_world(start.x, start.z)
+    var measured: Dictionary = RestDrop.measure(
+        terrain, mod_dir, TRUCK, spot["at"] as Vector3, spot["top"] as float
     )
-    if not is_finite(on_ground):
-        return fail("the rig would not settle on open ground, so there is nothing to compare to")
-
-    var at: Vector3 = spot["at"] as Vector3
-    # Let go from just above the slab. `place` measures its drop from the heightfield, which is
-    # what the slab stands over, so the clearance it is given is the whole way up.
-    var on_slab: float = _rest_offset(
-        solver, truck, Vector3(at.x, 0.0, at.z), clearance + DROP_M, spot["top"] as float
-    )
-    if not is_finite(on_slab):
-        return fail("the solver went non-finite while the rig settled on the slab")
+    if (measured["error"] as String) != "":
+        return fail(measured["error"] as String)
+    var on_ground: float = measured["on_ground"] as float
+    var on_slab: float = measured["on_surface"] as float
     var difference: float = on_slab - on_ground
     if absf(difference) > REST_TOLERANCE_M:
         return fail(
@@ -135,31 +107,11 @@ func run(_harness: Node) -> Dictionary:
             difference
         )
     return ok(
-        "%d solid boxes; dropped onto %s standing %.1f m clear of the ground, the rig settled"
-        % [solid, spot["name"], clearance]
-        + " %.2f m above the box top its definition declares, against %.2f m on open ground"
-        % [on_slab, on_ground],
+        "dropped onto %s standing %.1f m clear of the ground, the rig settled %.2f m above the"
+        % [spot["name"], clearance, on_slab]
+        + " box top its definition declares, against %.2f m on open ground" % on_ground,
         difference
     )
-
-
-## Where the rig's lowest node comes to rest above `surface`, dropped from `clearance` over the
-## heightfield at `origin`. INF when it never settles.
-func _rest_offset(
-    solver: RefCounted, truck: TruckParser, origin: Vector3, clearance: float, surface: float
-) -> float:
-    RigBuilder.place(solver, truck, origin, 0.0, clearance)
-    var dt: float = 1.0 / SUBSTEP_HZ
-    var chunk: int = int(SUBSTEP_HZ / 60.0)
-    for _frame: int in SETTLE_FRAMES:
-        solver.step(dt, chunk)
-    var lowest: float = INF
-    for index: int in truck.nodes.size():
-        var node: Vector3 = solver.get_node_position(index)
-        if not is_finite(node.y):
-            return INF
-        lowest = minf(lowest, node.y)
-    return lowest - surface
 
 
 ## The declared collision box standing furthest above the heightmap that a truck could sit on.
@@ -204,16 +156,3 @@ func _highest_slab(terrain: RorTerrain) -> Dictionary:
     return best
 
 
-## The terrain's own heights, straight from the shape.
-func _give_terrain(solver: RefCounted, terrain: RorTerrain) -> void:
-    var grid: Dictionary = terrain.lattice()
-    var size: int = grid["size"] as int
-    var heights: PackedFloat32Array = PackedFloat32Array()
-    heights.resize(size * size)
-    for z: int in size:
-        var row: int = z * size
-        for x: int in size:
-            heights[row + x] = terrain.height_at(x, z)
-    solver.set_heightfield(
-        heights, size, size, grid["origin"] as Vector3, grid["spacing"] as float
-    )

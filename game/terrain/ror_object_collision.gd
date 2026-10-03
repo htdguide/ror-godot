@@ -57,7 +57,9 @@ static func apply(terrain: RorTerrain, solver: RefCounted) -> int:
 
 ## Every solid box on a terrain, as {"transform", "half", "name"}.
 static func boxes(terrain: RorTerrain) -> Array[Dictionary]:
-    var out: Array[Dictionary] = []
+    # The procedural roads first. They are a surface a vehicle drives on rather than scenery it
+    # hits, and they are the one part of a terrain that is not an object at all.
+    var out: Array[Dictionary] = road_boxes(terrain)
     var state: Dictionary = RorObjects.state(terrain)
     var shapes: Dictionary = {}
     for placement: Dictionary in RorObjects.placements(terrain):
@@ -139,6 +141,73 @@ static func _authored_boxes(
             "name": placement["name"],
         })
     return out
+
+
+## How thick a carriageway is made for the solver. A road is a surface and the solver takes
+## boxes, so the box hangs below the surface: deep enough that a wheel at speed cannot step
+## through it in one tick, and the part of it under the ground costs nothing.
+const ROAD_THICKNESS_M: float = 1.0
+
+
+## The carriageway as something a vehicle can drive on: one box per segment, lying along it.
+##
+## An approximation, and the honest kind. The four corners of a segment's tarmac need not be
+## coplanar — the road banks and climbs between its points — so the box is built on the segment's
+## own axes and sized to it, which can only ever be as wrong as one segment is long. The kerbs,
+## shoulders and walls are not made solid: they are centimetres tall beside a carriageway metres
+## wide, and a box per quad would be four times the count for scenery a wheel rides over anyway.
+static func road_boxes(terrain: RorTerrain) -> Array[Dictionary]:
+    var out: Array[Dictionary] = []
+    for group: Array[Dictionary] in RorProceduralRoad.groups(terrain):
+        for index: int in range(1, group.size()):
+            var here: Dictionary = RorProceduralRoad.resolved(terrain, group[index])
+            var last: Dictionary = RorProceduralRoad.resolved(terrain, group[index - 1])
+            if not RorProceduralRoad.BUILT_KINDS.has(here["kind"]) or not RorProceduralRoad.BUILT_KINDS.has(last["kind"]):
+                continue
+            var box: Dictionary = _road_segment_box(
+                RorProceduralRoad.section(terrain, here), RorProceduralRoad.section(terrain, last)
+            )
+            if not box.is_empty():
+                out.append(box)
+    return out
+
+
+## One segment as a box, or empty when the segment has no length.
+##
+## **Across the whole section, not just the carriageway.** 107 of Port Starling's road lines
+## state a width of 0 with a 2 m border either side: upstream's cross-section collapses the
+## carriageway to a line and draws two 2 m strips, which is a footpath. Built from points 3 and 4
+## the box has no width at all and the path is not solid — which is how this was found, with the
+## drop test landing 14 m below a deck it should have rested on. Points 1 and 6 are the section's
+## outer edges and span the carriageway and its kerbs together.
+##
+## The top sits at the carriageway's own height rather than the kerbs': a kerb is something a
+## wheel rides over, and a box as tall as one would hold a vehicle up at its lip.
+static func _road_segment_box(a: PackedVector3Array, b: PackedVector3Array) -> Dictionary:
+    var near: Vector3 = (a[3] + a[4]) * 0.5
+    var far: Vector3 = (b[3] + b[4]) * 0.5
+    var along: Vector3 = far - near
+    if along.length_squared() <= 0.0:
+        return {}
+    var length: float = along.length()
+    along = along / length
+    var across: Vector3 = a[1] - a[6]
+    if across.length_squared() <= 0.0:
+        return {}
+    var width: float = (a[1].distance_to(a[6]) + b[1].distance_to(b[6])) * 0.5
+    across = across.normalized()
+    var up: Vector3 = across.cross(along).normalized()
+    if up.y < 0.0:
+        up = -up
+        across = -across
+    var surface: Vector3 = (near + far) * 0.5
+    return {
+        "transform": Transform3D(
+            Basis(along, up, across), surface - up * (ROAD_THICKNESS_M * 0.5)
+        ),
+        "half": Vector3(length * 0.5, ROAD_THICKNESS_M * 0.5, width * 0.5),
+        "name": "road",
+    }
 
 
 ## The boxes one object definition is worth, in its own frame. Worked out once per definition.

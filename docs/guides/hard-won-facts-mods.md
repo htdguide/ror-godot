@@ -376,3 +376,14 @@ See `hard-won-facts.md` for the solver, the terrain, the formats and the gate di
   the bound that catches a sweep landing somewhere else: shifting the section 40 m sideways
   reports "a vertex sits 40.2 m from the line its points describe, over the 9.0 m their own
   widths allow".
+- **107 of Port Starling's road lines state a width of 0.** With a 2 m border either side,
+  upstream's cross-section collapses the carriageway to a line and draws two 2 m strips: it is a
+  footpath, written in the road format. Collision built from the carriageway alone gave those a
+  box of no width at all, and the drop test landed 14 m under a deck it should have rested on.
+  The box spans the section's outer edges instead, which covers the carriageway and its kerbs
+  together, with its top at the carriageway's own height — a kerb is something a wheel rides
+  over, and a box as tall as one would hold a vehicle up at its lip.
+- **A road point is not a road.** A block's outermost point, or one whose neighbours are kinds
+  this does not build, has no carriageway through it. A drop test that picked the highest *point*
+  landed on a jetty's end 135 m from the nearest road and reported the road as not solid; it
+  picks the highest **segment** now, which is two points and therefore a thing that exists.
