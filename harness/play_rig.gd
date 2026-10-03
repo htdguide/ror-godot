@@ -109,6 +109,8 @@ func _populate_terrain() -> void:
     _world.add_child(RorProceduralRoad.build(loaded))
     # The forests the terrain paints with a density map. Russia asks for two fir species.
     _world.add_child(RorTrees.build(loaded))
+    # The sea the terrain declares. Port Starling spawns four metres above its own waterline.
+    _world.add_child(RorWater.build(loaded))
     _grow_vegetation(loaded)
     # `--facing` dresses the scenery in the same paint the object gates photograph with: a face
     # keeps its texture from the front and draws its axis in a primary colour from behind. A wall
