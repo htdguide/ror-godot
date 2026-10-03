@@ -13,10 +13,12 @@ extends GateBase
 ## turned — a false positive is the dangerous direction, because it breaks content that was right
 ## — and the same primitive reversed must be caught almost entirely.
 ##
-## **Why almost.** A sphere's poles are a fan of slivers meeting at a point, and a ray leaving one
-## of them grazes its neighbours rather than crossing them. 256 of 288 triangles of a reversed
-## 16-by-8 sphere are caught, and the 32 that are not are that fan. A box and a cylinder are
-## caught to the last triangle.
+## **Why almost.** The bound is 85% rather than everything because the test has been two
+## different things and may be again: when it decided surface by surface with a ray, a reversed
+## sphere came back 256 of 288, the 32 misses being the fan of slivers at its poles where a ray
+## grazes its neighbours instead of crossing them. Deciding by signed volume, as it does now, all
+## three solids come back whole. A bound that only the current implementation can meet is a bound
+## that has to be edited every time the implementation changes, and then it is not a control.
 
 ## How much of a reversed solid has to be caught.
 const MIN_CAUGHT: float = 0.85

@@ -16,13 +16,58 @@
       "verdict": "pass"
     },
     "8d25UID-chapel.mesh": {
-      "at": "2026-10-03 09:49:49Z",
+      "at": "2026-10-03 10:24:57Z",
+      "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "8d25UID-smallhouse.mesh": {
-      "at": "2026-10-03 09:48:52Z",
-      "note": "",
+      "at": "2026-10-03 10:23:01Z",
+      "marks": [
+        {
+          "area_m2": 3.33,
+          "faces": "+X",
+          "submesh": 0.0,
+          "triangle": 0.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 0.19,
+          "faces": "+X",
+          "submesh": 0.0,
+          "triangle": 20.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 0.04,
+          "faces": "+X",
+          "submesh": 0.0,
+          "triangle": 84.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 0.04,
+          "faces": "-Z",
+          "submesh": 0.0,
+          "triangle": 82.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 0.04,
+          "faces": "-Z",
+          "submesh": 0.0,
+          "triangle": 90.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 0.04,
+          "faces": "+X",
+          "submesh": 0.0,
+          "triangle": 88.0,
+          "triangles": 2.0
+        }
+      ],
+      "note": "these surfaces are missing or transparent",
       "verdict": "fail"
     },
     "a1da0UID-lab.mesh": {
@@ -36,7 +81,16 @@
       "verdict": "pass"
     },
     "a1da0UID-tunapicker.mesh": {
-      "at": "2026-10-03 09:49:52Z",
+      "at": "2026-10-03 10:25:03Z",
+      "marks": [
+        {
+          "area_m2": 301.92,
+          "faces": "+Y",
+          "submesh": 0.0,
+          "triangle": 6711.0,
+          "triangles": 1693.0
+        }
+      ],
       "note": "",
       "verdict": "fail"
     },
@@ -66,23 +120,65 @@
       "verdict": "pass"
     },
     "haus1.mesh": {
-      "at": "2026-10-03 09:47:05Z",
-      "note": "",
+      "at": "2026-10-03 10:18:55Z",
+      "marks": [
+        {
+          "area_m2": 41.37,
+          "faces": "+Y",
+          "submesh": 0.0,
+          "triangle": 10.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 41.37,
+          "faces": "-Y",
+          "submesh": 0.0,
+          "triangle": 0.0,
+          "triangles": 2.0
+        }
+      ],
+      "note": "roof broken",
       "verdict": "fail"
     },
     "haus2.mesh": {
-      "at": "2026-10-03 09:46:56Z",
-      "note": "",
+      "at": "2026-10-03 10:18:19Z",
+      "marks": [
+        {
+          "area_m2": 6.77,
+          "faces": "-X",
+          "submesh": 0.0,
+          "triangle": 463.0,
+          "triangles": 2.0
+        }
+      ],
+      "note": "this part is transparent and broken",
       "verdict": "fail"
     },
     "haus3.mesh": {
-      "at": "2026-10-03 09:46:23Z",
-      "note": "",
+      "at": "2026-10-03 10:16:48Z",
+      "marks": [],
+      "note": "is it just a roof?",
       "verdict": "fail"
     },
     "haus4.mesh": {
-      "at": "2026-10-03 09:46:33Z",
-      "note": "",
+      "at": "2026-10-03 10:17:42Z",
+      "marks": [
+        {
+          "area_m2": 24.47,
+          "faces": "+X",
+          "submesh": 0.0,
+          "triangle": 106.0,
+          "triangles": 7.0
+        },
+        {
+          "area_m2": 19.95,
+          "faces": "-X",
+          "submesh": 0.0,
+          "triangle": 107.0,
+          "triangles": 11.0
+        }
+      ],
+      "note": "these parts look inside out",
       "verdict": "fail"
     },
     "haus5.mesh": {
@@ -126,9 +222,10 @@
       "verdict": "pass"
     },
     "largedockoutercorner.mesh": {
-      "at": "2026-10-03 09:49:57Z",
+      "at": "2026-10-03 10:25:06Z",
+      "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "largedockstraight.mesh": {
       "at": "2026-10-03 09:48:30Z",
@@ -166,23 +263,35 @@
       "verdict": "pass"
     },
     "rey_bs_shelter1.mesh": {
-      "at": "2026-10-03 09:46:47Z",
-      "note": "",
+      "at": "2026-10-03 10:18:04Z",
+      "marks": [
+        {
+          "area_m2": 0.54,
+          "faces": "+Z",
+          "submesh": 0.0,
+          "triangle": 2.0,
+          "triangles": 6.0
+        }
+      ],
+      "note": "this part is transparent and missing",
       "verdict": "fail"
     },
     "rey_bs_shelter2.mesh": {
-      "at": "2026-10-03 09:48:21Z",
-      "note": "",
+      "at": "2026-10-03 10:21:51Z",
+      "marks": [],
+      "note": "looks like its missing a bench or it supposed to be likethat",
       "verdict": "fail"
     },
     "rey_bs_sign_blue.mesh": {
-      "at": "2026-10-03 09:46:14Z",
-      "note": "",
+      "at": "2026-10-03 10:16:00Z",
+      "marks": [],
+      "note": "It looks like its missing a main part with info",
       "verdict": "fail"
     },
     "rey_bs_sign_nopost.mesh": {
-      "at": "2026-10-03 09:47:17Z",
-      "note": "",
+      "at": "2026-10-03 10:21:17Z",
+      "marks": [],
+      "note": "looks like empty levitating frame",
       "verdict": "fail"
     },
     "rey_fishplant_big.mesh": {
@@ -191,9 +300,10 @@
       "verdict": "fail"
     },
     "rey_fishplant_small.mesh": {
-      "at": "2026-10-03 09:49:40Z",
+      "at": "2026-10-03 10:24:52Z",
+      "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "rey_gasstation.mesh": {
       "at": "2026-10-03 09:52:04Z",
@@ -226,9 +336,10 @@
       "verdict": "pass"
     },
     "rey_sign_pswelcome.mesh": {
-      "at": "2026-10-03 09:49:34Z",
+      "at": "2026-10-03 10:24:42Z",
+      "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "rey_sign_siwelcome.mesh": {
       "at": "2026-10-03 09:51:57Z",
@@ -246,13 +357,23 @@
       "verdict": "pass"
     },
     "rey_streetlamp.mesh": {
-      "at": "2026-10-03 09:45:30Z",
-      "note": "",
+      "at": "2026-10-03 10:14:12Z",
+      "marks": [],
+      "note": "It looks like its missing the bulb part where the light itself supposed to be. Maybes its not a part of this model, cant highlight it",
       "verdict": "fail"
     },
     "rey_windturbine.mesh": {
-      "at": "2026-10-03 09:48:47Z",
-      "note": "",
+      "at": "2026-10-03 10:22:13Z",
+      "marks": [
+        {
+          "area_m2": 118.29,
+          "faces": "+Y",
+          "submesh": 0.0,
+          "triangle": 36.0,
+          "triangles": 84.0
+        }
+      ],
+      "note": "this part is has a transaprent hole in there",
       "verdict": "fail"
     },
     "road-block5.mesh": {
@@ -281,12 +402,30 @@
       "verdict": "pass"
     },
     "sign-descent10.mesh": {
-      "at": "2026-10-03 09:51:45Z",
-      "note": "",
+      "at": "2026-10-03 10:25:12Z",
+      "marks": [
+        {
+          "area_m2": 0.42,
+          "faces": "+Y",
+          "submesh": 0.0,
+          "triangle": 14.0,
+          "triangles": 6.0
+        }
+      ],
+      "note": "sign again",
       "verdict": "fail"
     },
     "sign-fall.mesh": {
-      "at": "2026-10-03 09:51:47Z",
+      "at": "2026-10-03 10:25:15Z",
+      "marks": [
+        {
+          "area_m2": 0.42,
+          "faces": "+Y",
+          "submesh": 0,
+          "triangle": 14,
+          "triangles": 6
+        }
+      ],
       "note": "",
       "verdict": "fail"
     },
@@ -356,13 +495,31 @@
       "verdict": "pass"
     },
     "sign-priorityintersection.mesh": {
-      "at": "2026-10-03 09:48:58Z",
-      "note": "",
+      "at": "2026-10-03 10:23:15Z",
+      "marks": [
+        {
+          "area_m2": 0.42,
+          "faces": "+Y",
+          "submesh": 0.0,
+          "triangle": 14.0,
+          "triangles": 6.0
+        }
+      ],
+      "note": "another sign with the back missing",
       "verdict": "fail"
     },
     "sign-roadnarrows.mesh": {
-      "at": "2026-10-03 09:49:31Z",
-      "note": "",
+      "at": "2026-10-03 10:24:38Z",
+      "marks": [
+        {
+          "area_m2": 0.42,
+          "faces": "+Y",
+          "submesh": 0.0,
+          "triangle": 14.0,
+          "triangles": 6.0
+        }
+      ],
+      "note": "sign again with the back",
       "verdict": "fail"
     },
     "sign-rocks.mesh": {
@@ -376,8 +533,17 @@
       "verdict": "pass"
     },
     "sign-warning.mesh": {
-      "at": "2026-10-03 09:47:26Z",
-      "note": "",
+      "at": "2026-10-03 10:21:28Z",
+      "marks": [
+        {
+          "area_m2": 0.42,
+          "faces": "+Y",
+          "submesh": 0.0,
+          "triangle": 14.0,
+          "triangles": 6.0
+        }
+      ],
+      "note": "this side is transparent and broken",
       "verdict": "fail"
     },
     "store02.mesh": {
@@ -386,13 +552,15 @@
       "verdict": "fail"
     },
     "store08.mesh": {
-      "at": "2026-10-03 09:46:59Z",
-      "note": "",
+      "at": "2026-10-03 10:18:40Z",
+      "marks": [],
+      "note": "is it supposed to be with no windows and sidewalls?",
       "verdict": "fail"
     },
     "store10.mesh": {
-      "at": "2026-10-03 09:45:56Z",
-      "note": "",
+      "at": "2026-10-03 10:15:03Z",
+      "marks": [],
+      "note": "Is it supposed to be roof with no windows and no side walls?",
       "verdict": "fail"
     },
     "straightroadbusstop.mesh": {
@@ -406,24 +574,28 @@
       "verdict": "pass"
     },
     "townhouse01blue.mesh": {
-      "at": "2026-10-03 09:46:16Z",
-      "note": "",
+      "at": "2026-10-03 10:16:33Z",
+      "marks": [],
+      "note": "This house is missing a roof, windows and balcony",
       "verdict": "fail"
     },
     "townhouse01red.mesh": {
-      "at": "2026-10-03 09:46:25Z",
-      "note": "",
+      "at": "2026-10-03 10:17:10Z",
+      "marks": [],
+      "note": "Looks like its a part whihc combines with others",
       "verdict": "fail"
     },
     "townhouse01white.mesh": {
-      "at": "2026-10-03 09:46:08Z",
-      "note": "",
-      "verdict": "fail"
+      "at": "2026-10-03 10:15:21Z",
+      "marks": [],
+      "note": "Is it just smoke exauhst?",
+      "verdict": "pass"
     },
     "townhouse01yeller.mesh": {
-      "at": "2026-10-03 09:49:02Z",
+      "at": "2026-10-03 10:23:18Z",
+      "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "trafficlightsequence1.mesh": {
       "at": "2026-10-03 09:48:14Z",
@@ -441,8 +613,101 @@
       "verdict": "pass"
     },
     "truckshop.mesh": {
-      "at": "2026-10-03 09:49:24Z",
-      "note": "",
+      "at": "2026-10-03 10:24:32Z",
+      "marks": [
+        {
+          "area_m2": 11.98,
+          "faces": "-X",
+          "submesh": 0.0,
+          "triangle": 816.0,
+          "triangles": 8.0
+        },
+        {
+          "area_m2": 11.98,
+          "faces": "-X",
+          "submesh": 0.0,
+          "triangle": 814.0,
+          "triangles": 8.0
+        },
+        {
+          "area_m2": 95.73,
+          "faces": "+Y",
+          "submesh": 0.0,
+          "triangle": 364.0,
+          "triangles": 48.0
+        },
+        {
+          "area_m2": 1.44,
+          "faces": "-X",
+          "submesh": 0.0,
+          "triangle": 592.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 1.44,
+          "faces": "-X",
+          "submesh": 0.0,
+          "triangle": 596.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 1.44,
+          "faces": "-X",
+          "submesh": 0.0,
+          "triangle": 588.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 1.44,
+          "faces": "-X",
+          "submesh": 0.0,
+          "triangle": 584.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 1.44,
+          "faces": "-X",
+          "submesh": 0.0,
+          "triangle": 580.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 1.44,
+          "faces": "-X",
+          "submesh": 0.0,
+          "triangle": 600.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 1.44,
+          "faces": "-X",
+          "submesh": 0.0,
+          "triangle": 642.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 17.81,
+          "faces": "-X",
+          "submesh": 0.0,
+          "triangle": 1000.0,
+          "triangles": 2.0
+        },
+        {
+          "area_m2": 11.98,
+          "faces": "+X",
+          "submesh": 0.0,
+          "triangle": 817.0,
+          "triangles": 8.0
+        },
+        {
+          "area_m2": 11.98,
+          "faces": "+X",
+          "submesh": 0.0,
+          "triangle": 815.0,
+          "triangles": 8.0
+        }
+      ],
+      "note": "these are missing or transparent, maybe i cant reach some extra ones",
       "verdict": "fail"
     },
     "warehouse01.mesh": {

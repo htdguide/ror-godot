@@ -4,9 +4,15 @@
 #   tools/review.sh                     Port Starling, everything not yet judged
 #   tools/review.sh --map lapaz         another map
 #   tools/review.sh --map lapaz --again offer the ones already judged as well
+#   tools/review.sh --failed            only the ones already on record as failed
 #
 # Drag to turn the object over, wheel to come closer, R to reset the view, B to paint the back
 # of every face. P passes, F fails, left and right arrows move without settling anything.
+#
+# Hovering lights the surface under the cursor and clicking pins it; right-click clears the pins.
+# Type a sentence in the box to say what is wrong. Both are written with the verdict: a verdict
+# alone was not enough — thirteen objects failed by eye came back clean from every measurement in
+# the suite with nothing on record to say why.
 #
 # Why a person: three classes of content show a back face from outside while being exactly right
 # — a single-card road sign, two parallel facades with no end walls, a shell with no roof — and

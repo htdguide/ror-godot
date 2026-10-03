@@ -23,6 +23,10 @@ extends GateBase
 ## which meshes the question applies to.
 const CLOSED_SHARE: float = 0.05
 const MIN_TRIANGLES: int = 8
+## How much of a mesh's area has to look the same way before it is a sheet rather than a shape
+## with an inside. Matches `ObjectWinding.SHEET_AGREEMENT`, because the gate and the loader have
+## to agree on which meshes the question applies to.
+const SHEET_AGREEMENT: float = 0.5
 const LISTED: int = 6
 
 
@@ -73,6 +77,15 @@ func run(_harness: Node) -> Dictionary:
                 var mesh: ArrayMesh = RorObjects.mesh_of(terrain, file, state)
                 if mesh == null:
                     continue
+                # **A sheet has no inside and its volume is about where the origin sits.**
+                # `hospital.mesh` is one helipad quad; once it is turned to face up it "encloses"
+                # 0.92 of its box and this gate called it inside out. A shape with an inside has
+                # faces looking every way at once, so the area-weighted sum of their directions
+                # cancels; a sheet's does not. That is the filter, and it needs no threshold on
+                # the volume at all.
+                if _agreement(mesh) > SHEET_AGREEMENT:
+                    open_shapes += 1
+                    continue
                 var share: float = _enclosed_share(mesh)
                 if absf(share) < CLOSED_SHARE:
                     open_shapes += 1
@@ -120,6 +133,24 @@ func _control() -> String:
                 + " means anything"
             )
     return ""
+
+
+## How much of a mesh's area looks the same way: 1.0 for a flat sheet, near 0 for a solid.
+func _agreement(mesh: ArrayMesh) -> float:
+    var sum: Vector3 = Vector3.ZERO
+    var area: float = 0.0
+    for surface: int in mesh.get_surface_count():
+        var arrays: Array = mesh.surface_get_arrays(surface)
+        var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
+        var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] as PackedInt32Array
+        for at: int in range(0, indices.size() - 2, 3):
+            var a: Vector3 = points[indices[at]]
+            var face: Vector3 = -(points[indices[at + 1]] - a).cross(
+                points[indices[at + 2]] - a
+            ) * 0.5
+            sum += face
+            area += face.length()
+    return 0.0 if area <= 0.0 else sum.length() / area
 
 
 ## What share of its own bounding box a mesh encloses, signed. Near zero for an open shape.

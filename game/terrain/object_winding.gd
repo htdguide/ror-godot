@@ -11,36 +11,29 @@ extends RefCounted
 ## `OgreMeshReader`'s reversal is therefore the Ogre-to-Godot conversion, for a truck and a
 ## building alike, and nothing here undoes it.
 ##
-## **What is left is content whose author wound part of it inward — a part, not a whole.**
-## `haus4.mesh` is an A-frame whose roof slopes are right and whose two gable ends show their
-## backs. `hospital.mesh` is a helipad slab whose one face looks down. No per-mesh decision fixes
-## either: turning the first turns its roof as well, and the second has nothing to compare itself
-## against. Both were found by photographing every object a map places from outside and looking at
-## the stills, which is what `tools/mapcheck.sh` is for.
+## What is left after that is content, and `tools/mapcheck.sh` photographs it while
+## `tools/review.sh` asks a person about it.
 ##
-## **The test is a ray, and it needs no normal and no convention.** Step off a face along the way
-## it is drawn to look and count the crossings with the rest of the mesh. Even means it looks at
-## open air, which is what a surface anybody can see looks like. Odd means it looks into the body
-## of its own object and is drawn back to front. It is the point-in-polygon argument.
+## **Two rules, and a ray was tried for a third and withdrawn.** A mesh that encloses a positive
+## volume is a solid wound inward and is turned whole. A mesh whose faces all look the same way
+## is a sheet, and a sheet lying face-down is turned, because a terrain object stands on the
+## ground and is looked at from above, never from below — that is `hospital.mesh`, a helipad
+## whose one quad looked down.
 ##
-## **Three rays, not one, and that is not a refinement.** A single ray lands on the seam between
-## two triangles often enough to decide the question wrongly: aimed from the middle of a box at
-## the middle of the opposite face it crosses the shared diagonal and is counted twice, so a solid
-## that is inside out reads as even and passes. A reversed `BoxMesh` was missed entirely, which is
-## how this was found. Three directions spread off the normal, and a majority, have no single seam
-## to land on.
+## **The withdrawn rule was ray parity, and it was wrong for a reason worth writing down.** Step
+## off a face the way it is drawn to look, count the crossings with the rest of the mesh, and an
+## odd count means the face looks into its own object. That is the point-in-polygon argument, it
+## passes a two-way control on `BoxMesh`, `SphereMesh` and `CylinderMesh` — and **parity needs a
+## closed manifold**, which almost no object in this library is. On an open shell any overhang,
+## partition or L-shaped wing puts an odd count under a surface that was perfectly correct, and
+## the surface is turned and vanishes. A review session found it: of the surfaces a person
+## pointed at and called transparent or missing, most came back `turned=true`, meaning this file
+## had broken them. `GROUP_DEGREES`, `WELD`, `surfaces_of` and `hit_distance` remain because
+## `ReviewPick` needs them to find what the mouse is over.
 ##
-## **Per surface, not per face.** One vote is three passes over the mesh and a session loads
-## several hundred meshes. Triangles are grown into surfaces first — touching, and looking within
-## `GROUP_DEGREES` of each other — and one vote decides a whole surface, which also keeps one bad
-## triangle from putting a hole in a wall. Touching matters as much as direction: grouping by
-## direction alone put the outside of one roof slope and the inside of the opposite slope in the
-## same group, and one ray then spoke for both. Corners are matched by rounded position rather
-## than by vertex index, because an Ogre export splits a vertex per face as often as not.
-##
-## An open shell is left exactly as its file has it, deliberately: `store08.mesh` is two parallel
-## facades with no end walls and no roof, every face of it looks at open air, and from the end you
-## are correctly seeing the inside of a facade.
+## An open shell is therefore left exactly as its file has it, which also honours the author:
+## measured, the winding of every one of those marked surfaces already agreed with the vertex
+## normals the file carries for it.
 
 ## How much of its own bounding box a mesh has to enclose before its signed volume is taken as a
 ## statement about the whole of it.
@@ -50,17 +43,9 @@ const GROUP_DEGREES: float = 25.0
 ## How finely a corner is rounded when deciding whether two triangles touch, as a share of the
 ## mesh's own size.
 const WELD: float = 0.001
-## Over this many triangles a mesh is left alone: a vote is three passes over the mesh per surface
-## and the cost is the product. The library's mean is 436 triangles and its largest is 13,214.
-const MAX_RAY_TRIANGLES: int = 4000
-## How far off a surface a ray starts, as a share of the mesh's own size, so the face it came from
-## is never the first thing it hits.
-const RAY_OFFSET: float = 0.0005
-## How far off the normal the voting rays are aimed. Wide enough to miss a seam the straight ray
-## lands on, narrow enough to stay on the same side of the surface.
-const SPREAD_DEGREES: float = 11.0
-## How level a lone sheet has to be before "it lies on the ground" is a statement about it.
-const LEVEL: float = 0.85
+## How much of a mesh's area has to look the same way before it is one sheet rather than a shape
+## with an inside. A single slab is 1.0; a box is 0.0.
+const SHEET_AGREEMENT: float = 0.5
 ## The turn every terrain object is placed with, which is what makes a mesh axis into a world one.
 ## `RorObjects.transform_of` applies it unconditionally for every object on every terrain.
 const PITCH: Basis = Basis(
@@ -82,30 +67,45 @@ static func plan(submeshes: Array) -> Array[PackedInt32Array]:
     # surfaces has open air on the side it looks at, because the inside of a shell is open air
     # too. The two measures answer different questions and the cheaper one goes first.
     if enclosed_share(submeshes) > CLOSED_SHARE:
-        for at: int in submeshes.size():
-            var every: PackedInt32Array = PackedInt32Array()
-            for triangle: int in (
-                (submeshes[at]["indices"] as PackedInt32Array).size() / 3
-            ):
-                every.append(triangle)
-            out[at] = every
-        return out
-    var faces: Array[Dictionary] = faces_of(submeshes)
-    var span: float = span_of(submeshes)
-    if faces.is_empty() or faces.size() > MAX_RAY_TRIANGLES or span <= 0.0:
-        return out
-    for surface: Array in surfaces_of(faces, span):
-        var widest: Dictionary = surface[0] as Dictionary
-        for face: Dictionary in surface:
-            if (face["area"] as float) > (widest["area"] as float):
-                widest = face
-        if not looks_into_itself(faces, widest, span):
-            continue
-        for face: Dictionary in surface:
-            var at: int = face["submesh"] as int
-            var indices: PackedInt32Array = out[at]
-            indices.append(face["triangle"] as int)
-            out[at] = indices
+        return _every_triangle(submeshes, out)
+    # **A lone sheet has no inside, and the only thing that decides it is how it is used.**
+    # `hospital.mesh` is a helipad: one level quad with open air above and below, whose one face
+    # looks down, and no geometry in the file distinguishes that from the same quad looking up. A
+    # terrain object stands on the ground and is looked at from above, never from below.
+    var level: Dictionary = facing(submeshes)
+    if (level["agreement"] as float) > SHEET_AGREEMENT and (level["up"] as float) < 0.0:
+        return _every_triangle(submeshes, out)
+    return out
+
+
+## Which way a mesh looks as a whole, and how much of it agrees: `{"agreement", "up"}`.
+##
+## `agreement` is the length of the area-weighted sum of the drawn outward directions over the
+## total area — 1.0 for a flat sheet, near 0 for anything closed, because a closed shape's faces
+## point every way at once. `up` is that sum's world height once the -90 degree pitch every
+## terrain object is placed with has been applied, so it is "up" as a person standing on the map
+## means it rather than as the file's axes have it.
+static func facing(submeshes: Array) -> Dictionary:
+    var sum: Vector3 = Vector3.ZERO
+    var area: float = 0.0
+    for face: Dictionary in faces_of(submeshes):
+        var piece: Vector3 = (face["out"] as Vector3) * (face["area"] as float)
+        sum += piece
+        area += face["area"] as float
+    if area <= 0.0:
+        return {"agreement": 0.0, "up": 0.0}
+    return {"agreement": sum.length() / area, "up": (PITCH * sum).y}
+
+
+## Every triangle of every submesh, for the cases that turn a whole mesh.
+static func _every_triangle(
+    submeshes: Array, out: Array[PackedInt32Array]
+) -> Array[PackedInt32Array]:
+    for at: int in submeshes.size():
+        var every: PackedInt32Array = PackedInt32Array()
+        for triangle: int in ((submeshes[at]["indices"] as PackedInt32Array).size() / 3):
+            every.append(triangle)
+        out[at] = every
     return out
 
 
@@ -202,87 +202,31 @@ static func _corner_key(corner: Vector3, step: float) -> String:
     ]
 
 
-## Whether the way a face looks runs into the body of its own mesh.
+## How far along a ray a triangle is, or -1.0 when the ray misses it or it is behind the origin.
 ##
-## **A lone sheet crosses nothing either way and the ray has nothing to say about it.**
-## `hospital.mesh` is a helipad: one level quad with open air above and below, whose one face
-## looks down, and no geometry in the file distinguishes that from the same quad looking up. What
-## distinguishes it is how a terrain object is used — it stands on the ground and is looked at
-## from above, never from below — so a level sheet with nothing either side of it is turned to
-## face up. The guard is the second set of rays: a bridge deck's underside has its own structure
-## above it, crosses something, and is left alone.
-static func looks_into_itself(
-    faces: Array[Dictionary], face: Dictionary, span: float
-) -> bool:
-    var direction: Vector3 = face["out"] as Vector3
-    var rays: Array[Vector3] = _spread(direction)
-    var inside: int = 0
-    var crossed: int = 0
-    for along: Vector3 in rays:
-        var crossings: int = _crossings(faces, face, direction, along, span)
-        if crossings > 0:
-            crossed += 1
-        if crossings % 2 == 1:
-            inside += 1
-    if crossed > 0:
-        return inside * 2 > rays.size()
-    for along: Vector3 in _spread(-direction):
-        if _crossings(faces, face, -direction, along, span) > 0:
-            return false
-    return (PITCH * direction).y < -LEVEL
-
-
-## Three directions about a normal: the normal itself and two tilted off it. No seam catches all
-## three.
-static func _spread(normal: Vector3) -> Array[Vector3]:
-    var sideways: Vector3 = normal.cross(
-        Vector3.UP if absf(normal.dot(Vector3.UP)) < 0.9 else Vector3.RIGHT
-    ).normalized()
-    var other: Vector3 = normal.cross(sideways).normalized()
-    var tilt: float = tan(deg_to_rad(SPREAD_DEGREES))
-    return [
-        normal,
-        (normal + sideways * tilt).normalized(),
-        (normal + other * tilt).normalized(),
-    ]
-
-
-## How many of a mesh's own triangles one ray crosses. It starts off `face` along `offset` and
-## travels along `along`, which is tilted off it.
-static func _crossings(
-    faces: Array[Dictionary], face: Dictionary, offset: Vector3, along: Vector3, span: float
-) -> int:
-    var from: Vector3 = (face["centre"] as Vector3) + offset * span * RAY_OFFSET
-    var crossings: int = 0
-    for other: Dictionary in faces:
-        if other["submesh"] == face["submesh"] and other["triangle"] == face["triangle"]:
-            continue
-        var corners: Array = other["corners"] as Array
-        if _hit(
-            from, along, corners[0] as Vector3, corners[1] as Vector3, corners[2] as Vector3
-        ):
-            crossings += 1
-    return crossings
-
-
-## Moller-Trumbore, for a ray with no far end. Whether it crosses the triangle ahead of its origin.
-static func _hit(from: Vector3, along: Vector3, a: Vector3, b: Vector3, c: Vector3) -> bool:
+## The same arithmetic the winding test counts crossings with, exposed because picking a surface
+## with the mouse asks exactly the same question and a second copy of it would be a second thing
+## to get wrong.
+static func hit_distance(
+    from: Vector3, along: Vector3, a: Vector3, b: Vector3, c: Vector3
+) -> float:
     var edge1: Vector3 = b - a
     var edge2: Vector3 = c - a
     var sideways: Vector3 = along.cross(edge2)
     var determinant: float = edge1.dot(sideways)
     if absf(determinant) < 1e-9:
-        return false
+        return -1.0
     var inverse: float = 1.0 / determinant
     var offset: Vector3 = from - a
     var u: float = inverse * offset.dot(sideways)
     if u < 0.0 or u > 1.0:
-        return false
+        return -1.0
     var across: Vector3 = offset.cross(edge1)
     var v: float = inverse * along.dot(across)
     if v < 0.0 or u + v > 1.0:
-        return false
-    return inverse * edge2.dot(across) > 1e-6
+        return -1.0
+    var distance: float = inverse * edge2.dot(across)
+    return distance if distance > 1e-6 else -1.0
 
 
 ## How big a mesh is, as the diagonal of its own bounding box.

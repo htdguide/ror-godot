@@ -23,7 +23,7 @@ const PASS: String = "pass"
 const FAIL: String = "fail"
 
 
-## Every verdict on record, as `{mesh file: {"verdict", "at", "note"}}`.
+## Every verdict on record, as `{mesh file: {"verdict", "at", "note", "marks"}}`.
 static func load_all() -> Dictionary:
     var file: FileAccess = FileAccess.open(PATH, FileAccess.READ)
     if file == null:
@@ -40,12 +40,18 @@ static func load_all() -> Dictionary:
 ##
 ## Written whole each time rather than appended: the file is a few hundred lines at most, and a
 ## half-written record of what a person said is worse than none.
-static func record(mesh_file: String, verdict: String, note: String = "") -> String:
+static func record(
+    mesh_file: String, verdict: String, note: String = "", marks: Array = []
+) -> String:
     var verdicts: Dictionary = load_all()
     verdicts[mesh_file] = {
         "verdict": verdict,
         "at": Time.get_datetime_string_from_system(true, true) + "Z",
         "note": note,
+        # Which surfaces the person pointed at, as `ReviewPick.describe` writes them: the
+        # submesh, a triangle in it, how many triangles the surface has, its area, and which way
+        # it looks in the object's own axes. A sentence says what is wrong; this says where.
+        "marks": marks,
     }
     return _write(verdicts)
 
@@ -57,6 +63,22 @@ static func forget(mesh_file: String) -> String:
         return ""
     verdicts.erase(mesh_file)
     return _write(verdicts)
+
+
+## The whole record for one mesh, or empty.
+static func record_of(mesh_file: String) -> Dictionary:
+    var found: Variant = load_all().get(mesh_file, null)
+    return found as Dictionary if found is Dictionary else {}
+
+
+## Which meshes carry one verdict.
+static func with_verdict(verdict: String) -> PackedStringArray:
+    var out: PackedStringArray = PackedStringArray()
+    var verdicts: Dictionary = load_all()
+    for mesh_file: String in verdicts.keys():
+        if verdict_of(mesh_file) == verdict:
+            out.append(mesh_file)
+    return out
 
 
 ## What a person said about one mesh, or "" if nobody has.
