@@ -181,7 +181,12 @@ bool OgreMeshReader::read_mesh(Cursor &c, int64_t end, Geometry &shared, Array &
         const int64_t chunk_start = c.at;
         const uint16_t id = c.u16();
         const uint32_t length = c.u32();
-        if (length < CHUNK_HEADER_SIZE) { return false; }
+        // A mesh chunk whose declared length runs past the end of its own file is common
+        // enough in this library to be the rule rather than the exception, so the walk stops
+        // at whatever it cannot make sense of and keeps everything read up to there.
+        if (length < CHUNK_HEADER_SIZE || chunk_start + static_cast<int64_t>(length) > c.size) {
+            break;
+        }
         const int64_t chunk_end = chunk_start + static_cast<int64_t>(length);
         switch (id) {
             case M_GEOMETRY:
@@ -235,12 +240,21 @@ bool OgreMeshReader::read_submesh(Cursor &c, int64_t end, Array &submeshes) {
         indices[i + 2] = swap;
     }
 
+    // **A submesh that has been read is kept, whatever follows it.** The child chunks after
+    // the index data are operation type, bone assignments, texture aliases -- nothing this
+    // reader needs -- and walking off the end of them used to abandon the submesh entirely,
+    // throwing away geometry that had already been read correctly. `a1da0UID-kwhale.mesh` is
+    // one: its declared mesh chunk runs 110,924 bytes past a 106,944-byte file, so the walk
+    // reaches a chunk header made of whatever lies beyond the submesh, and a whale that was
+    // fully read drew nothing at all. Stop scanning children, keep the submesh.
     Geometry own;
     while (c.at + CHUNK_HEADER_SIZE <= end) {
         const int64_t chunk_start = c.at;
         const uint16_t id = c.u16();
         const uint32_t length = c.u32();
-        if (length < CHUNK_HEADER_SIZE) { return false; }
+        if (length < CHUNK_HEADER_SIZE || chunk_start + static_cast<int64_t>(length) > c.size) {
+            break;
+        }
         const int64_t chunk_end = chunk_start + static_cast<int64_t>(length);
         if (id == M_GEOMETRY && !uses_shared) {
             read_geometry(c, chunk_end, own);
@@ -269,7 +283,10 @@ bool OgreMeshReader::read_geometry(Cursor &c, int64_t end, Geometry &out) {
         const int64_t chunk_start = c.at;
         const uint16_t id = c.u16();
         const uint32_t length = c.u32();
-        if (length < CHUNK_HEADER_SIZE) { return false; }
+        // Keep whatever has been read rather than discarding the lot: see `read_submesh`.
+        if (length < CHUNK_HEADER_SIZE || chunk_start + static_cast<int64_t>(length) > c.size) {
+            break;
+        }
         const int64_t chunk_end = chunk_start + static_cast<int64_t>(length);
 
         if (id == M_GEOMETRY_VERTEX_DECLARATION) {
@@ -277,7 +294,7 @@ bool OgreMeshReader::read_geometry(Cursor &c, int64_t end, Geometry &out) {
                 const int64_t el_start = c.at;
                 const uint16_t el_id = c.u16();
                 const uint32_t el_len = c.u32();
-                if (el_len < CHUNK_HEADER_SIZE) { return false; }
+                if (el_len < CHUNK_HEADER_SIZE) { break; }
                 if (el_id == M_GEOMETRY_VERTEX_ELEMENT) {
                     VertexElement e;
                     e.source = c.u16();
