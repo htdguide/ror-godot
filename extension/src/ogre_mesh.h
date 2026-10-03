@@ -57,6 +57,9 @@ private:
     godot::String m_error;
 
     bool read_mesh(Cursor &c, int64_t end, Geometry &shared, godot::Array &submeshes);
+    // Where the next submesh really starts, found by its own shape rather than by the length
+    // the chunk before it claims. -1 when there is none. See the note in `read_mesh`.
+    int64_t next_submesh(const Cursor &c, int64_t from, int64_t limit) const;
     bool read_submesh(Cursor &c, int64_t end, godot::Array &submeshes);
     bool read_geometry(Cursor &c, int64_t end, Geometry &out);
 };

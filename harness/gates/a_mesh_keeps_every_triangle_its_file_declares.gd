@@ -14,13 +14,19 @@ extends GateBase
 ## evidence that the reader was complete. A walker that finds nothing must say so, so a file
 ## whose header cannot be parsed is counted and reported rather than skipped in silence.
 ##
+## **More than the walk finds is not a fault.** A chunk length in this library is a hint: every
+## fir on Russia declares a first submesh of 4091 bytes that really ends at 3835, so a walk by
+## declared length steps straight over the foliage and reads one bare trunk. The reader
+## resynchronises on a submesh's own shape when a length lands on something that is not a chunk,
+## and recovers geometry this walk cannot reach — 8 submeshes in Russia's hall where the lengths
+## lead to 1, 28 in `a1da0UID-nedlloyd.mesh`. So what is required is that nothing the file's own
+## headers *lead to* is lost. The surplus is counted and reported, because a resynchroniser that
+## started inventing submeshes would show up here first as a number that climbed.
+##
 ## **What it caught.** `a1da0UID-kwhale.mesh` declares one submesh of 1482 indices and the
-## reader returned none: its geometry is shared, held in a mesh-level `M_GEOMETRY` chunk, and
-## the submesh was read correctly and then thrown away because the chunk *after* it had a
-## nonsense length. That length is not corruption — the file's own mesh chunk claims 110,924
-## bytes in a 106,944-byte file, which is common enough in this library to be the rule — so the
-## walk now stops at what it cannot parse and keeps everything read up to there. A whale on
-## North St Helens drew nothing at all.
+## reader returned none: the submesh was read correctly and then thrown away because the chunk
+## *after* it had a nonsense length. The file's own mesh chunk claims 110,924 bytes in a
+## 106,944-byte file. A whale on North St Helens drew nothing at all.
 
 ## Below this there is nothing to judge: a fresh clone with no downloaded packs.
 const MIN_MESHES: int = 20
@@ -41,7 +47,10 @@ static func meta() -> Dictionary:
             + " number of indices the file states for it"
         ),
         "oracle": GateBase.ORACLE_EXTERNAL,
-        "threshold": "every file's submesh count and per-submesh index count matched exactly",
+        "threshold": (
+            "no file returns fewer submeshes than its own chunk lengths lead to, and every one"
+            + " of those carries the index count the file states"
+        ),
         "why": (
             "a submesh read correctly and then dropped is geometry that is simply absent from"
             + " the world, and absent geometry looks exactly like content the author never"
@@ -59,6 +68,7 @@ func run(_harness: Node) -> Dictionary:
         return fail("OgreMeshReader is not registered: build the GDExtension first")
     var checked: int = 0
     var submeshes: int = 0
+    var recovered: int = 0
     var unreadable: PackedStringArray = PackedStringArray()
     var problems: PackedStringArray = PackedStringArray()
     for path: String in _mesh_files():
@@ -76,10 +86,13 @@ func run(_harness: Node) -> Dictionary:
         checked += 1
         var got: Array = read["submeshes"] as Array
         submeshes += got.size()
-        if got.size() != declared.size():
+        if got.size() < declared.size():
             problems.append("%s declares %d submeshes and the reader returned %d"
                 % [path.get_file(), declared.size(), got.size()])
             continue
+        recovered += got.size() - declared.size()
+        # Every submesh the declared lengths lead to must come back with all of its indices.
+        # The reader may hand back more; those are the ones a length stepped over.
         for at: int in declared.size():
             var want: int = (declared[at] as Dictionary)["indices"] as int
             var have: int = ((got[at] as Dictionary)["indices"] as PackedInt32Array).size()
@@ -97,8 +110,9 @@ func run(_harness: Node) -> Dictionary:
             problems.size()
         )
     return ok(
-        "%d mesh files, %d submeshes, every index the files declare%s"
-        % [checked, submeshes,
+        "%d mesh files, %d submeshes, every index the files declare; %d more recovered past a"
+        % [checked, submeshes, recovered] + " chunk length that lies%s"
+        % [
            "" if unreadable.is_empty() else
            "; %d with no header this walker reads (%s)"
            % [unreadable.size(), ", ".join(unreadable.slice(0, LISTED))]],

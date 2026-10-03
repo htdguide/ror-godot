@@ -175,6 +175,32 @@ Dictionary OgreMeshReader::read_file(const String &path) {
     return result;
 }
 
+// Where the next submesh starts, recognised by its own shape: the chunk id, a newline-terminated
+// ASCII material name, a `useSharedVertices` byte that is 0 or 1, an index count that is neither
+// zero nor absurd, and a 32-bit-indices byte that is also 0 or 1. Six independent conditions, so
+// it does not fire on arbitrary bytes.
+int64_t OgreMeshReader::next_submesh(const Cursor &c, int64_t from, int64_t limit) const {
+    const int64_t last = limit < c.size ? limit : c.size;
+    for (int64_t at = from; at + 16 < last; ++at) {
+        if (c.data[at] != 0x00 || c.data[at + 1] != 0x40) { continue; }
+        const int64_t name_start = at + CHUNK_HEADER_SIZE;
+        int64_t name_end = -1;
+        for (int64_t p = name_start; p < name_start + 128 && p < last; ++p) {
+            const uint8_t ch = c.data[p];
+            if (ch == '\n') { name_end = p; break; }
+            if (ch < 32 || ch > 126) { break; }
+        }
+        if (name_end <= name_start) { continue; }
+        const int64_t after = name_end + 1;
+        if (after + 6 > last || c.data[after] > 1) { continue; }
+        uint32_t count = 0;
+        std::memcpy(&count, c.data + after + 1, sizeof(count));
+        if (count == 0 || count > 4000000u || c.data[after + 5] > 1) { continue; }
+        return at;
+    }
+    return -1;
+}
+
 bool OgreMeshReader::read_mesh(Cursor &c, int64_t end, Geometry &shared, Array &submeshes) {
     c.u8();  // skeletallyAnimated
     while (c.at + CHUNK_HEADER_SIZE <= end) {
@@ -199,6 +225,39 @@ bool OgreMeshReader::read_mesh(Cursor &c, int64_t end, Geometry &shared, Array &
                 break;  // Skeleton links, LOD, bounds, edge lists: not needed here.
         }
         c.at = chunk_end;
+
+        // **A chunk length in this library is a hint, not a fact.** Every fir on Russia holds
+        // two submeshes — the bark and the foliage — and the first one's header claims 4091
+        // bytes when it really ends at 3835. Walked by the claim, the foliage's header is
+        // stepped over, the walk lands in the middle of its vertex data and sees nonsense, and
+        // every tree on the map is a bare trunk. Reported from a window as "trees are there but
+        // with no leaves". `haus4.mesh`, `a1da0UID-tunapicker.mesh` and the Mazda's body lose a
+        // submesh the same way.
+        //
+        // So when the chunk the length lands on does not look like a chunk at all, the reader
+        // looks for the next submesh by its own shape instead. Only then: scanning the skipped
+        // span unconditionally finds signatures inside vertex data — tried, and it cost
+        // `policedepartment.mesh` nine of its ten submeshes — and a length that lands somewhere
+        // sensible is a length worth trusting.
+        if (c.at + CHUNK_HEADER_SIZE <= end) {
+            uint16_t ahead = 0;
+            std::memcpy(&ahead, c.data + c.at, sizeof(ahead));
+            uint32_t ahead_length = 0;
+            std::memcpy(&ahead_length, c.data + c.at + 2, sizeof(ahead_length));
+            // A chunk id below M_SUBMESH cannot appear at mesh level, so a small number here
+            // is vertex data rather than a header. Both halves matter: without the length test
+            // the walk trusts nonsense, and without the id test it distrusts chunks it should
+            // have followed and resynchronises into the middle of a buffer.
+            const bool plausible = ahead_length >= CHUNK_HEADER_SIZE &&
+                    c.at + static_cast<int64_t>(ahead_length) <= c.size &&
+                    ahead >= M_SUBMESH;
+            if (!plausible) {
+                // From just after this chunk's own header, not from where its length landed:
+                // the length overshoots, so what is being looked for is *behind* that position.
+                const int64_t found = next_submesh(c, chunk_start + 1, end);
+                if (found > chunk_start) { c.at = found; }
+            }
+        }
     }
     return true;
 }
