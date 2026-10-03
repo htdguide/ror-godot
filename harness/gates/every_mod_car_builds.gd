@@ -33,12 +33,11 @@ extends GateBase
 ## calling zero a failure flagged a vehicle that is fine. What is counted is the geometry that
 ## actually ends up in the scene.
 ##
-## A vehicle need not draw anything at all, either. NhelensGrass's bridge, crane and monorail
-## and the Daf pack's semi trailer carry no flexbodies and no props: their only geometry is in
-## `submesh` sections, which this project reads for collision and never renders — the hero
-## truck's carry zero texcoords. Those vehicles correctly draw nothing today, so they are counted
-## and reported rather than failed. Rendering submesh bodies is unimplemented, not broken, and a
-## gate that conflates the two would be demanding a feature by pretending it is a bug.
+## A vehicle need not draw anything at all, either. The hero truck and the Mazda declare `cab`
+## triangles and no `texcoords`, so their cabs are collision and nothing else — there is nothing
+## to draw such a panel with, and upstream does not draw one either. A vehicle whose only
+## geometry is a cab like that correctly draws nothing, so it is counted and reported rather than
+## failed.
 ##
 ## And a mod may name a mesh that is nowhere a mod may name it from. Starling Island's vehicles
 ## ask for `seat.mesh`, `dashboard-small.mesh` and `lightbar.mesh`, which are Rigs of Rods base
@@ -105,15 +104,16 @@ func run(_harness: Node) -> Dictionary:
         # crane and a monorail, and the Daf pack a semi trailer, none of which reference a single
         # mesh: they are node and beam structures, and demanding that they draw something flagged
         # four vehicles that are doing exactly what their files say.
-        # Drawn geometry is expected from flexbodies and props, which this project renders.
-        # `submesh` sections are **not** counted: they are read for collision only and never
-        # drawn — the hero truck's carry zero texcoords — so NhelensGrass's bridge, crane and
-        # monorail and the Daf semi trailer, whose only geometry is submesh, correctly draw
-        # nothing today. Rendering submesh bodies is unimplemented rather than broken, and this
-        # gate says so by counting them separately instead of failing on them.
+        # Drawn geometry is expected from flexbodies, props and `submesh` body panels, all of
+        # which this project renders. A cab that declares no texture coordinates is still not
+        # drawn, and a vehicle whose only geometry is one of those is counted separately rather
+        # than failed.
         if _has_installed_mesh(truck, entry["directory"] as String) and drawn < MIN_PARTS:
             problems.append("%s: names geometry and resolved to none of it" % name)
-        elif truck.flexbodies.is_empty() and truck.props.is_empty() and truck.submesh_count > 0:
+        elif (
+            truck.flexbodies.is_empty() and truck.props.is_empty()
+            and truck.submesh_count > 0 and drawn == 0
+        ):
             submesh_only += 1
         # Every wheel the file declares has to be built. This is the check that catches a wheel
         # section nobody parsed: the vehicle looks almost right and simply has no wheels.
@@ -149,7 +149,7 @@ func run(_harness: Node) -> Dictionary:
         % [entries.size(), parts, wheels, textures,
            ("" if absent == 0 else "; %d meshes named but not installed" % absent)
            + ("" if submesh_only == 0 else
-              "; %d drawn only from submesh sections, which are collision-only here"
+              "; %d whose only geometry is a cab with no texture coordinates"
               % submesh_only)],
         entries.size()
     )

@@ -63,6 +63,15 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         parts.append(part)
         built += 1
 
+    # The body panels a vehicle draws from its own nodes. Most of this library declares them and
+    # none of it drew them: for four vehicles they are the whole of the geometry, and for ten
+    # more they are bodywork missing from something that otherwise looked built.
+    var cab_parts: Array[SkinnedFlexbody] = CabBody.build(
+        root, truck, render_frame, mod_dir, dds_reader, textures, scripts
+    )
+    parts.append_array(cab_parts)
+    built += cab_parts.size()
+
     var prop_nodes: Array[Node3D] = []
     for entry: Dictionary in truck.props:
         var node: Node3D = _build_prop(
@@ -109,6 +118,7 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         # tell the rig's own motion apart from where a caller has placed the vehicle.
         "frame_origin": render_frame.origin,
         "parts": parts,
+        "cab_parts": cab_parts.size(),
         "wheel_nodes": wheel_nodes,
         "prop_nodes": prop_nodes,
         "lamps": lamps,

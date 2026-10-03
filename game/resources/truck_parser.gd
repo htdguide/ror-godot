@@ -43,9 +43,10 @@ var beam_strength: PackedFloat32Array:
     get: return beam_table.strength
 var beam_plastic: PackedFloat32Array:
     get: return beam_table.plastic
-var cab_triangles: PackedInt32Array = PackedInt32Array()
-var texcoord_nodes: PackedInt32Array = PackedInt32Array()
-var texcoords: PackedVector2Array = PackedVector2Array()
+## The body panels, kept per `submesh` group so each can be drawn with its own coordinates.
+var submeshes: SubmeshRows = SubmeshRows.new()
+## The material the `globals` line names, which is what a submesh panel is drawn with.
+var cab_material: String = ""
 var submesh_count: int = 0
 ## One entry per flexbody: {ref, nx, ny, offset: Vector3, rot_deg: Vector3, mesh: String,
 ## forset: PackedInt32Array}. A flexbody binds an external OGRE mesh to a subset of the
@@ -180,6 +181,9 @@ func _begin_section(line: String) -> bool:
     _section = line.to_lower()
     if _section == "submesh":
         submesh_count += 1
+        submeshes.begin()
+    elif _section == "backmesh":
+        submeshes.backmesh()
     return true
 
 
@@ -205,15 +209,24 @@ func _parse_row(line: String) -> void:
         "beams":
             _parse_beam(line)
         "texcoords":
-            _parse_texcoord(line)
+            _note("texcoord", submeshes.read_texcoord(
+                TruckLexer.fields(line), _node_id_to_index
+            ), line)
         "cab":
-            _parse_cab(line)
+            _note("cab", submeshes.read_cab(
+                TruckLexer.fields(line), _node_id_to_index
+            ), line)
         "flexbodies":
-            _parse_flexbody(line)
+            BodyRows.flexbody(line, _node_id_to_index, flexbodies, errors)
         "props":
-            _parse_prop(line)
+            BodyRows.prop(line, _node_id_to_index, props, errors)
+        # `globals` is dry mass, cargo mass and the material the body panels are drawn with.
+        "globals":
+            var fields: PackedStringArray = TruckLexer.fields(line)
+            if fields.size() > 2:
+                cab_material = fields[2]
         "managedmaterials":
-            _parse_managed_material(line)
+            BodyRows.managed_material(line, managed_materials, errors)
         # `flexbodywheels` carries the same row as `meshwheels2` — radius, rim radius, width,
         # rays, two nodes, a reference node, braked, propulsed, an arm node, mass, the tyre and
         # rim rates, a side and two mesh names — and differs in that its tyre deforms with the
@@ -234,7 +247,7 @@ func _parse_row(line: String) -> void:
         "axles", "interaxles":
             has_axles = true
         "flares", "flares2":
-            _parse_flare(line)
+            BodyRows.flare(line, _node_id_to_index, flares, errors)
         _:
             if DriveRows.handles(_section):
                 var error: String = DriveRows.read(_section, TruckLexer.fields(line), drivetrain)
@@ -276,15 +289,6 @@ func _parse_beam(line: String) -> void:
     beam_table.record(row)
 
 
-func _parse_texcoord(line: String) -> void:
-    var row: Dictionary = CabRows.texcoord(TruckLexer.fields(line), _node_id_to_index)
-    if (row["error"] as String) != "":
-        errors.append("texcoord %s: %s" % [row["error"], line])
-        return
-    texcoord_nodes.append(row["node"] as int)
-    texcoords.append(row["uv"] as Vector2)
-
-
 func _parse_minimass(line: String) -> void:
     var fields: PackedStringArray = TruckLexer.fields(line)
     if fields.size() >= 1:
@@ -312,46 +316,6 @@ func _parse_mesh_wheel(line: String, flexbody: bool) -> void:
     row["rim_spring"] = beam_defaults.spring()
     row["rim_damp"] = beam_defaults.damp()
     wheels.append(row)
-
-
-func _parse_managed_material(line: String) -> void:
-    var row: Dictionary = MaterialRows.row(TruckLexer.fields(line))
-    if (row["error"] as String) != "":
-        errors.append("managedmaterial %s: %s" % [row["error"], line])
-        return
-    managed_materials[row["name"] as String] = {
-        "effect": row["effect"], "textures": row["textures"]
-    }
-
-
-## Rows are "ref,x,y, offsetx,offsety,offsetz, rotx,roty,rotz, mesh", each optionally
-## followed by "forset <ranges>" lines naming the nodes the mesh may bind to.
-func _parse_flexbody(line: String) -> void:
-    if line.begins_with("forset"):
-        if flexbodies.is_empty():
-            errors.append("forset before any flexbody: %s" % line)
-            return
-        var last: Dictionary = flexbodies[flexbodies.size() - 1]
-        last["forset"] = NodeIdRanges.resolve(
-            line.substr("forset".length()), _node_id_to_index
-        )
-        return
-    var row: Dictionary = PlacementRows.head(TruckLexer.fields(line), _node_id_to_index)
-    if (row["error"] as String) != "":
-        errors.append("flexbody %s: %s" % [row["error"], line])
-        return
-    row.erase("error")
-    row["forset"] = PackedInt32Array()
-    flexbodies.append(row)
-
-
-func _parse_prop(line: String) -> void:
-    var row: Dictionary = PlacementRows.prop(TruckLexer.fields(line), _node_id_to_index)
-    if (row["error"] as String) != "":
-        errors.append("prop %s: %s" % [row["error"], line])
-        return
-    row.erase("error")
-    props.append(row)
 
 
 ## Sections that declare a beam without being called `beams`.
@@ -382,18 +346,7 @@ func _joint_length(fields: PackedStringArray) -> float:
     return nodes[a].distance_to(nodes[b])
 
 
-func _parse_flare(line: String) -> void:
-    var row: Dictionary = FlareRows.row(TruckLexer.fields(line), _node_id_to_index)
-    if (row["error"] as String) != "":
-        errors.append("flare %s: %s" % [row["error"], line])
-        return
-    row.erase("error")
-    flares.append(row)
-
-
-func _parse_cab(line: String) -> void:
-    var row: Dictionary = CabRows.triangle(TruckLexer.fields(line), _node_id_to_index)
-    if (row["error"] as String) != "":
-        errors.append("cab %s: %s" % [row["error"], line])
-        return
-    cab_triangles.append_array(row["nodes"] as PackedInt32Array)
+## Records a row reader's error against the line it came from, or does nothing.
+func _note(section: String, error: String, line: String) -> void:
+    if error != "":
+        errors.append("%s %s: %s" % [section, error, line])

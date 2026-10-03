@@ -59,7 +59,7 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
 
     # Which nodes a collision triangle is built on: upstream will not break the last beams
     # holding one, because a hole in the cab is worse than a beam that should have snapped.
-    for node: int in truck.cab_triangles:
+    for node: int in truck.submeshes.cab_triangles:
         solver.set_node_cab(node, true)
 
     _add_bounds(solver, truck)

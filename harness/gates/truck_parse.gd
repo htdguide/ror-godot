@@ -71,7 +71,7 @@ func run(_harness: Node) -> Dictionary:
         )
         % [
             truck.name, truck.nodes.size(), truck.beams.size() / 2,
-            truck.cab_triangles.size() / 3, truck.submesh_count,
+            truck.submeshes.cab_triangles.size() / 3, truck.submesh_count,
             box.size.x, box.size.y, box.size.z, covered * 100.0
         ],
         truck.nodes.size()

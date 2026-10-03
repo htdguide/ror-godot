@@ -336,3 +336,24 @@ See `hard-won-facts.md` for the solver, the terrain, the formats and the gate di
   weight through what the layers above it left, so with four layers one layer's share can move
   faster than any single channel did. The smoothness that matters is the source's, and everything
   downstream inherits it.
+- **A `submesh` is a body panel, and 18 of the 18 vehicles here declare one.** It is geometry with
+  no mesh file behind it: its vertices *are* nodes, its triangles are `cab` lines over them, its
+  texture coordinates come from `texcoords` lines, and it is drawn with the material the `globals`
+  line names. Upstream builds a `FlexObj` per group. This project read the triangles for collision
+  and drew none of it — for four vehicles that was the whole of their geometry (NhelensGrass's
+  bridge and monorail, the Daf pack's two semi trailers) and for ten more it was bodywork missing
+  from something that otherwise looked built. 405 drawn parts across the library became 573.
+- **It deforms, so it is skinned like a flexbody.** A panel's vertices are the truck, so each one
+  binds to the locator triad around the node it sits on — and because a vertex *is* a node, the
+  binding is exact rather than nearest-fit. That is also the check worth having:
+  `a_body_panel_is_made_of_its_own_nodes` requires every vertex to be within 1e-6 m of a node,
+  which is float slack and not a tolerance. A panel built from the wrong nodes would look
+  plausible.
+- **`backmesh` means the panel is drawn from both sides.** A truck is looked at from inside its
+  own load bed as well as from outside, and drawn one-sided the Daf trailers' walls vanish from
+  within. The reversed copy is a second surface on the same mesh, so it costs one draw call and
+  deforms with the first.
+- **A cab with no texture coordinates is not a panel anybody meant to see.** The hero truck
+  declares 242 cab triangles and the Mazda 187, both with zero `texcoords`: collision only, and
+  upstream draws nothing for them either. Half a panel is worse than none, so a group with a
+  triangle over a node that has no coordinates is dropped whole.
