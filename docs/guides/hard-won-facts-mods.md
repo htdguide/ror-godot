@@ -357,3 +357,22 @@ See `hard-won-facts.md` for the solver, the terrain, the formats and the gate di
   declares 242 cab triangles and the Mazda 187, both with zero `texcoords`: collision only, and
   upstream draws nothing for them either. Half a panel is worse than none, so a group with a
   triangle over a node that has no coordinates is dropped whole.
+- **A `begin_procedural_roads` block is a line of cross-sections, not a list of objects.** Each
+  line is ten fields — `ProcessProceduralLine`: position, rotation, carriageway width, border
+  width, border height, and a kind (`flat`, `left`, `right`, `both`, `bridge`, `monorail`) — and
+  upstream sweeps the section along the line into one mesh drawn with the single material `road2`,
+  whose texture is an atlas with a band for each part of the section. Eight points make the
+  section; the road runs along the point's local x and the section spans its local z. Port
+  Starling describes 374 of its 1502 object lines that way, which is most of its road network,
+  and all of it was missing. 351 points in 50 blocks build 3976 triangles there.
+- **A shoulder's foot is pinned to the ground, not to the road.** `baseOf` puts it on the
+  heightmap, or just under the road where the road already sits below ground, so a road laid over
+  a dip closes itself against the terrain instead of floating over it.
+- **The first sweep came out face-down on all 1638 of its horizontal faces.** Ogre's quad winding
+  is the reverse of what Godot draws front-facing, the same way a mesh file's is. A carriageway
+  wound the other way is invisible from the only place anybody looks at it from, and nothing
+  errors. `a_road_of_points_is_swept_into_a_road` checks the sign of every near-horizontal face
+  for that reason, and checks every vertex against the half-width its own points state, which is
+  the bound that catches a sweep landing somewhere else: shifting the section 40 m sideways
+  reports "a vertex sits 40.2 m from the line its points describe, over the 9.0 m their own
+  widths allow".

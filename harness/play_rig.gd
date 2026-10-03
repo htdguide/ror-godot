@@ -19,8 +19,7 @@ var _hud: Label
 ## What is loaded now, so the menu can mark it and a map change knows what to rebuild.
 var _map_name: String = ""
 var _vehicle_name: String = ""
-var _weather_names: Array[String] = []
-var _weather_index: int = 0
+var _weather: PlayWeather
 var _looking: bool = false
 var _yaw: float = 0.0
 var _pitch: float = 0.0
@@ -45,9 +44,7 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
     _world = world
     _yaw = camera.rotation.y
     _pitch = camera.rotation.x
-    for key: String in WeatherCfg.PRESETS.keys():
-        _weather_names.append(key)
-    _weather_index = maxi(0, _weather_names.find(weather))
+    _weather = PlayWeather.new(weather)
     _map_name = Harness.args.get_string("terrain-dir", DEFAULT_MAP)
     _hud = PlayHud.build(self)
     if not vehicle.is_empty():
@@ -107,6 +104,9 @@ func _populate_terrain() -> void:
     if ground != null:
         ground.visible = false
     _world.add_child(RorObjects.build(loaded))
+    # The roads the terrain draws from a line of points rather than from placed objects. Port
+    # Starling describes most of its network that way.
+    _world.add_child(RorProceduralRoad.build(loaded))
     _grow_vegetation(loaded)
     if _drive == null:
         return
@@ -169,7 +169,7 @@ func _process(delta: float) -> void:
     _frames += 1
     if _hud.visible and _frames % HUD_REFRESH_FRAMES == 0:
         _hud.text = PlayHud.text(
-            get_viewport(), _weather_names[_weather_index], PlayHud.footer(_drive)
+            get_viewport(), _weather.current(), PlayHud.footer(_drive)
         )
 
 
@@ -210,7 +210,7 @@ func _on_key(keycode: Key) -> void:
         KEY_F1:
             _hud.visible = not _hud.visible
         KEY_F2:
-            _cycle_weather()
+            _weather.cycle(_world)
         KEY_F3:
             var sun: DirectionalLight3D = _world.get_node_or_null(^"Sun") as DirectionalLight3D
             if sun != null:
@@ -241,29 +241,6 @@ func _set_looking(looking: bool) -> void:
     Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if looking else Input.MOUSE_MODE_VISIBLE
 
 
-func _cycle_weather() -> void:
-    _weather_index = (_weather_index + 1) % _weather_names.size()
-    _apply_weather(_weather_names[_weather_index])
-
-
-## Puts one weather preset on the live scene. Shared by F2 and by the environment panel, so the
-## two cannot drift into applying a preset differently.
-func _apply_weather(name: String) -> void:
-    # Everything the preset says, through the same function that builds a world from one.
-    #
-    # This used to aim the sun, set its energy trim and colour, and change two environment
-    # fields. It never set `light_intensity_lux`, which is what actually decides a light's
-    # brightness under physical units, so the sun barely changed; it never touched the fill, so a
-    # 12 000 lux cool light kept burning through a night preset; and it never rebuilt the sky, so
-    # the atmosphere stayed as built. `a_weather_switch_is_a_weather` holds the two paths together.
-    BlockoutWorld.apply_weather(_world, WeatherCfg.get_preset(name), RenderCfg.CLOUDS_ENABLED)
-    # And the index follows the name, whichever way the weather was chosen. Picking one in the
-    # settings panel used to leave this behind, so the HUD kept naming the weather before last —
-    # reported from the window as a night scene labelled `noon_clear`.
-    _weather_index = maxi(0, _weather_names.find(name))
-    print("PLAY  weather %s" % name)
-
-
 func _screenshot() -> void:
     # Named by the clock, not by a counter that restarts with the session.
     #
@@ -284,7 +261,7 @@ func _screenshot() -> void:
         "terrain": _loaded,
         "map": _map_name,
         "vehicle": _vehicle_name,
-        "weather": _weather_names[_weather_index],
+        "weather": _weather.current(),
         "mode": PlayCamera.Mode.keys()[_view.mode],
         "drive": _drive,
     })
@@ -309,7 +286,7 @@ func _build_menu(weather: String) -> PlayMenu:
         _drive,
         _camera,
         weather,
-        func(name: String) -> void: _apply_weather(name),
+        func(name: String) -> void: _weather.apply(_world, name),
         func() -> void: get_tree().quit(0),
         func(name: String) -> void: _change_map(name),
         func(name: String) -> void: _change_vehicle(name)
@@ -379,7 +356,11 @@ func _change_map(name: String) -> void:
         return
     _map_name = name
     for child: Node in _world.get_children():
-        if child.name.begins_with("RorObjects") or child == _terrain:
+        if (
+            child.name.begins_with("RorObjects")
+            or child.name.begins_with("RorProceduralRoads")
+            or child == _terrain
+        ):
             _world.remove_child(child)
             child.queue_free()
     if _vegetation != null:
