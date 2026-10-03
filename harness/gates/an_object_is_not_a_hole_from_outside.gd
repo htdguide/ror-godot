@@ -56,7 +56,10 @@ const CONVERGE: int = 2
 ## Not zero. A surface seen exactly edge-on shows a sliver of its own back through the depth
 ## buffer, and a building's own window reveals, door recesses and parapet returns are correctly
 ## back-facing from outside — they are the inside of a hole the author put there.
-const MAX_MARKED_SHARE: float = 0.15
+## Halved when the marker became magenta bars rather than a solid colour: the bars cover half of
+## a back-facing surface, so a fully turned-away view now reads 50% where it read 100%, and a
+## bound left where it was would have quietly stopped catching things.
+const MAX_MARKED_SHARE: float = 0.075
 ## Below this share of the frame a view has too little of the object in it to carry a verdict.
 ##
 ## **A sliver is all marker and means nothing.** Every road sign on Port Starling was reported as

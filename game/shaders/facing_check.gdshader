@@ -17,6 +17,8 @@ uniform vec4 albedo_colour : source_color = vec4(1.0);
 // How saturated the marker is. The detector asks for a channel spread no natural surface in a
 // terrain reaches, so this is not a matter of taste.
 uniform float marker_strength : hint_range(0.0, 1.0) = 1.0;
+// How wide the magenta bars are, in screen pixels.
+const int BAR_PX = 8;
 
 void fragment() {
     if (FRONT_FACING) {
@@ -36,6 +38,13 @@ void fragment() {
             (axis.y >= strongest && axis.x < strongest) ? 1.0 : 0.0,
             (axis.z >= strongest && axis.x < strongest && axis.y < strongest) ? 1.0 : 0.0
         );
-        ALBEDO = mix(vec3(1.0, 0.0, 1.0), marker, marker_strength);
+        // **Barred with magenta, because a primary colour is something content has.** A road
+        // sign is red, grass is green, and a detector keyed on "a bright saturated channel"
+        // counted a correctly drawn warning sign as 34% back-facing. Nothing in a terrain's
+        // palette is magenta, so the bars are what the measurement counts and the axis colour
+        // between them is what a person reads. In screen space, so the bars stay the same width
+        // however far away the surface is and however it is foreshortened.
+        float bar = step(0.5, fract((FRAGCOORD.x + FRAGCOORD.y) / float(BAR_PX) * 0.5));
+        ALBEDO = mix(marker, vec3(1.0, 0.0, 1.0), bar * marker_strength);
     }
 }

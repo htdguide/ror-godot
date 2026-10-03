@@ -17,10 +17,15 @@ extends RefCounted
 ## throws the mesh away afterwards.
 
 const SHADER: String = "res://game/shaders/facing_check.gdshader"
-## How saturated a pixel has to be to be a marker rather than scenery. A terrain's own colours —
-## brick, grass, asphalt, a pale sky — sit well inside this; the markers are primaries.
-const MARKER_SPREAD: float = 0.5
-const MARKER_BRIGHTNESS: float = 0.5
+## What a marker pixel is: magenta, which nothing in a terrain's palette is.
+##
+## **A primary colour is something content has.** The detector used to ask for a bright,
+## saturated channel, and a road sign is red: a correctly drawn warning sign counted as 34%
+## back-facing, and every sign on Port Starling was reported as a hole. The shader bars the
+## marker with magenta for this reason — the axis colour between the bars is what a person
+## reads, and the bars are what gets counted.
+const MARKER_MIN: float = 0.6
+const MARKER_MAX_GREEN: float = 0.35
 ## How much a pixel may move, summed over the channels, between two captures of the same frame and
 ## still be the same surface rather than the background behind it.
 const CHANGED: float = 0.02
@@ -151,6 +156,4 @@ static func drawn_and_marked(on_dark: String, on_light: String) -> Dictionary:
 
 ## Whether one pixel is a marker rather than scenery.
 static func is_marker(pixel: Color) -> bool:
-    var high: float = maxf(pixel.r, maxf(pixel.g, pixel.b))
-    var low: float = minf(pixel.r, minf(pixel.g, pixel.b))
-    return high > MARKER_BRIGHTNESS and high - low > MARKER_SPREAD
+    return pixel.r > MARKER_MIN and pixel.b > MARKER_MIN and pixel.g < MARKER_MAX_GREEN
