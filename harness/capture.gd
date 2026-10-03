@@ -109,6 +109,22 @@ static func write_manifest(path: String, extra: Dictionary) -> String:
 ## channel is not the value read back. And a lit background puts bright pixels all over
 ## the frame, which a threshold test counts as though they were geometry — the sky alone
 ## produced nearly two hundred thousand false positives before this existed.
+## Paints the background one flat colour, leaving everything else alone.
+##
+## **Two captures of the same frame against two backgrounds separate a subject from its stage
+## exactly.** A pixel the subject drew is the same in both; a pixel of background is not. The
+## alternative — capturing the stage without the subject and taking the difference — fails
+## silently whenever the subject happens to match the stage: `sidewalk.mesh` is mid-grey concrete
+## drawn unshaded against a mid-grey sky, and its whole top face cancelled, leaving a measurement
+## taken over its edges alone.
+static func use_background(world: Node3D, colour: Color) -> void:
+    var holder: WorldEnvironment = world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
+    if holder == null or holder.environment == null:
+        return
+    holder.environment.background_mode = Environment.BG_COLOR
+    holder.environment.background_color = colour
+
+
 static func use_measurement_environment(world: Node3D) -> void:
     var holder: WorldEnvironment = world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
     if holder == null or holder.environment == null:

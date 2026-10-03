@@ -8,6 +8,10 @@
 #   tools/play.sh --truck --map <name>   the same vehicle on another Rigs of Rods terrain
 #                                        (tools/import_terrain.sh --list says what there is)
 #   tools/play.sh --truck --no-terrain   the same vehicle on a bare flat plane
+#   tools/play.sh --truck --facing       scenery dressed in the object gates' facing paint: a
+#                                        face keeps its texture from the front and draws its axis
+#                                        in a primary colour from behind, so a wall turned the
+#                                        wrong way is bright instead of absent
 #
 # The window is tracked while it lives and the tracking file is removed on exit, so a
 # session can never be forgotten: tools/windows.sh list always tells the truth.

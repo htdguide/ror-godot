@@ -291,9 +291,14 @@ static func mesh_of(terrain: RorTerrain, file: String, state: Dictionary) -> Arr
         cache[file] = null
         return null
     var mesh: ArrayMesh = ArrayMesh.new()
-    var turn: bool = ObjectWinding.is_inside_out(read["submeshes"] as Array)
+    # Which triangles, if any, this file draws back to front. A plan rather than a per-mesh
+    # verdict: `haus4.mesh` has its roof right and its gable ends wrong, and turning the mesh
+    # turns the roof with it.
+    var turn: Array[PackedInt32Array] = ObjectWinding.plan(read["submeshes"] as Array)
+    var at: int = -1
     for submesh: Dictionary in read["submeshes"] as Array:
-        var arrays: Array = ObjectWinding.arrays(submesh, turn)
+        at += 1
+        var arrays: Array = ObjectWinding.arrays(submesh, turn[at])
         if arrays.is_empty():
             continue
         mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)

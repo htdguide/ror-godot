@@ -96,9 +96,10 @@ func run(harness: Node) -> Dictionary:
     if error != "":
         return fail(error)
 
-    # No shadows while measuring. The object casts one on the stage's floor, and a shadow is a
-    # difference between the two captures without being the object: a roof invisible from above
-    # still moved 0.5% of the frame through its shadow alone, which read as "the object is there".
+    # No floor, no sky, no ambient, no shadow. The stage's checkerboard ground sits at y = 0 and
+    # so does a ground-hugging object, and the two fight for the depth buffer; a shadow on it is a
+    # difference between captures without being the object.
+    harness.use_measurement_environment()
     var sun: DirectionalLight3D = harness.world.get_node_or_null(^"Sun") as DirectionalLight3D
     if sun != null:
         sun.shadow_enabled = false
@@ -223,15 +224,16 @@ func _photograph(
         var stem: String = "objectset/%s/%s" % [
             mesh_file.get_basename(), label.to_lower().replace(" ", "")
         ]
-        # The same frame without the group, so what is measured is the geometry and not the
-        # stage. A first version counted every pixel that was not background and the stage's own
-        # checkerboard floor passed every view on its own: the gate could not fail.
-        node.visible = false
-        var bare: Dictionary = await harness.capture_shot(stem + "-bare", "static", CONVERGE)
-        node.visible = true
-        if (bare["error"] as String) != "":
-            out["error"] = "%s %s: %s" % [mesh_file, label, bare["error"]]
+        # The same frame twice, against two backgrounds. What the group drew is identical in
+        # both; the background is not. Differencing against an empty stage instead loses every
+        # part of a subject that happens to match it, and a mid-grey slab drawn unshaded against
+        # a mid-grey sky cancels completely.
+        HarnessCapture.use_background(harness.world, Color.BLACK)
+        var dark: Dictionary = await harness.capture_shot(stem + "-dark", "static", CONVERGE)
+        if (dark["error"] as String) != "":
+            out["error"] = "%s %s: %s" % [mesh_file, label, dark["error"]]
             return out
+        HarnessCapture.use_background(harness.world, Color.WHITE)
         var shot: Dictionary = await harness.capture_shot(stem, "static", CONVERGE)
         if (shot["error"] as String) != "":
             out["error"] = "%s %s: %s" % [mesh_file, label, shot["error"]]
@@ -241,7 +243,7 @@ func _photograph(
         node.queue_free()
 
         var measured: Dictionary = FacingPaint.drawn_and_marked(
-            shot["png"] as String, bare["png"] as String
+            dark["png"] as String, shot["png"] as String
         )
         var drawn: int = measured["drawn"] as int
         var marked: int = measured["marked"] as int

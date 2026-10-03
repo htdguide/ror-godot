@@ -110,6 +110,13 @@ func _populate_terrain() -> void:
     # The forests the terrain paints with a density map. Russia asks for two fir species.
     _world.add_child(RorTrees.build(loaded))
     _grow_vegetation(loaded)
+    # `--facing` dresses the scenery in the same paint the object gates photograph with: a face
+    # keeps its texture from the front and draws its axis in a primary colour from behind. A wall
+    # turned the wrong way is otherwise empty sky, which looks exactly like correct empty sky, so
+    # there is nothing to point at in a screenshot without this.
+    if Harness.args.has_flag("facing"):
+        var dressed: int = FacingPaint.dress(_world)
+        print("PLAY  facing paint on %d meshes: any bright primary is the back of a face" % dressed)
     if _drive == null:
         return
     # Where a vehicle starts, and under what gravity, before the terrain is handed over: taking
