@@ -7,9 +7,12 @@ extends GateBase
 ## the materials name textures. A break anywhere in that chain looks the same from a distance —
 ## an empty desert — which is why this counts the chain rather than photographing it.
 ##
-## What the terrain asks for and this project does not draw yet is reported rather than ignored:
-## vegetation layers and the collision boxes object definitions carry. A gate that quietly drops
-## half a terrain is worse than no gate.
+## What a terrain asks for beyond its objects is reported rather than ignored, and what is
+## reported has to stay true: vegetation is grown by `RorVegetation`, collision boxes are built by
+## `RorObjectCollision` and road points are swept by `RorProceduralRoad`, so those are counted as
+## built elsewhere. Only actor spawns and unreadable lines are still unread. This line said
+## "not drawn yet: 2 vegetation layers" for as long as vegetation had been growing, which is the
+## kind of stale claim a gate exists to prevent rather than to make.
 
 const TERRAIN_DIR: String = "assets/terrains/lapaz2"
 ## How far outside its own map an object may stand. Horizon cards and ground skirts sit at the
@@ -140,11 +143,12 @@ func run(_harness: Node) -> Dictionary:
             textured
         )
     return ok(
-        "%d of %d objects built, %d textured, %d triangles; not drawn yet: %d vegetation layers,"
+        "%d of %d objects built, %d textured, %d triangles; %d vegetation layers grown by"
         % [built, placements.size(), textured, triangles, sorted["grass"] as int]
-        + " %d collision boxes, %d road points, %d actor spawns, %d unread lines"
-        % [sorted["collision_boxes"] as int, sorted["road_points"] as int,
-           sorted["actor_spawns"] as int, sorted["unread_lines"] as int],
+        + " RorVegetation, %d collision boxes and %d road points built elsewhere; not read:"
+        % [sorted["collision_boxes"] as int, sorted["road_points"] as int]
+        + " %d actor spawns, %d other lines"
+        % [sorted["actor_spawns"] as int, sorted["unread_lines"] as int],
         built
     )
 

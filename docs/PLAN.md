@@ -877,9 +877,35 @@ So this is two jobs that happen to share a name, and the second is the one that 
 - **Depth precision.** At kilometre ranges a 24-bit depth buffer z-fights. Reversed-Z, a log depth
   buffer, or a separate far pass. Only needed once something is actually drawn out there.
 
-**Order proposed.** The authored `beginlodmesh` chains are done. Instancing by definition and
-per-object visibility ranges for everything else next, because they pay for themselves on a map
-that is already over budget. Then the fog curve and Terrain3D's LOD extent, which is what the
+**Two of those were measured on 2026-10-03 and one of them is not worth doing.**
+
+- **Per-object visibility ranges buy nothing at the only threshold that can be chosen without a
+  person looking.** An object is worth hiding once it covers less than a pixel, and that distance
+  is derived rather than guessed: `size x height / (2 tan(fov/2))`. At a generous 2160-line
+  reference, **1776 of 1781 placements across Port Starling, La Paz and NhelensGrass stay over a
+  pixel all the way to the 6 km far plane**; the five that do not are between 2 and 6 km. Anything
+  that would actually pay — eight pixels, thirty-two — is a judgement about what may vanish, and
+  that needs somebody at the window. Not built.
+- **Instancing by definition is a real trade and wants a frame time to settle it.** Objects are
+  batched per mesh per 256 m tile today, and at the pose of one of the session's own screenshots
+  Port Starling comes to 310 batches of which 165 have something in frustum — and **163 of those
+  310 hold exactly one instance**, where tiling cannot help culling and only adds a draw call.
+  Tiling only the meshes placed more than N times across the map:
+
+  | N | batches | drawn | instances submitted |
+  |---|---|---|---|
+  | 0 (today) | 310 | 165 | 641 |
+  | 4 | 278 | 154 | 659 |
+  | 8 | 235 | 142 | 704 |
+  | 16 | 183 | 119 | 756 |
+  | 32 | 162 | 108 | 772 |
+
+  Draw calls fall 28% at N=16 and instances submitted rise 18%. Which of those is the scarcer
+  resource on this machine is a frame-time question and nothing here answers it, so no value was
+  chosen. Measure it in a window first; the numbers above are the before.
+
+**Order proposed.** The authored `beginlodmesh` chains are done. Instancing by definition next,
+once a frame time has settled the table above. Then the fog curve and Terrain3D's LOD extent, which is what the
 request literally asks for. Then generated mesh LOD, then HLOD and occlusion if a map still
 cannot afford its own scenery.
 

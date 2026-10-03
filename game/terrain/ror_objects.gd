@@ -145,8 +145,10 @@ static func placements(terrain: RorTerrain) -> Array[Dictionary]:
     return out
 
 
-## What the terrain asks for and this does not draw yet, as a line for a gate or a session to
-## report: vegetation, procedural roads, actor spawns, and collision boxes on object definitions.
+## What a terrain asks for beyond the objects this builds, as a line for a gate or a session to
+## report. Not all of it is unbuilt any more: vegetation is grown by `RorVegetation`, collision
+## boxes by `RorObjectCollision` and road points by `RorProceduralRoad`. Only actor spawns and
+## lines nothing reads are still nothing at all.
 static func unbuilt(terrain: RorTerrain) -> Dictionary:
     var grass: int = 0
     var unread: int = 0
