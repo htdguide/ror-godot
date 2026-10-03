@@ -1,0 +1,455 @@
+{
+  "verdicts": {
+    "2af11UID-mc_tree02.mesh": {
+      "at": "2026-10-03 09:46:05Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "2af11UID-mc_tree03.mesh": {
+      "at": "2026-10-03 09:46:03Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "2af11UID-mc_tree04.mesh": {
+      "at": "2026-10-03 09:45:59Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "8d25UID-chapel.mesh": {
+      "at": "2026-10-03 09:49:49Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "8d25UID-smallhouse.mesh": {
+      "at": "2026-10-03 09:48:52Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "a1da0UID-lab.mesh": {
+      "at": "2026-10-03 09:50:01Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "a1da0UID-myobs.mesh": {
+      "at": "2026-10-03 09:52:52Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "a1da0UID-tunapicker.mesh": {
+      "at": "2026-10-03 09:49:52Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "allyentrance.mesh": {
+      "at": "2026-10-03 09:46:40Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "curvedroadninteydegsidewalk.mesh": {
+      "at": "2026-10-03 09:47:12Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "ferryslip.mesh": {
+      "at": "2026-10-03 09:51:54Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "firehouse.mesh": {
+      "at": "2026-10-03 09:52:32Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "hangar.mesh": {
+      "at": "2026-10-03 09:52:50Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "haus1.mesh": {
+      "at": "2026-10-03 09:47:05Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "haus2.mesh": {
+      "at": "2026-10-03 09:46:56Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "haus3.mesh": {
+      "at": "2026-10-03 09:46:23Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "haus4.mesh": {
+      "at": "2026-10-03 09:46:33Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "haus5.mesh": {
+      "at": "2026-10-03 09:48:43Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "haus6.mesh": {
+      "at": "2026-10-03 09:49:21Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "haus7.mesh": {
+      "at": "2026-10-03 09:48:34Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "haus8.mesh": {
+      "at": "2026-10-03 09:47:02Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "helipad.mesh": {
+      "at": "2026-10-03 09:49:37Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "hospital.mesh": {
+      "at": "2026-10-03 09:51:43Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "largedockasphalt.mesh": {
+      "at": "2026-10-03 09:49:05Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "largedockinnercorner.mesh": {
+      "at": "2026-10-03 09:52:02Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "largedockoutercorner.mesh": {
+      "at": "2026-10-03 09:49:57Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "largedockstraight.mesh": {
+      "at": "2026-10-03 09:48:30Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "load-spawner.mesh": {
+      "at": "2026-10-03 09:47:22Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "marina.mesh": {
+      "at": "2026-10-03 09:49:12Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "officeblock02.mesh": {
+      "at": "2026-10-03 09:52:14Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "open-truck-spawner.mesh": {
+      "at": "2026-10-03 09:50:03Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "parkinglotedge.mesh": {
+      "at": "2026-10-03 09:46:11Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "policedepartment.mesh": {
+      "at": "2026-10-03 09:52:12Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "rey_bs_shelter1.mesh": {
+      "at": "2026-10-03 09:46:47Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "rey_bs_shelter2.mesh": {
+      "at": "2026-10-03 09:48:21Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "rey_bs_sign_blue.mesh": {
+      "at": "2026-10-03 09:46:14Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "rey_bs_sign_nopost.mesh": {
+      "at": "2026-10-03 09:47:17Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "rey_fishplant_big.mesh": {
+      "at": "2026-10-03 09:52:35Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "rey_fishplant_small.mesh": {
+      "at": "2026-10-03 09:49:40Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "rey_gasstation.mesh": {
+      "at": "2026-10-03 09:52:04Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "rey_openshed.mesh": {
+      "at": "2026-10-03 09:46:37Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "rey_si_stairs.mesh": {
+      "at": "2026-10-03 09:52:22Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "rey_sign_amberbeach.mesh": {
+      "at": "2026-10-03 09:50:05Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "rey_sign_fishplant.mesh": {
+      "at": "2026-10-03 09:52:37Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "rey_sign_mine.mesh": {
+      "at": "2026-10-03 09:52:55Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "rey_sign_pswelcome.mesh": {
+      "at": "2026-10-03 09:49:34Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "rey_sign_siwelcome.mesh": {
+      "at": "2026-10-03 09:51:57Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "rey_sign_wells.mesh": {
+      "at": "2026-10-03 09:50:08Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "rey_speedbump.mesh": {
+      "at": "2026-10-03 09:48:08Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "rey_streetlamp.mesh": {
+      "at": "2026-10-03 09:45:30Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "rey_windturbine.mesh": {
+      "at": "2026-10-03 09:48:47Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "road-block5.mesh": {
+      "at": "2026-10-03 09:48:37Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "road-park.mesh": {
+      "at": "2026-10-03 09:45:17Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "road-slab.mesh": {
+      "at": "2026-10-03 09:44:59Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sidewalk.mesh": {
+      "at": "2026-10-03 09:45:13Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-bluearrow2downright.mesh": {
+      "at": "2026-10-03 09:52:41Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-descent10.mesh": {
+      "at": "2026-10-03 09:51:45Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "sign-fall.mesh": {
+      "at": "2026-10-03 09:51:47Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "sign-hospital.mesh": {
+      "at": "2026-10-03 09:52:16Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-maxspeed10.mesh": {
+      "at": "2026-10-03 09:49:15Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-maxspeed100.mesh": {
+      "at": "2026-10-03 09:49:29Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-maxspeed30.mesh": {
+      "at": "2026-10-03 09:48:11Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-maxspeed50.mesh": {
+      "at": "2026-10-03 09:48:22Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-maxspeed70.mesh": {
+      "at": "2026-10-03 09:47:23Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-noparking.mesh": {
+      "at": "2026-10-03 09:46:19Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-nostopping.mesh": {
+      "at": "2026-10-03 09:47:15Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-notrucks.mesh": {
+      "at": "2026-10-03 09:52:39Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-novehicles.mesh": {
+      "at": "2026-10-03 09:48:32Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-parking.mesh": {
+      "at": "2026-10-03 09:46:27Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-parkingzoneend.mesh": {
+      "at": "2026-10-03 09:49:38Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-parkingzonestart.mesh": {
+      "at": "2026-10-03 09:49:27Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-priorityintersection.mesh": {
+      "at": "2026-10-03 09:48:58Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "sign-roadnarrows.mesh": {
+      "at": "2026-10-03 09:49:31Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "sign-rocks.mesh": {
+      "at": "2026-10-03 09:51:49Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "sign-stop.mesh": {
+      "at": "2026-10-03 09:49:13Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "sign-warning.mesh": {
+      "at": "2026-10-03 09:47:26Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "store02.mesh": {
+      "at": "2026-10-03 09:52:29Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "store08.mesh": {
+      "at": "2026-10-03 09:46:59Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "store10.mesh": {
+      "at": "2026-10-03 09:45:56Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "straightroadbusstop.mesh": {
+      "at": "2026-10-03 09:48:56Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "straightroadsidewalk.mesh": {
+      "at": "2026-10-03 09:46:01Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "townhouse01blue.mesh": {
+      "at": "2026-10-03 09:46:16Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "townhouse01red.mesh": {
+      "at": "2026-10-03 09:46:25Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "townhouse01white.mesh": {
+      "at": "2026-10-03 09:46:08Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "townhouse01yeller.mesh": {
+      "at": "2026-10-03 09:49:02Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "trafficlightsequence1.mesh": {
+      "at": "2026-10-03 09:48:14Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "trafficlightsequence2.mesh": {
+      "at": "2026-10-03 09:49:00Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "troadstopsign.mesh": {
+      "at": "2026-10-03 09:52:19Z",
+      "note": "",
+      "verdict": "pass"
+    },
+    "truckshop.mesh": {
+      "at": "2026-10-03 09:49:24Z",
+      "note": "",
+      "verdict": "fail"
+    },
+    "warehouse01.mesh": {
+      "at": "2026-10-03 09:51:59Z",
+      "note": "",
+      "verdict": "fail"
+    }
+  },
+  "version": 1
+}

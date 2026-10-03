@@ -88,7 +88,7 @@ func begin(main: Node) -> void:
     # starts unfocused and the one case that wants focus asks for it here. A suite run used to
     # pull the keyboard away from whatever was being typed into, which is worse than it sounds:
     # the text goes to the game, and the game is listening for keys.
-    if args.has_flag("play"):
+    if args.has_flag("play") or args.has_flag("review"):
         # The flag has to be *cleared*, not just worked around.
         #
         # `no_focus` is a window flag the OS honours: while it is set the window cannot become
@@ -237,12 +237,7 @@ func _run_capture() -> void:
             _die(EXIT_USAGE, loaded)
             return
 
-    if args.has_flag("play"):
-        var rig: PlayRig = PlayRig.new()
-        rig.name = "PlayRig"
-        add_child(rig)
-        rig.setup(camera, world, weather, vehicle)
-        print("HARNESS_PLAY interactive mode; press Esc or close the window to exit")
+    if HumanSession.start(self, camera, world, weather, vehicle):
         return
     var out_dir: String = args.get_string("out", "adhoc")
     var converge: int = args.get_int("converge", HarnessCfg.CONVERGE_FRAMES)
