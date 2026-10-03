@@ -291,8 +291,9 @@ static func mesh_of(terrain: RorTerrain, file: String, state: Dictionary) -> Arr
         cache[file] = null
         return null
     var mesh: ArrayMesh = ArrayMesh.new()
+    var flip: bool = ObjectWinding.is_inside_out(read["submeshes"] as Array)
     for submesh: Dictionary in read["submeshes"] as Array:
-        var arrays: Array = _arrays(submesh)
+        var arrays: Array = ObjectWinding.arrays(submesh, flip)
         if arrays.is_empty():
             continue
         mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
@@ -305,38 +306,6 @@ static func mesh_of(terrain: RorTerrain, file: String, state: Dictionary) -> Arr
         return null
     cache[file] = mesh
     return mesh
-
-
-## One submesh's geometry, as Godot's array format wants it.
-static func _arrays(submesh: Dictionary) -> Array:
-    var positions: PackedVector3Array = submesh["positions"] as PackedVector3Array
-    var indices: PackedInt32Array = submesh["indices"] as PackedInt32Array
-    if positions.is_empty() or indices.is_empty():
-        return []
-    var arrays: Array = []
-    arrays.resize(Mesh.ARRAY_MAX)
-    arrays[Mesh.ARRAY_VERTEX] = positions
-    var normals: PackedVector3Array = submesh["normals"] as PackedVector3Array
-    if normals.size() == positions.size():
-        arrays[Mesh.ARRAY_NORMAL] = normals
-    var uvs: PackedVector2Array = submesh["uvs"] as PackedVector2Array
-    if uvs.size() == positions.size():
-        arrays[Mesh.ARRAY_TEX_UV] = uvs
-    # **Wound back the way the file has it.** `OgreMeshReader` reverses every triangle, for a
-    # vehicle: loaded in file order a truck is culled from outside and drawn from inside, and the
-    # reader's own note says something in the pose path mirrors the geometry and has never been
-    # isolated. A terrain object goes through no such path — `transform_of` is a rotation and a
-    # positive scale — so the same reversal turns a building inside out. Measured: after the
-    # reader, 0.0% of `store08.mesh`'s 160 triangles agree with the normals the file carries for
-    # them, and the same for `warehouse01` and `firehouse`. Reported from a window as walls
-    # visible from one side only.
-    var forward: PackedInt32Array = indices.duplicate()
-    for at: int in range(0, forward.size() - 2, 3):
-        var swap: int = forward[at + 1]
-        forward[at + 1] = forward[at + 2]
-        forward[at + 2] = swap
-    arrays[Mesh.ARRAY_INDEX] = forward
-    return arrays
 
 
 ## The material a submesh names, built from the terrain's own scripts.

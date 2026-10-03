@@ -206,3 +206,23 @@ Its companion is `hard-won-facts-mods.md`, which covers how a vehicle is read, b
   Russia's vegetation materials declared one apiece and this project found none of them, which is
   "the grass is still white textures". The same fault had already been found and fixed once that
   day in a gate's own row reader, and not in `OgreMaterial`.
+- **Winding is settled by geometry, not by normals, and the content is not consistent.**
+  Un-reversing every object mesh is right for 79 of Port Starling's 90 and wrong for four:
+  `store02`, `haus3`, `firehouse` and `haus4` are authored the other way round **and their own
+  vertex normals agree with it**, so a check against the normals passes them while from outside
+  they are a hole. Reported from a window as "the outside texture is facing inside, from outside
+  it looks transparent". The signed volume of a closed triangle soup — sum `a . (b x c) / 6` —
+  says which way it winds without reference to any normal, and that is the divergence theorem
+  rather than an opinion. 20 meshes across the library were inverted, Russia's `6a8cUID_hall`
+  worst at -0.29 of its own box.
+- **An inside-out mesh is inside out in both senses.** Turning its faces round without negating
+  its normals leaves it drawn from the right side and lit from the wrong one. Both go together.
+- **An open mesh encloses nothing in particular.** 54 of the library's object meshes — sidewalks,
+  road slabs, signs, helipads — land near zero and are left exactly as their files have them. That
+  is also why "do the faces point away from the object's centre" is not a facing test: it is
+  meaningless for a third of a terrain's objects, and a first attempt at this measurement flagged
+  every flat thing on the map.
+- **A gate can check the wrong authority and pass.** `an_object_is_wound_the_way_its_file_is` was
+  written against the normals the file carries, which is the right oracle for shading and the
+  wrong one for culling, and it passed every one of the 20 inverted meshes. The fault was still
+  reported from a window. Two gates now, one per authority.
