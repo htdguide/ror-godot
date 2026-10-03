@@ -108,10 +108,19 @@ A capture is only comparable if the run that produced it is reproducible.
 
 ## Visual history
 
-Artifacts are pruned, so `tools/gate.sh` copies every captured frame into `history/` under
-the run's date and short commit before pruning. Nothing there is ever deleted. It is not
-committed — thousands of full-resolution frames do not belong in a repository — but it is
-never thrown away either, so how the project looked at any point can be reviewed locally.
+Artifacts are pruned, so `tools/gate.sh` copies each run's captured frames into `history/`
+under the run's date and short commit before pruning. It is not committed — thousands of
+full-resolution frames do not belong in a repository — but it is kept locally, so how the
+project looked recently can be reviewed.
+
+**It is bounded at both ends, and it has to be.** This said "nothing there is ever deleted"
+and reached 1104 runs and 194 GB in a fortnight beside a 1.2 GB repository — not 1104
+distinct pictures of the project, but the same stills copied again and again, because
+`artifacts/` accumulates and every run archived all of it. Now a run archives only what it
+produced, captures nothing has touched in `ARTIFACT_KEEP_DAYS` (3) are dropped before the next
+archive can copy them, the newest `HISTORY_KEEP_RUNS` (25) runs are kept, and sweep output —
+`tools/mapcheck.sh` photographs every object a map places, 501 MB a run and reproducible from
+one command — is not archived at all. A smoke run archives 520 KB.
 
     tools/history.sh list                      what has been archived, newest first
     tools/history.sh shots vehicle/hero_3q.png every version of one capture, oldest first

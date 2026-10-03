@@ -33,6 +33,13 @@ FIXED_FPS="${FIXED_FPS:-60}"
 # Hard stop so a hung gate fails instead of blocking the suite.
 QUIT_AFTER="${QUIT_AFTER:-3600}"
 KEEP_RUNS="${KEEP_RUNS:-10}"
+# How much visual history to keep. It was unbounded by design and reached 1104 runs and 194 GB in
+# a fortnight, because every run copies every PNG still sitting in artifacts/ — the same stills
+# again and again, 176 MB a run. Bounded now at both ends: a run older than the newest
+# HISTORY_KEEP_RUNS goes, and an artifact file nothing has touched in ARTIFACT_KEEP_DAYS goes
+# before the next archive copies it for the hundredth time.
+HISTORY_KEEP_RUNS="${HISTORY_KEEP_RUNS:-25}"
+ARTIFACT_KEEP_DAYS="${ARTIFACT_KEEP_DAYS:-3}"
 
 if [[ ! -x "$GODOT" ]]; then
     echo "gate.sh: Godot not found at $GODOT (override with GODOT=...)" >&2
@@ -73,8 +80,22 @@ run_engine() {
 }
 
 # Artifacts are pruned, so without this the record of how the project looked is thrown
-# away. Every captured frame is copied into history/ under the run's date and commit, and
-# nothing there is ever deleted: it is the visual history of the project.
+# away. Every captured frame is copied into history/ under the run's date and commit.
+#
+# **It is bounded.** It used to say nothing here was ever deleted, and on this machine that
+# came to 1104 runs and 194 GB in a fortnight — not 1104 distinct pictures of the project but
+# the same stills copied over and over, because artifacts/ accumulates and every run archives
+# all of it. Old runs are of no use to current work and the repository they sit beside is
+# 1.2 GB. `prune_history` keeps the newest HISTORY_KEEP_RUNS and `prune_artifacts` drops
+# captures nothing has touched in ARTIFACT_KEEP_DAYS, which is what stops the archive growing
+# in the first place.
+#
+# Sweeps are the exception, and have to be. A sweep photographs every object a map places from
+# five sides, twice over, and is 501 MB of near-identical stills per run; eight runs of
+# tools/mapcheck.sh in one afternoon put 4 GB into a directory that is never pruned. It is also
+# the one output here that is fully reproducible from a single command, so what it records is
+# the state of the content rather than the look of the project. SWEEPS names those directories.
+SWEEPS=(outside)
 archive_history() {
     [[ -d "$ARTIFACTS" ]] || return 0
     local sha stamp dest
@@ -82,6 +103,19 @@ archive_history() {
     stamp="$(date +%Y%m%d-%H%M%S)"
     dest="$REPO_ROOT/history/$stamp-$sha"
     local found=0
+    local excludes=(-not -path "*/windows/*")
+    local sweep
+    for sweep in "${SWEEPS[@]}"; do
+        excludes+=(-not -path "*/$sweep/*")
+    done
+    # Only what this run produced. artifacts/ accumulates, so copying all of it every time
+    # archived the same stills over and over — 176 MB a run, 194 GB in a fortnight, almost none
+    # of it a picture nobody already had. Anything older than the last archive is in the last
+    # archive.
+    local previous
+    previous="$(find "$REPO_ROOT/history" -maxdepth 1 -mindepth 1 -type d 2>/dev/null |
+        sort | tail -1)"
+    [[ -n "$previous" ]] && excludes+=(-newer "$previous")
     while IFS= read -r png; do
         local relative target
         relative="${png#"$ARTIFACTS/"}"
@@ -89,8 +123,9 @@ archive_history() {
         mkdir -p "$(dirname "$target")"
         cp "$png" "$target"
         found=1
-    done < <(find "$ARTIFACTS" -name '*.png' -not -path "*/windows/*" 2>/dev/null)
+    done < <(find "$ARTIFACTS" -name '*.png' "${excludes[@]}" 2>/dev/null)
     [[ $found -eq 1 ]] && echo "history: archived to history/$stamp-$sha" >&2
+    prune_history
 }
 
 prune_artifacts() {
@@ -100,6 +135,22 @@ prune_artifacts() {
     # reverse-sorted list instead.
     find "$ARTIFACTS" -maxdepth 1 -type d -name 'run-*' 2>/dev/null | sort -r |
         tail -n "+$((KEEP_RUNS + 1))" | while read -r old; do rm -rf "$old"; done
+    # And every capture nothing has touched lately, whatever directory it is in. Without this
+    # a sheet taken once stays in artifacts/ for ever and is copied into every archive after
+    # it, which is where 194 GB of history came from.
+    find "$ARTIFACTS" -type f -mtime "+$ARTIFACT_KEEP_DAYS" -not -path "*/windows/*" -delete \
+        2>/dev/null || true
+    find "$ARTIFACTS" -type d -empty -not -path "*/windows*" -delete 2>/dev/null || true
+}
+
+# The newest HISTORY_KEEP_RUNS runs, and nothing older. Deliberately by count rather than by
+# age: a heavy afternoon writes more history than a quiet week, and what matters is having the
+# recent ones to compare against rather than covering a particular span of days.
+prune_history() {
+    local history="$REPO_ROOT/history"
+    [[ -d "$history" ]] || return 0
+    find "$history" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort -r |
+        tail -n "+$((HISTORY_KEEP_RUNS + 1))" | while read -r old; do rm -rf "$old"; done
 }
 
 list_gates() {

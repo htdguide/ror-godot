@@ -19,6 +19,13 @@ const ADDON_DIR: String = "game/addons"
 ## Marketplace content whose licence forbids use outside its own engine. Matched against
 ## file and directory names anywhere in the tree.
 const ENGINE_LOCKED: Array[String] = ["megascans", "quixel", "unrealmarketplace", "unreal_marketplace"]
+## Directories this project writes itself and never ships. They are in `.gitignore`, nothing
+## third-party can arrive in them, and `history/` in particular is unbounded by design — it holds
+## every captured frame of every run ever made, which on this machine is 1099 runs and 179 GB. A
+## scan that walks it is a scan that gets slower every time the suite is used, and this one did:
+## it ran in 27.5 s this morning and 36.1 s by the afternoon, against a 30 s budget, and failed
+## every commit in between on nothing but its own output.
+const OWN_OUTPUT: Array[String] = ["history", "artifacts", "build", "bin", ".godot", ".git"]
 ## An entry has to say these things, not merely exist. A pin is among them because the rule
 ## is that no dependency floats: a branch or a tag that moves is not a version.
 const REQUIRED_FIELDS: Array[String] = ["Source:", "Pin:", "Licence:", "Why:"]
@@ -185,7 +192,7 @@ func _scan_locked(path: String, out: PackedStringArray, depth: int) -> void:
     if dir == null:
         return
     for name: String in dir.get_directories():
-        if name.begins_with("."):
+        if name.begins_with(".") or (depth == 0 and OWN_OUTPUT.has(name)):
             continue
         if _is_engine_locked(name):
             out.append(SourceScan.relative(path.path_join(name)))
