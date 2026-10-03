@@ -316,3 +316,23 @@ See `hard-won-facts.md` for the solver, the terrain, the formats and the gate di
   whose box starts a metre away left most of the rig hanging over the edge, and read as 0.91 m of
   penetration into a box that was working perfectly. Dropped on the box's own centre it rests at
   exactly the declared top — the same figure, to a centimetre, as it rests on open ground.
+- **A blend map is a gradient and was being read as a classification.** Ogre hands a terrain's
+  splat map to the GPU, which filters it; this project read the nearest pixel, so the map's own
+  resolution became hard edges on the ground. La Paz's is 1024 squared over 4000 m — 3.9 m a pixel
+  with full 0-to-1 steps between neighbours — against a lattice spacing of 1.95 m, so a boundary
+  moved the whole way in one vertex. Bilinear halves that, and `a_blend_map_is_a_gradient` bounds
+  it by arithmetic over the terrain's own two numbers: the largest step between neighbouring
+  pixels times (vertex spacing / metres per pixel). Nothing in that bound is a number this project
+  chose. A terrain's **traction** map is still read nearest and should be: it names which ground
+  model is underfoot, and halfway between gravel and asphalt is not a surface.
+- **That is not what makes Starling Island's hillsides look terraced.** Measured rather than
+  assumed, and the first guess was wrong: its blend map is 64 by 64 but reads r = 1.00 in every
+  pixel, so there is no boundary in it to be blocky. Its heightmap is not quantised either — 483
+  distinct heights over 600 samples along one line, with steps down to 15 mm. What is left is the
+  terrain's own layer 0, `starling.dds`, a 2048-square aerial photograph of the island stretched
+  over 3000 m at 1.46 m a texel. Unproven, and the next thing to measure.
+- **A composite is not bounded the way its source is.** A first draft of that gate measured
+  *coverage* rather than the map as it is read, and failed La Paz: Ogre multiplies each layer's
+  weight through what the layers above it left, so with four layers one layer's share can move
+  faster than any single channel did. The smoothness that matters is the source's, and everything
+  downstream inherits it.

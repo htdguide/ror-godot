@@ -159,7 +159,10 @@ func layer_coverage_at(x: float, z: float) -> PackedFloat32Array:
         return out
     var blend: Color = Color(0.0, 0.0, 0.0, 0.0)
     if _blend_image != null:
-        blend = _blend_image.get_pixelv(_image_cell(_blend_image, x, z))
+        blend = RorTerrainSkin.blend_at(
+            _blend_image, x, z,
+            Vector2(geometry["world_x"] as float, geometry["world_z"] as float)
+        )
     var remaining: float = 1.0
     for index: int in range(out.size() - 1, 0, -1):
         var weight: float = clampf(
@@ -169,6 +172,12 @@ func layer_coverage_at(x: float, z: float) -> PackedFloat32Array:
         remaining -= out[index]
     out[0] = maxf(remaining, 0.0)
     return out
+
+
+## The splat map this terrain paints its layers with, or null when it ships none. Exposed so that
+## how it is read can be checked against the map itself.
+func blend_image() -> Image:
+    return _blend_image
 
 
 ## Which textures Terrain3D draws at a lattice cell, and how they mix.

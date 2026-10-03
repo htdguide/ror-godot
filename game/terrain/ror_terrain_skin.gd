@@ -194,6 +194,37 @@ static func image_of(path: String, reader: RefCounted) -> Image:
     return image
 
 
+## The splat weights at a world position, interpolated between the four pixels around it.
+##
+## **A blend map is a gradient, not a classification.** Ogre hands it to the GPU as a texture and
+## the GPU filters it; read with the nearest pixel instead, its own resolution becomes visible as
+## hard edges on the ground. Starling Island's is 64 by 64 over 3000 m — **46.9 m a pixel** — and
+## its hillsides came out in terraces, dark bands with staircase edges following the painted
+## boundaries, which reads as broken lighting or a broken heightmap and is neither.
+##
+## A terrain's traction map is still read with the nearest pixel, and should be: it names which
+## ground model is underfoot, and halfway between gravel and asphalt is not a surface.
+static func blend_at(image: Image, x: float, z: float, world: Vector2) -> Color:
+    # Pixel centres sit half a pixel in, which is the convention a nearest read rounds to.
+    var u: float = (x / maxf(world.x, 1.0)) * float(image.get_width()) - 0.5
+    var v: float = (z / maxf(world.y, 1.0)) * float(image.get_height()) - 0.5
+    var x0: int = int(floor(u))
+    var z0: int = int(floor(v))
+    var tx: float = u - float(x0)
+    var tz: float = v - float(z0)
+    var north: Color = _pixel(image, x0, z0).lerp(_pixel(image, x0 + 1, z0), tx)
+    var south: Color = _pixel(image, x0, z0 + 1).lerp(_pixel(image, x0 + 1, z0 + 1), tx)
+    return north.lerp(south, tz)
+
+
+## One pixel, clamped to the image's edges.
+static func _pixel(image: Image, x_index: int, z_index: int) -> Color:
+    return image.get_pixel(
+        clampi(x_index, 0, image.get_width() - 1),
+        clampi(z_index, 0, image.get_height() - 1)
+    )
+
+
 ## Which two of a terrain's layers are drawn at a point, and how they mix.
 ##
 ## Ogre lays each layer over what is under it at its own alpha, so a layer's share of the final
