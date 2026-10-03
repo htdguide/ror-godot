@@ -160,7 +160,10 @@ func _judge(terrain: RorTerrain, root: Node3D, name: String) -> PackedStringArra
         var low: float = minf(layer["scale_from"] as float, layer["scale_to"] as float)
         var high: float = maxf(layer["scale_from"] as float, layer["scale_to"] as float)
         for index: int in batch.multimesh.instance_count:
-            var at: Transform3D = batch.multimesh.get_instance_transform(index)
+            # Local to the batch, which stands among its own trees.
+            var at: Transform3D = (
+                batch.transform * batch.multimesh.get_instance_transform(index)
+            )
             var ground: float = terrain.height_at_world(at.origin.x, at.origin.z)
             if absf(at.origin.y - ground) > ON_GROUND_M:
                 out.append(

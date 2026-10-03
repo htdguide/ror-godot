@@ -190,7 +190,7 @@ func _instance_of(objects: Node3D, mesh_file: String) -> Dictionary:
         if not batch.has_meta("mesh_file") or batch.get_meta("mesh_file") != mesh_file:
             continue
         if instances == 0 and batch.multimesh.instance_count > 0:
-            at = batch.multimesh.get_instance_transform(0).origin
+            at = (batch.transform * batch.multimesh.get_instance_transform(0)).origin
         instances += batch.multimesh.instance_count
     if instances == 0:
         return {}

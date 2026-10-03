@@ -107,7 +107,11 @@ func run(_harness: Node) -> Dictionary:
         if _is_textured(mesh):
             textured += drawn_here
         for index: int in drawn_here:
-            var at: Vector3 = batch.multimesh.get_instance_transform(index).origin
+            # Instance transforms are local to their batch, which stands where its instances
+            # do so that a visibility range is measured from somewhere sensible.
+            var at: Vector3 = (
+                batch.transform * batch.multimesh.get_instance_transform(index)
+            ).origin
             # One object can carry several meshes and so appear in several batches at the same
             # place; counted by where it stands, it is one object either way.
             places[Vector3i(roundi(at.x), roundi(at.y), roundi(at.z))] = true

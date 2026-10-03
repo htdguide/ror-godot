@@ -145,13 +145,22 @@ static func _stand(
 static func _batch(
     layer: Dictionary, mesh: ArrayMesh, key: Vector2i, at: Array[Transform3D], index: int
 ) -> MultiMeshInstance3D:
+    # A visibility range is measured from the camera to the node, so the batch has to stand where
+    # its trees stand. Left at the world origin, a forest 800 m from (0, 0, 0) is never drawn.
+    var centre: Vector3 = Vector3.ZERO
+    for frame: Transform3D in at:
+        centre += frame.origin
+    centre /= maxf(float(at.size()), 1.0)
     var multimesh: MultiMesh = MultiMesh.new()
     multimesh.transform_format = MultiMesh.TRANSFORM_3D
     multimesh.mesh = mesh
     multimesh.instance_count = at.size()
     for which: int in at.size():
-        multimesh.set_instance_transform(which, at[which])
+        multimesh.set_instance_transform(
+            which, Transform3D(at[which].basis, at[which].origin - centre)
+        )
     var node: MultiMeshInstance3D = MultiMeshInstance3D.new()
+    node.position = centre
     node.name = "Trees%d_%d_%d" % [index, key.x, key.y]
     node.set_meta("mesh_file", layer["mesh"])
     node.multimesh = multimesh

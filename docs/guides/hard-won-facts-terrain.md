@@ -167,3 +167,18 @@ Its companion is `hard-won-facts-mods.md`, which covers how a vehicle is read, b
   `a_terrain_grows_the_forest_it_paints` decided there was nothing to judge from the number of
   trees it found, so halving the density made it grow zero and report "skipped". It decides from
   what the terrain asks for now, which is the number that does not move when the builder breaks.
+- **A visibility range is measured to the node, not to the instance.** Godot takes the distance
+  from the camera to a `GeometryInstance3D`'s own origin and applies it to everything that node
+  draws, so a `MultiMeshInstance3D` left at the world origin with its instances scattered across a
+  3 km map is judged by how far the camera is from (0, 0, 0). Adding the `beginlodmesh` distance
+  meshes put a range on every batch of every object that declares one, and those buildings were
+  then drawn only within 100 m of the map's corner. Reported from a window as "some of the
+  buildings are still missing", one commit after a gate had confirmed each of those ranges was
+  exactly the distance its definition states. **The range was right and it was being measured from
+  nowhere.** A batch stands at the centroid of its own instances now, which also fixes the frustum
+  test and the sort order, both of which were being computed from the same wrong point.
+- **A gate that checks a number is not a gate that checks the number means something.**
+  `an_object_draws_its_own_distance_mesh` passed throughout that fault and was not wrong to: every
+  range it inspected was the one the content asked for. `a_batch_stands_among_its_own_instances`
+  is the other half — every batch's node inside the bounding box of what it draws, which is true
+  by construction when the batch is built right and 1326 m false when it is not.

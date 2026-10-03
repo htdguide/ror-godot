@@ -108,13 +108,29 @@ static func tile_of(at: Vector3) -> Vector2i:
 
 ## One mesh, drawn once for every transform that wants it.
 static func _batch(key: String, mesh: ArrayMesh, at: Array[Transform3D]) -> MultiMeshInstance3D:
+    # **The batch stands where its instances are.** A visibility range is measured from the
+    # camera to the *node*, not to the instance, so a batch left at the world origin with its
+    # instances scattered across the map is judged by how far the camera is from (0, 0, 0). On a
+    # 3 km map that is hundreds of metres from anywhere, and every batch carrying a range
+    # disappeared the moment distance meshes were added: the buildings with a `beginlodmesh`
+    # chain were invisible from everywhere except the corner of the map. Reported from a window
+    # as "some of the buildings are still missing", and no gate saw it, because the gate checked
+    # that the range was the one the definition states and not that it was measured from
+    # anywhere sensible.
+    var centre: Vector3 = Vector3.ZERO
+    for frame: Transform3D in at:
+        centre += frame.origin
+    centre /= maxf(float(at.size()), 1.0)
     var multimesh: MultiMesh = MultiMesh.new()
     multimesh.transform_format = MultiMesh.TRANSFORM_3D
     multimesh.mesh = mesh
     multimesh.instance_count = at.size()
     for index: int in at.size():
-        multimesh.set_instance_transform(index, at[index])
+        multimesh.set_instance_transform(
+            index, Transform3D(at[index].basis, at[index].origin - centre)
+        )
     var node: MultiMeshInstance3D = MultiMeshInstance3D.new()
+    node.position = centre
     node.name = key.get_slice("|", 0).get_basename()
     # The distances the object's own definition states, with a margin either side so a building
     # fades between its levels instead of snapping.
