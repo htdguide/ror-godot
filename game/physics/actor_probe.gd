@@ -87,3 +87,22 @@ static func _drawn(node: Node, to_root: Transform3D) -> Array[Dictionary]:
             out.append({"transform": accumulated, "aabb": mesh.get_aabb()})
         out.append_array(_drawn(spatial, accumulated))
     return out
+
+
+## Takes every actor probe in a scene again.
+##
+## **A probe set to `UPDATE_ONCE` holds the sky it was built under.** Switch a window from noon
+## to a moonlit night and the bodywork goes on reflecting a daylight sky — a white truck on a
+## dark road, reported from a window as "the car starts reflecting something and also becomes
+## white". Re-assigning the update mode marks the probe dirty, so it captures the hour it is
+## actually in and goes back to costing nothing.
+static func recapture(root: Node) -> int:
+    var taken: int = 0
+    for child: Node in root.get_children():
+        taken += recapture(child)
+        var probe: ReflectionProbe = child as ReflectionProbe
+        if probe == null:
+            continue
+        probe.update_mode = ReflectionProbe.UPDATE_ONCE
+        taken += 1
+    return taken

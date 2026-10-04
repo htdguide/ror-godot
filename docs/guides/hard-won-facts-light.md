@@ -223,3 +223,19 @@ See `hard-won-facts.md` for the solver, the file formats, the terrain and the ga
   out of the tailgate. A lamp only gets a beam if it faces the way the vehicle goes, which the
   actor's own frame knows: forward is -Z there, because upstream's `cameras` section names a node
   behind the centre.
+- **A sky shader has to apply the hour's energy to everything it draws, clouds included.** The
+  marched cloud layer was mixed over the gradient *after* the energy multiplier, so a night that
+  states four ten-thousandths dimmed the gradient and left the clouds at their daylight
+  brightness: a blazing white overcast with black holes in it, and a vehicle whose reflection
+  probe caught it and turned white.
+- **A reflection probe on `UPDATE_ONCE` holds the sky it was built under.** Switching a window
+  from noon to night leaves the bodywork reflecting a daylight sky. Re-assigning `update_mode`
+  marks it dirty and it takes the hour it is actually in.
+- **A spot light's projector is a square image and a beam is not square.** The light samples the
+  whole texture, corners included, so a pattern with light at its edge is thrown as a rectangle
+  with hard sides — reported from a window as "a weird shape how it lights", and it was the
+  texture's own border drawn on the road. The pattern has to fall to nothing inside a circle.
+- **A measurement preset is an instrument, not an hour of the day.** `spike_black` is an unlit
+  void so that a gate can encode a number into a pixel and read it back; a window that cycles
+  into it finds a black world with headlights that appear not to work. It carries
+  `measurement: true` and the window leaves it out.

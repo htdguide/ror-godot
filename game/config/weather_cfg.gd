@@ -91,7 +91,14 @@ const PRESETS: Dictionary = {
     },
     # A black, unlit environment. Measurement gates encode numbers into pixels, so any
     # ambient contribution would be added to the value being read back.
+    #
+    # **An instrument, not an hour of the day**, and `measurement` is what says so. A window used
+    # to cycle into it and find a black world with headlights that did nothing — reported in
+    # those words — because it has no sun, no sky and a daylight exposure, and changing any of
+    # that would change every number read back through it. `PlayWeather` leaves it out of the
+    # cycle and the settings panel; a gate still asks for it by name.
     "spike_black": {
+        "measurement": true,
         "sun_from": Vector3(0.0, 1.0, 0.0),
         "sun_energy": 0.0,
         "sun_color": Color(0.0, 0.0, 0.0),

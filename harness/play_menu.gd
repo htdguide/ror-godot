@@ -84,6 +84,10 @@ func setup(
     _on_map = on_map
     _on_vehicle = on_vehicle
     for name: String in WeatherCfg.PRESETS.keys():
+        # The same filter the F2 cycle uses: a measurement preset is an instrument and not an
+        # hour of the day. See `PlayWeather._init`.
+        if bool((WeatherCfg.get_preset(name)).get("measurement", false)):
+            continue
         _weather_names.append(name)
     _weather_index = maxi(0, _weather_names.find(weather))
     layer = 2

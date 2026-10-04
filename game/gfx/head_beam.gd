@@ -80,18 +80,27 @@ const SHADOW_NORMAL_BIAS: float = 1.2
 ## The projector texture. Small, because it is a beam pattern and not a picture.
 const COOKIE_PX: int = 128
 ## Where the hot spot sits in the pattern, as a fraction of the texture, and how wide it is.
-const HOT_SPOT_V: float = 0.60
-const HOT_SPOT_WIDTH: float = 0.26
-const HOT_SPOT_HEIGHT: float = 0.15
-## The low beam's cut-off: the line above which it keeps only a trace of its light, and how much
-## of that trace is left. Not zero — a real cut-off scatters a little above the line, and a hard
-## black edge in the air looks like a clipped cone.
+const HOT_SPOT_V: float = 0.58
+const HOT_SPOT_WIDTH: float = 0.30
+const HOT_SPOT_HEIGHT: float = 0.17
+## The low beam's cut-off: the line above which it keeps only a trace of its light, how much of
+## that trace is left, and how softly it fades into it. Not zero and not sudden — a real cut-off
+## scatters above the line, and a hard edge reads as a stencil rather than as a beam.
 const CUT_OFF_V: float = 0.46
-const ABOVE_CUT_OFF: float = 0.06
+const ABOVE_CUT_OFF: float = 0.07
+const CUT_OFF_SOFT: float = 0.10
 ## How far the cut-off rises across the half of the beam on the kerb side, so that a sign at the
-## roadside is lit and an oncoming driver is not. A quarter of the pattern, which is the step
-## every European low beam has.
-const KERB_RISE: float = 0.12
+## roadside is lit and an oncoming driver is not. Gentle: a step that shows as a staircase on
+## the road is worse than no step at all.
+const KERB_RISE: float = 0.07
+## **The pattern is a square texture and a beam is not square.** A spot light samples its
+## projector across the whole image, corners included, so a pattern that still has light at its
+## edge is thrown as a rectangle with hard sides — reported from a window as "a weird shape how
+## it lights", and it was the texture's own border drawn on the road. Everything past this radius
+## is dark, and the last tenth of it fades, so what shapes the beam is the pattern and not the
+## image it is stored in.
+const PATTERN_RADIUS: float = 0.48
+const PATTERN_FADE: float = 0.12
 
 
 ## One forward lamp, dark, for a flare of this type. Null when the type does not project.
@@ -165,24 +174,25 @@ static func _cookie(kind: String) -> ImageTexture:
 ##
 ## A main beam is a hot spot in a soft surround and nothing else. A low beam and a fog lamp have
 ## the cut-off, which is the whole point of them: above the line they keep a trace, below it they
-## light the road. The low beam's line steps up across the kerb side.
+## light the road. The low beam's line steps up across the kerb side. Everything is then taken to
+## nothing at the edge of the circle the square image holds.
 static func _pattern(kind: String, u: float, v: float) -> float:
-    var across: float = (u - 0.5) / HOT_SPOT_WIDTH
     var hot_v: float = 0.5 if kind == "high" else HOT_SPOT_V
+    var across: float = (u - 0.5) / HOT_SPOT_WIDTH
     var down: float = (v - hot_v) / HOT_SPOT_HEIGHT
     var spot: float = exp(-(across * across + down * down))
     # The spill: everything the lamp throws that is not the hot spot, falling off from the middle.
-    var away: float = Vector2(u - 0.5, (v - hot_v) * 1.6).length()
-    var spill: float = pow(clampf(1.0 - away * 1.7, 0.0, 1.0), 2.0)
-    var value: float = clampf(spot + spill * 0.55, 0.0, 1.0)
-    if kind == "high":
-        return value
-    # The cut-off, stepped up on the kerb side so that the verge is lit and an oncoming driver
-    # is not.
-    var line: float = CUT_OFF_V - (KERB_RISE if u > 0.5 else 0.0)
-    if v < line:
-        # A soft shoulder just above the line, a trace further up: a real cut-off scatters, and
-        # a hard black edge reads as a clipped cone rather than as a beam.
-        var above: float = clampf((line - v) / 0.06, 0.0, 1.0)
-        value *= lerpf(1.0, ABOVE_CUT_OFF, above)
-    return value
+    var away: float = Vector2(u - 0.5, (v - hot_v) * 1.3).length()
+    var spill: float = pow(clampf(1.0 - away / PATTERN_RADIUS, 0.0, 1.0), 2.0)
+    var value: float = clampf(spot + spill * 0.6, 0.0, 1.0)
+    if kind != "high":
+        # The cut-off, stepped up on the kerb side so that the verge is lit and an oncoming
+        # driver is not, and faded into rather than cut.
+        var line: float = CUT_OFF_V - KERB_RISE * smoothstep(0.5, 0.72, u)
+        value *= lerpf(
+            1.0, ABOVE_CUT_OFF, clampf((line - v) / CUT_OFF_SOFT, 0.0, 1.0)
+        )
+    # And nothing at all outside the circle, so the square the pattern is stored in is never
+    # what the road sees.
+    var radius: float = Vector2(u - 0.5, v - 0.5).length()
+    return value * (1.0 - smoothstep(PATTERN_RADIUS - PATTERN_FADE, PATTERN_RADIUS, radius))

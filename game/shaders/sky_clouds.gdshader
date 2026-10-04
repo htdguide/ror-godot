@@ -122,7 +122,7 @@ void sky() {
 		+ pow(to_sun, 8.0) * 0.06
 	);
 
-	vec3 colour = base * sky_energy;
+	vec3 colour = base;
 
 	// Clouds are drawn for the eye and not into the radiance map. The map is what lights the
 	// scene, and a sky full of bright cloud raises its irradiance enough to flatten everything:
@@ -169,5 +169,12 @@ void sky() {
 		float cover = (1.0 - transmittance) * horizon_fade;
 		colour = mix(colour, scattered / max(cover, 0.001), cover);
 	}
-	COLOR = colour;
+	// The hour's own brightness, applied to the clouds as well as to the gradient.
+	//
+	// **It used to scale only the gradient.** A night states a sky energy of four ten-thousandths
+	// and the clouds stayed at their daylight brightness, so the night sky in a window was a
+	// blazing white overcast with black holes in it, and the vehicle's reflection probe caught it
+	// and turned the bodywork white. Reported from a window: "when I choose night, the sky is
+	// very white and the car starts reflecting something and also becomes white."
+	COLOR = colour * sky_energy;
 }

@@ -20,6 +20,12 @@ var shot: Dictionary = {}
 
 func _init(wanted: String) -> void:
     for key: String in WeatherCfg.PRESETS.keys():
+        # Measurement presets are instruments: `spike_black` is an unlit void that exists so a
+        # gate can encode a number into a pixel and read it back, and a session that cycles into
+        # it gets a black world with headlights that appear not to work. A gate still names it
+        # directly; the window does not offer it.
+        if bool((WeatherCfg.get_preset(key)).get("measurement", false)):
+            continue
         names.append(key)
     index = maxi(0, names.find(wanted))
 
@@ -45,6 +51,8 @@ func apply(world: Node3D, name: String) -> void:
     # headlights in it and nothing to see them by.
     if camera != null and is_instance_valid(camera):
         PhysicalCamera.reexpose(camera, shot, preset)
+    # And the vehicle's own reflection, which was taken once under whatever sky was up then.
+    ActorProbe.recapture(world)
     index = maxi(0, names.find(name))
     print("PLAY  weather %s" % name)
 
