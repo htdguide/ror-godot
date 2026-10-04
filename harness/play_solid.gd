@@ -7,8 +7,10 @@ extends RefCounted
 ## these are about the collision set rather than about driving, and both only exist because that
 ## set stopped being a handful of boxes around corners.
 
-## How far above whatever is solid beneath it a vehicle is placed.
-const SPAWN_CLEAR_M: float = 0.6
+## How far above whatever is solid beneath it a vehicle is placed. `RigBuilder.place` adds its
+## own small clearance on top of this and drops the rig from there, so this only has to clear the
+## surface itself rather than leave room for the suspension to settle.
+const SPAWN_CLEAR_M: float = 0.05
 ## And how far above the start height a box may reach and still count as the thing being stood
 ## on rather than a roof over it.
 const SPAWN_REACH_M: float = 2.0

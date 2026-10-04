@@ -142,7 +142,13 @@ static func place(
     var lowest: float = INF
     for node: Vector3 in truck.nodes:
         lowest = minf(lowest, (upright * node).y)
-    var ground: float = solver.ground_height_at(origin)
+    # **The ground is the higher of the heightfield and whatever the caller says it stands on.**
+    # This used to be the heightfield alone, so `origin.y` was read for x and z and thrown away
+    # for height — which was harmless while a terrain's objects were barely solid, and is not
+    # now. Port Starling's start sits on a quay pad whose top is 0.32 m above the dirt: placed at
+    # the dirt the rig began inside the pad, its suspension fully compressed, and shot into the
+    # air on every reset. Reported from a window in those words.
+    var ground: float = maxf(solver.ground_height_at(origin), origin.y)
     for i: int in truck.nodes.size():
         var placed: Vector3 = upright * truck.nodes[i]
         solver.set_node_position(
