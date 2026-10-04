@@ -234,10 +234,16 @@ static func _wall(
 
 
 ## Two triangles over four corners, wound the way Godot draws a front face.
+## **Clockwise, because that is the way Godot faces a triangle forward.** Wound the other way
+## round, every deck of every swept road on every map was drawn pointing at the ground: the
+## shoulders stood either side of a corridor of grass, and a vehicle drove on a surface nobody
+## could see. Measured at one spot on Port Starling: 32 near-horizontal road triangles, every one
+## facing down and not one facing up. See ADR 0005 — the same convention the object meshes needed
+## and the one place nothing had checked.
 static func _triangles(base: int, indices: PackedInt32Array) -> void:
     indices.append_array(PackedInt32Array([
-        base, base + 1, base + 2,
-        base, base + 2, base + 3,
+        base, base + 2, base + 1,
+        base, base + 3, base + 2,
     ]))
 
 

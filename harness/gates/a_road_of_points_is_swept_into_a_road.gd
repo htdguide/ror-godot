@@ -125,7 +125,12 @@ func _judge(node: MeshInstance3D, terrain: RorTerrain, group: Array[Dictionary])
     var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
     var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] as PackedInt32Array
     for i: int in range(0, indices.size() - 2, 3):
-        var face: Vector3 = (
+        # **Negated, because Godot faces a triangle forward when its corners run clockwise.**
+        # Read the other way round this said every correctly drawn deck was inside out — and it
+        # was green for as long as the sweep wound them counter-clockwise, which is to say for as
+        # long as no road on any map could be seen from above. The same sign error as the two
+        # object gates in ADR 0005, in the one place that had no file to check itself against.
+        var face: Vector3 = -(
             vertices[indices[i + 1]] - vertices[indices[i]]
         ).cross(vertices[indices[i + 2]] - vertices[indices[i]]).normalized()
         if face.y < -HORIZONTAL_DOT:
