@@ -30,8 +30,15 @@ GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 RESOLUTION="${RESOLUTION:-1920x1080}"
 # Fixed frame pacing: a scenario advances by frame count, never by wall-clock time.
 FIXED_FPS="${FIXED_FPS:-60}"
-# Hard stop so a hung gate fails instead of blocking the suite.
-QUIT_AFTER="${QUIT_AFTER:-3600}"
+# Hard stop so a hung gate fails instead of blocking the suite, counted in frames.
+#
+# **It is a backstop and it was being hit by healthy runs.** Two photoset gates — a day an hour
+# at a time, and a vehicle from four sides at nine of those hours — added some six hundred
+# captured frames to the suite, and at 3600 the engine reached the limit part way through and
+# quit, cleanly and without a word. The suite then reported "110 gates run; all passed" for a
+# suite of 124, because fourteen gates that never ran emit no result line to count. The limit is
+# now far above what the suite costs and the tally below is what notices if it is hit anyway.
+QUIT_AFTER="${QUIT_AFTER:-60000}"
 KEEP_RUNS="${KEEP_RUNS:-10}"
 # How much visual history to keep. It was unbounded by design and reached 1104 runs and 194 GB in
 # a fortnight, because every run copies every PNG still sitting in artifacts/ — the same stills
@@ -339,6 +346,26 @@ for line in sys.stdin:
     if [[ $ran -eq 0 ]]; then
         printf '%s\n' "$output" | tail -25 >&2
         echo "gate.sh: the engine ran no gates" >&2
+        cleanup_plan
+        return 1
+    fi
+    # A run that stopped early is not a run that passed.
+    #
+    # The engine says how many gates it planned and how many it accounted for. Without that,
+    # what is counted here is the result lines that arrived, and a gate that never ran emits
+    # none: a suite killed part way through printed "110 gates run; all passed" for a suite of
+    # 125, with fourteen gates simply absent. Reported by the machine running out of memory
+    # during a run, which is exactly the kind of thing that must not come back green.
+    local planned accounted
+    planned="$(printf '%s\n' "$output" | sed -n 's/.*HARNESS_SUITE_PLAN {"gates": *\([0-9]*\)}.*/\1/p' | tail -1)"
+    accounted="$(printf '%s\n' "$output" | sed -n 's/.*HARNESS_SUITE_DONE .*"planned": *\([0-9]*\).*/\1/p' | tail -1)"
+    if [[ -z "$accounted" ]]; then
+        echo "gate.sh: the engine stopped before the suite finished: $ran of ${planned:-?} gates ran" >&2
+        cleanup_plan
+        return 1
+    fi
+    if [[ $((ran + implied)) -ne "$accounted" ]]; then
+        echo "gate.sh: $ran run and $implied implied, of $accounted the suite planned" >&2
         cleanup_plan
         return 1
     fi

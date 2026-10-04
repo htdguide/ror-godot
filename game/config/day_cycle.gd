@@ -106,7 +106,17 @@ const FOG_COLOUR_DUSK: Color = Color(0.72, 0.46, 0.3)
 ## luminance on a ground of 0.0002.
 const FOG_COLOUR_NIGHT: Color = Color(0.006, 0.009, 0.018)
 
-## The photographer's three numbers at either end of the day.
+## The photographer's three numbers at either end of the day, and the light each end was metered
+## for.
+##
+## **The camera meters the light, not the clock.** The exposure used to be interpolated on how
+## much of the day it was, and the light does not follow that curve: half past six in the evening
+## is six per cent of the way through the twilight — a night sky, stars out — while the ground
+## still has 4.6 lux on it, eighteen times a full moon. A night exposure on eighteen moons is a
+## scene lit like dusk under a sky like midnight, with the vehicle the brightest thing in it.
+## Metering on the hour's own illuminance in log space keeps the two together at every hour.
+const DAY_LUX_ANCHOR: float = SUN_LUX_NOON
+const NIGHT_LUX_ANCHOR: float = MOON_LUX
 const ISO_DAY: float = 32.0
 const ISO_NIGHT: float = 1600.0
 const F_STOP_DAY: float = 8.0
@@ -116,6 +126,14 @@ const SHUTTER_NIGHT_S: float = 0.0167
 
 ## The fill light, which is a daylight device: a cool bounce against a warm sun. There is nothing
 ## for it to bounce off at night.
+##
+## **It is a share of the sun and not a number of its own.** `FILL_LUX` is twelve thousand lux,
+## and an hour that scaled only the trim left 720 lux of cool white light standing against a sun
+## of 4.6 at half past six in the evening — a hundred and fifty times the light that was actually
+## there. The vehicle went white while the road beside it stayed grey, which is what a session saw
+## as "a weird too bright white reflection on the truck when getting closer to the sunset". A
+## bounce cannot be brighter than what it bounces.
+const FILL_SHARE: float = 0.05
 const FILL_ENERGY_DAY: float = 1.0
 
 
@@ -131,6 +149,16 @@ static func at(hour: float) -> Dictionary:
         (elevation - NIGHT_ELEVATION_DEG) / (DAY_ELEVATION_DEG - NIGHT_ELEVATION_DEG), 0.0, 1.0
     )
     var daylight: bool = elevation > 0.0
+    var lux: float = _lux(
+        elevation, daylight,
+        MOON_LUX * clampf(sin(deg_to_rad(moon_elevation_deg(clock))), 0.12, 1.0)
+    )
+    # Where this hour's light sits between a full moon and a midday sun, in ratios. This is what
+    # the camera is set from.
+    var metered: float = clampf(
+        log(maxf(lux, NIGHT_LUX_ANCHOR) / NIGHT_LUX_ANCHOR)
+        / log(DAY_LUX_ANCHOR / NIGHT_LUX_ANCHOR), 0.0, 1.0
+    )
     # How much of the horizon's own colour this hour has. Not the same question as how bright it
     # is: the sun is warm for an hour after it is fully up, and this is what says so.
     # The curve favours the low sun: halfway up the band is still most of the way warm, which is
@@ -148,10 +176,7 @@ static func at(hour: float) -> Dictionary:
         # The moon's own height matters the way the sun's does: a moon near the horizon lights
         # the ground less than one overhead, and a night that is one brightness from dusk to
         # dawn is a night nobody has stood in.
-        "sun_lux": _lux(
-            elevation, daylight,
-            MOON_LUX * clampf(sin(deg_to_rad(moon_elevation_deg(clock))), 0.12, 1.0)
-        ),
+        "sun_lux": lux,
         "sun_energy": 1.0,
         "sun_color": (
             SUN_COLOUR_NOON.lerp(SUN_COLOUR_HORIZON, warmth) if daylight else MOON_COLOUR
@@ -175,6 +200,7 @@ static func at(hour: float) -> Dictionary:
         "ambient_energy": _between(AMBIENT_ENERGY_NIGHT, AMBIENT_ENERGY_DAY, day),
         "bg_color": SKY_TOP_NIGHT.lerp(SKY_TOP_DAY, day),
         "fill_energy": FILL_ENERGY_DAY * day,
+        "fill_lux": lux * FILL_SHARE,
         "fog_density": lerpf(FOG_DENSITY_NIGHT, FOG_DENSITY_DAY, day),
         # The haze takes the hour's colour too: a low sun reddens the air it comes through, and a
         # pale grey daylight haze under an orange sky is the other half of what read as white.
@@ -183,9 +209,9 @@ static func at(hour: float) -> Dictionary:
         ),
         # Air for a headlight to stand in, while there is a headlight worth seeing.
         "volumetric": day < 0.5,
-        "iso": _between(ISO_NIGHT, ISO_DAY, day),
-        "f_stop": lerpf(F_STOP_NIGHT, F_STOP_DAY, day),
-        "shutter_s": lerpf(SHUTTER_NIGHT_S, SHUTTER_DAY_S, day),
+        "iso": _between(ISO_NIGHT, ISO_DAY, metered),
+        "f_stop": lerpf(F_STOP_NIGHT, F_STOP_DAY, metered),
+        "shutter_s": lerpf(SHUTTER_NIGHT_S, SHUTTER_DAY_S, metered),
         # What an unlit surface is scaled by. A terrain's horizon backdrop is a photograph with
         # the daylight painted into it and cannot be lit; this is the only thing that can carry
         # it through a night. Never quite nothing: a horizon that vanishes is as wrong as one

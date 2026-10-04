@@ -284,3 +284,14 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   a gate that drops a rig onto one box does not cover a gate that counts every box on the map.
   Removing them took the suite from 43 implied to 35, and the fourteen are roots now. The bound is
   the only thing that noticed; the edges themselves looked reasonable in every individual review.
+
+- **A suite that stops early used to report that it passed.** `tools/gate.sh` counts the result
+  lines the engine hands it, and a gate that never runs emits none — so a run cut short printed
+  "110 gates run in 1 window; all passed" for a suite of 124, with fourteen gates simply absent
+  and nothing to say so. The engine now states what it planned (`HARNESS_SUITE_PLAN`) and what it
+  accounted for (`HARNESS_SUITE_DONE`), and the front end fails when the tally does not match.
+- **What cut it short was the frame backstop, not a crash.** `--quit-after` is a hard stop in
+  frames so a hung gate cannot block the suite, and it was 3600. Two photoset gates — a day an
+  hour at a time and a vehicle from four sides at nine of those hours — added about six hundred
+  captured frames, the engine reached the limit mid-run and quit cleanly, and the truncated run
+  read as green. The limit is 60000 now, and the tally is what notices if it is ever reached.

@@ -134,7 +134,7 @@ has just stated.
 
 ## The suite is green
 
-123 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
+124 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
 twice in one session with a worst measured drift of zero.
 
 It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%

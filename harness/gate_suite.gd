@@ -40,7 +40,17 @@ func run(harness: Node, every: bool) -> Dictionary:
     var results: Dictionary = {}
     var ran: int = 0
     var failed: int = 0
-    for name: String in GateChain.order(graph):
+    var planned: PackedStringArray = GateChain.order(graph)
+    # What this run intends to account for, said before it starts.
+    #
+    # **A suite that stops early used to read as a suite that passed.** The engine was killed
+    # part way through a run — the machine was short of memory — and `tools/gate.sh` printed
+    # "110 gates run in 1 window; all passed" for a suite of 125, because what it counts is the
+    # result lines it was handed and there is no line for a gate that never ran. Fourteen gates
+    # were simply absent and the run was green. The plan and the tally below are what let the
+    # front end tell a finished run from a truncated one.
+    print("HARNESS_SUITE_PLAN " + JSON.stringify({"gates": planned.size()}))
+    for name: String in planned:
         if not every and implied_by.has(name):
             gate_implied.emit(name, implied_by[name] as String)
             results[name] = {"gate": name, "implied_by": implied_by[name]}
@@ -66,4 +76,7 @@ func run(harness: Node, every: bool) -> Dictionary:
         for covered: String in GateChain.closure(graph, name):
             if not implied_by.has(covered):
                 implied_by[covered] = name
+    print("HARNESS_SUITE_DONE " + JSON.stringify({
+        "ran": ran, "implied": implied_by.size(), "planned": planned.size(),
+    }))
     return {"ran": ran, "failed": failed, "implied": implied_by.size(), "results": results}
