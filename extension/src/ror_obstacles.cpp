@@ -6,6 +6,14 @@ using namespace godot;
 
 namespace rorgd {
 
+namespace {
+
+// How far beyond a face to look for a neighbour. Smaller than any box this project builds and
+// larger than the gap a float leaves between two that meet exactly.
+constexpr float SKIN_M = 0.01f;
+
+} // namespace
+
 int RorObstacles::add_box(const Transform3D &transform, const Vector3 &half_extents, int surface) {
     RorObstacleBox box;
     box.basis = transform.basis.orthonormalized();
@@ -53,6 +61,24 @@ void RorObstacles::select(const Vector3 &min, const Vector3 &max) {
     }
 }
 
+bool RorObstacles::occupied(const Vector3 &point, int ignore) const {
+    for (const int index : m_near) {
+        if (index == ignore) {
+            continue;
+        }
+        const RorObstacleBox &box = m_boxes[static_cast<size_t>(index)];
+        const Vector3 offset = point - box.origin;
+        const Vector3 local(offset.dot(box.basis.get_column(0)), offset.dot(box.basis.get_column(1)),
+                            offset.dot(box.basis.get_column(2)));
+        if (std::abs(static_cast<float>(local.x)) < box.half.x &&
+            std::abs(static_cast<float>(local.y)) < box.half.y &&
+            std::abs(static_cast<float>(local.z)) < box.half.z) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool RorObstacles::contact(const Vector3 &position, float &penetration, Vector3 &normal,
                            int &surface) const {
     bool found = false;
@@ -75,17 +101,41 @@ bool RorObstacles::contact(const Vector3 &position, float &penetration, Vector3 
         if (depth_z <= 0.0f) {
             continue;
         }
-        // Out through the nearest face: a node a centimetre under the top of a ramp is pushed up,
-        // not sideways out of the end of it, and the two are a metre apart in a long box.
-        int axis = 0;
-        float depth = depth_x;
-        if (depth_y < depth) {
-            axis = 1;
-            depth = depth_y;
+        // **Out through the nearest face a node can actually leave by.** Nearest alone is right
+        // while a box is wider than a node is deep inside it, and wrong the moment it is not: on
+        // a 0.7 m wide, 4 m tall column a node falling onto the top is nearer a side than the top
+        // after one centimetre, so it is pushed off something it should be resting on. That is
+        // what stopped a terrain's objects being approximated by columns that cover their
+        // surfaces rather than their corners.
+        //
+        // A node cannot be pushed into another solid box, so a face with a neighbour flush
+        // against it is not an exit. Inside a grid of columns every side face has one and the
+        // top is the only way out, which is the answer wanted — and it falls out of the geometry
+        // rather than being asserted. Velocity was tried for this and is worse than useless: a
+        // resting node has a little of it in every direction, the chosen face flips frame to
+        // frame, and a rig sank into open ground while a pole hit threw it off at 277 m/s.
+        const float depths[3] = {depth_x, depth_y, depth_z};
+        int order[3] = {0, 1, 2};
+        for (int i = 0; i < 2; ++i) {
+            for (int j = i + 1; j < 3; ++j) {
+                if (depths[order[j]] < depths[order[i]]) {
+                    const int swap = order[i];
+                    order[i] = order[j];
+                    order[j] = swap;
+                }
+            }
         }
-        if (depth_z < depth) {
-            axis = 2;
-            depth = depth_z;
+        int axis = order[0];
+        float depth = depths[axis];
+        for (int i = 0; i < 3; ++i) {
+            const int candidate = order[i];
+            const double along = candidate == 0 ? local.x : (candidate == 1 ? local.y : local.z);
+            const Vector3 face = box.basis.get_column(candidate) * (along < 0.0 ? -1.0f : 1.0f);
+            if (!occupied(position + face * (depths[candidate] + SKIN_M), index)) {
+                axis = candidate;
+                depth = depths[candidate];
+                break;
+            }
         }
         if (!found || depth > deepest) {
             found = true;

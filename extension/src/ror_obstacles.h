@@ -49,6 +49,10 @@ public:
                  int &surface) const;
 
 private:
+    // Whether a point is inside any selected box. A face that would push a node into one of its
+    // neighbours is a face it cannot leave by.
+    bool occupied(const godot::Vector3 &point, int ignore) const;
+
     std::vector<RorObstacleBox> m_boxes;
     std::vector<int> m_near;
 };
