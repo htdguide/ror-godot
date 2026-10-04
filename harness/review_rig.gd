@@ -18,6 +18,13 @@ extends Node
 ## `--failed` offers only what is already on record as failed, which is how you go back over a
 ## list of faults.
 ##
+## **`--collision` reviews what a terrain is solid as instead.** The subject is then an object
+## definition rather than a mesh file, and it is shown with the solver's own boxes around it —
+## not a second derivation of them, the same list the solver is given. 832 of Port Starling's
+## 5343 boxes hold no drawn geometry at all, and a box is wrong in ways no measurement states
+## well: too fat, in the wrong place, lying down, or standing where nothing is. Verdicts are kept
+## under a `collision/` name so they never overwrite what was said about the geometry.
+##
 ## **What is written down is a verdict, a sentence and a set of surfaces.** The first round
 ## recorded verdicts alone, and thirteen objects failed by eye came back clean from every
 ## measurement in the suite with nothing to say why. So there is a box to type in, and clicking a
@@ -57,6 +64,8 @@ var _yaw: float = START_YAW
 var _pitch: float = START_PITCH
 var _turning: bool = false
 var _painted: bool = false
+## Whether this session is reviewing collision rather than geometry.
+var _collision: bool = false
 var _pick: ReviewPick = ReviewPick.new()
 var _hover: MeshInstance3D = null
 var _marks: MeshInstance3D = null
@@ -89,20 +98,28 @@ func setup(camera: Camera3D, world: Node3D) -> void:
         return
     _terrain = loaded["terrain"] as RorTerrain
     _state = RorObjects.state(_terrain)
+    _collision = Harness.args.has_flag("collision")
     _subjects = _remaining(Harness.args.has_flag("again"))
-    print("REVIEW  %s: %d objects to look at; P pass, F fail, arrows move, B paints backs,"
-        % [wanted, _subjects.size()] + " click a surface to mark it")
+    print("REVIEW  %s: %d %s to look at; P pass, F fail, arrows move, B paints backs,"
+        % [wanted, _subjects.size(), "collision shapes" if _collision else "objects"]
+        + " click a surface to mark it")
     _show()
 
 
-## Every distinct mesh the map places, most-placed first, minus whatever is already on record.
+## Every distinct subject the map offers, busiest first, minus whatever is already on record.
+##
+## A geometry review counts mesh files; a collision review counts an object definition's boxes,
+## so the ones with most to be wrong about come up first.
 func _remaining(again: bool) -> PackedStringArray:
     var counts: Dictionary = {}
+    if _collision:
+        counts = CollisionView.counts(_terrain)
     for placement: Dictionary in RorObjects.placements(_terrain):
-        var odef: Dictionary = RorObjects.definition(
-            _terrain, placement["name"] as String, _state
-        )
+        var name: String = placement["name"] as String
+        var odef: Dictionary = RorObjects.definition(_terrain, name, _state)
         if (odef.get("error", "") as String) != "":
+            continue
+        if _collision:
             continue
         for file: String in odef["meshes"] as PackedStringArray:
             counts[file] = (counts.get(file, 0) as int) + 1
@@ -119,7 +136,7 @@ func _remaining(again: bool) -> PackedStringArray:
     var only_failed: bool = Harness.args.has_flag("failed")
     var out: PackedStringArray = PackedStringArray()
     for name: String in names:
-        var verdict: String = ObjectReview.verdict_of(name as String)
+        var verdict: String = ObjectReview.verdict_of(_recorded(name as String))
         if only_failed:
             if verdict == ObjectReview.FAIL:
                 out.append(name as String)
@@ -141,7 +158,7 @@ func _show() -> void:
         return
     _at = clampi(_at, 0, _subjects.size() - 1)
     var file: String = _subjects[_at]
-    var mesh: ArrayMesh = RorObjects.mesh_of(_terrain, file, _state)
+    var mesh: ArrayMesh = _subject_mesh(file)
     if mesh == null:
         _panel.show_object("%s — will not read" % file, _at, _subjects.size(), "")
         return
@@ -157,6 +174,8 @@ func _show() -> void:
         {"position": Vector3.ZERO, "rotation": Vector3.ZERO}, Vector3.ONE
     )
     _world.add_child(_node)
+    if _collision:
+        _node.add_child(CollisionView.for_object(_terrain, file, _state))
     _hover = _overlay_node("Hover")
     _marks = _overlay_node("Marks")
     _marked = PackedInt32Array()
@@ -174,12 +193,33 @@ func _show() -> void:
     # new verdict. What was said before is shown, not re-submitted.
     _panel.note_field.text = ""
     _panel.show_marks(0)
-    var known: Dictionary = ObjectReview.record_of(file)
+    var known: Dictionary = ObjectReview.record_of(_recorded(file))
     _panel.show_object(
         file, _at, _subjects.size(), known.get("verdict", "") as String,
         known.get("note", "") as String
     )
     _aim()
+
+
+## What a subject is called in the record. A collision verdict is about the boxes, not the mesh,
+## so it is kept under its own name and never overwrites what was said about the geometry.
+func _recorded(subject: String) -> String:
+    return ("collision/" + subject) if _collision else subject
+
+
+## The mesh a subject is shown as: the object's first drawable mesh when reviewing collision,
+## since the subject is then a definition rather than a file.
+func _subject_mesh(subject: String) -> ArrayMesh:
+    if not _collision:
+        return RorObjects.mesh_of(_terrain, subject, _state)
+    var odef: Dictionary = RorObjects.definition(_terrain, subject, _state)
+    if (odef.get("error", "") as String) != "":
+        return null
+    for file: String in odef["meshes"] as PackedStringArray:
+        var mesh: ArrayMesh = RorObjects.mesh_of(_terrain, file, _state)
+        if mesh != null:
+            return mesh
+    return null
 
 
 ## A child of the object that draws a highlight over it, in the object's own frame.
@@ -207,7 +247,7 @@ func _settle(verdict: String) -> void:
     for index: int in _marked:
         marks.append(_pick.describe(index))
     var error: String = ObjectReview.record(
-        file, verdict, _panel.note_field.text.strip_edges(), marks
+        _recorded(file), verdict, _panel.note_field.text.strip_edges(), marks
     )
     if error != "":
         printerr("REVIEW  %s" % error)

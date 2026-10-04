@@ -6,6 +6,8 @@
 #   tools/review.sh --map lapaz --again offer the ones already judged as well
 #   tools/review.sh --failed            only the ones already on record as failed
 #   tools/review.sh --object haus4.mesh one mesh and nothing else
+#   tools/review.sh --collision         what the terrain is solid as, object by object, with the
+#                                       solver's own boxes drawn around each one, busiest first
 #
 # Drag to turn the object over, wheel to come closer, R to reset the view, B to paint the back
 # of every face. P passes, F fails, left and right arrows move without settling anything.
@@ -20,8 +22,9 @@
 # nothing in a file separates them from a wall that is genuinely turned round. The measurement
 # gates count and report; this is where the question gets an answer.
 #
-# Verdicts go to harness/reference/object_review.json, keyed by mesh file, and an object that has
-# one is not offered again.
+# Verdicts go to harness/reference/object_review.json, keyed by mesh file — or by "collision/" and
+# the object's name under --collision, so the two reviews never overwrite each other. Anything
+# with a verdict is not offered again.
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

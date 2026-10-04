@@ -67,6 +67,61 @@ static func count(terrain: RorTerrain) -> int:
     return RorObjectCollision.boxes(terrain).size()
 
 
+## One object's own boxes, in the object's frame rather than the world's, for looking at it on a
+## stage beside its mesh.
+##
+## **Taken from the terrain's own list rather than rebuilt.** The point of looking is to see what
+## the solver was given; a second derivation of it could differ and would be the wrong thing to
+## judge. The boxes of the object's first placement are lifted back into its local frame by that
+## placement's own transform.
+static func for_object(terrain: RorTerrain, name: String, state: Dictionary) -> Node3D:
+    var root: Node3D = Node3D.new()
+    root.name = "Boxes"
+    var placement: Dictionary = {}
+    for candidate: Dictionary in RorObjects.placements(terrain):
+        if (candidate["name"] as String) == name:
+            placement = candidate
+            break
+    if placement.is_empty():
+        return root
+    var odef: Dictionary = RorObjects.definition(terrain, name, state)
+    if (odef.get("error", "") as String) != "":
+        return root
+    var frame: Transform3D = RorObjects.transform_of(placement, odef["scale"] as Vector3)
+    var inverse: Transform3D = frame.affine_inverse()
+    var unit: BoxMesh = BoxMesh.new()
+    unit.size = Vector3.ONE
+    unit.material = _material()
+    for box: Dictionary in RorObjectCollision.boxes(terrain):
+        if (box.get("name", "") as String) != name:
+            continue
+        var at: Transform3D = box["transform"] as Transform3D
+        # Only this placement's: the same object stands all over the map.
+        if (at.origin - frame.origin).length() > 40.0:
+            continue
+        var shell: MeshInstance3D = MeshInstance3D.new()
+        shell.mesh = unit
+        shell.transform = inverse * Transform3D(
+            at.basis.scaled((box["half"] as Vector3) * 2.0), at.origin
+        )
+        shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        root.add_child(shell)
+    return root
+
+
+## How many boxes each object has, for ordering a review by how wrong it might be.
+##
+## One pass. Asking per object instead rebuilds every box on the terrain once per name — ninety
+## rebuilds of five thousand boxes, which hangs a window before it opens.
+static func counts(terrain: RorTerrain) -> Dictionary:
+    var out: Dictionary = {}
+    for box: Dictionary in RorObjectCollision.boxes(terrain):
+        var name: String = box.get("name", "") as String
+        if name != "":
+            out[name] = (out.get(name, 0) as int) + 1
+    return out
+
+
 static func _material() -> StandardMaterial3D:
     var material: StandardMaterial3D = StandardMaterial3D.new()
     material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -75,5 +130,8 @@ static func _material() -> StandardMaterial3D:
     # Both sides and no depth test: the point is to see a box that is inside something, or behind
     # it. A shell you can only see from outside hides exactly the case this exists for.
     material.cull_mode = BaseMaterial3D.CULL_DISABLED
+    # Seen through whatever is in front of it. In a session that is the point — a box inside a
+    # building is the case worth finding — and on a review stage the object is alone, so there is
+    # nothing it can hide behind to confuse the picture.
     material.no_depth_test = true
     return material
