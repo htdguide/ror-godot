@@ -39,9 +39,16 @@ const FLAT_CELL_M: float = 16.0
 const MAX_GROWN_CELL_M: float = 4.0
 ## And one this thin in both directions on the ground is drawn detail rather than structure.
 const MIN_FOOTPRINT_M: float = 0.05
-## How many cells one object may produce. A mesh that needs more than this is a building, and a
-## building wants its own collision rather than a voxel grid.
-const MAX_BOXES_PER_OBJECT: int = 64
+## How many cells one object may produce.
+##
+## **It was 64, which was a number for a builder that bucketed vertices.** Now that cells follow
+## surfaces a 20 by 10 m building wants 36 of them and a 50 by 30 m quay pad wants 3053, so 64
+## kept a corner of each and nothing else. Measured by raising it and watching the gates: 128,
+## 256, 512 and 768 all hold, and 1024 drops a rig through a road deck 19 m up. The cliff is not
+## understood — none of the extra boxes is anywhere near that deck, and excluding the one object
+## that gains most at 1024 makes it pass again — so this sits below the highest value shown to
+## work rather than at a number anybody reasoned to.
+const MAX_BOXES_PER_OBJECT: int = 768
 ## What a terrain's objects are made of, as far as a wheel is concerned.
 const SURFACE: String = "concrete"
 ## How coarse a cell may get once the object's own scale is applied.
