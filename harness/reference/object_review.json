@@ -100,525 +100,525 @@
       "verdict": "pass"
     },
     "collision/2af11UID-mc_tree02": {
-      "at": "2026-10-04 01:37:26Z",
+      "at": "2026-10-04 04:08:07Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/2af11UID-mc_tree03": {
-      "at": "2026-10-04 01:37:16Z",
+      "at": "2026-10-04 04:07:28Z",
       "marks": [],
-      "note": "",
+      "note": "The colission columns is vertical now, but too far from the tree",
       "verdict": "fail"
     },
     "collision/2af11UID-mc_tree04": {
-      "at": "2026-10-04 01:37:17Z",
+      "at": "2026-10-04 04:07:29Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/8d25UID-chapel": {
-      "at": "2026-10-04 01:38:08Z",
+      "at": "2026-10-04 04:08:21Z",
       "marks": [],
       "note": "",
-      "verdict": "pass"
+      "verdict": "fail"
     },
     "collision/8d25UID-smallhouse": {
-      "at": "2026-10-04 01:37:56Z",
+      "at": "2026-10-04 04:08:19Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/a1da0UID-lab": {
-      "at": "2026-10-04 01:38:21Z",
+      "at": "2026-10-04 04:08:24Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/a1da0UID-myobs": {
-      "at": "2026-10-04 01:38:25Z",
+      "at": "2026-10-04 04:08:25Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/a1da0UID-tunapicker": {
-      "at": "2026-10-04 01:38:03Z",
+      "at": "2026-10-04 04:08:21Z",
       "marks": [],
       "note": "",
-      "verdict": "pass"
+      "verdict": "fail"
     },
     "collision/allyentrance": {
-      "at": "2026-10-04 01:37:27Z",
+      "at": "2026-10-04 04:08:08Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/curvedroadninteydegsidewalk": {
-      "at": "2026-10-04 01:37:22Z",
+      "at": "2026-10-04 04:07:59Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/ferryslip": {
-      "at": "2026-10-04 01:37:10Z",
+      "at": "2026-10-04 04:05:52Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/firehouse": {
-      "at": "2026-10-04 01:37:37Z",
+      "at": "2026-10-04 04:08:11Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/hangar": {
-      "at": "2026-10-04 01:37:08Z",
+      "at": "2026-10-04 03:59:52Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/haus1": {
-      "at": "2026-10-04 01:37:24Z",
+      "at": "2026-10-04 04:08:06Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/haus2": {
-      "at": "2026-10-04 01:37:20Z",
+      "at": "2026-10-04 04:07:56Z",
       "marks": [],
-      "note": "",
+      "note": "pillars",
       "verdict": "fail"
     },
     "collision/haus3": {
-      "at": "2026-10-04 01:37:13Z",
+      "at": "2026-10-04 04:06:56Z",
       "marks": [],
-      "note": "",
+      "note": "Is it supposed to be just 4 pillars and not the house?",
       "verdict": "fail"
     },
     "collision/haus4": {
-      "at": "2026-10-04 01:37:39Z",
+      "at": "2026-10-04 04:08:11Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/haus5": {
-      "at": "2026-10-04 01:37:41Z",
+      "at": "2026-10-04 04:08:12Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/haus6": {
-      "at": "2026-10-04 01:37:41Z",
+      "at": "2026-10-04 04:08:12Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/haus7": {
-      "at": "2026-10-04 01:37:32Z",
+      "at": "2026-10-04 04:08:10Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/haus8": {
-      "at": "2026-10-04 01:37:09Z",
+      "at": "2026-10-04 03:59:57Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/hospital": {
-      "at": "2026-10-04 01:37:18Z",
+      "at": "2026-10-04 04:07:46Z",
       "marks": [],
-      "note": "",
+      "note": "Only pillars collision, not the house",
       "verdict": "fail"
     },
     "collision/largedockasphalt": {
-      "at": "2026-10-04 01:37:45Z",
+      "at": "2026-10-04 04:08:13Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/largedockinnercorner": {
-      "at": "2026-10-04 01:37:49Z",
+      "at": "2026-10-04 04:08:14Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/largedockoutercorner": {
-      "at": "2026-10-04 01:37:33Z",
+      "at": "2026-10-04 04:08:10Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/largedockstraight": {
-      "at": "2026-10-04 01:37:14Z",
+      "at": "2026-10-04 04:07:00Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/load-spawner": {
-      "at": "2026-10-04 01:37:00Z",
+      "at": "2026-10-04 03:59:37Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/marina": {
-      "at": "2026-10-04 01:36:52Z",
+      "at": "2026-10-04 03:59:18Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/officeblock02": {
-      "at": "2026-10-04 01:38:02Z",
+      "at": "2026-10-04 04:08:20Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/opentruckshop": {
-      "at": "2026-10-04 01:37:45Z",
+      "at": "2026-10-04 04:08:13Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/policedepartment": {
-      "at": "2026-10-04 01:37:43Z",
+      "at": "2026-10-04 04:08:13Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/rey_bs_shelter1": {
-      "at": "2026-10-04 01:37:03Z",
+      "at": "2026-10-04 03:59:45Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/rey_bs_shelter2": {
-      "at": "2026-10-04 01:37:15Z",
+      "at": "2026-10-04 04:07:10Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/rey_bs_sign_blue": {
-      "at": "2026-10-04 01:37:06Z",
+      "at": "2026-10-04 03:59:49Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/rey_bs_sign_nopost": {
-      "at": "2026-10-04 01:37:23Z",
+      "at": "2026-10-04 04:08:25Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/rey_fishplant_big": {
-      "at": "2026-10-04 01:37:07Z",
+      "at": "2026-10-04 03:59:51Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/rey_fishplant_small": {
-      "at": "2026-10-04 01:36:58Z",
+      "at": "2026-10-04 03:59:35Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/rey_gasstation": {
-      "at": "2026-10-04 01:37:30Z",
+      "at": "2026-10-04 04:08:09Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/rey_openshed": {
-      "at": "2026-10-04 01:37:27Z",
+      "at": "2026-10-04 04:08:08Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/rey_si_stairs": {
-      "at": "2026-10-04 01:37:48Z",
+      "at": "2026-10-04 04:08:14Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/rey_sign_amberbeach": {
-      "at": "2026-10-04 01:38:11Z",
+      "at": "2026-10-04 04:08:22Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/rey_sign_fishplant": {
-      "at": "2026-10-04 01:38:20Z",
+      "at": "2026-10-04 04:08:24Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/rey_sign_mine": {
-      "at": "2026-10-04 01:38:10Z",
+      "at": "2026-10-04 04:08:21Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/rey_sign_pswelcome": {
-      "at": "2026-10-04 01:38:05Z",
+      "at": "2026-10-04 04:08:21Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/rey_sign_siwelcome": {
-      "at": "2026-10-04 01:38:12Z",
+      "at": "2026-10-04 04:08:22Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/rey_sign_wells": {
-      "at": "2026-10-04 01:37:53Z",
+      "at": "2026-10-04 04:08:17Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/rey_streetlamp": {
-      "at": "2026-10-04 01:36:48Z",
+      "at": "2026-10-04 03:59:13Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/rey_windturbine": {
-      "at": "2026-10-04 01:36:57Z",
+      "at": "2026-10-04 03:59:27Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/road": {
-      "at": "2026-10-04 01:36:45Z",
+      "at": "2026-10-04 03:59:07Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/road-block5": {
-      "at": "2026-10-04 01:38:16Z",
+      "at": "2026-10-04 04:08:23Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/road-park": {
-      "at": "2026-10-04 01:36:55Z",
+      "at": "2026-10-04 03:59:24Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/road-slab": {
-      "at": "2026-10-04 01:36:51Z",
+      "at": "2026-10-04 03:59:16Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/sign-bluearrow2downright": {
-      "at": "2026-10-04 01:38:13Z",
+      "at": "2026-10-04 04:08:23Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-descent": {
-      "at": "2026-10-04 01:38:13Z",
+      "at": "2026-10-04 04:08:22Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-fall": {
-      "at": "2026-10-04 01:38:19Z",
+      "at": "2026-10-04 04:08:24Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-hospital": {
-      "at": "2026-10-04 01:38:17Z",
+      "at": "2026-10-04 04:08:23Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-maxspeed10": {
-      "at": "2026-10-04 01:37:54Z",
+      "at": "2026-10-04 04:08:18Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-maxspeed100": {
-      "at": "2026-10-04 01:37:51Z",
+      "at": "2026-10-04 04:08:16Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-maxspeed30": {
-      "at": "2026-10-04 01:37:35Z",
+      "at": "2026-10-04 04:08:10Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-maxspeed50": {
-      "at": "2026-10-04 01:37:38Z",
+      "at": "2026-10-04 04:08:11Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-maxspeed70": {
-      "at": "2026-10-04 01:37:28Z",
+      "at": "2026-10-04 04:08:09Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-noparking": {
-      "at": "2026-10-04 01:37:11Z",
+      "at": "2026-10-04 04:06:35Z",
       "marks": [],
-      "note": "",
+      "note": "I approved some of the before, but this one looks like the collision is too thick for the thin sign, it looks like a huge box of collision here",
       "verdict": "fail"
     },
     "collision/sign-nostopping": {
-      "at": "2026-10-04 01:37:25Z",
+      "at": "2026-10-04 04:08:07Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-notrucks": {
-      "at": "2026-10-04 01:38:14Z",
+      "at": "2026-10-04 04:08:23Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-novehicles": {
-      "at": "2026-10-04 01:37:42Z",
+      "at": "2026-10-04 04:08:12Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-parking": {
-      "at": "2026-10-04 01:37:12Z",
+      "at": "2026-10-04 04:06:36Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-parkingzoneend": {
-      "at": "2026-10-04 01:37:50Z",
+      "at": "2026-10-04 04:08:15Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-parkingzonestart": {
-      "at": "2026-10-04 01:37:52Z",
+      "at": "2026-10-04 04:08:16Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-priorityintersection": {
-      "at": "2026-10-04 01:37:40Z",
+      "at": "2026-10-04 04:08:11Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-roadnarrows": {
-      "at": "2026-10-04 01:37:55Z",
+      "at": "2026-10-04 04:08:18Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-rocks": {
-      "at": "2026-10-04 01:38:18Z",
+      "at": "2026-10-04 04:08:24Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-stop": {
-      "at": "2026-10-04 01:37:46Z",
+      "at": "2026-10-04 04:08:14Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/sign-warning": {
-      "at": "2026-10-04 01:37:31Z",
+      "at": "2026-10-04 04:08:09Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/store02": {
-      "at": "2026-10-04 01:37:44Z",
+      "at": "2026-10-04 04:08:13Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/store08": {
-      "at": "2026-10-04 01:36:49Z",
+      "at": "2026-10-04 03:59:15Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/store10": {
-      "at": "2026-10-04 01:36:43Z",
+      "at": "2026-10-04 03:59:05Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/straightroadbusstop": {
-      "at": "2026-10-04 01:37:21Z",
+      "at": "2026-10-04 04:07:58Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/straightroadsidewalk": {
-      "at": "2026-10-04 01:36:54Z",
+      "at": "2026-10-04 03:59:21Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/townhouse01blue": {
-      "at": "2026-10-04 01:36:42Z",
+      "at": "2026-10-04 03:59:00Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/townhouse01red": {
-      "at": "2026-10-04 01:36:46Z",
+      "at": "2026-10-04 03:59:11Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/townhouse01white": {
-      "at": "2026-10-04 01:36:41Z",
+      "at": "2026-10-04 03:58:59Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/townhouse01yeller": {
-      "at": "2026-10-04 01:37:01Z",
+      "at": "2026-10-04 03:59:40Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/trafficlightsequence1": {
-      "at": "2026-10-04 01:37:36Z",
+      "at": "2026-10-04 04:08:10Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/trafficlightsequence2": {
-      "at": "2026-10-04 01:37:47Z",
+      "at": "2026-10-04 04:08:14Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/troadstopsign": {
-      "at": "2026-10-04 01:37:49Z",
+      "at": "2026-10-04 04:08:15Z",
       "marks": [],
       "note": "",
       "verdict": "fail"
     },
     "collision/truckshop": {
-      "at": "2026-10-04 01:37:04Z",
+      "at": "2026-10-04 03:59:47Z",
       "marks": [],
       "note": "",
-      "verdict": "fail"
+      "verdict": "pass"
     },
     "collision/warehouse01": {
-      "at": "2026-10-04 01:37:19Z",
+      "at": "2026-10-04 04:07:52Z",
       "marks": [],
-      "note": "",
+      "note": "Pillars",
       "verdict": "fail"
     },
     "curvedroadninteydegsidewalk.mesh": {
