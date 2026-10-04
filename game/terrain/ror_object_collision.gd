@@ -19,9 +19,24 @@ extends RefCounted
 
 ## How big a cell is on the ground plane, in metres.
 const CELL_M: float = 0.7
-## A cell whose geometry is shorter than this is scenery rather than an obstacle: wires, cables,
-## the lip of a kerb.
-const MIN_HEIGHT_M: float = 0.5
+## How thick a slab is made of a surface that has no thickness of its own.
+##
+## **A flat thing is still something to stand on.** A cell's geometry used to have to be half a
+## metre tall to count, on the grounds that a wire is not an obstacle — and that threw away every
+## horizontal surface in the library. `largedockasphalt.mesh` is a 50 by 30 m quay pad, the hero
+## truck spawns on one, and it had nothing solid in it at all: the wheels rested on the terrain
+## underneath and sank through the drawn surface. Reported from a window as "it spawns on a block
+## which doesn't have collision so wheels are half way in the texture".
+const MIN_SLAB_M: float = 0.2
+## How tall an object may be and still count as flat, and how coarse a cell it may then use.
+##
+## A coarse cell on a tall object is a wall across whatever it covers, which is why growth is
+## capped. A coarse cell on something flat is still something flat, so a quay pad may be
+## approximated at 16 m and lose nothing but its edges.
+const FLAT_M: float = 1.0
+const FLAT_CELL_M: float = 16.0
+## And how coarse a cell may become for anything taller than that.
+const MAX_GROWN_CELL_M: float = 4.0
 ## And one this thin in both directions on the ground is drawn detail rather than structure.
 const MIN_FOOTPRINT_M: float = 0.05
 ## How many cells one object may produce. A mesh that needs more than this is a building, and a
@@ -280,6 +295,34 @@ static func _columns(points: PackedVector3Array) -> Array[Dictionary]:
     var out: Array[Dictionary] = []
     if points.is_empty():
         return out
+    var low: Vector3 = Vector3.INF
+    var high: Vector3 = -Vector3.INF
+    for at: int in points.size():
+        low = low.min(points[at])
+        high = high.max(points[at])
+    # A flat object may be approximated coarsely; a tall one may not.
+    # **A flat object is one slab.** A 50 by 30 m quay pad is 3053 cells at `CELL_M` and the cap
+    # keeps 64 of them, so the hero truck spawns on a corner of its own collision and sinks
+    # through the rest — reported from a window as "it spawns on a block which doesn't have
+    # collision so wheels are half way in the texture". A grid buys nothing on something with no
+    # height to vary: its own bounds are exact where the object fills them and the only error is
+    # at a notch in its outline.
+    if (high.z - low.z) <= FLAT_M:
+        var middle: Vector3 = (low + high) * 0.5
+        return [{
+            "transform": Transform3D(Basis.IDENTITY, middle),
+            "half": Vector3(
+                maxf((high.x - low.x) * 0.5, MIN_FOOTPRINT_M),
+                maxf((high.y - low.y) * 0.5, MIN_FOOTPRINT_M),
+                maxf((high.z - low.z) * 0.5, MIN_SLAB_M * 0.5)
+            ),
+        }]
+    var cell: float = CELL_M
+    return _boxes_of(_raster(points, cell), cell)
+
+
+## Every cell a triangle soup crosses at this size, as `cell -> [bottom, top]`.
+static func _raster(points: PackedVector3Array, cell: float) -> Dictionary:
     var cells: Dictionary = {}
     for first: int in range(0, points.size() - 2, 3):
         var a: Vector3 = points[first]
@@ -287,30 +330,36 @@ static func _columns(points: PackedVector3Array) -> Array[Dictionary]:
         var c: Vector3 = points[first + 2]
         var low: Vector3 = a.min(b).min(c)
         var high: Vector3 = a.max(b).max(c)
-        for x: int in range(int(floor(low.x / CELL_M)), int(floor(high.x / CELL_M)) + 1):
-            for y: int in range(int(floor(low.y / CELL_M)), int(floor(high.y / CELL_M)) + 1):
+        for x: int in range(int(floor(low.x / cell)), int(floor(high.x / cell)) + 1):
+            for y: int in range(int(floor(low.y / cell)), int(floor(high.y / cell)) + 1):
                 var key: Vector2i = Vector2i(x, y)
-                var bounds: Vector4 = cells.get(
-                    key, Vector4(0.0, 0.0, INF, -INF)
-                ) as Vector4
-                cells[key] = Vector4(
-                    0.0, 0.0, minf(bounds.z, low.z), maxf(bounds.w, high.z)
-                )
-    for key: Vector2i in cells.keys():
+                var span: PackedFloat32Array = cells.get(
+                    key, PackedFloat32Array([INF, -INF])
+                ) as PackedFloat32Array
+                cells[key] = PackedFloat32Array([
+                    minf(span[0], low.z), maxf(span[1], high.z)
+                ])
+    return cells
+
+
+## One box per cell, each a slab of whatever that cell holds.
+static func _boxes_of(cells: Dictionary, cell: float) -> Array[Dictionary]:
+    var out: Array[Dictionary] = []
+    var keys: Array = cells.keys()
+    # Sorted, so one mesh always produces the same boxes in the same order.
+    keys.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+        return a.x < b.x if a.x != b.x else a.y < b.y
+    )
+    for key: Vector2i in keys:
         if out.size() >= MAX_BOXES_PER_OBJECT:
             break
-        var bounds: Vector4 = cells[key] as Vector4
-        var height: float = bounds.w - bounds.z
-        if height < MIN_HEIGHT_M:
-            continue
-        var low: Vector2 = Vector2(float(key.x), float(key.y)) * CELL_M
-        var half: Vector3 = Vector3(
-            maxf(CELL_M * 0.5, MIN_FOOTPRINT_M),
-            maxf(CELL_M * 0.5, MIN_FOOTPRINT_M),
-            height * 0.5
-        )
-        var centre: Vector3 = Vector3(
-            low.x + CELL_M * 0.5, low.y + CELL_M * 0.5, bounds.z + height * 0.5
-        )
-        out.append({"transform": Transform3D(Basis.IDENTITY, centre), "half": half})
+        var span: PackedFloat32Array = cells[key] as PackedFloat32Array
+        var height: float = maxf(span[1] - span[0], MIN_SLAB_M)
+        out.append({
+            "transform": Transform3D(Basis.IDENTITY, Vector3(
+                (float(key.x) + 0.5) * cell, (float(key.y) + 0.5) * cell,
+                (span[0] + span[1]) * 0.5
+            )),
+            "half": Vector3(cell * 0.5, cell * 0.5, height * 0.5),
+        })
     return out
