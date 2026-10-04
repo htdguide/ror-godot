@@ -27,6 +27,22 @@ static func material(weather: Dictionary) -> ShaderMaterial:
         "sky_horizon", weather.get("sky_horizon", RenderCfg.SKY_HORIZON) as Color
     )
     material.set_shader_parameter("ground_colour", RenderCfg.GROUND_HORIZON)
+    # How much of the sky's brightness reaches the radiance map every glossy surface reflects.
+    # A night states a fraction here: see the uniform's own note in the shader.
+    material.set_shader_parameter(
+        "radiance_scale", float(weather.get("radiance_scale", 1.0))
+    )
+    # The stars, which an hour of the day turns up as its sky goes out.
+    material.set_shader_parameter("stars", float(weather.get("stars", 0.0)))
+    # How much light is on the clouds. A preset that says nothing is a daylight one.
+    material.set_shader_parameter(
+        "cloud_light", float(weather.get("cloud_light", 1.0))
+    )
+    # How bright the disc of whatever is up is drawn. A moon is not scaled by the night sky's
+    # own four ten-thousandths or there is no moon.
+    material.set_shader_parameter(
+        "disc_energy", float(weather.get("disc_energy", 1.0))
+    )
     material.set_shader_parameter("sky_curve", RenderCfg.SKY_CURVE)
     material.set_shader_parameter(
         "sky_energy", float(weather.get("sky_energy", RenderCfg.SKY_ENERGY))

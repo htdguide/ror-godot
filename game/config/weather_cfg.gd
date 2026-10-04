@@ -56,6 +56,16 @@ const PRESETS: Dictionary = {
         # moonlit ground is as bright as what the low beams throw, and the lamps read as glow
         # rather than as light.
         "sky_energy": 0.0004,
+        # And a fiftieth of that again as light. A moonlit sky is something to see, not something
+        # to be lit by; left at its own brightness it put a white truck at 0.57 on a black road.
+        "radiance_scale": 0.006,
+        # And the clouds are lit by the moon, not by a sun that set hours ago.
+        "cloud_light": 0.05,
+        "disc_energy": 0.02,
+        # This project's own sky shader rather than the atmosphere model, because it is the one
+        # that can state a radiance scale, and because a modelled atmosphere lit by a moon is a
+        # daylight sky with the brightness turned down.
+        "sky_shader": true,
         # The moon, high and over the camera's left shoulder.
         "sun_from": Vector3(-0.42, 0.74, 0.52),
         # What a full moon actually is. A quarter of a lux against a low beam's fifty-odd on the
@@ -85,7 +95,7 @@ const PRESETS: Dictionary = {
         # The haze is what the night is, not what the day is: thinner, and the colour of the
         # sky rather than of a bright overcast.
         "fog_density": 0.0004,
-        "fog_colour": Color(0.05, 0.07, 0.13),
+        "fog_colour": Color(0.006, 0.009, 0.018),
         # Air for the beams to stand in.
         "volumetric": true,
     },

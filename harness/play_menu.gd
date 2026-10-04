@@ -32,9 +32,6 @@ const GRAVITY_PRESETS: Dictionary = {
 const SUN_ELEVATION_RANGE: Vector2 = Vector2(-10.0, 89.0)
 const SUN_AZIMUTH_RANGE: Vector2 = Vector2(-180.0, 180.0)
 ## How far a session may push the view, and how thick the haze may get.
-const VIEW_RANGE_M: Vector2 = Vector2(200.0, 12000.0)
-const FOG_RANGE: Vector2 = Vector2(0.0, 0.02)
-const GRASS_RANGE_M: Vector2 = Vector2(0.0, 400.0)
 const PANEL_WIDTH: int = 380
 const PANEL_MAX_HEIGHT: int = 720
 
@@ -51,6 +48,10 @@ var _vegetation: RorVegetation = null
 var _weather_names: PackedStringArray = PackedStringArray()
 var _weather_index: int = 0
 var _on_weather: Callable
+## Called with a clock hour when the day is dragged. The sky, the sun, the stars and the
+## exposure are the session's business; this panel only says which hour.
+var _on_hour: Callable
+var _hour: float = 12.0
 var _on_quit: Callable
 var _on_map: Callable
 var _on_vehicle: Callable
@@ -71,6 +72,7 @@ func setup(
     camera: Camera3D,
     weather: String,
     on_weather: Callable,
+    on_hour: Callable,
     on_quit: Callable,
     on_map: Callable = Callable(),
     on_vehicle: Callable = Callable()
@@ -80,6 +82,7 @@ func setup(
     _drive = drive
     _camera = camera
     _on_weather = on_weather
+    _on_hour = on_hour
     _on_quit = on_quit
     _on_map = on_map
     _on_vehicle = on_vehicle
@@ -148,7 +151,7 @@ func _build() -> void:
     _title()
     _world_section()
     _sky_section()
-    _distance_section()
+    PlayDistanceRows.build(_rows, _environment, _camera, _vegetation)
     _vehicle_section()
     MenuWidgets.buttons(_rows, PackedStringArray(["Resume", "Quit"]), func(index: int) -> void:
         if index == 0:
@@ -286,9 +289,16 @@ func _fill() -> DirectionalLight3D:
 ## The sky: how bright it is, how it is graded, and what is in it.
 func _sky_section() -> void:
     MenuWidgets.heading(_rows, "Sky")
+    # The clock, which is the whole day rather than a preset: sun, moon, stars, haze and the
+    # exposure that light was metered for. `Sky brightness` used to sit here and did nothing —
+    # `ambient_light_energy` is ignored while the sky supplies all of the ambient.
     MenuWidgets.slider(
-        _rows, "Sky brightness", 0.0, 4.0, _environment.ambient_light_energy,
-        func(value: float) -> void: _environment.ambient_light_energy = value
+        _rows, "Time of day", 0.0, 24.0, _hour,
+        func(value: float) -> void:
+            _hour = value
+            if _on_hour.is_valid():
+                _on_hour.call(value),
+        "%.1f h"
     )
     MenuWidgets.slider(
         _rows, "Exposure", 0.1, 3.0, _environment.tonemap_exposure,
@@ -310,42 +320,6 @@ func _sky_section() -> void:
         _rows, "Wind", 0.0, 0.05, clouds["wind_speed"] as float,
         func(value: float) -> void: SkyClouds.set_parameter(_environment, "wind_speed", value),
         "%.3f"
-    )
-
-
-## How far a person can see, and what closes the distance.
-func _distance_section() -> void:
-    MenuWidgets.heading(_rows, "Distance")
-    MenuWidgets.slider(
-        _rows, "View distance", VIEW_RANGE_M.x, VIEW_RANGE_M.y,
-        _camera.far if _camera != null else RenderCfg.VIEW_DISTANCE_M,
-        func(value: float) -> void:
-            if _camera != null:
-                _camera.far = value,
-        "%.0f m"
-    )
-    MenuWidgets.check(
-        _rows, "Fog", _environment.fog_enabled,
-        func(on: bool) -> void: _environment.fog_enabled = on
-    )
-    MenuWidgets.slider(
-        _rows, "Fog thickness", FOG_RANGE.x, FOG_RANGE.y, _environment.fog_density,
-        func(value: float) -> void:
-            _environment.fog_density = value
-            _environment.fog_enabled = value > 0.0,
-        "%.4f"
-    )
-    MenuWidgets.slider(
-        _rows, "Fog in the sky", 0.0, 1.0, _environment.fog_sky_affect,
-        func(value: float) -> void: _environment.fog_sky_affect = value
-    )
-    MenuWidgets.slider(
-        _rows, "Grass distance", GRASS_RANGE_M.x, GRASS_RANGE_M.y,
-        _vegetation.range_m() if _vegetation != null else RorVegetation.MAX_RANGE_M,
-        func(value: float) -> void:
-            if _vegetation != null:
-                _vegetation.set_range(value),
-        "%.0f m"
     )
 
 

@@ -254,6 +254,9 @@ static func _lens(flare: Dictionary, colour: Color) -> MeshInstance3D:
     material.albedo_texture = _glow_texture()
     material.albedo_color = colour * LENS_EMISSION_OFF
     material.disable_receive_shadows = true
+    # A lamp is unlit because it *is* a light, and the one thing that must not dim as the day
+    # goes out. See `BlockoutWorld.dim_unlit`.
+    material.set_meta("keeps_its_own_light", true)
     # Seen from behind a lamp is not there, rather than being a bright disc inside the wing.
     material.cull_mode = BaseMaterial3D.CULL_BACK
     var lens: MeshInstance3D = MeshInstance3D.new()

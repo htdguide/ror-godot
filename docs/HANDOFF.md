@@ -127,11 +127,14 @@ distance, lamps — with Resume and Quit in it. Controls: `G` drive, `B` reverse
 ignition, `N` or `L` lights, `R` recover upright, Backspace respawn, `Z`/`C`/`X` indicators,
 `F5`/`F6`/`F7` chase, free and driver's seat. `K` is the main beam: a vehicle with no `h` lamps
 of its own — which is most of them — puts its low beams onto the main-beam pattern instead, the
-way a two-filament bulb does. `F2` cycles the weather, and `night_moon` is one of them.
+way a two-filament bulb does. `F2` cycles the weather, and `night_moon` is one of them. The settings panel's **Time of day**
+slider runs the whole 24 hours instead — `DayCycle` moves the sun along its arc, hands the night
+to the moon, brings the stars up through the twilight, and re-meters the camera for the light it
+has just stated.
 
 ## The suite is green
 
-121 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
+122 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
 twice in one session with a worst measured drift of zero.
 
 It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%

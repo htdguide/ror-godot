@@ -20,6 +20,34 @@ uniform vec3 sky_horizon : source_color = vec3(0.62, 0.72, 0.84);
 uniform vec3 ground_colour : source_color = vec3(0.42, 0.40, 0.37);
 uniform float sky_curve = 0.12;
 uniform float sky_energy = 1.0;
+// How much of that brightness the sky contributes as *light*, as against how much of it is
+// seen.
+//
+// **A night sky lights a white vehicle far harder than its own brightness suggests.** The sky's
+// radiance map is what every glossy surface reflects, and at a sky energy of four ten-thousandths
+// — a sky that photographs at 0.03 — a white truck panel came back at 0.57, brighter than the
+// road under its own headlights, while the terrain around it was black. Reported from a window:
+// "in the dark with a very weak moonlight we are supposed to barely see the car, but here it is
+// so bright". The cube-map pass is the one the radiance is built from, so this scales that pass
+// and leaves what a person sees alone.
+uniform float radiance_scale = 1.0;
+// How much light is falling on the clouds, as a fraction of a midday sun's.
+//
+// **A cloud is lit by the sun and the sky shader did not know the sun had set.** The marched
+// layer takes its colour from `cloud_colour` and a Beer's-law shadow, neither of which has the
+// hour in it, so a moonlit sky kept daylight-white clouds: ten times the brightness of the clear
+// sky beside them, which at midnight is a band of grey noise standing over a black world.
+// Measured at the horizon, 0.0526 against 0.0048 with the clouds taken out.
+uniform float cloud_light = 1.0;
+// How bright whatever is up is drawn as a disc. One by day, a fraction under a moon.
+uniform float disc_energy = 1.0;
+// How bright a star is drawn, before the hour's own `stars` fraction.
+const float STAR_BRIGHTNESS = 0.07;
+
+// How much of the star field shows. One after dark, nothing by day: the stars are there the
+// whole time and the sky in front of them is what hides them.
+uniform float stars : hint_range(0.0, 1.0) = 0.0;
+uniform vec3 star_colour : source_color = vec3(0.88, 0.92, 1.0);
 
 uniform vec3 cloud_colour : source_color = vec3(1.0, 0.99, 0.96);
 uniform vec3 cloud_shadow : source_color = vec3(0.42, 0.46, 0.55);
@@ -115,12 +143,30 @@ void sky() {
 
 	vec3 sun_direction = -LIGHT0_DIRECTION;
 	float to_sun = clamp(dot(direction, sun_direction), 0.0, 1.0);
-	// The sun's own disc and the glow around it, on the gradient rather than on the clouds.
-	base += LIGHT0_COLOR * LIGHT0_ENERGY * (
-		smoothstep(0.9995, 0.99975, 1.0 - (1.0 - to_sun)) * 0.0
-		+ pow(to_sun, 700.0) * 12.0
-		+ pow(to_sun, 8.0) * 0.06
+	// Whatever is up, as a disc with a glow around it. Kept apart from the gradient because it
+	// is a light rather than a part of the sky's own brightness: at midnight the sky is four
+	// ten-thousandths of a noon and the moon in it is not.
+	vec3 disc = LIGHT0_COLOR * LIGHT0_ENERGY * (
+		pow(to_sun, 700.0) * 12.0 + pow(to_sun, 8.0) * 0.06
 	);
+
+	// The stars. A fixed field rather than a scattered list: the direction is quantised into
+	// cells and a hash decides whether that cell holds one and how bright it is, so the same
+	// star is in the same place every frame and from every position, which is what a star is.
+	// Never in the pass the radiance map is built from — a sky full of points convolves into a
+	// grey wash and lights the scene with it.
+	vec3 starlight = vec3(0.0);
+	if (stars > 0.001 && !AT_CUBEMAP_PASS && direction.y > 0.0) {
+		vec3 cell = floor(direction * 260.0);
+		float pick = hash(cell);
+		if (pick > 0.9955) {
+			float brightness = (pick - 0.9955) / 0.0045;
+			// Fading in with height, so the horizon does not fill with stars a real one puts
+			// behind its own haze.
+			starlight = star_colour * stars * brightness * brightness * STAR_BRIGHTNESS
+				* smoothstep(0.0, 0.35, direction.y);
+		}
+	}
 
 	vec3 colour = base;
 
@@ -158,7 +204,7 @@ void sky() {
 			}
 			float light = exp(-shadow * 0.55);
 			vec3 lit = mix(cloud_shadow, cloud_colour, light)
-				* (LIGHT0_COLOR * LIGHT0_ENERGY * 0.5 + 0.5);
+				* (LIGHT0_COLOR * LIGHT0_ENERGY * 0.5 + 0.5) * cloud_light;
 			float step_transmittance = exp(-thickness * span * 0.0016);
 			scattered += lit * transmittance * (1.0 - step_transmittance);
 			transmittance *= step_transmittance;
@@ -176,5 +222,9 @@ void sky() {
 	// blazing white overcast with black holes in it, and the vehicle's reflection probe caught it
 	// and turned the bodywork white. Reported from a window: "when I choose night, the sky is
 	// very white and the car starts reflecting something and also becomes white."
-	COLOR = colour * sky_energy;
+	// The sky's own brightness scales the sky. The disc and the stars are lights in front of it
+	// and carry their own: an hour states `disc_energy`, and a moon that the night sky's own
+	// multiplier had been applied to would not be there at all.
+	COLOR = colour * sky_energy * (AT_CUBEMAP_PASS ? radiance_scale : 1.0)
+		+ disc * disc_energy + starlight;
 }

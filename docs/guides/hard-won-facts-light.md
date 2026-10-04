@@ -239,3 +239,22 @@ See `hard-won-facts.md` for the solver, the file formats, the terrain and the ga
   void so that a gate can encode a number into a pixel and read it back; a window that cycles
   into it finds a black world with headlights that appear not to work. It carries
   `measurement: true` and the window leaves it out.
+- **A cloud shader does not know the sun has set.** The marched layer takes its colour from a
+  stated cloud colour and a Beer's-law shadow, neither of which has the hour in it, so a moonlit
+  sky kept daylight-white clouds — ten times the clear sky beside them, which at midnight is a
+  band of grey noise standing over a black world. `cloud_light` is how much light is falling on
+  them.
+- **A disc and a star are lights in front of the sky, not part of its brightness.** Scaled by the
+  sky's own four-ten-thousandth night multiplier, the moon is not dim, it is absent. They carry
+  their own `disc_energy` and star brightness and are added after that multiplier.
+- **An unlit surface does not know what time it is.** A terrain paints its horizon on one — La
+  Paz's backdrop is a photograph of mountains with the daylight already in it — and under a day
+  that moves it is the one thing that does not: at midnight the world goes black and a band of
+  bright mountains stays up around it. Nothing can light a picture of being lit, so
+  `BlockoutWorld.dim_unlit` scales them by how much of the day it is, and a lamp's lens says
+  `keeps_its_own_light` to opt out.
+- **Under physical light units the exposure belongs to the hour.** `DayCycle` states the three
+  numbers along with the lux: f/8, a hundred-and-twenty-fifth and ISO 32 at noon; f/2.8, a
+  sixtieth and ISO 1600 under a quarter-lux moon. Interpolated in ratios rather than in steps,
+  because a sky that runs from 0.0004 to 1.0 linearly is full daylight for all but the last
+  moments of dusk.

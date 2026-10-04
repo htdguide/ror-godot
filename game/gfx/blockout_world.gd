@@ -124,7 +124,10 @@ static func _grade_air(env: Environment, weather: Dictionary) -> void:
 ## last world to be built had asked for. Invisible with one world per process and an
 ## order-dependent bug the moment there is not — which is what D0's containers exist to stop.
 static func _build_sky(weather: Dictionary, clouds: bool) -> Sky:
-    if clouds and RenderCfg.CLOUDS_ENABLED:
+    # An hour may ask for this project's own sky shader whatever the session is doing. The night
+    # does, because it is the only sky with a radiance scale — see the uniform in
+    # `sky_clouds.gdshader` — and a gate and a window have to be looking at the same night.
+    if bool(weather.get("sky_shader", false)) or (clouds and RenderCfg.CLOUDS_ENABLED):
         var clouded: ShaderMaterial = SkyClouds.material(weather)
         if clouded != null:
             return _new_sky(clouded)
@@ -253,6 +256,52 @@ static func apply_weather(root: Node3D, weather: Dictionary, clouds: bool = fals
     var fill: DirectionalLight3D = root.get_node_or_null(^"Fill") as DirectionalLight3D
     if fill != null:
         _grade_fill(fill, weather)
+    dim_unlit(root, float(weather.get("unlit_dim", 1.0)))
+
+
+## Takes every unlit surface in the scene down with the hour.
+##
+## **A surface with `lighting off` does not know what time it is.** A Rigs of Rods terrain paints
+## its horizon on one — La Paz's backdrop ring is a photograph of mountains with the daylight
+## already in it — and upstream draws those unshaded so that they read as distance rather than as
+## geometry. Under a day that moves, they are the one thing that does not: at midnight the world
+## goes black and a band of bright grey mountains stays up around it.
+##
+## Nothing can light them correctly, because what they are is a picture of being lit. So they are
+## scaled by how much of the day it is, which is the same number the sky's own brightness follows.
+## A lamp's lens is exempt — it is unlit because it is a light, and a headlight at midnight is the
+## one thing that should not dim — and says so with `keeps_its_own_light` on its material.
+static func dim_unlit(root: Node, factor: float) -> void:
+    for child: Node in root.get_children():
+        dim_unlit(child, factor)
+        var instance: GeometryInstance3D = child as GeometryInstance3D
+        if instance == null:
+            continue
+        var mesh: Mesh = null
+        if instance is MultiMeshInstance3D:
+            var multimesh: MultiMesh = (instance as MultiMeshInstance3D).multimesh
+            mesh = null if multimesh == null else multimesh.mesh
+        elif instance is MeshInstance3D:
+            mesh = (instance as MeshInstance3D).mesh
+        if mesh == null:
+            continue
+        for surface: int in mesh.get_surface_count():
+            _dim_one(mesh.surface_get_material(surface) as StandardMaterial3D, factor)
+
+
+static func _dim_one(material: StandardMaterial3D, factor: float) -> void:
+    if material == null or material.shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED:
+        return
+    if bool(material.get_meta("keeps_its_own_light", false)):
+        return
+    # The colour the material was built with, kept once so that dimming and undimming are not
+    # a product of every hour this session has been through.
+    if not material.has_meta("daylight_albedo"):
+        material.set_meta("daylight_albedo", material.albedo_color)
+    var base: Color = material.get_meta("daylight_albedo") as Color
+    material.albedo_color = Color(
+        base.r * factor, base.g * factor, base.b * factor, base.a
+    )
 
 
 ## Everything about the sun that a weather preset decides.
