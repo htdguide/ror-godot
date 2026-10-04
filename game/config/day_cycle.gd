@@ -38,8 +38,20 @@ const MOON_ELEVATION_DEG: float = 48.0
 ## Full daylight at this elevation and full night at this one, with the twilight between them.
 ## Civil twilight ends around six degrees below the horizon; this is a little wider so that the
 ## change reads as a change rather than as a switch.
-const DAY_ELEVATION_DEG: float = 8.0
-const NIGHT_ELEVATION_DEG: float = -8.0
+const DAY_ELEVATION_DEG: float = 6.0
+const NIGHT_ELEVATION_DEG: float = -9.0
+## How high the sun has to climb before its light stops being the colour of the horizon.
+##
+## **This is the golden hour and it is much longer than the twilight.** How bright an hour is and
+## what colour it is are two different questions, and answering both with one number made an hour
+## after sunrise look like noon: the sun was at 15.7 degrees, the brightness had saturated, and
+## with it went every trace of the warmth — a pale blue-white frame at seven in the morning.
+## Reported from a window as "a few moments when it looks weirdly white when it is supposed to be
+## sunset or sunrise".
+const WARM_ELEVATION_DEG: float = 30.0
+## And where the stars go out: they are gone before the sun itself is up.
+const STARS_FROM_DEG: float = -13.0
+const STARS_TO_DEG: float = -1.5
 
 ## The sun at its highest, and what is left of it on the horizon. A low sun is dim as well as
 ## red: the light comes through far more air.
@@ -85,6 +97,8 @@ const AMBIENT_ENERGY_NIGHT: float = 0.002
 const FOG_DENSITY_DAY: float = 0.0006
 const FOG_DENSITY_NIGHT: float = 0.0004
 const FOG_COLOUR_DAY: Color = Color(0.68, 0.72, 0.78)
+## The haze a low sun comes through, which is the colour of the light that is in it.
+const FOG_COLOUR_DUSK: Color = Color(0.72, 0.46, 0.3)
 ## **A haze is as dark as the sky it hangs in.** The night's own sky colour looks like the right
 ## figure here and is not: fog colour is an absolute, not something the sky's brightness scales,
 ## so a navy that reads correctly as a sky washed every distant hill to a visible grey band
@@ -117,27 +131,39 @@ static func at(hour: float) -> Dictionary:
         (elevation - NIGHT_ELEVATION_DEG) / (DAY_ELEVATION_DEG - NIGHT_ELEVATION_DEG), 0.0, 1.0
     )
     var daylight: bool = elevation > 0.0
-    # How close to the horizon the light is, for the colour of it. One at the horizon.
-    var low: float = 1.0 - clampf(absf(elevation) / 25.0, 0.0, 1.0)
+    # How much of the horizon's own colour this hour has. Not the same question as how bright it
+    # is: the sun is warm for an hour after it is fully up, and this is what says so.
+    # The curve favours the low sun: halfway up the band is still most of the way warm, which is
+    # what an hour after sunrise actually looks like.
+    var warmth: float = (
+        pow(1.0 - clampf(absf(elevation) / WARM_ELEVATION_DEG, 0.0, 1.0), 0.6)
+        * smoothstep(NIGHT_ELEVATION_DEG - 4.0, 0.0, elevation)
+    )
     return {
         "physical_sky": true,
         # This project's own sky shader rather than the atmosphere model: it is the one that can
         # state how much of its brightness is light rather than only a picture.
         "sky_shader": true,
         "sun_from": toward_light(clock),
-        "sun_lux": _lux(elevation, daylight),
+        # The moon's own height matters the way the sun's does: a moon near the horizon lights
+        # the ground less than one overhead, and a night that is one brightness from dusk to
+        # dawn is a night nobody has stood in.
+        "sun_lux": _lux(
+            elevation, daylight,
+            MOON_LUX * clampf(sin(deg_to_rad(moon_elevation_deg(clock))), 0.12, 1.0)
+        ),
         "sun_energy": 1.0,
         "sun_color": (
-            SUN_COLOUR_NOON.lerp(SUN_COLOUR_HORIZON, low) if daylight else MOON_COLOUR
+            SUN_COLOUR_NOON.lerp(SUN_COLOUR_HORIZON, warmth) if daylight else MOON_COLOUR
         ),
         "sun_angular_deg": SUN_ANGULAR_DEG if daylight else MOON_ANGULAR_DEG,
         "sky_energy": _between(SKY_ENERGY_NIGHT, SKY_ENERGY_DAY, day),
         "radiance_scale": _between(RADIANCE_NIGHT, RADIANCE_DAY, day),
-        "sky_top": _sky_colour(SKY_TOP_NIGHT, SKY_TOP_DUSK, SKY_TOP_DAY, day, low),
+        "sky_top": _sky_colour(SKY_TOP_NIGHT, SKY_TOP_DUSK, SKY_TOP_DAY, day, warmth),
         "sky_horizon": _sky_colour(
-            SKY_HORIZON_NIGHT, SKY_HORIZON_DUSK, SKY_HORIZON_DAY, day, low
+            SKY_HORIZON_NIGHT, SKY_HORIZON_DUSK, SKY_HORIZON_DAY, day, warmth
         ),
-        "stars": 1.0 - day,
+        "stars": 1.0 - smoothstep(STARS_FROM_DEG, STARS_TO_DEG, elevation),
         # What is falling on the clouds. They are lit by whatever is up, so they go out with it:
         # a moonlit cloud is a dim grey shape and not a white one.
         "cloud_light": maxf(day, 0.03),
@@ -150,7 +176,11 @@ static func at(hour: float) -> Dictionary:
         "bg_color": SKY_TOP_NIGHT.lerp(SKY_TOP_DAY, day),
         "fill_energy": FILL_ENERGY_DAY * day,
         "fog_density": lerpf(FOG_DENSITY_NIGHT, FOG_DENSITY_DAY, day),
-        "fog_colour": FOG_COLOUR_NIGHT.lerp(FOG_COLOUR_DAY, day),
+        # The haze takes the hour's colour too: a low sun reddens the air it comes through, and a
+        # pale grey daylight haze under an orange sky is the other half of what read as white.
+        "fog_colour": FOG_COLOUR_NIGHT.lerp(FOG_COLOUR_DAY, day).lerp(
+            FOG_COLOUR_DUSK, warmth * 0.85
+        ),
         # Air for a headlight to stand in, while there is a headlight worth seeing.
         "volumetric": day < 0.5,
         "iso": _between(ISO_NIGHT, ISO_DAY, day),
@@ -209,12 +239,12 @@ static func toward_light(hour: float) -> Vector3:
 ## at the horizon — because that is what makes a low sun dim as well as orange. Below the horizon
 ## it is the moon's quarter of a lux, faded in across the twilight so that the sky goes out
 ## before the stars come up rather than at the same instant.
-static func _lux(elevation_deg: float, daylight: bool) -> float:
+static func _lux(elevation_deg: float, daylight: bool, moon_lux: float = MOON_LUX) -> float:
     if daylight:
         var height: float = sin(deg_to_rad(maxf(elevation_deg, 0.0)))
         return maxf(SUN_LUX_HORIZON, SUN_LUX_NOON * pow(height, 1.25))
     var dusk: float = clampf(1.0 + elevation_deg / -NIGHT_ELEVATION_DEG, 0.0, 1.0)
-    return lerpf(MOON_LUX, SUN_LUX_HORIZON, dusk * dusk)
+    return lerpf(moon_lux, SUN_LUX_HORIZON, dusk * dusk)
 
 
 ## A value that spans orders of magnitude, interpolated the way an eye reads it: in ratios
@@ -224,9 +254,12 @@ static func _between(dark: float, light: float, day: float) -> float:
     return dark * pow(light / dark, clampf(day, 0.0, 1.0))
 
 
-## The sky's colour at an hour: night to day, with the horizon's own warmth laid over whichever
-## of them is nearer.
+## The sky's colour at an hour: night to day, with the horizon's own warmth laid over it.
+##
+## **Warmth is not a function of brightness.** It used to be `low * day * (1 - day) * 4`, which is
+## zero wherever the brightness has settled — so the only warm frames in a day were the two
+## half-hours when it happened to be halfway, and seven in the morning was a pale blue noon.
 static func _sky_colour(
-    night: Color, dusk: Color, day_colour: Color, day: float, low: float
+    night: Color, dusk: Color, day_colour: Color, day: float, warmth: float
 ) -> Color:
-    return night.lerp(day_colour, day).lerp(dusk, low * day * (1.0 - day) * 4.0)
+    return night.lerp(day_colour, day).lerp(dusk, warmth)

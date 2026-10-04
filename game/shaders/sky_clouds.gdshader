@@ -42,7 +42,9 @@ uniform float cloud_light = 1.0;
 // How bright whatever is up is drawn as a disc. One by day, a fraction under a moon.
 uniform float disc_energy = 1.0;
 // How bright a star is drawn, before the hour's own `stars` fraction.
-const float STAR_BRIGHTNESS = 0.07;
+const float STAR_BRIGHTNESS = 0.09;
+// How finely the sky is divided when looking for stars. One star per cell at most.
+const float STAR_CELLS = 260.0;
 
 // How much of the star field shows. One after dark, nothing by day: the stars are there the
 // whole time and the sky in front of them is what hides them.
@@ -157,13 +159,20 @@ void sky() {
 	// grey wash and lights the scene with it.
 	vec3 starlight = vec3(0.0);
 	if (stars > 0.001 && !AT_CUBEMAP_PASS && direction.y > 0.0) {
-		vec3 cell = floor(direction * 260.0);
+		vec3 cell = floor(direction * STAR_CELLS);
 		float pick = hash(cell);
 		if (pick > 0.9955) {
 			float brightness = (pick - 0.9955) / 0.0045;
+			// Where in its own cell the star sits, so that it is a point with a soft edge
+			// rather than the cell itself: a whole cell lit is a square, and a sky full of
+			// squares is what the first attempt at this drew.
+			vec3 jitter = vec3(hash(cell + 1.7), hash(cell + 3.3), hash(cell + 5.9));
+			vec3 star_at = normalize((cell + jitter) / STAR_CELLS);
+			float away = distance(direction, star_at) * STAR_CELLS;
 			// Fading in with height, so the horizon does not fill with stars a real one puts
 			// behind its own haze.
 			starlight = star_colour * stars * brightness * brightness * STAR_BRIGHTNESS
+				* smoothstep(0.75, 0.0, away)
 				* smoothstep(0.0, 0.35, direction.y);
 		}
 	}
@@ -203,8 +212,11 @@ void sky() {
 				shadow += cloud_density(toward, TIME);
 			}
 			float light = exp(-shadow * 0.55);
+			// A cloud is the colour of what is lighting it. At a quarter past five the sun
+			// is orange and so is every cloud it reaches; mixing it only halfway left a white
+			// overcast over a sunrise, which is most of what "weirdly white" was.
 			vec3 lit = mix(cloud_shadow, cloud_colour, light)
-				* (LIGHT0_COLOR * LIGHT0_ENERGY * 0.5 + 0.5) * cloud_light;
+				* mix(vec3(1.0), LIGHT0_COLOR, 0.85) * LIGHT0_ENERGY * cloud_light;
 			float step_transmittance = exp(-thickness * span * 0.0016);
 			scattered += lit * transmittance * (1.0 - step_transmittance);
 			transmittance *= step_transmittance;

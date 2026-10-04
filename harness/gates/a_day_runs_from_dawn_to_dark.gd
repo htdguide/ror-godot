@@ -43,13 +43,14 @@ static func meta() -> Dictionary:
         "proves": (
             "every hour of DayCycle puts the sun where that hour has it, lights the ground by"
             + " its height, meters the camera for that light, and renders a noon far brighter"
-            + " than its own midnight"
+            + " than its own midnight, with the moon highest in the middle of the night"
         ),
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": (
             "the sun above the horizon between the model's own sunrise and sunset and below it"
-            + " otherwise; noon the brightest hour and midnight the darkest; and a rendered noon"
-            + " at least 8 times a rendered midnight, which is itself under 0.08"
+            + " otherwise; noon the brightest hour, the darkest hour a dark one, the moon"
+            + " highest at midnight; and a rendered noon at least 8 times a rendered midnight,"
+            + " which is itself under 0.08"
         ),
         "why": (
             "a day that is a list of presets cannot be dragged, and a day that is a path has to"
@@ -102,8 +103,18 @@ func run(harness: Node) -> Dictionary:
         previous_iso = iso
     if not is_equal_approx(brightest_hour, 12.0):
         problems.append("the brightest hour is %.1f and not noon" % brightest_hour)
-    if not is_equal_approx(darkest_hour, 0.0):
-        problems.append("the darkest hour is %.1f and not midnight" % darkest_hour)
+    # **Not midnight.** The moon rises as the sun sets and is highest in the middle of the
+    # night, so the darkest hour of a day is the one just after dusk, when the sun is gone and
+    # the moon is still on the horizon — and midnight is the brightest hour of the night. What
+    # is astronomical here is that the darkest hour is a dark one and that the moonlight peaks
+    # when the moon is overhead; the clock hour it lands on follows from those.
+    if DayCycle.sun_elevation_deg(darkest_hour) > 0.0:
+        problems.append(
+            "the darkest hour is %.1f, with the sun %.1f degrees up"
+            % [darkest_hour, DayCycle.sun_elevation_deg(darkest_hour)]
+        )
+    if DayCycle.moon_elevation_deg(0.0) < DayCycle.moon_elevation_deg(21.0):
+        problems.append("the moon is not highest at midnight")
     if problems.size() > 0:
         return fail("; ".join(problems.slice(0, LISTED)), problems.size())
 
@@ -133,8 +144,9 @@ func run(harness: Node) -> Dictionary:
     return ok(
         "48 half-hours: the sun is up from %.0f to %.0f, brightest at noon at %.0f lux and"
         % [DayCycle.SUNRISE_H, DayCycle.SUNSET_H, brightest]
-        + " darkest at midnight at %.2f; drawn, noon is %.4f, dusk %.4f and midnight %.4f"
-        % [darkest, noon, dusk, midnight],
+        + " darkest at %.1f at %.2f lux, with the moon still on the horizon; drawn, noon is"
+        % [darkest_hour, darkest]
+        + " %.4f, dusk %.4f and midnight %.4f" % [noon, dusk, midnight],
         noon / maxf(midnight, 0.0001)
     )
 

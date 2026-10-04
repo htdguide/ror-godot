@@ -258,3 +258,15 @@ See `hard-won-facts.md` for the solver, the file formats, the terrain and the ga
   sixtieth and ISO 1600 under a quarter-lux moon. Interpolated in ratios rather than in steps,
   because a sky that runs from 0.0004 to 1.0 linearly is full daylight for all but the last
   moments of dusk.
+- **How bright an hour is and what colour it is are two different questions.** The warmth of a low
+  sun was computed from the same number as its brightness — `low * day * (1 - day) * 4`, which is
+  zero wherever the brightness has settled — so the only warm frames in a day were the two
+  half-hours when it happened to be halfway, and seven in the morning was a pale blue-white noon
+  with the sun 16 degrees up. Twilight is about fifteen degrees of elevation wide; the golden hour
+  is nearer thirty, and it has to be its own curve.
+- **A cloud is the colour of whatever is lighting it.** Mixing the light's colour in at half
+  strength left a white overcast over an orange sunrise, which was most of what read as "weirdly
+  white". At 0.85 the clouds take the hour.
+- **A star has to be a point inside its cell, not the cell.** Quantising the view direction and
+  lighting the whole cell draws square stars; keeping a jittered position per cell and fading with
+  the angular distance to it draws round ones for the same cost.
