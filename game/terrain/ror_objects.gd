@@ -298,6 +298,12 @@ static func mesh_of(terrain: RorTerrain, file: String, state: Dictionary) -> Arr
     var at: int = -1
     for submesh: Dictionary in read["submeshes"] as Array:
         at += 1
+        # A submesh whose indices run past its own vertices cannot be drawn: Godot rejects the
+        # surface and every measurement over it reads off the end of an array. They appear where
+        # the reader resynchronises past a chunk length that lies — the index buffer survives and
+        # the vertex buffer does not — and dropping them costs nothing that could have been shown.
+        if not _indices_fit(submesh):
+            continue
         var arrays: Array = ObjectWinding.arrays(submesh, turn[at])
         if arrays.is_empty():
             continue
@@ -311,6 +317,15 @@ static func mesh_of(terrain: RorTerrain, file: String, state: Dictionary) -> Arr
         return null
     cache[file] = mesh
     return mesh
+
+
+## Whether every index of a submesh names a vertex it actually has.
+static func _indices_fit(submesh: Dictionary) -> bool:
+    var points: int = (submesh["positions"] as PackedVector3Array).size()
+    for index: int in submesh["indices"] as PackedInt32Array:
+        if index < 0 or index >= points:
+            return false
+    return true
 
 
 ## The material a submesh names, built from the terrain's own scripts.

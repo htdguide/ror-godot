@@ -112,6 +112,13 @@ func _populate_terrain() -> void:
     # The sea the terrain declares. Port Starling spawns four metres above its own waterline.
     _world.add_child(RorWater.build(loaded))
     _grow_vegetation(loaded)
+    # `--collision` draws what the terrain is solid as, over whatever is drawn. A box with
+    # nothing in it is geometry that is missing; drawn geometry with no box is something a
+    # vehicle will drive through.
+    if Harness.args.has_flag("collision"):
+        var solid: Node3D = CollisionView.build(loaded)
+        _world.add_child(solid)
+        print("PLAY  collision shown: %d solid boxes" % CollisionView.count(loaded))
     # `--facing` dresses the scenery in the same paint the object gates photograph with: a face
     # keeps its texture from the front and draws its axis in a primary colour from behind. A wall
     # turned the wrong way is otherwise empty sky, which looks exactly like correct empty sky, so

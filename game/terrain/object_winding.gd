@@ -123,6 +123,8 @@ static func enclosed_share(submeshes: Array) -> float:
             low = low.min(point)
             high = high.max(point)
         for at: int in range(0, indices.size() - 2, 3):
+            if indices[at + 2] >= points.size():
+                continue
             volume += points[indices[at]].dot(
                 points[indices[at + 1]].cross(points[indices[at + 2]])
             ) / 6.0
@@ -143,6 +145,14 @@ static func faces_of(submeshes: Array) -> Array[Dictionary]:
         var indices: PackedInt32Array = submesh["indices"] as PackedInt32Array
         var triangle: int = 0
         for first: int in range(0, indices.size() - 2, 3):
+            # **A triangle may name a vertex that is not there.** Resynchronising past a chunk
+            # length that lies recovers submeshes whose index buffer was read correctly and whose
+            # vertex buffer the same bad length cut short. Such a triangle cannot be drawn and is
+            # not geometry; `RorObjects.mesh_of` drops the submesh, and this skips it so that the
+            # measurement never reads off the end of an array.
+            if indices[first + 2] >= points.size():
+                triangle += 1
+                continue
             var a: Vector3 = points[indices[first]]
             var b: Vector3 = points[indices[first + 1]]
             var c: Vector3 = points[indices[first + 2]]
