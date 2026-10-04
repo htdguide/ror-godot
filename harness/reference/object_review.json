@@ -99,6 +99,528 @@
       "note": "",
       "verdict": "pass"
     },
+    "collision/2af11UID-mc_tree02": {
+      "at": "2026-10-04 01:37:26Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/2af11UID-mc_tree03": {
+      "at": "2026-10-04 01:37:16Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/2af11UID-mc_tree04": {
+      "at": "2026-10-04 01:37:17Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/8d25UID-chapel": {
+      "at": "2026-10-04 01:38:08Z",
+      "marks": [],
+      "note": "",
+      "verdict": "pass"
+    },
+    "collision/8d25UID-smallhouse": {
+      "at": "2026-10-04 01:37:56Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/a1da0UID-lab": {
+      "at": "2026-10-04 01:38:21Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/a1da0UID-myobs": {
+      "at": "2026-10-04 01:38:25Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/a1da0UID-tunapicker": {
+      "at": "2026-10-04 01:38:03Z",
+      "marks": [],
+      "note": "",
+      "verdict": "pass"
+    },
+    "collision/allyentrance": {
+      "at": "2026-10-04 01:37:27Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/curvedroadninteydegsidewalk": {
+      "at": "2026-10-04 01:37:22Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/ferryslip": {
+      "at": "2026-10-04 01:37:10Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/firehouse": {
+      "at": "2026-10-04 01:37:37Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/hangar": {
+      "at": "2026-10-04 01:37:08Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/haus1": {
+      "at": "2026-10-04 01:37:24Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/haus2": {
+      "at": "2026-10-04 01:37:20Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/haus3": {
+      "at": "2026-10-04 01:37:13Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/haus4": {
+      "at": "2026-10-04 01:37:39Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/haus5": {
+      "at": "2026-10-04 01:37:41Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/haus6": {
+      "at": "2026-10-04 01:37:41Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/haus7": {
+      "at": "2026-10-04 01:37:32Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/haus8": {
+      "at": "2026-10-04 01:37:09Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/hospital": {
+      "at": "2026-10-04 01:37:18Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/largedockasphalt": {
+      "at": "2026-10-04 01:37:45Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/largedockinnercorner": {
+      "at": "2026-10-04 01:37:49Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/largedockoutercorner": {
+      "at": "2026-10-04 01:37:33Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/largedockstraight": {
+      "at": "2026-10-04 01:37:14Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/load-spawner": {
+      "at": "2026-10-04 01:37:00Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/marina": {
+      "at": "2026-10-04 01:36:52Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/officeblock02": {
+      "at": "2026-10-04 01:38:02Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/opentruckshop": {
+      "at": "2026-10-04 01:37:45Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/policedepartment": {
+      "at": "2026-10-04 01:37:43Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_bs_shelter1": {
+      "at": "2026-10-04 01:37:03Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_bs_shelter2": {
+      "at": "2026-10-04 01:37:15Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_bs_sign_blue": {
+      "at": "2026-10-04 01:37:06Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_bs_sign_nopost": {
+      "at": "2026-10-04 01:37:23Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_fishplant_big": {
+      "at": "2026-10-04 01:37:07Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_fishplant_small": {
+      "at": "2026-10-04 01:36:58Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_gasstation": {
+      "at": "2026-10-04 01:37:30Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_openshed": {
+      "at": "2026-10-04 01:37:27Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_si_stairs": {
+      "at": "2026-10-04 01:37:48Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_sign_amberbeach": {
+      "at": "2026-10-04 01:38:11Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_sign_fishplant": {
+      "at": "2026-10-04 01:38:20Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_sign_mine": {
+      "at": "2026-10-04 01:38:10Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_sign_pswelcome": {
+      "at": "2026-10-04 01:38:05Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_sign_siwelcome": {
+      "at": "2026-10-04 01:38:12Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_sign_wells": {
+      "at": "2026-10-04 01:37:53Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_streetlamp": {
+      "at": "2026-10-04 01:36:48Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/rey_windturbine": {
+      "at": "2026-10-04 01:36:57Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/road": {
+      "at": "2026-10-04 01:36:45Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/road-block5": {
+      "at": "2026-10-04 01:38:16Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/road-park": {
+      "at": "2026-10-04 01:36:55Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/road-slab": {
+      "at": "2026-10-04 01:36:51Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-bluearrow2downright": {
+      "at": "2026-10-04 01:38:13Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-descent": {
+      "at": "2026-10-04 01:38:13Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-fall": {
+      "at": "2026-10-04 01:38:19Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-hospital": {
+      "at": "2026-10-04 01:38:17Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-maxspeed10": {
+      "at": "2026-10-04 01:37:54Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-maxspeed100": {
+      "at": "2026-10-04 01:37:51Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-maxspeed30": {
+      "at": "2026-10-04 01:37:35Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-maxspeed50": {
+      "at": "2026-10-04 01:37:38Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-maxspeed70": {
+      "at": "2026-10-04 01:37:28Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-noparking": {
+      "at": "2026-10-04 01:37:11Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-nostopping": {
+      "at": "2026-10-04 01:37:25Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-notrucks": {
+      "at": "2026-10-04 01:38:14Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-novehicles": {
+      "at": "2026-10-04 01:37:42Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-parking": {
+      "at": "2026-10-04 01:37:12Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-parkingzoneend": {
+      "at": "2026-10-04 01:37:50Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-parkingzonestart": {
+      "at": "2026-10-04 01:37:52Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-priorityintersection": {
+      "at": "2026-10-04 01:37:40Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-roadnarrows": {
+      "at": "2026-10-04 01:37:55Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-rocks": {
+      "at": "2026-10-04 01:38:18Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-stop": {
+      "at": "2026-10-04 01:37:46Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/sign-warning": {
+      "at": "2026-10-04 01:37:31Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/store02": {
+      "at": "2026-10-04 01:37:44Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/store08": {
+      "at": "2026-10-04 01:36:49Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/store10": {
+      "at": "2026-10-04 01:36:43Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/straightroadbusstop": {
+      "at": "2026-10-04 01:37:21Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/straightroadsidewalk": {
+      "at": "2026-10-04 01:36:54Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/townhouse01blue": {
+      "at": "2026-10-04 01:36:42Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/townhouse01red": {
+      "at": "2026-10-04 01:36:46Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/townhouse01white": {
+      "at": "2026-10-04 01:36:41Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/townhouse01yeller": {
+      "at": "2026-10-04 01:37:01Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/trafficlightsequence1": {
+      "at": "2026-10-04 01:37:36Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/trafficlightsequence2": {
+      "at": "2026-10-04 01:37:47Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/troadstopsign": {
+      "at": "2026-10-04 01:37:49Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/truckshop": {
+      "at": "2026-10-04 01:37:04Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
+    "collision/warehouse01": {
+      "at": "2026-10-04 01:37:19Z",
+      "marks": [],
+      "note": "",
+      "verdict": "fail"
+    },
     "curvedroadninteydegsidewalk.mesh": {
       "at": "2026-10-03 09:47:12Z",
       "note": "",

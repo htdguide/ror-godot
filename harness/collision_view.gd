@@ -51,9 +51,7 @@ static func build(terrain: RorTerrain) -> Node3D:
         var at: Transform3D = box["transform"] as Transform3D
         # `half` is a half-extent and the unit box is one metre across, so the scale is the whole
         # extent.
-        multimesh.set_instance_transform(
-            index, Transform3D(at.basis.scaled((box["half"] as Vector3) * 2.0), at.origin)
-        )
+        multimesh.set_instance_transform(index, _sized(at, box["half"] as Vector3))
     var node: MultiMeshInstance3D = MultiMeshInstance3D.new()
     node.name = "Solid"
     node.multimesh = multimesh
@@ -101,9 +99,7 @@ static func for_object(terrain: RorTerrain, name: String, state: Dictionary) -> 
             continue
         var shell: MeshInstance3D = MeshInstance3D.new()
         shell.mesh = unit
-        shell.transform = inverse * Transform3D(
-            at.basis.scaled((box["half"] as Vector3) * 2.0), at.origin
-        )
+        shell.transform = inverse * _sized(at, box["half"] as Vector3)
         shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
         root.add_child(shell)
     return root
@@ -120,6 +116,18 @@ static func counts(terrain: RorTerrain) -> Dictionary:
         if name != "":
             out[name] = (out.get(name, 0) as int) + 1
     return out
+
+
+## A unit box sized to one box's own extents, in the box's own axes.
+##
+## **`scaled` is the wrong one and it lied about every box on the map.** `Basis.scaled` applies
+## the scale in the parent's axes — after the rotation — so a box whose own z is its height came
+## out with that height along world z: lying on its side, in the air. Reported from a window as
+## "they are all flipped, they need 90 degrees to stand up", and the collision data was right the
+## whole time. `scaled_local` applies it before the rotation, which is what a half-extent in the
+## box's own frame means.
+static func _sized(at: Transform3D, half: Vector3) -> Transform3D:
+    return Transform3D(at.basis.orthonormalized().scaled_local(half * 2.0), at.origin)
 
 
 static func _material() -> StandardMaterial3D:
