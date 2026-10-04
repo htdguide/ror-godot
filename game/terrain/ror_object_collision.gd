@@ -235,38 +235,67 @@ static func _shape_of(
         if mesh == null:
             continue
         for surface: int in mesh.get_surface_count():
-            points.append_array(
-                mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX] as PackedVector3Array
-            )
+            var arrays: Array = mesh.surface_get_arrays(surface)
+            var corners: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
+            var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] as PackedInt32Array
+            for at: int in range(0, indices.size() - 2, 3):
+                points.append(corners[indices[at]])
+                points.append(corners[indices[at + 1]])
+                points.append(corners[indices[at + 2]])
     var cells: Array[Dictionary] = _columns(points)
     shapes[name] = cells
     return cells
 
 
-## The occupied columns of a point cloud, as boxes in the same frame.
+## The occupied columns of a triangle soup, as boxes in the same frame.
 ##
 ## The mesh is z-up in its own frame — every object in this library is, which is why upstream
 ## pitches them all by -90 degrees when it places them — so the ground plane here is x/y and the
-## height is z.
+## height is z. `points` is three corners per triangle, in order.
+##
+## **Triangles, not vertices, and that one fault answered three complaints.** This used to bucket
+## the mesh's own vertices, which works only where a mesh is finely tessellated and nothing in
+## this library is: `store08.mesh` is a 20 by 10 by 18 m building made of 160 vertices, so each
+## wall is two triangles and only the cells holding a corner got a box. Reported from a window as
+## "a lot of buildings have just pillars of collision, thin ones, and the building itself doesn't
+## have its box" — the pillars were the corners. `2af11UID-mc_tree03.mesh` is 20 vertices across
+## 28 m and came out as one box several metres from its trunk: "the boxes don't match the model".
+## Port Starling went from 5343 boxes to 22815.
+##
+## **A triangle claims every cell its bounding box touches, not only the cells it covers.** A
+## separating-axis test was written, measured and taken out again: it is the more faithful answer
+## and it drops a rig through both the tuna boat and a road deck 19 m up. Why a *smaller* solid
+## breaks support is not yet understood, and shipping a change whose failure nobody can explain is
+## worse than shipping a conservative one — this over-reaches by at most a cell on a diagonal.
+##
+## **The box count is still cut at `MAX_BOXES_PER_OBJECT`, in dictionary order.** Growing the cell
+## until an object fits was written and is the better answer; it rides on the same test and comes
+## back with it.
+##
+## What this still is not: tight. A cell is `CELL_M` across whatever is inside it, so a 0.1 m lamp
+## post gets a 0.7 m column — reported as "too thick", and it is, by seven times. Narrowing a box
+## to its own geometry makes tall boxes narrow, which is only safe now that
+## `RorObstacles::contact` can tell which face a node may leave by.
 static func _columns(points: PackedVector3Array) -> Array[Dictionary]:
     var out: Array[Dictionary] = []
     if points.is_empty():
         return out
     var cells: Dictionary = {}
-    for point: Vector3 in points:
-        var key: Vector2i = Vector2i(
-            int(floor(point.x / CELL_M)), int(floor(point.y / CELL_M))
-        )
-        var bounds: Vector4 = cells.get(
-            key, Vector4(point.x, point.y, point.z, point.z)
-        ) as Vector4
-        # x and y hold the cell's own middle as it fills in; z and w its height range.
-        cells[key] = Vector4(
-            minf(bounds.x, point.x),
-            minf(bounds.y, point.y),
-            minf(bounds.z, point.z),
-            maxf(bounds.w, point.z)
-        )
+    for first: int in range(0, points.size() - 2, 3):
+        var a: Vector3 = points[first]
+        var b: Vector3 = points[first + 1]
+        var c: Vector3 = points[first + 2]
+        var low: Vector3 = a.min(b).min(c)
+        var high: Vector3 = a.max(b).max(c)
+        for x: int in range(int(floor(low.x / CELL_M)), int(floor(high.x / CELL_M)) + 1):
+            for y: int in range(int(floor(low.y / CELL_M)), int(floor(high.y / CELL_M)) + 1):
+                var key: Vector2i = Vector2i(x, y)
+                var bounds: Vector4 = cells.get(
+                    key, Vector4(0.0, 0.0, INF, -INF)
+                ) as Vector4
+                cells[key] = Vector4(
+                    0.0, 0.0, minf(bounds.z, low.z), maxf(bounds.w, high.z)
+                )
     for key: Vector2i in cells.keys():
         if out.size() >= MAX_BOXES_PER_OBJECT:
             break

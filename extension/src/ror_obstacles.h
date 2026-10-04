@@ -49,9 +49,14 @@ public:
                  int &surface) const;
 
 private:
-    // Whether a point is inside any selected box. A face that would push a node into one of its
-    // neighbours is a face it cannot leave by.
-    bool occupied(const godot::Vector3 &point, int ignore) const;
+    // Whether a point is inside another box of the same grid as `of`. A face that would push a
+    // node into the box next to it is a face it cannot leave by.
+    //
+    // Same grid, not merely any box: two boxes that happen to overlap are not a continuous solid
+    // and treating them as one is how a road deck lost its top face. Boxes built together share
+    // an orientation — a terrain object's columns all carry its placement's frame — so a shared
+    // basis is what "next to it" means here.
+    bool occupied(const godot::Vector3 &point, const RorObstacleBox &of, int ignore) const;
 
     std::vector<RorObstacleBox> m_boxes;
     std::vector<int> m_near;

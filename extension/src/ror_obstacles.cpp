@@ -11,6 +11,8 @@ namespace {
 // How far beyond a face to look for a neighbour. Smaller than any box this project builds and
 // larger than the gap a float leaves between two that meet exactly.
 constexpr float SKIN_M = 0.01f;
+// How closely two boxes must agree on their axes to count as part of one grid.
+constexpr float ALIGNED_COS = 0.999f;
 
 } // namespace
 
@@ -61,12 +63,19 @@ void RorObstacles::select(const Vector3 &min, const Vector3 &max) {
     }
 }
 
-bool RorObstacles::occupied(const Vector3 &point, int ignore) const {
+bool RorObstacles::occupied(const Vector3 &point, const RorObstacleBox &of, int ignore) const {
     for (const int index : m_near) {
         if (index == ignore) {
             continue;
         }
         const RorObstacleBox &box = m_boxes[static_cast<size_t>(index)];
+        // Only a box of the same grid can continue this one's solid.
+        if (std::abs(static_cast<float>(box.basis.get_column(0).dot(of.basis.get_column(0)))) <
+                    ALIGNED_COS ||
+            std::abs(static_cast<float>(box.basis.get_column(2).dot(of.basis.get_column(2)))) <
+                    ALIGNED_COS) {
+            continue;
+        }
         const Vector3 offset = point - box.origin;
         const Vector3 local(offset.dot(box.basis.get_column(0)), offset.dot(box.basis.get_column(1)),
                             offset.dot(box.basis.get_column(2)));
@@ -131,7 +140,7 @@ bool RorObstacles::contact(const Vector3 &position, float &penetration, Vector3 
             const int candidate = order[i];
             const double along = candidate == 0 ? local.x : (candidate == 1 ? local.y : local.z);
             const Vector3 face = box.basis.get_column(candidate) * (along < 0.0 ? -1.0f : 1.0f);
-            if (!occupied(position + face * (depths[candidate] + SKIN_M), index)) {
+            if (!occupied(position + face * (depths[candidate] + SKIN_M), box, index)) {
                 axis = candidate;
                 depth = depths[candidate];
                 break;
