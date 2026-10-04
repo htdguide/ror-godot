@@ -43,12 +43,9 @@ const MIN_FOOTPRINT_M: float = 0.05
 ##
 ## **It was 64, which was a number for a builder that bucketed vertices.** Now that cells follow
 ## surfaces a 20 by 10 m building wants 36 of them and a 50 by 30 m quay pad wants 3053, so 64
-## kept a corner of each and nothing else. Measured by raising it and watching the gates: 128,
-## 256, 512 and 768 all hold, and 1024 drops a rig through a road deck 19 m up. The cliff is not
-## understood — none of the extra boxes is anywhere near that deck, and excluding the one object
-## that gains most at 1024 makes it pass again — so this sits below the highest value shown to
-## work rather than at a number anybody reasoned to.
-const MAX_BOXES_PER_OBJECT: int = 768
+## kept a corner of each and nothing else — the hero truck spawned on a corner of its own
+## collision and sank through the rest of the pad.
+const MAX_BOXES_PER_OBJECT: int = 4096
 ## What a terrain's objects are made of, as far as a wheel is concerned.
 const SURFACE: String = "concrete"
 ## How coarse a cell may get once the object's own scale is applied.
@@ -298,6 +295,10 @@ static func _shape_of(
 ## post gets a 0.7 m column — reported as "too thick", and it is, by seven times. Narrowing a box
 ## to its own geometry makes tall boxes narrow, which is only safe now that
 ## `RorObstacles::contact` can tell which face a node may leave by.
+static func columns_for_probe(points: PackedVector3Array) -> Array[Dictionary]:
+    return _columns(points)
+
+
 static func _columns(points: PackedVector3Array) -> Array[Dictionary]:
     var out: Array[Dictionary] = []
     if points.is_empty():

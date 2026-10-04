@@ -31,14 +31,21 @@ static func measure(
     var truck: TruckParser = rig["truck"] as TruckParser
     var solver: RefCounted = rig["solver"] as RefCounted
     give_terrain(solver, terrain)
-    RorObjectCollision.apply(terrain, solver)
     solver.set_ground(0.0, true)
 
+    # **The baseline is the heightfield alone, with nothing solid on it.** It used to be measured
+    # with the terrain's objects in place, at the map's own start position — and a start position
+    # is where an author puts a vehicle, which on Port Starling is a 50 by 30 m quay pad. For as
+    # long as that pad had no collision the rig landed on the dirt and the baseline was the
+    # heightfield by accident. The moment the pad became solid the baseline rose with it, every
+    # comparison against it moved, and two gates failed as though the thing being measured had
+    # broken. What "resting on open ground" means is resting on the ground.
     var start: Vector3 = terrain.start_position()
     out["on_ground"] = _rest(
         solver, truck, Vector3(start.x, 0.0, start.z), DROP_M,
         terrain.height_at_world(start.x, start.z)
     )
+    RorObjectCollision.apply(terrain, solver)
     if not is_finite(out["on_ground"] as float):
         out["error"] = "the rig would not settle on open ground, so there is nothing to compare to"
         return out
