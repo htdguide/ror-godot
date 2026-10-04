@@ -42,13 +42,6 @@ static func build(
 static func _build_environment(weather: Dictionary, clouds: bool) -> WorldEnvironment:
     var env: Environment = Environment.new()
     _grade_environment(env, weather, clouds)
-    # Distance haze, so a 4 km terrain has depth to it and a session can say how far it wants
-    # to see. Not volumetric: that is a froxel grid with its own range and cost, and what a
-    # driver wants is depth cueing to the horizon.
-    env.fog_enabled = RenderCfg.FOG_ENABLED
-    env.fog_density = RenderCfg.FOG_DENSITY
-    env.fog_light_color = RenderCfg.FOG_COLOUR
-    env.fog_sky_affect = RenderCfg.FOG_SKY_AFFECT
     env.tonemap_mode = RenderCfg.TONEMAP as Environment.ToneMapper
     env.tonemap_white = RenderCfg.WHITE
     env.tonemap_exposure = RenderCfg.EXPOSURE
@@ -67,7 +60,20 @@ static func _grade_environment(env: Environment, weather: Dictionary, clouds: bo
         # The sky lights the scene: diffuse from its irradiance, specular from its
         # radiance map. This is what makes metal look like metal without a light rig.
         env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-        env.ambient_light_sky_contribution = RenderCfg.AMBIENT_FROM_SKY
+        # How much of the ambient term is the sky's own irradiance, and how much is the stated
+        # colour below it.
+        #
+        # **At 1.0 the ambient energy does nothing at all.** Godot blends the sky's irradiance
+        # against `ambient_light_color * ambient_light_energy` by this fraction, so a preset
+        # that leaves it at one has no way to say "a dark night under a sky I can still see":
+        # dimming the ground means dimming the sky with it, and the only knob left was the
+        # sky's own multiplier. Measured, 0.05 and 0.015 ambient energy gave the same frame to
+        # four decimals. A night states a small fraction here and lights its ground with the
+        # colour instead.
+        env.ambient_light_sky_contribution = float(
+            weather.get("ambient_from_sky", RenderCfg.AMBIENT_FROM_SKY)
+        )
+        env.ambient_light_color = weather.get("ambient_colour", Color.WHITE) as Color
         env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
     else:
         env.background_mode = Environment.BG_COLOR
@@ -75,6 +81,32 @@ static func _grade_environment(env: Environment, weather: Dictionary, clouds: bo
         env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
         env.ambient_light_color = weather.get("bg_color", Color.GRAY) as Color
     env.ambient_light_energy = float(weather.get("ambient_energy", 0.0))
+    _grade_air(env, weather)
+
+
+## The air: the distance haze, and whether it catches light.
+##
+## **Both were built once and never graded, which is why a night was a grey day.** The haze was
+## set in `_build_environment` from constants, so switching the weather left a daylight fog —
+## a pale grey 0.68, 0.72, 0.78 — hanging over a moonlit sky, and the horizon glowed through
+## the dark. An hour of the day states its own air or keeps the default one.
+##
+## Volumetric fog is the froxel grid, and it is off everywhere but the night presets that ask
+## for it. It costs a pass and it buys exactly one thing: a headlight beam you can see as a
+## shaft in the air rather than only as a pool on the road.
+static func _grade_air(env: Environment, weather: Dictionary) -> void:
+    env.fog_enabled = RenderCfg.FOG_ENABLED
+    env.fog_density = float(weather.get("fog_density", RenderCfg.FOG_DENSITY))
+    env.fog_light_color = weather.get("fog_colour", RenderCfg.FOG_COLOUR) as Color
+    env.fog_sky_affect = RenderCfg.FOG_SKY_AFFECT
+    env.volumetric_fog_enabled = bool(weather.get("volumetric", false))
+    env.volumetric_fog_density = RenderCfg.VOLUMETRIC_DENSITY
+    env.volumetric_fog_albedo = weather.get("fog_colour", RenderCfg.FOG_COLOUR) as Color
+    env.volumetric_fog_length = RenderCfg.VOLUMETRIC_LENGTH_M
+    # The sky must not pour light into the froxels: an ambient term in the air is a grey wash
+    # over the whole frame, and what a beam has to stand out against at night is darkness.
+    env.volumetric_fog_ambient_inject = 0.0
+    env.volumetric_fog_gi_inject = 0.0
 
 
 ## Whether this world's sky has weather in it.

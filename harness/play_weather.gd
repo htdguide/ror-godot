@@ -12,6 +12,10 @@ extends RefCounted
 
 var names: Array[String] = []
 var index: int = 0
+## The camera to re-meter when the hour changes, and the shot it was framed for. Set once by the
+## window. Null in anything that only wants the lights moved.
+var camera: Camera3D = null
+var shot: Dictionary = {}
 
 
 func _init(wanted: String) -> void:
@@ -34,7 +38,13 @@ func current() -> String:
 ## burning through a night preset; and it never rebuilt the sky, so the atmosphere stayed as
 ## built. `a_weather_switch_is_a_weather` holds the two paths together.
 func apply(world: Node3D, name: String) -> void:
-    BlockoutWorld.apply_weather(world, WeatherCfg.get_preset(name), RenderCfg.CLOUDS_ENABLED)
+    var preset: Dictionary = WeatherCfg.get_preset(name)
+    BlockoutWorld.apply_weather(world, preset, RenderCfg.CLOUDS_ENABLED)
+    # And the exposure, because an hour that states its light in lux states what that light was
+    # metered for. Without this, switching to the night preset gives a black window with working
+    # headlights in it and nothing to see them by.
+    if camera != null and is_instance_valid(camera):
+        PhysicalCamera.reexpose(camera, shot, preset)
     index = maxi(0, names.find(name))
     print("PLAY  weather %s" % name)
 

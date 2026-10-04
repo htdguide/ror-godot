@@ -47,6 +47,9 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
     _yaw = camera.rotation.y
     _pitch = camera.rotation.x
     _weather = PlayWeather.new(weather)
+    # So that switching to a night hour opens the lens as well as putting the sun out.
+    _weather.camera = camera
+    _weather.shot = CameraCfg.get_preset(Harness.args.get_string("shot", "diag_origin"))
     _map_name = Harness.args.get_string("terrain-dir", DEFAULT_MAP)
     _hud = PlayHud.build(self)
     if not vehicle.is_empty():

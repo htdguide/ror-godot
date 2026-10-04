@@ -173,3 +173,14 @@ const FOG_COLOUR: Color = Color(0.68, 0.72, 0.78)
 ## How far the camera draws. A Rigs of Rods terrain is 4 km across and its own horizon mesh
 ## stands at its edge, so the default far plane has to reach it.
 const VIEW_DISTANCE_M: float = 6000.0
+
+## --- Air that catches light --------------------------------------------------------------------
+##
+## The froxel grid, used only by the hours that ask for it. A headlight is a shaft as well as a
+## pool, and the shaft is the air in front of the lamp scattering the beam back; with no
+## participating medium a beam at night is a bright patch of road under an invisible lamp.
+## Thin enough that it reads as clear night air rather than as fog.
+const VOLUMETRIC_DENSITY: float = 0.010
+## How far out the grid reaches. Past this a beam stops being a shaft, which is well beyond
+## where a headlight has anything left to scatter.
+const VOLUMETRIC_LENGTH_M: float = 96.0

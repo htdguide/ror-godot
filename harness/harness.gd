@@ -169,7 +169,9 @@ func _build_world(scenario: String, weather: String) -> String:
     # environment and probes out of the next one's frame.
     var host: Node = container.viewport if container != null else _main
     host.add_child(world)
-    camera = PhysicalCamera.build(preset)
+    # The hour decides the exposure as well as the light: under physical units a camera metered
+    # for midday sees nothing by moonlight. See `PhysicalCamera.reexpose`.
+    camera = PhysicalCamera.build(preset, WeatherCfg.get_preset(weather))
     world.add_child(camera)
     if container != null:
         container.world = world
@@ -193,7 +195,7 @@ func use_camera(shot: String) -> String:
     var err: String = _resolve_preset(shot)
     if err != "":
         return err
-    var fresh: Camera3D = PhysicalCamera.build(preset)
+    var fresh: Camera3D = PhysicalCamera.build(preset, WeatherCfg.get_preset(weather_name))
     if camera != null and is_instance_valid(camera):
         if camera.get_parent() != null:
             camera.get_parent().remove_child(camera)

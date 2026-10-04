@@ -23,6 +23,10 @@ var _substep_remainder: float = 0.0
 var _solver_usec: int = 0
 var _selector: int = 1
 var _lit: bool = false
+## The main beam. A second filament rather than a second switch: it only shows while the lights
+## are on, and a vehicle with no `h` lamps of its own puts its low beams onto the main-beam
+## pattern instead.
+var _main_beam: bool = false
 var _left_indicator: bool = false
 var _right_indicator: bool = false
 var _seconds: float = 0.0
@@ -127,6 +131,9 @@ func on_key(keycode: Key) -> bool:
             print("DRIVE  engine %s" % ("running" if solver.engine_running() else "off"))
         KEY_L, KEY_N:
             set_lights(not _lit)
+        KEY_K:
+            _main_beam = not _main_beam
+            print("DRIVE  main beam %s" % ("on" if _main_beam else "off"))
         KEY_Z:
             _left_indicator = not _left_indicator
             _right_indicator = false
@@ -245,6 +252,7 @@ func _recover() -> void:
 func _respawn() -> void:
     RigBuilder.place(solver, truck, spawn, spawn_heading, DriveCfg.SPAWN_HEIGHT_M)
     _lit = false
+    _main_beam = false
     solver.start_engine()
     _apply_pose()
     print("DRIVE  respawned")
@@ -255,6 +263,7 @@ func _respawn() -> void:
 func _apply_cabin() -> void:
     FlareBuilder.apply_state(_built["lamps"] as Array[Node3D], truck, {
         "headlights": _lit,
+        "high_beam": _main_beam,
         "brake": _brake,
         "reverse": _selector < 0,
         "left": _left_indicator,

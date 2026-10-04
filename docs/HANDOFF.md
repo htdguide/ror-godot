@@ -125,11 +125,13 @@ sun is the hour that shows a vehicle off. `Esc` opens the settings panel — wea
 shadows, sky brightness, exposure, cloud cover and density, wind, view distance, fog, grass
 distance, lamps — with Resume and Quit in it. Controls: `G` drive, `B` reverse, `H` neutral, `I`
 ignition, `N` or `L` lights, `R` recover upright, Backspace respawn, `Z`/`C`/`X` indicators,
-`F5`/`F6`/`F7` chase, free and driver's seat.
+`F5`/`F6`/`F7` chase, free and driver's seat. `K` is the main beam: a vehicle with no `h` lamps
+of its own — which is most of them — puts its low beams onto the main-beam pattern instead, the
+way a two-filament bulb does. `F2` cycles the weather, and `night_moon` is one of them.
 
 ## The suite is green
 
-120 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
+121 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
 twice in one session with a worst measured drift of zero.
 
 It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%

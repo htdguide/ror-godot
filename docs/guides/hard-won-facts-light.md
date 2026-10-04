@@ -191,3 +191,35 @@ See `hard-won-facts.md` for the solver, the file formats, the terrain and the ga
   0.000126, and both are inside any tolerance worth setting. The first draft of the gate *required*
   the correction to matter and failed on its own claim. It reports both distances now and turns on
   neither, because a bound drawn between them would be a bound drawn around the answer.
+
+- **Under physical light units, the exposure is part of the hour and not of the camera.** An
+  hour states its light in lux — a hundred thousand for midday sun, a quarter of one for a full
+  moon — so it has to state the aperture, shutter and sensitivity that light was metered for. A
+  camera set for noon sees nothing at all by moonlight, and no lamp can reach it: a 22,000 cd low
+  beam puts about fifty lux on the road at twenty metres, a two-thousandth of what a daylight
+  exposure expects. Reported from a window as "during the night headlights are not working";
+  the headlights were working. `night_moon` opens the lens to f/2.8, a sixtieth and ISO 1600,
+  which is 850 times a midday exposure, and `PhysicalCamera.reexpose` re-meters when the weather
+  changes.
+- **`ambient_light_energy` does nothing while the sky supplies all of the ambient.** Godot blends
+  the sky's own irradiance against `ambient_light_color * ambient_light_energy` by
+  `ambient_light_sky_contribution`, and at 1.0 the colour and the energy are both ignored.
+  Measured, 0.05 and 0.015 gave the same frame to four decimals. A preset that wants a dark
+  ground under a sky it can still see has to drop the contribution and light the ground from the
+  colour.
+- **Godot takes a lamp's output in lumens and defaults it to a thousand.** A ceiling fitting. A
+  tail light is about twelve lumens, an indicator forty, a reversing lamp a hundred; ten omni
+  lights at the default lit the whole vehicle like a showroom the moment the switch went on,
+  which is invisible at a daylight exposure and is the entire picture at night.
+- **A spot light's projector is only sampled when that light casts a shadow.** The beam pattern —
+  the cut-off, the hot spot, the kerb-side step — is a texture the lamp is seen through, and with
+  `shadow_enabled` false the lamp emits nothing whatever: measured, the road ahead read 0.2150
+  with a quarter of a million lumens pointed at it and 0.2150 with the lamps off, the same frame
+  to four decimals. Upstream turns headlight shadows off, and this project cannot.
+- **A float image with a generated mip chain is not a usable projector.** `FORMAT_RGBAF` plus
+  `generate_mipmaps` sampled as black. Eight bits, no mipmaps.
+- **`f` means headlight and modders use it for lamps that are not.** The hero truck's rear lights
+  are two `f` rows with a red flare material on them, which built two white 150 m beams firing
+  out of the tailgate. A lamp only gets a beam if it faces the way the vehicle goes, which the
+  actor's own frame knows: forward is -Z there, because upstream's `cameras` section names a node
+  behind the centre.

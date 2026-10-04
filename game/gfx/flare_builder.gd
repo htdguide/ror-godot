@@ -44,23 +44,36 @@ const GLOW_SIZE_SCALE: float = 1.7
 const GLOW_TEXTURE_PX: int = 64
 const GLOW_CORE: float = 0.45
 const GLOW_HALO: float = 0.55
-## A headlight's cone. Wide enough to light the road either side, not so wide it is a bulb, and
-## far enough to be a headlight: at 45 m and six units it lit a patch of ground in front of the
-## bumper, which in daylight is indistinguishable from being off.
-const SPOT_ANGLE_DEG: float = 32.0
-const SPOT_RANGE_M: float = 110.0
-const SPOT_ENERGY: float = 14.0
-## How the cone falls off across its width and along its length. Both are how a headlight is
-## told apart from a torch: bright in the middle, dim at the edge, and reaching.
-const SPOT_ANGLE_ATTENUATION: float = 0.8
-const SPOT_ATTENUATION: float = 1.3
-## And whether the beams cast shadows. Only the projecting lamps do, so a vehicle has at most a
-## pair of shadow-casting lights and the truck's own body stops its headlights lighting the cab.
-const SPOT_SHADOWS: bool = true
+## What a forward lamp throws is `HeadBeam`'s: a low beam has a cut-off, a main beam does not,
+## and neither is a cone of even brightness. This file decides which lamps are forward ones and
+## when they are lit.
+##
+## **A lamp only projects if it faces the way the vehicle goes.** Upstream's `f` means headlight
+## and nothing else, and modders use it for lamps that are not: the hero truck's own rear lights
+## are two `f` rows with a red flare material on them, which built two white 150 m beams firing
+## out of the tailgate. The vehicle's own frame says which way is forward, so that is the test.
+const FORWARD_DOT: float = 0.5
 ## The lamps that do not project still light what they are mounted on: a brake light reddens the
 ## tailgate, an indicator throws amber on the wing. Small, short and cheap.
 const GLOW_RANGE_M: float = 3.2
-const GLOW_ENERGY: float = 2.4
+## And they are the size of a bulb, which is the part that was missing.
+##
+## **A tail light is about fifteen lumens.** Under physical light units Godot takes an omni's
+## output in lumens and defaults it to a thousand — a ceiling fitting — and this file left that
+## default standing and scaled it by 2.4. Ten of them hung on the bodywork lit the whole vehicle
+## like a showroom the moment the switch went on, which is invisible at a daylight exposure and
+## is the entire picture at night: a glowing truck on a dark road. These are the figures a bulb
+## is sold in.
+const GLOW_LUMENS: Dictionary = {
+    FlareRows.TAIL_LIGHT: 12.0,
+    FlareRows.SIDELIGHT: 10.0,
+    FlareRows.DASHBOARD: 4.0,
+    FlareRows.BRAKE_LIGHT: 40.0,
+    FlareRows.BLINKER_LEFT: 40.0,
+    FlareRows.BLINKER_RIGHT: 40.0,
+    FlareRows.REVERSE_LIGHT: 110.0,
+}
+const GLOW_DEFAULT_LUMENS: float = 15.0
 
 
 ## How hard the pedal has to be pressed before the brake lights come on, and how fast an
@@ -95,11 +108,17 @@ static func build(root: Node3D, truck: TruckParser, render_frame: Transform3D) -
         var colour: Color = COLOURS.get(flare["type"] as String, DEFAULT_COLOUR) as Color
         holder.set_meta("lamp_colour", colour)
         holder.add_child(_lens(flare, colour))
-        if FlareRows.projects(flare):
-            holder.add_child(_beam(colour))
-        else:
-            holder.add_child(_glow(colour))
         holder.transform = to_local * _placement(truck.nodes, flare)
+        var beam: SpotLight3D = null
+        # Forward in the actor's own frame is -Z: upstream's `cameras` section names a node
+        # *behind* the centre, which is where +Z comes from. A lamp's own facing is its
+        # holder's -Z, and the two have to agree before it throws a beam.
+        if FlareRows.projects(flare) and (-holder.transform.basis.z).dot(Vector3.FORWARD) > FORWARD_DOT:
+            beam = HeadBeam.build(flare["type"] as String)
+        if beam != null:
+            holder.add_child(beam)
+        else:
+            holder.add_child(_glow(colour, flare["type"] as String))
         root.add_child(holder)
         lamps.append(holder)
     # Built dark. A lamp's beam is a Light3D and a Light3D is visible the moment it exists, so a
@@ -133,15 +152,21 @@ static func set_lit(lamps: Array[Node3D], truck: TruckParser, lit: bool) -> void
 ## the file format.
 static func apply_state(lamps: Array[Node3D], truck: TruckParser, state: Dictionary) -> void:
     var headlights: bool = bool(state.get("headlights", false))
+    # The main beam, which is a second filament rather than a second switch: it only means
+    # anything while the lights are on.
+    var main_beam: bool = headlights and bool(state.get("high_beam", false))
     var braking: bool = float(state.get("brake", 0.0)) > BRAKE_THRESHOLD
     var reversing: bool = bool(state.get("reverse", false))
     var seconds: float = float(state.get("seconds", 0.0))
     var blink: bool = fmod(seconds, BLINK_PERIOD_S) < BLINK_PERIOD_S * 0.5
+    var truck_has_high: bool = _has_type(truck, FlareRows.HIGH_BEAM)
     for i: int in mini(lamps.size(), truck.flares.size()):
         var type: String = truck.flares[i]["type"] as String
         var lit: bool = false
         match type:
-            FlareRows.HEADLIGHT, FlareRows.HIGH_BEAM, FlareRows.FOG_LIGHT, FlareRows.TAIL_LIGHT, \
+            FlareRows.HIGH_BEAM:
+                lit = main_beam
+            FlareRows.HEADLIGHT, FlareRows.FOG_LIGHT, FlareRows.TAIL_LIGHT, \
             FlareRows.SIDELIGHT, FlareRows.DASHBOARD:
                 lit = headlights
             FlareRows.BRAKE_LIGHT:
@@ -157,6 +182,14 @@ static func apply_state(lamps: Array[Node3D], truck: TruckParser, state: Diction
             _:
                 lit = false
         _set_lamp(lamps[i], lit)
+        # A vehicle with no `h` row of its own — which is most of them, the hero truck
+        # included — puts its low beams onto the main-beam pattern instead, the way a
+        # two-filament bulb does.
+        if type == FlareRows.HEADLIGHT:
+            var beam: SpotLight3D = lamps[i].get_node_or_null(^"Beam") as SpotLight3D
+            var wanted: String = "high" if main_beam and not truck_has_high else "low"
+            if beam != null and HeadBeam.kind_of(beam) != wanted:
+                HeadBeam.aim(beam, wanted)
 
 
 static func _set_lamp(lamp: Node3D, lit: bool) -> void:
@@ -264,27 +297,24 @@ static func _glow_texture() -> Texture2D:
     return _glow_sprite
 
 
-static func _beam(colour: Color) -> SpotLight3D:
-    var light: SpotLight3D = SpotLight3D.new()
-    light.name = "Beam"
-    light.light_color = colour
-    light.light_energy = SPOT_ENERGY
-    light.spot_range = SPOT_RANGE_M
-    light.spot_angle = SPOT_ANGLE_DEG
-    light.spot_angle_attenuation = SPOT_ANGLE_ATTENUATION
-    light.spot_attenuation = SPOT_ATTENUATION
-    light.shadow_enabled = SPOT_SHADOWS
-    light.visible = false
-    return light
 
 
 ## What a lamp that does not project still does: light its own corner of the vehicle.
-static func _glow(colour: Color) -> OmniLight3D:
+static func _glow(colour: Color, flare_type: String) -> OmniLight3D:
     var light: OmniLight3D = OmniLight3D.new()
     light.name = "Glow"
     light.light_color = colour
-    light.light_energy = GLOW_ENERGY
+    light.light_intensity_lumens = GLOW_LUMENS.get(flare_type, GLOW_DEFAULT_LUMENS) as float
+    light.light_energy = 1.0
     light.omni_range = GLOW_RANGE_M
     light.shadow_enabled = false
     light.visible = false
     return light
+
+
+## Whether the vehicle declares a lamp of this type at all.
+static func _has_type(truck: TruckParser, type: String) -> bool:
+    for flare: Dictionary in truck.flares:
+        if (flare["type"] as String) == type:
+            return true
+    return false
