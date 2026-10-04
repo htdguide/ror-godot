@@ -372,5 +372,12 @@ static func _material(
             material.cull_mode = BaseMaterial3D.CULL_DISABLED
         if not (declared["lit"] as bool):
             material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        # A pass that states its own fog and states it as practically none is a backdrop: a
+        # horizon ring or a ground skirt painted *as* a distance, standing ten kilometres out
+        # where this project's own haze is 99.8% and leaves a flat grey sheet. Ogre's fog is a
+        # per-pass setting, Godot's is the scene's, and the only part of that which survives the
+        # translation is whether the scene's fog applies to this surface at all.
+        if declared.get("no_fog", false) as bool:
+            material.disable_fog = true
     cache[name] = material
     return material

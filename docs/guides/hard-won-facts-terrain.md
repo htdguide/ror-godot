@@ -226,3 +226,22 @@ Its companion is `hard-won-facts-mods.md`, which covers how a vehicle is read, b
   written against the normals the file carries, which is the right oracle for shading and the
   wrong one for culling, and it passed every one of the 20 inverted meshes. The fault was still
   reported from a window. Two gates now, one per authority.
+- **Ogre states fog per pass, Godot states it per scene, and a terrain's backdrop depends on the
+  difference.** A Rigs of Rods terrain paints its distance twice: once as haze, and once as a
+  backdrop mesh — a horizon ring and a ground skirt standing ten kilometres out, with the
+  mountains and the dust already painted into the texture. Those passes say so: `fog_override true
+  exp 0.71 0.81 0.87 0.00001 2000 3000` is a density of one part in a hundred thousand, 9.5% fog
+  where they stand. This project's haze is 0.0006, which is 99.8% at the same distance, so the
+  backdrop was drawn as the fog colour and nothing else. `fog_override true` with nothing after it
+  means the same thing — Ogre's default type is `none` — and nine passes in the library are
+  written that way.
+- **A backdrop fault reads as a sky fault.** La Paz's horizon ring is 10,070 m out and 1,250 m
+  tall, so it is clipped away entirely until the far plane passes about 7.3 km. Reported from a
+  window as "I can't see the sky with clouds on view distance 12000, it looks like there is a gray
+  texture above me, and the more distance I set, the bigger is the gray thing; if I set 200 m view
+  distance, I can't see it". Nothing was wrong with the sky, the clouds or the fog: a grey sheet
+  was moving into the frame from ten kilometres away as the far plane reached it.
+- **Those backdrops are objects, and a commented-out one stays commented out.** La Paz's `.tobj`
+  places `lapaz-horizon` and `lapaz-base` and has `lapaz-sky` disabled with a leading `;`, which
+  is one of the three comment markers Ogre and Rigs of Rods accept. The sky dome in that file is
+  not content this project is missing.

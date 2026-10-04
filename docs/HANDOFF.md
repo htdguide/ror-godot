@@ -129,7 +129,7 @@ ignition, `N` or `L` lights, `R` recover upright, Backspace respawn, `Z`/`C`/`X`
 
 ## The suite is green
 
-80 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
+120 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
 twice in one session with a worst measured drift of zero.
 
 It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%
