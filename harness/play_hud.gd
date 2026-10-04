@@ -63,7 +63,7 @@ static func text(viewport: Viewport, weather: String, footer: String) -> String:
 static func footer(drive: PlayDrive) -> String:
     var keys: String = (
         "click to look  WASD move  Q/E down/up  Shift boost  F1 hud  F2 weather"
-        + "  F3 shadows  F4 sun  P shot  Esc settings"
+        + "  F3 shadows  F4 sun  F8 collision  P shot  Esc settings"
     )
     if drive == null:
         return keys
@@ -76,6 +76,8 @@ static func print_help(drive: PlayDrive) -> void:
         "PLAY  click to look with the mouse, Esc releases it, Esc again opens the settings\n"
         + "PLAY  W A S D move, Q/E down/up, hold Shift to boost\n"
         + "PLAY  F1 toggle HUD, F2 cycle weather, F3 toggle shadows, F4 toggle the sun\n"
+        + "PLAY  F8 show what the terrain is solid as: a box with nothing in it is geometry"
+        + " that is missing, and drawn geometry with no box is something you drive through\n"
         + "PLAY  Esc or M open the settings: weather, gravity, sun, sky, fog, distance\n"
         + "PLAY  P save a screenshot and a .json beside it saying where it was taken from"
     )

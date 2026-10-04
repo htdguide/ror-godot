@@ -34,6 +34,8 @@ var _terrain_pending: bool = false
 ## ground height and surface under the camera, and only the loaded terrain knows them.
 var _loaded: RorTerrain = null
 var _vegetation: RorVegetation = null
+## What the terrain is solid as: the F8 overlay, and where a vehicle may stand.
+var _solid: PlaySolid = PlaySolid.new()
 
 
 ## `vehicle` is a VehicleBuilder result, or empty when no vehicle was loaded. With one, the
@@ -115,10 +117,9 @@ func _populate_terrain() -> void:
     # `--collision` draws what the terrain is solid as, over whatever is drawn. A box with
     # nothing in it is geometry that is missing; drawn geometry with no box is something a
     # vehicle will drive through.
+    _solid.setup(loaded)
     if Harness.args.has_flag("collision"):
-        var solid: Node3D = CollisionView.build(loaded)
-        _world.add_child(solid)
-        print("PLAY  collision shown: %d solid boxes" % CollisionView.count(loaded))
+        print("PLAY  " + _solid.show_boxes(_world, true))
     # `--facing` dresses the scenery in the same paint the object gates photograph with: a face
     # keeps its texture from the front and draws its axis in a primary colour from behind. A wall
     # turned the wrong way is otherwise empty sky, which looks exactly like correct empty sky, so
@@ -130,7 +131,7 @@ func _populate_terrain() -> void:
         return
     # Where a vehicle starts, and under what gravity, before the terrain is handed over: taking
     # the terrain puts the rig down, and it has to be put down where the terrain says.
-    _drive.spawn = loaded.start_position()
+    _drive.spawn = PlaySolid.clear_spawn(loaded)
     _drive.solver.set_gravity(Vector3(0.0, loaded.gravity(), 0.0))
     error = _drive.use_terrain(_terrain.get("data"))
     if error != "":
@@ -138,7 +139,7 @@ func _populate_terrain() -> void:
         return
     var solid: int = RorObjectCollision.apply(loaded, _drive.solver)
     print("PLAY  driving on %s, spawned at %v under %.2f m/s^2; %d parts of its own"
-        % [loaded.name, loaded.start_position(), loaded.gravity(), solid]
+        % [loaded.name, _drive.spawn, loaded.gravity(), solid]
         + " scenery are solid")
 
 
@@ -239,6 +240,8 @@ func _on_key(keycode: Key) -> void:
             if light != null:
                 light.visible = not light.visible
                 print("PLAY  sun %s" % ("on" if light.visible else "off"))
+        KEY_F8:
+            print("PLAY  " + _solid.show_boxes(_world, not _solid.shown()))
         KEY_P:
             _screenshot()
         KEY_ESCAPE:
