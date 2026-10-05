@@ -7,54 +7,22 @@ extends RefCounted
 ## through. The solver takes static boxes, so the question is how to get a few sensible boxes out
 ## of an arbitrary mesh.
 ##
-## Columns, not a bounding box. A pole object here is a 40 m span of wire with two poles in it, so
-## its own box is a wall across the desert. Instead the mesh is divided into cells on the ground
-## plane, and each cell that holds geometry becomes one box as tall as the geometry in it. Two
-## poles come out as two boxes; the wires between them come out as nothing, because a cell whose
-## geometry is a centimetre tall is not something to crash into.
-##
-## That is an approximation and it is the honest kind: it can only ever be as wrong as the cell
-## size, it never invents solid where the mesh has none, and what it produces is checked by
-## driving into it.
+## Turning one mesh into boxes is `ObjectColumns`; what is here is everything about the terrain
+## around it — which objects it places, where they stand, what they are made of, the collision an
+## `.odef` states in its own right, the roads it sweeps, and which objects this method should not
+## be used on at all.
 
-## How big a cell is on the ground plane, in metres.
-const CELL_M: float = 0.7
-## How thick a slab is made of a surface that has no thickness of its own.
-##
-## **A flat thing is still something to stand on.** A cell's geometry used to have to be half a
-## metre tall to count, on the grounds that a wire is not an obstacle — and that threw away every
-## horizontal surface in the library. `largedockasphalt.mesh` is a 50 by 30 m quay pad, the hero
-## truck spawns on one, and it had nothing solid in it at all: the wheels rested on the terrain
-## underneath and sank through the drawn surface. Reported from a window as "it spawns on a block
-## which doesn't have collision so wheels are half way in the texture".
-const MIN_SLAB_M: float = 0.2
-## How tall an object may be and still count as flat, and how coarse a cell it may then use.
-##
-## A coarse cell on a tall object is a wall across whatever it covers, which is why growth is
-## capped. A coarse cell on something flat is still something flat, so a quay pad may be
-## approximated at 16 m and lose nothing but its edges.
-const FLAT_M: float = 1.0
-const FLAT_CELL_M: float = 16.0
-## And how coarse a cell may become for anything taller than that.
-const MAX_GROWN_CELL_M: float = 4.0
-## And one this thin in both directions on the ground is drawn detail rather than structure.
-const MIN_FOOTPRINT_M: float = 0.05
-## How many cells one object may produce.
-##
-## **It was 64, which was a number for a builder that bucketed vertices.** Now that cells follow
-## surfaces a 20 by 10 m building wants 36 of them and a 50 by 30 m quay pad wants 3053, so 64
-## kept a corner of each and nothing else — the hero truck spawned on a corner of its own
-## collision and sank through the rest of the pad.
-const MAX_BOXES_PER_OBJECT: int = 4096
+
 ## What a terrain's objects are made of, as far as a wheel is concerned.
 const SURFACE: String = "concrete"
-## How coarse a cell may get once the object's own scale is applied.
+## How coarse a cell may get, once the object's own scale is applied, before this method is not
+## approximating the object at all.
 ##
 ## A terrain's own furniture is placed as an object like anything else and scaled up to cover the
-## map: La Paz's ground skirt and horizon card are 100 times their mesh, so one 0.7 m cell of
-## them is 70 m of solid wall across the desert. An object whose cells come out this coarse is
-## not being approximated by this method at all, so it is left alone — and a horizon is not
-## something to crash into anyway.
+## map: La Paz's ground skirt and horizon card are 100 times their mesh, so one cell of them is
+## 70 m of solid wall across the desert. Starling's `8d25UID-chapel` needs a 4 m cell at a scale
+## of one — it reads as 1152 by 919 by 1355 m from 1348 vertices in 506 triangles — which is a
+## square kilometre of boxes standing for a chapel. Neither is something to crash into.
 const MAX_CELL_WORLD_M: float = 3.0
 
 
@@ -101,7 +69,13 @@ static func boxes(terrain: RorTerrain) -> Array[Dictionary]:
         if local.is_empty():
             continue
         var scale: Vector3 = definition["scale"] as Vector3
-        if CELL_M * maxf(absf(scale.x), absf(scale.y)) > MAX_CELL_WORLD_M:
+        # The cell this object actually needed, in world metres. Coarser than this and the
+        # method is not approximating the object at all: La Paz's ground skirt is 100 times its
+        # mesh, so one cell of it is 70 m of wall across the desert, and Starling's
+        # `8d25UID-chapel` reads as a kilometre across — 1348 vertices in 506 triangles — and
+        # takes a 4 m cell to fit, which is a square kilometre of boxes standing for a chapel.
+        var used: float = (local[0].get("cell", ObjectColumns.CELL_M) as float)
+        if used * maxf(absf(scale.x), absf(scale.y)) > MAX_CELL_WORLD_M:
             continue
         var frame: Transform3D = RorObjects.transform_of(placement, scale)
         for cell: Dictionary in local:
@@ -261,7 +235,7 @@ static func _shape_of(
                 points.append(corners[indices[at]])
                 points.append(corners[indices[at + 1]])
                 points.append(corners[indices[at + 2]])
-    var cells: Array[Dictionary] = _columns(points)
+    var cells: Array[Dictionary] = ObjectColumns.of(points)
     shapes[name] = cells
     return cells
 
@@ -287,108 +261,3 @@ static func _shape_of(
 ## breaks support is not yet understood, and shipping a change whose failure nobody can explain is
 ## worse than shipping a conservative one — this over-reaches by at most a cell on a diagonal.
 ##
-## **The box count is still cut at `MAX_BOXES_PER_OBJECT`, in dictionary order.** Growing the cell
-## until an object fits was written and is the better answer; it rides on the same test and comes
-## back with it.
-##
-## **A cell says where a box is; the geometry in it says how big.** See `_raster`: a cell used to
-## contribute its own full width and a 0.1 m lamp post came out 0.7 m thick.
-static func columns_for_probe(points: PackedVector3Array) -> Array[Dictionary]:
-    return _columns(points)
-
-
-static func _columns(points: PackedVector3Array) -> Array[Dictionary]:
-    var out: Array[Dictionary] = []
-    if points.is_empty():
-        return out
-    var low: Vector3 = Vector3.INF
-    var high: Vector3 = -Vector3.INF
-    for at: int in points.size():
-        low = low.min(points[at])
-        high = high.max(points[at])
-    # A flat object may be approximated coarsely; a tall one may not.
-    # **A flat object is one slab.** A 50 by 30 m quay pad is 3053 cells at `CELL_M` and the cap
-    # keeps 64 of them, so the hero truck spawns on a corner of its own collision and sinks
-    # through the rest — reported from a window as "it spawns on a block which doesn't have
-    # collision so wheels are half way in the texture". A grid buys nothing on something with no
-    # height to vary: its own bounds are exact where the object fills them and the only error is
-    # at a notch in its outline.
-    if (high.z - low.z) <= FLAT_M:
-        var middle: Vector3 = (low + high) * 0.5
-        return [{
-            "transform": Transform3D(Basis.IDENTITY, middle),
-            "half": Vector3(
-                maxf((high.x - low.x) * 0.5, MIN_FOOTPRINT_M),
-                maxf((high.y - low.y) * 0.5, MIN_FOOTPRINT_M),
-                maxf((high.z - low.z) * 0.5, MIN_SLAB_M * 0.5)
-            ),
-        }]
-    var cell: float = CELL_M
-    return _boxes_of(_raster(points, cell), cell)
-
-
-## Every cell a triangle soup crosses at this size, as
-## `cell -> [bottom, top, left, right, near, far]` — the box the geometry in that cell actually
-## occupies, not the cell.
-##
-## **The cell decides where a box is, not how big it is.** A cell used to contribute its own full
-## width, so a 0.1 m lamp post came out as a 0.7 m column: seven times too thick, reported from a
-## window in exactly those words. What is kept instead is the extent of the geometry inside the
-## cell, clipped to the cell so that a triangle crossing four of them does not make all four as
-## wide as itself. A surface that fills its cell still gets the whole cell; a post gets a post.
-##
-## Narrow boxes are only safe because `RorObstacles::contact` picks the face a node can actually
-## leave by. Before that, a tall thin box was a trap: a node pushed into one left through whatever
-## face the velocity suggested, and on a thin box that is usually the wrong one.
-static func _raster(points: PackedVector3Array, cell: float) -> Dictionary:
-    var cells: Dictionary = {}
-    for first: int in range(0, points.size() - 2, 3):
-        var a: Vector3 = points[first]
-        var b: Vector3 = points[first + 1]
-        var c: Vector3 = points[first + 2]
-        var low: Vector3 = a.min(b).min(c)
-        var high: Vector3 = a.max(b).max(c)
-        for x: int in range(int(floor(low.x / cell)), int(floor(high.x / cell)) + 1):
-            for y: int in range(int(floor(low.y / cell)), int(floor(high.y / cell)) + 1):
-                var key: Vector2i = Vector2i(x, y)
-                # The part of this triangle's own box that lies in this cell.
-                var left: float = maxf(low.x, float(x) * cell)
-                var right: float = minf(high.x, float(x + 1) * cell)
-                var near: float = maxf(low.y, float(y) * cell)
-                var far: float = minf(high.y, float(y + 1) * cell)
-                var span: PackedFloat32Array = cells.get(
-                    key, PackedFloat32Array([INF, -INF, INF, -INF, INF, -INF])
-                ) as PackedFloat32Array
-                cells[key] = PackedFloat32Array([
-                    minf(span[0], low.z), maxf(span[1], high.z),
-                    minf(span[2], left), maxf(span[3], right),
-                    minf(span[4], near), maxf(span[5], far),
-                ])
-    return cells
-
-
-## One box per cell, each the box the geometry in that cell occupies.
-static func _boxes_of(cells: Dictionary, _cell: float) -> Array[Dictionary]:
-    var out: Array[Dictionary] = []
-    var keys: Array = cells.keys()
-    # Sorted, so one mesh always produces the same boxes in the same order.
-    keys.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-        return a.x < b.x if a.x != b.x else a.y < b.y
-    )
-    for key: Vector2i in keys:
-        if out.size() >= MAX_BOXES_PER_OBJECT:
-            break
-        var span: PackedFloat32Array = cells[key] as PackedFloat32Array
-        var height: float = maxf(span[1] - span[0], MIN_SLAB_M)
-        # A box no thinner than the detail it stands for: a wire or a panel edge is a plane in
-        # one direction, and a box with no width at all is a box a solver cannot push out of.
-        var across: float = maxf(span[3] - span[2], MIN_FOOTPRINT_M)
-        var along: float = maxf(span[5] - span[4], MIN_FOOTPRINT_M)
-        out.append({
-            "transform": Transform3D(Basis.IDENTITY, Vector3(
-                (span[2] + span[3]) * 0.5, (span[4] + span[5]) * 0.5,
-                (span[0] + span[1]) * 0.5
-            )),
-            "half": Vector3(across * 0.5, along * 0.5, height * 0.5),
-        })
-    return out

@@ -256,3 +256,15 @@ Its companion is `hard-won-facts-mods.md`, which covers how a vehicle is read, b
   trap: a node pushed into one left by whichever face its velocity suggested, which on a thin box
   is usually the wrong one. `RorObstacles::contact` picking the nearest face a node can actually
   leave by is what made this change available at all, which is why it waited for it.
+- **A cap that truncates is worse than a coarse cell.** Boxes are emitted in sorted cell order, so
+  an object with more cells than `MAX_BOXES_PER_OBJECT` got its first 4096 and nothing after —
+  one side of a building, cut off mid-way. `hospital` covered 43.7% of its own footprint with its
+  boxes' centre 25.58 m from the mesh's; `warehouse01`, `policedepartment` and two dock corners
+  sat exactly on the cap the same way. Reported from a window reviewing the overlay as "only
+  pillars collision, not the house". Growing the cell until the object fits is the answer, and it
+  is only available once each box hugs the geometry in its own cell: before that, a coarser cell
+  meant a fatter box rather than fewer of them.
+- **Judge an object's coarseness by the cell it needed, not the one it started with.** The guard
+  that drops objects too coarse to approximate was reading `CELL_M`, so Starling's
+  `8d25UID-chapel` — which reads as 1152 by 919 by 1355 m from 1348 vertices in 506 triangles, and
+  needs a 4 m cell — passed it and produced a square kilometre of boxes.
