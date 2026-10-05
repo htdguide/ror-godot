@@ -25,7 +25,7 @@ extends GateBase
 
 ## `file basename -> variable name` a human has exempted, with the reason in the source.
 const ALLOWED: Dictionary = {
-    "flare_builder.gd": "_glow_sprite",
+    "flare_sprite.gd": "_glow_sprite",
 }
 
 

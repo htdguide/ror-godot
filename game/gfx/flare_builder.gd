@@ -2,16 +2,18 @@ class_name FlareBuilder
 extends RefCounted
 ## Turns a vehicle's parsed `flares` into lamps that exist in the scene.
 ##
-## Each flare becomes a lens — a small emissive quad, which is what is seen when the lamp is
-## looked at — and, for the lamps that throw light down the road, a real light. Both ride the
-## flare's node triad, so they deform with the panel they are mounted on.
+## Each flare becomes a lens — a sprite standing in front of the glass, which is what is seen when
+## the lamp is looked at — and, for the lamps that throw light down the road, a real light. Both
+## ride the flare's node triad, so they deform with the panel they are mounted on. A lamp that the
+## vehicle binds a material to also lights its own glass: see `MaterialFlares`.
 ##
-## Colour is taken from the type letter rather than from the flare's material. A mod's flare
-## material is a sprite with a colour baked into it, and the hero truck reuses one material
-## for lamps of three different colours; the letter is the vehicle telling us what the lamp is
-## for, which is the thing worth believing.
+## The sprite is the game's own artwork, picked per lamp the way upstream picks it — see
+## `FlareSprite` — and it carries its own colour, so a lamp drawn with one is drawn white and left
+## to say what colour it is. The type colours below are for the generated fallback, which has no
+## colour of its own.
 
-## Lens colours per upstream flare type. Amber for indicators, red behind, white in front.
+## Lens colours per upstream flare type, for a lamp with no artwork. Amber for indicators, red
+## behind, white in front.
 const COLOURS: Dictionary = {
     FlareRows.HEADLIGHT: Color(1.0, 0.97, 0.9),
     FlareRows.HIGH_BEAM: Color(1.0, 1.0, 1.0),
@@ -34,16 +36,18 @@ const LENS_METRES_PER_SIZE: float = 0.28
 ## lamps that light the road without lighting up themselves. Upstream draws its flares as sprites
 ## in front of the panel for the same reason.
 const LENS_STANDOFF_M: float = 0.04
+## And how much further out a `flares2` row's own third offset puts it, per unit. Upstream's
+## figure, from `GfxActor::UpdateFlares`: `mposition - 0.1 * amplitude * normal * flare.offsetz`.
+## The Mazda states 1.1 for its headlamps, which is 11 cm of clearance in front of the glass.
+const STANDOFF_PER_OFFSET_M: float = 0.1
 ## How bright the glow is with the lamp off and on. Off is zero: an additive sprite that adds
 ## nothing is not there, which is what a lamp that is off looks like.
 const LENS_EMISSION_OFF: float = 0.0
 const LENS_EMISSION_ON: float = 2.4
-## The glow sprite: how big across it is drawn compared with the lamp itself, how much of it is
-## the bright core, and how strong the halo around that is.
+## How big the sprite is drawn compared with the lamp itself. Upstream's own billboard is the
+## flare's stated size in metres; this is smaller, because the sprite here is a fixed quad on the
+## bodywork rather than a billboard that shrinks as it turns away.
 const GLOW_SIZE_SCALE: float = 1.7
-const GLOW_TEXTURE_PX: int = 64
-const GLOW_CORE: float = 0.45
-const GLOW_HALO: float = 0.55
 ## What a forward lamp throws is `HeadBeam`'s: a low beam has a cut-off, a main beam does not,
 ## and neither is a cone of even brightness. This file decides which lamps are forward ones and
 ## when they are lit.
@@ -83,42 +87,61 @@ const BRAKE_THRESHOLD: float = 0.08
 const BLINK_PERIOD_S: float = 0.8
 
 
-## The shared glow sprite, built on first use and never changed after.
-##
-## The one `static var` D0 allows, and it is allowed because it is a memo and not state: it is
-## derived from constants, it is written once, and no observable behaviour depends on whether it
-## was built by this gate or an earlier one. `static_state` knows about it by name — an
-## exemption a human granted for a stated reason, not a pattern the lint waves through.
-##
-## It does outlive a gate container, which means one texture stays allocated for the life of the
-## process. That is bounded at one and deliberate: rebuilding a 64 px radial gradient per
-## container would be slower and would prove nothing.
-static var _glow_sprite: Texture2D = null
-
-
 ## Builds every lamp under `root`, in the space `render_frame` maps rig coordinates into.
 ## Returns the lamp holders, one per flare, in file order.
-static func build(root: Node3D, truck: TruckParser, render_frame: Transform3D) -> Array[Node3D]:
+static func build(
+    root: Node3D,
+    truck: TruckParser,
+    render_frame: Transform3D,
+    mod_dir: String = "",
+    dds_reader: RefCounted = null,
+    textures: Dictionary = {},
+    scripts: Dictionary = {}
+) -> Array[Node3D]:
     var lamps: Array[Node3D] = []
     var to_local: Transform3D = render_frame.affine_inverse()
     for index: int in truck.flares.size():
         var flare: Dictionary = truck.flares[index]
         var holder: Node3D = Node3D.new()
         holder.name = "Flare_%d_%s" % [index, flare["type"]]
-        var colour: Color = COLOURS.get(flare["type"] as String, DEFAULT_COLOUR) as Color
-        holder.set_meta("lamp_colour", colour)
-        holder.add_child(_lens(flare, colour))
         holder.transform = to_local * _placement(truck.nodes, flare)
+        # **A headlight that names its own sprite and points backwards is a tail light.** `t` was
+        # only added to the format in 2022; before it a modder wrote a rear lamp as an `f` row
+        # with a red flare material on it, and upstream still reads every `f` row that names a
+        # material that way — `ActorSpawner::AddBaseFlare`. Read literally the hero truck fires
+        # two white 150 m beams out of its tailgate.
+        #
+        # Upstream's rule is the material alone, and it is too broad: the Mazda 626 names a
+        # material on its *front* lamps as well, and loses its headlights to the same line. What
+        # the lamp is for is settled here instead, where the vehicle's own frame says which end of
+        # it the lamp is on.
+        var type: String = flare["type"] as String
+        if (
+            type == FlareRows.HEADLIGHT
+            and not FlareRows.is_default_material(flare["material"] as String)
+            and not _points_forward(holder)
+        ):
+            type = FlareRows.TAIL_LIGHT
+        holder.set_meta("lamp_type", type)
+        var sprite: Texture2D = FlareSprite.texture(
+            flare, mod_dir, dds_reader, textures, scripts
+        )
+        # A sprite out of the game's own resources carries the lamp's colour in its own pixels —
+        # `redflare.dds` is red — so it is drawn white and left to say what colour it is. The type
+        # colour is for the generated fallback, which is white and would otherwise stay white.
+        var colour: Color = Color.WHITE
+        if sprite == null:
+            sprite = FlareSprite.fallback()
+            colour = COLOURS.get(type, DEFAULT_COLOUR) as Color
+        holder.set_meta("lamp_colour", colour)
+        holder.add_child(_lens(flare, colour, sprite))
         var beam: SpotLight3D = null
-        # Forward in the actor's own frame is -Z: upstream's `cameras` section names a node
-        # *behind* the centre, which is where +Z comes from. A lamp's own facing is its
-        # holder's -Z, and the two have to agree before it throws a beam.
-        if FlareRows.projects(flare) and (-holder.transform.basis.z).dot(Vector3.FORWARD) > FORWARD_DOT:
-            beam = HeadBeam.build(flare["type"] as String)
+        if FlareRows.PROJECTING.has(type) and _points_forward(holder):
+            beam = HeadBeam.build(type)
         if beam != null:
             holder.add_child(beam)
         else:
-            holder.add_child(_glow(colour, flare["type"] as String))
+            holder.add_child(_glow(colour, type))
         root.add_child(holder)
         lamps.append(holder)
     # Built dark. A lamp's beam is a Light3D and a Light3D is visible the moment it exists, so a
@@ -171,7 +194,7 @@ static func apply_state(lamps: Array[Node3D], truck: TruckParser, state: Diction
     var blink: bool = fmod(seconds, BLINK_PERIOD_S) < BLINK_PERIOD_S * 0.5
     var truck_has_high: bool = _has_type(truck, FlareRows.HIGH_BEAM)
     for i: int in mini(lamps.size(), truck.flares.size()):
-        var type: String = truck.flares[i]["type"] as String
+        var type: String = type_of(lamps[i], truck.flares[i])
         var lit: bool = false
         match type:
             FlareRows.HIGH_BEAM:
@@ -202,7 +225,24 @@ static func apply_state(lamps: Array[Node3D], truck: TruckParser, state: Diction
                 HeadBeam.aim(beam, wanted)
 
 
+## What a lamp is for: the type its row states, unless building it decided otherwise. See
+## `build` — a rear lamp written as an `f` row is a tail light.
+static func type_of(lamp: Node3D, flare: Dictionary) -> String:
+    return lamp.get_meta("lamp_type", flare["type"]) as String
+
+
+## Whether a lamp points the way the vehicle goes.
+##
+## Forward in the actor's own frame is -Z: upstream's `cameras` section names a node *behind* the
+## centre, which is where +Z comes from. A lamp's own facing is its holder's -Z, and the two have
+## to agree before it throws a beam.
+static func _points_forward(holder: Node3D) -> bool:
+    return (-holder.transform.basis.z).dot(Vector3.FORWARD) > FORWARD_DOT
+
+
 static func _set_lamp(lamp: Node3D, lit: bool) -> void:
+    # The lamp's own glass, where the vehicle binds a material to it. See `MaterialFlares`.
+    MaterialFlares.light(lamp, lit)
     for child: Node in lamp.get_children():
         var light: Light3D = child as Light3D
         if light != null:
@@ -245,7 +285,7 @@ static func _placement(nodes: PackedVector3Array, flare: Dictionary) -> Transfor
     return Transform3D(Basis(right, right.cross(normal), -normal), origin)
 
 
-static func _lens(flare: Dictionary, colour: Color) -> MeshInstance3D:
+static func _lens(flare: Dictionary, colour: Color, sprite: Texture2D) -> MeshInstance3D:
     var size: float = (flare["size"] as float) * LENS_METRES_PER_SIZE * GLOW_SIZE_SCALE
     var quad: QuadMesh = QuadMesh.new()
     quad.size = Vector2(size, size)
@@ -261,7 +301,7 @@ static func _lens(flare: Dictionary, colour: Color) -> MeshInstance3D:
     material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
     material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
     material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-    material.albedo_texture = _glow_texture()
+    material.albedo_texture = sprite
     material.albedo_color = colour * LENS_EMISSION_OFF
     material.disable_receive_shadows = true
     # A lamp is unlit because it *is* a light, and the one thing that must not dim as the day
@@ -280,36 +320,13 @@ static func _lens(flare: Dictionary, colour: Color) -> MeshInstance3D:
     # lens added without this turn shows its back to the world: culled from outside the vehicle
     # and visible from inside it.
     lens.transform = Transform3D(
-        Basis(Vector3.UP, PI), Vector3(0.0, 0.0, -LENS_STANDOFF_M)
+        Basis(Vector3.UP, PI),
+        Vector3(0.0, 0.0, -maxf(
+            LENS_STANDOFF_M,
+            (flare["offset"] as Vector3).z * STANDOFF_PER_OFFSET_M
+        ))
     )
     return lens
-
-
-## The glow sprite every lens is drawn with: white in the middle, fading to nothing at the edge.
-##
-## Built once and shared. A radial falloff rather than a disc, because an additive disc has an
-## edge and an edge is what makes a lamp look like a sticker.
-static func _glow_texture() -> Texture2D:
-    if _glow_sprite != null:
-        return _glow_sprite
-    var image: Image = Image.create_empty(
-        GLOW_TEXTURE_PX, GLOW_TEXTURE_PX, false, Image.FORMAT_RGBAF
-    )
-    var centre: float = float(GLOW_TEXTURE_PX - 1) * 0.5
-    for y: int in GLOW_TEXTURE_PX:
-        for x: int in GLOW_TEXTURE_PX:
-            var away: float = Vector2(float(x) - centre, float(y) - centre).length() / centre
-            # A bright core inside a wider halo, which is what a lamp at night looks like.
-            var core: float = pow(clampf(1.0 - away / GLOW_CORE, 0.0, 1.0), 2.0)
-            var halo: float = pow(clampf(1.0 - away, 0.0, 1.0), 3.0)
-            var value: float = clampf(core + halo * GLOW_HALO, 0.0, 1.0)
-            image.set_pixel(x, y, Color(value, value, value, value))
-    if not image.is_compressed():
-        image.generate_mipmaps()
-    _glow_sprite = ImageTexture.create_from_image(image)
-    return _glow_sprite
-
-
 
 
 ## What a lamp that does not project still does: light its own corner of the vehicle.

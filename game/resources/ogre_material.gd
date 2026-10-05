@@ -80,6 +80,17 @@ static func read(path: String) -> Dictionary:
                 # a grey texture above me, and the further I set the view distance the bigger it
                 # gets" — the backdrop entering the far plane, not the sky.
                 "no_fog": false,
+                # Every frame of a flipbook `texture_unit`, in order, where the pass declares one.
+                # A lamp lens is authored as two frames — off and on — and Rigs of Rods lights it
+                # by switching the frame rather than by adding a glow: `mazda626gf-sd-lights_0.dds`
+                # is the car's dark glass and `_1.dds` the same glass alight. `textures` keeps the
+                # first frame, which is what a still picture shows; this keeps the rest, which is
+                # what `materialflarebindings` switches to.
+                "frames": PackedStringArray(),
+                # What the pass glows by itself, from `emissive`. Rigs of Rods reads this off a
+                # bound lamp material and restores it whenever the lamp is switched on, so a lens
+                # that declares one is lit by its own colour rather than only by its frame.
+                "emissive": Color.BLACK,
             }
             continue
         if current.is_empty():
@@ -110,9 +121,15 @@ static func _take(material: Dictionary, line: String) -> void:
         # taking the name as written finds nothing and the lamp draws untextured. The first frame
         # is what a still picture should show.
         "anim_texture":
-            if words.size() > 2:
+            if words.size() > 2 and words[2].is_valid_int():
+                var frames: PackedStringArray = PackedStringArray()
+                for frame: int in maxi(words[2].to_int(), 1):
+                    frames.append(
+                        "%s_%d.%s" % [words[1].get_basename(), frame, words[1].get_extension()]
+                    )
+                material["frames"] = frames
                 var textures: PackedStringArray = material["textures"] as PackedStringArray
-                textures.append("%s_0.%s" % [words[1].get_basename(), words[1].get_extension()])
+                textures.append(frames[0])
                 material["textures"] = textures
         # `set_texture_alias <alias> <file>` — the leaf of a managed material, see DIFFUSE_ALIAS.
         "set_texture_alias":
@@ -134,6 +151,12 @@ static func _take(material: Dictionary, line: String) -> void:
                 # opaque it is a grey box standing where nothing should be.
                 if (material["diffuse"] as Color).a < 1.0:
                     material["alpha"] = true
+        # `emissive <r> <g> <b> [a]` — Ogre's self-illumination, which a lamp lens carries.
+        "emissive":
+            if words.size() > 3 and words[1].is_valid_float():
+                material["emissive"] = Color(
+                    words[1].to_float(), words[2].to_float(), words[3].to_float()
+                )
         "scene_blend":
             if words.size() > 1 and ALPHA_BLENDS.has(words[1].to_lower()):
                 material["alpha"] = true

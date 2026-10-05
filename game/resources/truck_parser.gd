@@ -78,6 +78,10 @@ var drivetrain: Dictionary = DriveRows.empty()
 var hydros: Array[Dictionary] = []
 ## One entry per `flares` row: the vehicle's lamps. See FlareRows.
 var flares: Array[Dictionary] = []
+## Which of the vehicle's own materials each lamp lights up: material name -> flare indices, from
+## `materialflarebindings`. This is the lamp's glass rather than the glow in front of it — see
+## `FlareRows.binding`.
+var material_flares: Dictionary = {}
 var bounded_beams: Array[Dictionary]:
     get: return beam_table.bounded
 ## Whether the rig declares an `axles` section. Upstream doubles a rig's drive torque when
@@ -247,7 +251,9 @@ func _parse_row(line: String) -> void:
         "axles", "interaxles":
             has_axles = true
         "flares", "flares2":
-            BodyRows.flare(line, _node_id_to_index, flares, errors)
+            BodyRows.flare(line, _node_id_to_index, flares, errors, _section)
+        "materialflarebindings":
+            _parse_material_flare(line)
         _:
             if DriveRows.handles(_section):
                 var error: String = DriveRows.read(_section, TruckLexer.fields(line), drivetrain)
@@ -287,6 +293,18 @@ func _parse_beam(line: String) -> void:
         errors.append("beam %s: %s" % [row["error"], line])
         return
     beam_table.record(row)
+
+
+## `materialflarebindings`: which material a given lamp lights up.
+func _parse_material_flare(line: String) -> void:
+    var row: Dictionary = FlareRows.binding(TruckLexer.fields(line))
+    if (row["error"] as String) != "":
+        errors.append("materialflarebinding %s: %s" % [row["error"], line])
+        return
+    var material: String = row["material"] as String
+    var bound: PackedInt32Array = material_flares.get(material, PackedInt32Array())
+    bound.append(row["flare"] as int)
+    material_flares[material] = bound
 
 
 func _parse_minimass(line: String) -> void:

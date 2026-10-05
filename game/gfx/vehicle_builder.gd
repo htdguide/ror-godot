@@ -84,7 +84,14 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         root.add_child(node)
         prop_nodes.append(node)
 
-    var lamps: Array[Node3D] = FlareBuilder.build(root, truck, render_frame)
+    var lamps: Array[Node3D] = FlareBuilder.build(
+        root, truck, render_frame, mod_dir, dds_reader, textures, scripts
+    )
+    # And the lamps that light their own glass rather than only glowing in front of it. Built
+    # after the meshes, because what it binds to is the materials they were given.
+    var lit_lenses: int = MaterialFlares.bind(
+        root, truck, lamps, mod_dir, dds_reader, textures, scripts
+    )
 
     var wheels_built: int = 0
     var wheel_nodes: Array[Node3D] = []
@@ -123,6 +130,8 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         "prop_nodes": prop_nodes,
         "lamps": lamps,
         "flares": lamps.size(),
+        # How many of the vehicle's own materials are lamp glass, from `materialflarebindings`.
+        "lit_lenses": lit_lenses,
         "props": prop_nodes.size(),
         "wheels": wheels_built,
         "truck": truck,

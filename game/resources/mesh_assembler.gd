@@ -74,13 +74,17 @@ static func material_for(
         declared = scripts.get(material_name, {}) as Dictionary
     var classified: Dictionary = MaterialClass.classify(material_name, declared)
     MaterialClass.apply(material, classified["class"] as String)
+    # Which declaration this surface was built from. A vehicle's `materialflarebindings` names a
+    # material and expects the lamp to light it, and by the time the meshes are built nothing else
+    # remembers which surface came from which name. See `MaterialFlares`.
+    material.set_meta("ogre_material", material_name)
     material.albedo_color = Color(0.7, 0.7, 0.72)
     if declared.is_empty():
         return material
 
     var files: PackedStringArray = declared["textures"] as PackedStringArray
     if files.size() > 0:
-        var albedo: Texture2D = _texture(
+        var albedo: Texture2D = texture(
             RorContentPath.find(files[0], mod_dir), dds_reader, textures
         )
         if albedo != null:
@@ -175,7 +179,9 @@ static func _image(path: String, dds_reader: RefCounted) -> Image:
     return DdsImage.read(path, dds_reader)
 
 
-static func _texture(path: String, dds_reader: RefCounted, cache: Dictionary) -> Texture2D:
+## One texture from a DDS on disk, decoded once per cache. Public because a lamp's sprite is a
+## texture out of the game's own resources rather than off a mesh, and it is read the same way.
+static func texture(path: String, dds_reader: RefCounted, cache: Dictionary) -> Texture2D:
     if cache.has(path):
         return cache[path] as Texture2D
     var image: Image = _image(path, dds_reader)

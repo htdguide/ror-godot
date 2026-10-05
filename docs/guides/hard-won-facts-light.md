@@ -294,3 +294,27 @@ See `hard-won-facts.md` for the solver, the file formats, the terrain and the ga
   takes the low beam to 0.6444 against a main beam of 0.5672 — a low beam brighter than a main
   beam, which is a cut-off that has stopped cutting anything off. The pattern was right; what was
   missing was a known up vector, which levelling supplies.
+- **Rigs of Rods ships the artwork for a lamp and names it per lamp type.** A `flares` row ends in
+  a material; where it names none, upstream picks `tracks/flare`, `tracks/redflare`,
+  `tracks/brakeflare`, `tracks/blinkflare` or `tracks/greenflare` by the type letter, and all five
+  are in the pinned checkout with their textures. This project generated a radial gradient instead
+  and a session called it "a fake light orb". The artwork is a starburst with rays and it reads as
+  a lamp; a gradient reads as a sprite.
+- **A lamp's own glass is lit by `materialflarebindings` and by nothing else.** The binding names
+  one of the vehicle's materials, and the material carries two authored frames —
+  `mazda626gf-sd-lights_0.dds` is the Mazda's dark headlamp, unlit brake lenses and black
+  instrument cluster, `_1.dds` is all three alight. Upstream switches the frame and restores the
+  pass's `emissive`. Measured with the lamp's sprite and bulb removed so that nothing else in the
+  scene can move: the glass changes by 0.361 and goes from 0.131 to 0.484 display luma. **A
+  vehicle that declares no binding has no lit glass in upstream either** — the hero truck declares
+  none, and its `S10flares.mesh` is wheel-arch trim, not lamp lenses.
+- **`flares2` carries a third offset and it is not a third axis.** Every field after it shifts by
+  one, so read as `flares` the Mazda's lamps take `1.1` for their type letter — twelve lamps of no
+  type at all. And the offset is a sprite stand-off at a tenth of a metre per unit, not a position:
+  `mposition - 0.1 * amplitude * normal * flare.offsetz`. Read as metres it hangs the car's
+  headlights a metre out in the air beside it.
+- **Upstream's "an `f` row with a material is a tail light" rule is too broad to copy literally.**
+  It exists because `t` was only added in 2022, and it is right for the hero truck, whose rear
+  lamps are `f` rows carrying `tracks/redflare`. The Mazda names a material on its *front* lamps
+  as well and loses its headlights to the same line. The vehicle's own frame says which end of it
+  a lamp is on, so the geometry decides here and the material only starts the question.

@@ -38,10 +38,20 @@ static func prop(
     keep("prop", PlacementRows.prop(TruckLexer.fields(line), id_to_index), line, into, errors)
 
 
+## `flares2` states a third offset that `flares` does not, so the section decides where the row's
+## type letter is. See `FlareRows.row`.
 static func flare(
-    line: String, id_to_index: Dictionary, into: Array[Dictionary], errors: PackedStringArray
+    line: String,
+    id_to_index: Dictionary,
+    into: Array[Dictionary],
+    errors: PackedStringArray,
+    section: String = "flares"
 ) -> void:
-    keep("flare", FlareRows.row(TruckLexer.fields(line), id_to_index), line, into, errors)
+    keep(
+        "flare",
+        FlareRows.row(TruckLexer.fields(line), id_to_index, section == "flares2"),
+        line, into, errors
+    )
 
 
 ## A `managedmaterials` row names a material, the effect it is drawn with, and its textures.
