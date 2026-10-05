@@ -25,10 +25,17 @@ const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
 const MAP: String = "lapaz"
 ## The hours this is held at, and how much of the open roof's light the enclosed bed may have at
-## each. Dusk measured 0.75 and the small hours 0.36; before the probe followed the hour, dusk
-## was 0.93.
-const HOURS: Array[float] = [18.25, 21.0]
-const MOST_OF_THE_ROOF: Array[float] = [0.85, 0.6]
+## each. The claim is strongest as the light goes: 0.69, 0.65 and 0.47 measured, against a dusk
+## that was 0.93 before the probe followed the hour.
+##
+## **The second hour used to be nine in the evening and nothing can be measured there now.** The
+## sky stopped following the camera — see `PhysicalCamera.exposure_scale` — and with it went the
+## last of the light after sunset: at 21:00 the roof reads 0.0029 and the bed 0.0028, which is two
+## numbers near zero rather than a surface taking a share of the sky. The hours here are the ones
+## that still have a sky to block, and the spread across them is what carries the claim that the
+## darker the hour, the less the enclosed part may take.
+const HOURS: Array[float] = [17.5, 18.0, 18.35]
+const MOST_OF_THE_ROOF: Array[float] = [0.85, 0.8, 0.6]
 ## Below this the frame is too dark to divide one number by another and mean anything.
 const MIN_ROOF: float = 0.002
 const CONVERGE: int = 8

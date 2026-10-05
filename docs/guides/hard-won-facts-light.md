@@ -318,3 +318,29 @@ See `hard-won-facts.md` for the solver, the file formats, the terrain and the ga
   lamps are `f` rows carrying `tracks/redflare`. The Mazda names a material on its *front* lamps
   as well and loses its headlights to the same line. The vehicle's own frame says which end of it
   a lamp is on, so the geometry decides here and the material only starts the question.
+- **Godot exposes a sky's light twice and a lamp's once.** With physical light units a sky shader
+  is handed `LIGHT0_ENERGY` with the camera's exposure already in it, the result is rendered into
+  a radiance map, and the exposure is applied again when the scene is lit from that map. Measured
+  on one unchanged scene through an HDR capture: a grey card lit by the sun read 0.0557, 0.1253,
+  0.3327, 1.1722 at ISO 16, 32, 64 and 128 — exactly doubling, as it must — and the same card lit
+  only by the sky read 0.0029, 0.0197, 0.1216, 0.7500, which is 6.2 times a stop. **The whole
+  sun-to-sky balance was a property of the film**: 19.2:1, 6.4:1, 2.7:1, 1.6:1. Both halves are
+  divided out in `sky_clouds.gdshader` — the light the clouds and the disc are given, and the
+  cube-map pass — and the same scene then reads 7.2:1 on every film within 4.2%.
+- **An ambient colour does not respond to the exposure at all.** The same card lit only by
+  `ambient_light_color` photographed at 0.060669 at ISO 16, 32, 64 and 128 — the same value to six
+  decimals across three stops. Godot's exposure normalisation reaches lights with a physical
+  intensity and nothing else, so a stated ambient has the camera applied to it by hand in
+  `BlockoutWorld._grade_environment`, or an hour that opens the lens opens it on everything except
+  the ambient term.
+- **Godot's `PhysicalSkyMaterial` is not a radiance source and cannot be made into one.** It is a
+  Preetham model with a tone curve on the end, and the curve is applied to the sun's own energy:
+  at a fixed exposure, doubling the sun's lux brightened it by 1.54 rather than by 2, four times
+  running — a response of `light ^ 0.625`. A multiplier outside a power cannot undo it, which is
+  why M2's HDRI sky is the fix and not a correction factor.
+- **Four "grading" constants were cancelling one bug.** The night's `radiance_scale` 0.006,
+  `cloud_light` 0.05, `disc_energy` 0.02 and `ambient_energy` 0.002 were all undoing an 852-fold
+  over-exposure — a night metered 850 times a midday exposure, squared. They are 1.0, 1.0, 1.0 and
+  2.5e-6 now, and the last of those is roughly what a moonlit sky's irradiance actually is against
+  a day sky's. The 21:00 and 18:00 frames come back the same as the archived ones. **When several
+  unrelated-looking constants all sit at odd fractions, suspect one multiplier upstream of them.**

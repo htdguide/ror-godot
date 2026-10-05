@@ -20,6 +20,16 @@ uniform vec3 sky_horizon : source_color = vec3(0.62, 0.72, 0.84);
 uniform vec3 ground_colour : source_color = vec3(0.42, 0.40, 0.37);
 uniform float sky_curve = 0.12;
 uniform float sky_energy = 1.0;
+// How much of the camera's own exposure is already in `LIGHT0_ENERGY`.
+//
+// **A sky must not follow the camera.** With physical light units Godot hands this shader a light
+// energy with the camera's exposure already applied, and then applies the exposure again to
+// whatever is returned, so everything here that is drawn from the sun is exposure squared. On one
+// unchanged noon scene the sun lit a grey card at exactly twice the value for twice the ISO and
+// the sky lit it 6.2 times, which made the whole sunlit-to-skylit balance a property of the film:
+// 19.2:1 at ISO 16, 6.4:1 at 32, 2.7:1 at 64. Dividing it out here leaves the one exposure the
+// renderer applies. See `PhysicalCamera.exposure_scale`.
+uniform float light_exposure = 1.0;
 // How much of that brightness the sky contributes as *light*, as against how much of it is
 // seen.
 //
@@ -148,7 +158,7 @@ void sky() {
 	// Whatever is up, as a disc with a glow around it. Kept apart from the gradient because it
 	// is a light rather than a part of the sky's own brightness: at midnight the sky is four
 	// ten-thousandths of a noon and the moon in it is not.
-	vec3 disc = LIGHT0_COLOR * LIGHT0_ENERGY * (
+	vec3 disc = LIGHT0_COLOR * (LIGHT0_ENERGY / max(light_exposure, 0.000001)) * (
 		pow(to_sun, 700.0) * 12.0 + pow(to_sun, 8.0) * 0.06
 	);
 
@@ -216,7 +226,8 @@ void sky() {
 			// is orange and so is every cloud it reaches; mixing it only halfway left a white
 			// overcast over a sunrise, which is most of what "weirdly white" was.
 			vec3 lit = mix(cloud_shadow, cloud_colour, light)
-				* mix(vec3(1.0), LIGHT0_COLOR, 0.85) * LIGHT0_ENERGY * cloud_light;
+				* mix(vec3(1.0), LIGHT0_COLOR, 0.85)
+				* (LIGHT0_ENERGY / max(light_exposure, 0.000001)) * cloud_light;
 			float step_transmittance = exp(-thickness * span * 0.0016);
 			scattered += lit * transmittance * (1.0 - step_transmittance);
 			transmittance *= step_transmittance;
@@ -237,6 +248,13 @@ void sky() {
 	// The sky's own brightness scales the sky. The disc and the stars are lights in front of it
 	// and carry their own: an hour states `disc_energy`, and a moon that the night sky's own
 	// multiplier had been applied to would not be there at all.
-	COLOR = colour * sky_energy * (AT_CUBEMAP_PASS ? radiance_scale : 1.0)
+	// **The light a sky gives is exposed twice and the sky itself once.** Godot renders this
+	// shader into a radiance cube map and lights the scene from it, and the camera's exposure
+	// lands on both steps: measured on one unchanged scene, a surface lit only by the sky
+	// brightened four times for twice the ISO where a surface lit by the sun brightened twice,
+	// which is a sunlit-to-skylit balance that is a property of the film. The pass knows which
+	// of the two it is, so the cube-map pass gives the exposure back.
+	COLOR = colour * sky_energy
+		* (AT_CUBEMAP_PASS ? radiance_scale / max(light_exposure, 0.000001) : 1.0)
 		+ disc * disc_energy + starlight;
 }

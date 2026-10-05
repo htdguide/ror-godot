@@ -71,12 +71,18 @@ const SUN_ANGULAR_DEG: float = 1.8
 const MOON_ANGULAR_DEG: float = 0.6
 
 ## The sky's brightness at noon and under the moon, and how much of that brightness reaches the
-## radiance map every glossy surface reflects. See `sky_clouds.gdshader` on the second one: a
-## night sky left at its own brightness lights a white vehicle harder than its own headlights do.
+## radiance map every glossy surface reflects.
+##
+## **The night's share used to be six thousandths and it was cancelling a bug, not grading an
+## hour.** The sky's light was exposed twice — once rendering it into the radiance map and once
+## lighting the scene from it — so a night metered 852 times a midday exposure lit everything 852
+## times too hard, and the fraction here was what stopped a white truck reading 0.57 on a black
+## road. The sky no longer follows the camera, so the hour's own light is what dims it and the
+## radiance is the sky's own. See `PhysicalCamera.exposure_scale`.
 const SKY_ENERGY_DAY: float = 1.0
 const SKY_ENERGY_NIGHT: float = 0.0004
 const RADIANCE_DAY: float = 1.0
-const RADIANCE_NIGHT: float = 0.006
+const RADIANCE_NIGHT: float = 1.0
 ## The sky's own colours at noon, at the horizon's own hour, and at midnight.
 const SKY_TOP_DAY: Color = Color(0.22, 0.42, 0.78)
 const SKY_HORIZON_DAY: Color = Color(0.62, 0.74, 0.88)
@@ -91,7 +97,15 @@ const AMBIENT_FROM_SKY_DAY: float = 1.0
 const AMBIENT_FROM_SKY_NIGHT: float = 0.0
 const AMBIENT_COLOUR_NIGHT: Color = Color(0.42, 0.55, 1.0)
 const AMBIENT_ENERGY_DAY: float = 1.0
-const AMBIENT_ENERGY_NIGHT: float = 0.002
+## **The night's share is an irradiance now, not a number with the night's film in it.** Godot's
+## exposure normalisation does not reach the ambient term — measured, a surface lit only by it
+## photographed at 0.060669 at ISO 16, 32, 64 and 128, the same value across three stops — so this
+## used to be stated against the night camera and was 0.002. The camera is applied in
+## `BlockoutWorld._grade_environment` now, and what is left is how much light a night sky actually
+## gives against a midday one: a moonlit sky is about a thousandth of a lux where a day sky is
+## fifteen thousand, which is one part in ten million. This is a little above that, which is the
+## nearest thing to "nothing, but not zero" that keeps a shaded panel from being a silhouette.
+const AMBIENT_ENERGY_NIGHT: float = 0.0000025
 
 ## The haze: a pale daylight one, the colour of the sky it hangs in at night.
 const FOG_DENSITY_DAY: float = 0.0006
@@ -191,12 +205,14 @@ static func at(hour: float) -> Dictionary:
             SKY_HORIZON_NIGHT, SKY_HORIZON_DUSK, SKY_HORIZON_DAY, day, warmth
         ),
         "stars": 1.0 - smoothstep(STARS_FROM_DEG, STARS_TO_DEG, elevation),
-        # What is falling on the clouds. They are lit by whatever is up, so they go out with it:
-        # a moonlit cloud is a dim grey shape and not a white one.
-        "cloud_light": maxf(day, 0.03),
-        # The disc of whatever is up, drawn with its own brightness rather than the sky's. A moon
-        # at the sky's own night multiplier is not a moon, it is nothing.
-        "disc_energy": maxf(day, 0.015),
+        # What is falling on the clouds, and how bright the disc of whatever is up is drawn. Both
+        # are 1.0 at every hour now: the light the sky is given is the hour's own — a quarter of a
+        # lux under the moon against a hundred thousand at noon — and that is what takes a cloud
+        # from white to a dim grey shape. They used to carry a floor apiece, which was the same
+        # bug as `RADIANCE_NIGHT` above: the camera's exposure was in the sky's own light, so a
+        # night needed its clouds and its moon dialled back out again.
+        "cloud_light": 1.0,
+        "disc_energy": 1.0,
         "ambient_from_sky": lerpf(AMBIENT_FROM_SKY_NIGHT, AMBIENT_FROM_SKY_DAY, day),
         "ambient_colour": AMBIENT_COLOUR_NIGHT,
         "ambient_energy": _between(AMBIENT_ENERGY_NIGHT, AMBIENT_ENERGY_DAY, day),

@@ -29,13 +29,20 @@ extends GateBase
 ## at the bright end and quantisation at the dark end. `captures_carry_real_light` is what makes
 ## this number mean something.
 ##
-## **It still moves with exposure, and that is now a question about the renderer rather than
-## about this gate.** 6.4:1 at ISO 32, 2.7:1 at 64, 19.2:1 at 16, on one unchanged scene and
-## with a capture proven linear to 0.24% up to a value of 8. A gain cannot change a ratio, so
-## something in the lighting is not scaling with the camera — the suspicion is that under
-## physical light units the sky's ambient contribution and the direct light do not share an
-## exposure normalisation. Until that is understood, no single number from here should be
-## compared against a daylight illuminance figure, and the band below stays wide.
+## **It used to move with exposure, and that was the renderer.** 6.4:1 at ISO 32, 2.7:1 at 64,
+## 19.2:1 at 16, on one unchanged scene and with a capture proven linear to 0.24% up to a value
+## of 8. A gain cannot change a ratio, and the cause was exactly what the spread suggested: under
+## physical light units Godot hands a sky the camera's exposure inside the light it is given and
+## applies the exposure again to the radiance map the scene is lit from, so the sky was exposed
+## twice and the sun once. `the_sky_does_not_follow_the_camera` holds the fixed behaviour and
+## measures the same scene at 7.2:1 on every film within 4.2%.
+##
+## **This gate is still photographed through `PhysicalSkyMaterial`, which is not fixed and cannot
+## be.** Godot's physical sky is a Preetham model with a tone curve applied to the sun's own
+## energy — doubling the sun's lux at a fixed exposure brightened it by 1.54, not by 2 — so its
+## response to light is a power and no multiplier outside it can straighten it. M2's HDRI sky is
+## what replaces it; until then the band below stays wide, and the number this gate reports is a
+## picture's ratio rather than a measurement of light.
 ##
 ## The bound on the ratio is a sanity range rather than a physical claim, and the reason is worth
 ## recording. Clear-sky daylight is measured physics: a surface facing a midday sun receives about

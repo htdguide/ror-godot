@@ -56,12 +56,16 @@ const PRESETS: Dictionary = {
         # moonlit ground is as bright as what the low beams throw, and the lamps read as glow
         # rather than as light.
         "sky_energy": 0.0004,
-        # And a fiftieth of that again as light. A moonlit sky is something to see, not something
-        # to be lit by; left at its own brightness it put a white truck at 0.57 on a black road.
-        "radiance_scale": 0.006,
-        # And the clouds are lit by the moon, not by a sun that set hours ago.
-        "cloud_light": 0.05,
-        "disc_energy": 0.02,
+        # **These three used to be a fiftieth, a twentieth and a fiftieth, and all three were
+        # cancelling the same bug.** The sky's light was exposed twice — once into the radiance
+        # map and once when lighting with it — so a night metered 852 times a midday exposure lit
+        # the scene 852 times too hard, and a white truck came back at 0.57 on a black road. They
+        # are 1.0 now because the sky no longer follows the camera (see
+        # `PhysicalCamera.exposure_scale`) and because the moon's own quarter-lux against a
+        # midday sun's hundred thousand is what should be dimming the clouds and the disc.
+        "radiance_scale": 1.0,
+        "cloud_light": 1.0,
+        "disc_energy": 1.0,
         # This project's own sky shader rather than the atmosphere model, because it is the one
         # that can state a radiance scale, and because a modelled atmosphere lit by a moon is a
         # daylight sky with the brightness turned down.
@@ -80,7 +84,11 @@ const PRESETS: Dictionary = {
         # supplies all of it.
         "ambient_from_sky": 0.0,
         "ambient_colour": Color(0.42, 0.55, 1.0),
-        "ambient_energy": 0.002,
+        # How much light a night sky gives against a midday one, which is almost none: a moonlit
+        # sky is about a thousandth of a lux where a day sky is fifteen thousand. The camera is
+        # applied to it in `BlockoutWorld._grade_environment`, so this is an irradiance rather
+        # than a number with the night's own film already in it.
+        "ambient_energy": 0.0000025,
         "bg_color": Color(0.015, 0.025, 0.055),
         "fill_energy": 0.0,
         # A moon is a disc like the sun and casts a shadow with an edge of its own.

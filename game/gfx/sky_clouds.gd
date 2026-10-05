@@ -43,6 +43,10 @@ static func material(weather: Dictionary) -> ShaderMaterial:
     material.set_shader_parameter(
         "disc_energy", float(weather.get("disc_energy", 1.0))
     )
+    # How much of the camera's exposure is already in the light this sky is given. See the
+    # uniform's own note: without it the sky is exposure squared and the scene's lighting balance
+    # depends on the film in the camera.
+    material.set_shader_parameter("light_exposure", PhysicalCamera.exposure_scale(weather))
     material.set_shader_parameter("sky_curve", RenderCfg.SKY_CURVE)
     material.set_shader_parameter(
         "sky_energy", float(weather.get("sky_energy", RenderCfg.SKY_ENERGY))

@@ -13,6 +13,52 @@ extends RefCounted
 ## auto-exposure, whose convergence is temporal and would make a gate's result depend on how many
 ## frames it happened to render.
 
+## The camera this project is graded against: the exposure every stated brightness in it means.
+##
+## A weather preset that names no exposure of its own is metered here, and `exposure_scale` is how
+## far from here any other hour has been taken.
+const REFERENCE_F_STOP: float = 8.0
+const REFERENCE_SHUTTER_S: float = 0.008
+
+
+## How much more light this hour's camera gathers than the reference one.
+##
+## **A sky must not follow the camera, and this is what lets it stop.** With physical light units
+## Godot hands a sky shader a light energy that already has the camera's exposure in it, and then
+## applies the exposure again to whatever the sky returns, so every part of a sky that is drawn
+## from the sun — the scattering of `PhysicalSkyMaterial`, this project's own clouds and sun disc —
+## is exposure *squared*. Measured on one unchanged noon scene, the sun lit a grey card at exactly
+## twice the value for twice the ISO, as it must, while the sky lit it 6.2 times: the sunlit to
+## skylit ratio read 19.2:1 at ISO 16, 6.4:1 at 32 and 2.7:1 at 64, which is a lighting balance
+## that depends on the film in the camera. Dividing the sun's energy by this before the sky uses it
+## leaves exactly one exposure on the result, which is the one the renderer applies.
+static func exposure_scale(weather: Dictionary) -> float:
+    var f_stop: float = float(weather.get("f_stop", REFERENCE_F_STOP))
+    var shutter_s: float = float(weather.get("shutter_s", REFERENCE_SHUTTER_S))
+    var iso: float = float(weather.get("iso", RenderCfg.CAMERA_ISO))
+    var reference: float = (
+        RenderCfg.CAMERA_ISO * REFERENCE_SHUTTER_S
+        / (REFERENCE_F_STOP * REFERENCE_F_STOP)
+    )
+    if reference <= 0.0 or f_stop <= 0.0:
+        return 1.0
+    return (iso * shutter_s / (f_stop * f_stop)) / reference
+
+
+## The same number for a camera that already exists, which is what a live exposure change has.
+static func exposure_scale_of(camera: Camera3D) -> float:
+    var attributes: CameraAttributesPhysical = (
+        camera.attributes as CameraAttributesPhysical if camera != null else null
+    )
+    if attributes == null:
+        return 1.0
+    return exposure_scale({
+        "f_stop": attributes.exposure_aperture,
+        "shutter_s": 1.0 / maxf(attributes.exposure_shutter_speed, 0.000001),
+        "iso": attributes.exposure_sensitivity,
+    })
+
+
 ## The camera is physical: depth of field then follows from the lens instead of being
 ## dialled by hand, and exposure is comparable between weather presets.
 static func build(from_preset: Dictionary, weather: Dictionary = {}) -> Camera3D:
@@ -57,10 +103,10 @@ static func _expose(
     attributes: CameraAttributesPhysical, preset: Dictionary, weather: Dictionary
 ) -> void:
     attributes.exposure_aperture = float(
-        weather.get("f_stop", preset.get("f_stop", 8.0))
+        weather.get("f_stop", preset.get("f_stop", REFERENCE_F_STOP))
     )
     attributes.exposure_shutter_speed = 1.0 / maxf(
-        float(weather.get("shutter_s", preset.get("shutter_s", 0.008))), 0.000001
+        float(weather.get("shutter_s", preset.get("shutter_s", REFERENCE_SHUTTER_S))), 0.000001
     )
     # With physical light units the exposure is the photographer's three numbers and nothing
     # else: aperture, shutter, sensitivity. There is no multiplier standing in for them.
