@@ -136,7 +136,7 @@ has just stated.
 
 ## The suite is green
 
-128 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
+129 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
 twice in one session with a worst measured drift of zero.
 
 It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%
@@ -166,10 +166,17 @@ prerequisite for anything.
 `blank_NRM.dds` for all four layers, so its normal maps really are flat. "Normal depth to zero
 changed nothing" was true.
 
-Also measured and still open: `daylight_shadows_are_readable` records that the scene's sun-to-sky
-balance is about 3:1 where clear-sky daylight is nearer 14:1 — the sky is roughly three times too
-strong relative to the sun — which belongs with M2's HDRI sky. That one was measured against a
-grey quad rather than against the ground, so the blank-texture bug did not reach it.
+**M2 has started, and the first thing in it was a renderer bug rather than a feature.** Godot
+exposes a sky's light twice and a lamp's once — see `the_sky_does_not_follow_the_camera` and the
+entry in `docs/guides/hard-won-facts-light.md` — so the project's sun-to-sky balance was a
+property of the film: 19.2:1 at ISO 16 and 1.6:1 at 128 on one unchanged scene. It is fixed for
+the sky this project draws itself and holds at 7.2:1 on every film within 4.2%.
+
+Also measured and still open: the balance is 7.2:1 where clear-sky daylight is nearer 14:1, so the
+sky is about twice as strong as daylight's relative to its sun. Correcting that is the HDRI sky's
+job, because `PhysicalSkyMaterial` cannot be graded against at all: it is a Preetham model with a
+tone curve applied to the sun's own energy, measured at `light ^ 0.625`, and the daylight presets
+still photograph through it.
 
 **2. The money shots do not exist.** PLAN §0.5 named eight, and half of them named features of the
 deleted valley. Nothing renders the sheet today, so there is no before-image for the project to be
