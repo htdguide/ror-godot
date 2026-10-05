@@ -22,6 +22,14 @@ const MAP: String = "lapaz"
 const MIN_GROUND: float = 0.01
 const MAX_GROUND: float = 0.9
 const MAX_SKY: float = 0.95
+## Above this much sky there is daylight in the frame for an hour to change.
+##
+## **Two hours of the same deep night are the same frame, and that is correct.** The moon moves
+## and its light with it, but what the camera sees of a road at two and at three in the morning is
+## the vehicle's own headlights on it, metered the same way both times. Holding consecutive hours
+## apart is a check for a scene that has stopped following the clock, and it has nothing to say
+## where the clock has nothing left to change.
+const LIT_SKY: float = 0.01
 const LISTED: int = 6
 
 
@@ -107,9 +115,12 @@ func run(harness: Node) -> Dictionary:
             problems.append("%02d:00 draws a ground of %.3f" % [step, ground_luma])
         elif (read["sky"] as float) > MAX_SKY:
             problems.append("%02d:00 draws a sky of %.3f" % [step, read["sky"]])
-        elif not previous.is_empty() and is_equal_approx(
-            previous["sky"] as float, read["sky"] as float
-        ) and is_equal_approx(previous["ground"] as float, ground_luma):
+        elif (
+            (read["sky"] as float) > LIT_SKY
+            and not previous.is_empty()
+            and is_equal_approx(previous["sky"] as float, read["sky"] as float)
+            and is_equal_approx(previous["ground"] as float, ground_luma)
+        ):
             problems.append("%02d:00 is the same frame as the hour before it" % step)
         previous = read
     for row: String in rows:

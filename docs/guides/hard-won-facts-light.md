@@ -270,3 +270,16 @@ See `hard-won-facts.md` for the solver, the file formats, the terrain and the ga
 - **A star has to be a point inside its cell, not the cell.** Quantising the view direction and
   lighting the whole cell draws square stars; keeping a jittered position per cell and fading with
   the angular distance to it draws round ones for the same cost.
+- **Ambient occlusion darkens the ambient term and nothing else.** It is the right name for "the
+  moon should not reach the inside of the bed" and it is not the whole of the fault: at twelve
+  times its own strength, Godot's SSAO moved an enclosed truck bed from 0.0343 to 0.0320. What
+  lights an enclosed surface is *reflection* — the sky's radiance, and above all a reflection
+  probe.
+- **A reflection probe cannot know what is in front of a surface.** It is one cubemap taken from
+  the middle of the actor and applied to everything inside its box, so the floor of a truck bed
+  reflects the sky that the bed's own sides are blocking. Measured at dusk: bed 0.0626 against a
+  roof of 0.0671 — 93% — and with the probe off, 0.0305 against 0.0616. The probe is a daylight
+  nicety and now follows the hour down.
+- **A shadow that lets a quarter of the light through is a daylight device.** `SHADOW_OPACITY` is
+  0.72 because by day the sky fills a shadow; at night nothing does, and the moon shines through
+  whatever is standing in front of it. The day cycle runs it to 1.0 after dark.

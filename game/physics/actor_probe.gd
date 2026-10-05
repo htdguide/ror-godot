@@ -96,13 +96,27 @@ static func _drawn(node: Node, to_root: Transform3D) -> Array[Dictionary]:
 ## dark road, reported from a window as "the car starts reflecting something and also becomes
 ## white". Re-assigning the update mode marks the probe dirty, so it captures the hour it is
 ## actually in and goes back to costing nothing.
-static func recapture(root: Node) -> int:
+## **And how strongly it is applied, because a probe cannot know what is in front of a surface.**
+## It is one cubemap taken from the middle of the vehicle and applied to everything inside its
+## box, so the floor of the bed reflects the sky the probe saw over the sides that are standing in
+## the way. Measured at a quarter past six in the evening, the enclosed bed read 0.0626 against an
+## open roof at 0.0671 — 93% of the light of a surface facing the sky — and with the probe turned
+## off it read 0.0305. Reported from a window as the moon shining through the truck and landing in
+## its bed.
+##
+## Screen-space ambient occlusion is the usual answer and it is not this one: Godot applies it to
+## the ambient term, not to a reflection, and at twelve times its own strength it moved the bed by
+## a hundredth. What is left is the probe's own strength, and a probe is a daylight nicety — paint
+## reflecting a world that has something in it. An hour with nothing to reflect but a dark sky
+## turns it down and the enclosed parts of a vehicle go dark with it.
+static func recapture(root: Node, intensity: float = INTENSITY) -> int:
     var taken: int = 0
     for child: Node in root.get_children():
-        taken += recapture(child)
+        taken += recapture(child, intensity)
         var probe: ReflectionProbe = child as ReflectionProbe
         if probe == null:
             continue
+        probe.intensity = intensity
         probe.update_mode = ReflectionProbe.UPDATE_ONCE
         taken += 1
     return taken

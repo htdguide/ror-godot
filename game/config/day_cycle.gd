@@ -134,6 +134,8 @@ const SHUTTER_NIGHT_S: float = 0.0167
 ## as "a weird too bright white reflection on the truck when getting closer to the sunset". A
 ## bounce cannot be brighter than what it bounces.
 const FILL_SHARE: float = 0.05
+## What a vehicle's own reflection probe is worth after dark.
+const PROBE_AT_NIGHT: float = 0.12
 const FILL_ENERGY_DAY: float = 1.0
 
 
@@ -200,6 +202,16 @@ static func at(hour: float) -> Dictionary:
         "ambient_energy": _between(AMBIENT_ENERGY_NIGHT, AMBIENT_ENERGY_DAY, day),
         "bg_color": SKY_TOP_NIGHT.lerp(SKY_TOP_DAY, day),
         "fill_energy": FILL_ENERGY_DAY * day,
+        # How much light a shadow takes away. By day a shadow is not a hole — the sky fills it,
+        # and this project's own figure says so — but at night there is nothing to fill it with,
+        # and a shadow that keeps letting a quarter of the moon through is a moon that shines
+        # through the vehicle it is standing behind.
+        "shadow_opacity": lerpf(1.0, RenderCfg.SHADOW_OPACITY, day),
+        # How strongly a vehicle's own reflection probe is applied. See `ActorProbe.recapture`:
+        # a probe is one cubemap from the middle of the vehicle and cannot know what is in front
+        # of a surface, so at an hour with nothing to reflect it is turned down rather than left
+        # to light the inside of a truck bed.
+        "probe_intensity": lerpf(PROBE_AT_NIGHT, 1.0, day),
         "fill_lux": lux * FILL_SHARE,
         "fog_density": lerpf(FOG_DENSITY_NIGHT, FOG_DENSITY_DAY, day),
         # The haze takes the hour's colour too: a low sun reddens the air it comes through, and a

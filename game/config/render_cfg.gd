@@ -174,6 +174,35 @@ const FOG_COLOUR: Color = Color(0.68, 0.72, 0.78)
 ## stands at its edge, so the default far plane has to reach it.
 const VIEW_DISTANCE_M: float = 6000.0
 
+## --- Occlusion ------------------------------------------------------------------------------
+##
+## **Ambient light arrives from every direction and geometry does not.** The ambient term and the
+## sky's radiance reach a surface regardless of what is standing in front of it, so the floor of a
+## truck bed, the inside of a wheel arch and the top of an axle are lit exactly as brightly as the
+## roof above them. Measured at a quarter past six in the evening: the bed floor read 0.0633 and
+## the open roof 0.0680 — an enclosed surface at 93% of one facing the sky. Reported from a window
+## as the moon's light coming through the truck and landing in its bed.
+##
+## Screen-space ambient occlusion is the answer to that, and it is the thing a session means by
+## "ambient occlusion": for each pixel, how much of the sky it can actually see, applied to the
+## light that comes from everywhere.
+const SSAO_ENABLED: bool = true
+## How far out a surface looks for something blocking its sky, in metres, and how hard the
+## darkening is. A metre reaches across a wheel arch and under a bumper without reaching across
+## a street.
+const SSAO_RADIUS_M: float = 1.0
+const SSAO_INTENSITY: float = 2.4
+const SSAO_POWER: float = 1.6
+const SSAO_DETAIL: float = 0.6
+const SSAO_HORIZON: float = 0.06
+const SSAO_SHARPNESS: float = 0.98
+## How much of it also lands on direct light. Direct light has shadow maps of its own, so this is
+## small: an occlusion term applied twice to the same sunbeam is a dark smear under every object.
+const SSAO_LIGHT_AFFECT: float = 0.15
+## And how much of it lands on the sky's reflection, which is the other half of a bed floor
+## lighting itself: a surface that cannot see the sky cannot reflect it either.
+const SSAO_REFLECTION_AFFECT: float = 1.0
+
 ## --- Air that catches light --------------------------------------------------------------------
 ##
 ## The froxel grid, used only by the hours that ask for it. A headlight is a shaft as well as a

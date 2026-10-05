@@ -81,32 +81,7 @@ static func _grade_environment(env: Environment, weather: Dictionary, clouds: bo
         env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
         env.ambient_light_color = weather.get("bg_color", Color.GRAY) as Color
     env.ambient_light_energy = float(weather.get("ambient_energy", 0.0))
-    _grade_air(env, weather)
-
-
-## The air: the distance haze, and whether it catches light.
-##
-## **Both were built once and never graded, which is why a night was a grey day.** The haze was
-## set in `_build_environment` from constants, so switching the weather left a daylight fog —
-## a pale grey 0.68, 0.72, 0.78 — hanging over a moonlit sky, and the horizon glowed through
-## the dark. An hour of the day states its own air or keeps the default one.
-##
-## Volumetric fog is the froxel grid, and it is off everywhere but the night presets that ask
-## for it. It costs a pass and it buys exactly one thing: a headlight beam you can see as a
-## shaft in the air rather than only as a pool on the road.
-static func _grade_air(env: Environment, weather: Dictionary) -> void:
-    env.fog_enabled = RenderCfg.FOG_ENABLED
-    env.fog_density = float(weather.get("fog_density", RenderCfg.FOG_DENSITY))
-    env.fog_light_color = weather.get("fog_colour", RenderCfg.FOG_COLOUR) as Color
-    env.fog_sky_affect = RenderCfg.FOG_SKY_AFFECT
-    env.volumetric_fog_enabled = bool(weather.get("volumetric", false))
-    env.volumetric_fog_density = RenderCfg.VOLUMETRIC_DENSITY
-    env.volumetric_fog_albedo = weather.get("fog_colour", RenderCfg.FOG_COLOUR) as Color
-    env.volumetric_fog_length = RenderCfg.VOLUMETRIC_LENGTH_M
-    # The sky must not pour light into the froxels: an ambient term in the air is a grey wash
-    # over the whole frame, and what a beam has to stand out against at night is darkness.
-    env.volumetric_fog_ambient_inject = 0.0
-    env.volumetric_fog_gi_inject = 0.0
+    WorldAir.grade(env, weather)
 
 
 ## Whether this world's sky has weather in it.

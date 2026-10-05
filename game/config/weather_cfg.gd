@@ -85,6 +85,10 @@ const PRESETS: Dictionary = {
         "fill_energy": 0.0,
         # A moon is a disc like the sun and casts a shadow with an edge of its own.
         "sun_angular_deg": 0.6,
+        # Nothing fills a shadow at night.
+        "shadow_opacity": 1.0,
+        # Nothing to reflect but a dark sky: see `ActorProbe.recapture`.
+        "probe_intensity": 0.12,
         # The eye a driver brings to it: wide open, slow, and sensitive.
         "iso": 1600.0,
         "f_stop": 2.8,

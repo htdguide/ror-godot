@@ -79,7 +79,9 @@ func _put(world: Node3D, weather: Dictionary) -> void:
     if camera != null and is_instance_valid(camera):
         PhysicalCamera.reexpose(camera, shot, weather)
     # And the vehicle's own reflection, which was taken once under whatever sky was up then.
-    ActorProbe.recapture(world)
+    ActorProbe.recapture(
+        world, float(weather.get("probe_intensity", ActorProbe.INTENSITY))
+    )
 
 
 ## The next preset in the list, applied.
