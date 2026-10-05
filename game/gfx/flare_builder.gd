@@ -124,6 +124,10 @@ static func build(root: Node3D, truck: TruckParser, render_frame: Transform3D) -
     # Built dark. A lamp's beam is a Light3D and a Light3D is visible the moment it exists, so a
     # vehicle whose lights nobody has switched on would otherwise spawn with its headlights on.
     set_lit(lamps, truck, false)
+    for lamp: Node3D in lamps:
+        var beam: SpotLight3D = lamp.get_node_or_null(^"Beam") as SpotLight3D
+        if beam != null and beam.is_inside_tree():
+            HeadBeam.level(beam)
     return lamps
 
 
@@ -134,6 +138,12 @@ static func apply_pose(
     var to_local: Transform3D = actor.affine_inverse()
     for i: int in mini(lamps.size(), truck.flares.size()):
         lamps[i].transform = to_local * _placement(nodes, truck.flares[i])
+        # And a forward lamp is re-aimed at the road: its holder pitches with the bodywork, and
+        # a beam that pitches with the bodywork is in the sky the moment the vehicle squats.
+        # See `HeadBeam.level`.
+        var beam: SpotLight3D = lamps[i].get_node_or_null(^"Beam") as SpotLight3D
+        if beam != null:
+            HeadBeam.level(beam)
 
 
 ## Turns every lamp on or off together. Kept for the checks that only care whether a lamp can

@@ -283,3 +283,14 @@ See `hard-won-facts.md` for the solver, the file formats, the terrain and the ga
 - **A shadow that lets a quarter of the light through is a daylight device.** `SHADOW_OPACITY` is
   0.72 because by day the sky fills a shadow; at night nothing does, and the moon shines through
   whatever is standing in front of it. The day cycle runs it to 1.0 after dark.
+- **A headlight bolted to bodywork rides the bodywork.** A flare's frame is the normal of its own
+  node triad, so the beam pitches with the chassis: nosed up six degrees, the hero truck's two
+  beams pointed 0.027 and 0.003 *above* the horizon and the road ahead read 0.0018 against 0.264
+  level. Reported from a window as "when I throttle it is even worse, the light doesn't even touch
+  the ground". `HeadBeam.level` keeps the lamp's own yaw — its toe-out is what splays the pattern
+  — and takes the pitch from the aim, which is what automatic headlight levelling does.
+- **A beam pattern has no "up" until the lamp does.** Turning the projector image over looked like
+  the fix for a beam in the sky, and on a checkerboard it measured like one. On a real road it
+  takes the low beam to 0.6444 against a main beam of 0.5672 — a low beam brighter than a main
+  beam, which is a cut-off that has stopped cutting anything off. The pattern was right; what was
+  missing was a known up vector, which levelling supplies.

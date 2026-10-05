@@ -147,6 +147,30 @@ static func kind_of(light: SpotLight3D) -> String:
     return light.get_meta("beam_kind", "low") as String
 
 
+## Points a lamp at the road rather than at whatever the panel it is mounted on is doing.
+##
+## **A headlight is aimed at the ground, and a vehicle is not a fixed thing.** The lamp's own
+## frame is the bodywork's: it pitches with the chassis, so a truck that squats under power lifts
+## its beams into the sky — measured, nosed up six degrees the road ahead read 0.0018 against
+## 0.264 level, which is a beam that has left the ground altogether. Reported from a window as
+## "when I throttle it is even worse, the light doesn't even touch the ground".
+##
+## Every car sold with a headlight has an answer to this, from a thumbwheel on the dash to
+## automatic levelling that reads the axles. This is the automatic kind: the lamp keeps the
+## direction it is pointed in — its own toe-out included, which is what splays the pattern — and
+## the pitch is taken from the aim rather than from the body. A beam then sits a fixed angle below
+## the horizon whatever the chassis is doing.
+static func level(light: SpotLight3D) -> void:
+    var facing: Vector3 = -light.global_transform.basis.z
+    var flat: Vector3 = Vector3(facing.x, 0.0, facing.z)
+    if flat.length_squared() < 0.000001:
+        return
+    var beam: Dictionary = KINDS.get(kind_of(light), KINDS["low"]) as Dictionary
+    var drop: float = tan(deg_to_rad(beam["tilt_deg"] as float))
+    var aim: Vector3 = (flat.normalized() - Vector3.UP * drop).normalized()
+    light.look_at(light.global_position + aim, Vector3.UP)
+
+
 ## The beam pattern, as a texture the lamp is seen through.
 ##
 ## Built per lamp rather than shared. A 128 px pattern is a tenth of a millisecond to make and
@@ -162,6 +186,12 @@ static func _cookie(kind: String) -> ImageTexture:
     # took the road ahead from 0.24 to 0.95.
     var image: Image = Image.create_empty(COOKIE_PX, COOKIE_PX, false, Image.FORMAT_RGBA8)
     for y: int in COOKIE_PX:
+        # **Which way up this pattern lands depends on the lamp having an up at all**, and until
+        # `level` gave every beam a world up vector, each one had whatever its node triad
+        # happened to produce. Turning the image over looked like the fix for a beam in the sky
+        # and is not: on a real road it takes the low beam to 0.6444 against a main beam of
+        # 0.5672 — a low beam brighter than a main beam, which is a cut-off that has stopped
+        # cutting anything off. Written the way it is read, with the cut-off above the hot spot.
         var v: float = (float(y) + 0.5) / float(COOKIE_PX)
         for x: int in COOKIE_PX:
             var u: float = (float(x) + 0.5) / float(COOKIE_PX)
