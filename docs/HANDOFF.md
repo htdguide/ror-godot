@@ -116,8 +116,10 @@ hero truck bends 276 beams, worst by 204 mm, and breaks 51 of 1,995. At 2.4 m/s 
 **The suspension travels**, 90 to 99 mm per wheel, which is what a lifted truck does.
 
 Also working: OGRE `.mesh` reading, DDS textures, PBR materials from `managedmaterials`, flexbodies
-skinned to solver nodes, rigid props, generated wheel tread that spins, flares as real lamps
-drawn as additive sprites, a reflection probe per actor, a terrain's own objects as solid columns,
+skinned to solver nodes, rigid props, generated wheel tread that spins, flares as real lamps drawn
+with the game's own flare artwork — and, where a vehicle declares `materialflarebindings`, its own
+glass switched to the lit frame its author drew — a reflection probe per actor, a terrain's own
+objects as solid columns,
 a terrain's own vegetation in a ring that follows the driver, and recovery from a roll.
 
 Sessions open at golden dusk unless `--weather` says otherwise: a window is not a gate, and the low
@@ -235,8 +237,10 @@ Acceptance 1, 3, 6, 7 and 8 pass.
   one with locked or open diffs.
 - `commands2` beams hold the doors but are not key-driven, so the doors do not open.
 - Traction control and ABS are not implemented; neither is declared by the hero rig.
-- Flares are placed and lit but not animated: indicators do not blink, brake lights do not follow
-  the pedal, and reversing lights do not follow the gear.
+- A vehicle that declares no `materialflarebindings` has no lit lamp glass, which is upstream's
+  behaviour too — the hero truck declares none, so its lamps are the sprite and the beam and its
+  lenses never change. Giving it lit glass means authoring a two-frame lens texture and four
+  binding rows into a mod this project otherwise loads unmodified.
 
 ## Checking against Rigs of Rods itself
 
