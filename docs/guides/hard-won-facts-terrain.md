@@ -245,3 +245,14 @@ Its companion is `hard-won-facts-mods.md`, which covers how a vehicle is read, b
   places `lapaz-horizon` and `lapaz-base` and has `lapaz-sky` disabled with a leading `;`, which
   is one of the three comment markers Ogre and Rigs of Rods accept. The sky dome in that file is
   not content this project is missing.
+- **A cell decides where a collision box is, not how big it is.** Rasterising a mesh into cells on
+  the ground plane and making each cell a box gives every box the cell's own width, so a 0.1 m
+  lamp post comes out a 0.7 m column — reported from a window as "the collision boxes are vertical
+  and align with the signs, but too thick", and it was, by seven times. Keeping the extent of the
+  geometry *inside* each cell, clipped to the cell so a triangle crossing four of them does not
+  make all four as wide as itself, costs four floats per cell and takes La Paz's widest box from
+  0.70 m to 0.10 m with the same 396 boxes.
+- **Narrow boxes are only safe once the contact rule is right.** A tall thin box used to be a
+  trap: a node pushed into one left by whichever face its velocity suggested, which on a thin box
+  is usually the wrong one. `RorObstacles::contact` picking the nearest face a node can actually
+  leave by is what made this change available at all, which is why it waited for it.

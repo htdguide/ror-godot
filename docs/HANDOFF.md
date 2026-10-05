@@ -188,10 +188,12 @@ Acceptance 1, 3, 6, 7 and 8 pass.
 
 **4. What a loaded terrain does not have yet**, each named rather than forgotten:
 
-- **Water.** A terrain's `Water` and `WaterLine` are read and ignored, so there is no water in the
-  project at all — the valley's lake and river went with it. `simple2_w` declares water at 100 m and
-  renders dry. PLAN §0.5 records that water is now unscheduled rather than staged.
-- **Procedural roads.** `.tobj` road/road2 sections are reported as unread lines.
+- ~~**Water.**~~ Built: `RorWater` reads `Water` and `WaterLine` and puts a surface at the height
+  the file states, held by `a_terrain_has_the_water_its_file_declares`. What it still is not is
+  polished — the ripples tile, nothing reflects in it, and it does not move.
+- ~~**Procedural roads.**~~ Built: `.tobj` road points are swept into decks, shoulders and
+  bridges, held by `a_road_of_points_is_swept_into_a_road`, `a_road_rests_on_the_ground_it_crosses`
+  and `a_swept_road_faces_the_sky`.
 - **Hand-placed collision meshes.** A terrain can ship them and La Paz does not. Its objects are
   solid by columns instead — `world/ror_object_collision.gd` turns each mesh into a cell of ground
   plane and the height of the geometry in it — so a pole is a pole and a 40 m power line is two

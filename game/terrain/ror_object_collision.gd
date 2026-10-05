@@ -291,10 +291,8 @@ static func _shape_of(
 ## until an object fits was written and is the better answer; it rides on the same test and comes
 ## back with it.
 ##
-## What this still is not: tight. A cell is `CELL_M` across whatever is inside it, so a 0.1 m lamp
-## post gets a 0.7 m column — reported as "too thick", and it is, by seven times. Narrowing a box
-## to its own geometry makes tall boxes narrow, which is only safe now that
-## `RorObstacles::contact` can tell which face a node may leave by.
+## **A cell says where a box is; the geometry in it says how big.** See `_raster`: a cell used to
+## contribute its own full width and a 0.1 m lamp post came out 0.7 m thick.
 static func columns_for_probe(points: PackedVector3Array) -> Array[Dictionary]:
     return _columns(points)
 
@@ -329,7 +327,19 @@ static func _columns(points: PackedVector3Array) -> Array[Dictionary]:
     return _boxes_of(_raster(points, cell), cell)
 
 
-## Every cell a triangle soup crosses at this size, as `cell -> [bottom, top]`.
+## Every cell a triangle soup crosses at this size, as
+## `cell -> [bottom, top, left, right, near, far]` — the box the geometry in that cell actually
+## occupies, not the cell.
+##
+## **The cell decides where a box is, not how big it is.** A cell used to contribute its own full
+## width, so a 0.1 m lamp post came out as a 0.7 m column: seven times too thick, reported from a
+## window in exactly those words. What is kept instead is the extent of the geometry inside the
+## cell, clipped to the cell so that a triangle crossing four of them does not make all four as
+## wide as itself. A surface that fills its cell still gets the whole cell; a post gets a post.
+##
+## Narrow boxes are only safe because `RorObstacles::contact` picks the face a node can actually
+## leave by. Before that, a tall thin box was a trap: a node pushed into one left through whatever
+## face the velocity suggested, and on a thin box that is usually the wrong one.
 static func _raster(points: PackedVector3Array, cell: float) -> Dictionary:
     var cells: Dictionary = {}
     for first: int in range(0, points.size() - 2, 3):
@@ -341,17 +351,24 @@ static func _raster(points: PackedVector3Array, cell: float) -> Dictionary:
         for x: int in range(int(floor(low.x / cell)), int(floor(high.x / cell)) + 1):
             for y: int in range(int(floor(low.y / cell)), int(floor(high.y / cell)) + 1):
                 var key: Vector2i = Vector2i(x, y)
+                # The part of this triangle's own box that lies in this cell.
+                var left: float = maxf(low.x, float(x) * cell)
+                var right: float = minf(high.x, float(x + 1) * cell)
+                var near: float = maxf(low.y, float(y) * cell)
+                var far: float = minf(high.y, float(y + 1) * cell)
                 var span: PackedFloat32Array = cells.get(
-                    key, PackedFloat32Array([INF, -INF])
+                    key, PackedFloat32Array([INF, -INF, INF, -INF, INF, -INF])
                 ) as PackedFloat32Array
                 cells[key] = PackedFloat32Array([
-                    minf(span[0], low.z), maxf(span[1], high.z)
+                    minf(span[0], low.z), maxf(span[1], high.z),
+                    minf(span[2], left), maxf(span[3], right),
+                    minf(span[4], near), maxf(span[5], far),
                 ])
     return cells
 
 
-## One box per cell, each a slab of whatever that cell holds.
-static func _boxes_of(cells: Dictionary, cell: float) -> Array[Dictionary]:
+## One box per cell, each the box the geometry in that cell occupies.
+static func _boxes_of(cells: Dictionary, _cell: float) -> Array[Dictionary]:
     var out: Array[Dictionary] = []
     var keys: Array = cells.keys()
     # Sorted, so one mesh always produces the same boxes in the same order.
@@ -363,11 +380,15 @@ static func _boxes_of(cells: Dictionary, cell: float) -> Array[Dictionary]:
             break
         var span: PackedFloat32Array = cells[key] as PackedFloat32Array
         var height: float = maxf(span[1] - span[0], MIN_SLAB_M)
+        # A box no thinner than the detail it stands for: a wire or a panel edge is a plane in
+        # one direction, and a box with no width at all is a box a solver cannot push out of.
+        var across: float = maxf(span[3] - span[2], MIN_FOOTPRINT_M)
+        var along: float = maxf(span[5] - span[4], MIN_FOOTPRINT_M)
         out.append({
             "transform": Transform3D(Basis.IDENTITY, Vector3(
-                (float(key.x) + 0.5) * cell, (float(key.y) + 0.5) * cell,
+                (span[2] + span[3]) * 0.5, (span[4] + span[5]) * 0.5,
                 (span[0] + span[1]) * 0.5
             )),
-            "half": Vector3(cell * 0.5, cell * 0.5, height * 0.5),
+            "half": Vector3(across * 0.5, along * 0.5, height * 0.5),
         })
     return out
