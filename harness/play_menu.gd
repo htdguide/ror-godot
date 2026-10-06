@@ -51,7 +51,16 @@ var _on_weather: Callable
 ## Called with a clock hour when the day is dragged. The sky, the sun, the stars and the
 ## exposure are the session's business; this panel only says which hour.
 var _on_hour: Callable
+## Called with a weather key and a value when one of the sky's own knobs is moved. The panel does
+## not touch the sky itself: a session's weather is one state — the hour, with whatever has been
+## moved by hand over it — and `PlayWeather` is what holds it. See `PlayWeather.set_override`.
+var _on_sky: Callable
 var _hour: float = 12.0
+## The weather chooser, kept so that moving any of the sky's knobs can put it on `Custom`. A
+## preset is a set of values here rather than a mode, so the moment one of them moves, what is on
+## is no longer that preset.
+var _weather_control: OptionButton = null
+const CUSTOM: String = "Custom"
 var _on_quit: Callable
 var _on_map: Callable
 var _on_vehicle: Callable
@@ -73,6 +82,7 @@ func setup(
     weather: String,
     on_weather: Callable,
     on_hour: Callable,
+    on_sky: Callable,
     on_quit: Callable,
     on_map: Callable = Callable(),
     on_vehicle: Callable = Callable()
@@ -83,6 +93,7 @@ func setup(
     _camera = camera
     _on_weather = on_weather
     _on_hour = on_hour
+    _on_sky = on_sky
     _on_quit = on_quit
     _on_map = on_map
     _on_vehicle = on_vehicle
@@ -92,6 +103,7 @@ func setup(
         if bool((WeatherCfg.get_preset(name)).get("measurement", false)):
             continue
         _weather_names.append(name)
+    _weather_names.append(CUSTOM)
     _weather_index = maxi(0, _weather_names.find(weather))
     layer = 2
     _build()
@@ -215,11 +227,13 @@ func _title() -> void:
 ## The world the vehicle is in: its weather, its gravity, its sun.
 func _world_section() -> void:
     MenuWidgets.heading(_rows, "World")
-    MenuWidgets.options(
+    _weather_control = MenuWidgets.options(
         _rows, "Weather", _weather_names, _weather_index,
         func(index: int) -> void:
             _weather_index = index
-            if _on_weather.is_valid():
+            # `Custom` is what the panel shows when a knob has been moved, not something to put
+            # on: there is nothing to apply that is not already applied.
+            if _on_weather.is_valid() and _weather_names[index] != CUSTOM:
                 _on_weather.call(_weather_names[index])
     )
     var names: Array = GRAVITY_PRESETS.keys()
@@ -286,41 +300,31 @@ func _fill() -> DirectionalLight3D:
     return _sun.get_parent().get_node_or_null(^"Fill") as DirectionalLight3D
 
 
-## The sky: how bright it is, how it is graded, and what is in it.
+## The sky: how bright it is, how it is graded, and what is in it. The rows themselves are
+## `PlaySkyRows`, which this file went over the source cap to hold.
 func _sky_section() -> void:
-    MenuWidgets.heading(_rows, "Sky")
-    # The clock, which is the whole day rather than a preset: sun, moon, stars, haze and the
-    # exposure that light was metered for. `Sky brightness` used to sit here and did nothing —
-    # `ambient_light_energy` is ignored while the sky supplies all of the ambient.
-    MenuWidgets.slider(
-        _rows, "Time of day", 0.0, 24.0, _hour,
+    PlaySkyRows.build(
+        _rows, _environment, _hour,
         func(value: float) -> void:
             _hour = value
+            _mark_custom()
             if _on_hour.is_valid():
                 _on_hour.call(value),
-        "%.1f h"
+        func(key: String, value: float) -> void:
+            _mark_custom()
+            if _on_sky.is_valid():
+                _on_sky.call(key, value)
     )
-    MenuWidgets.slider(
-        _rows, "Exposure", 0.1, 3.0, _environment.tonemap_exposure,
-        func(value: float) -> void: _environment.tonemap_exposure = value
-    )
-    var clouds: Dictionary = SkyClouds.settings(_environment)
-    if clouds.is_empty():
-        MenuWidgets.note(_rows, "This sky has no clouds to move.")
+
+
+## Says that what is on is no longer the preset whose name is showing.
+func _mark_custom() -> void:
+    if _weather_control == null:
         return
-    MenuWidgets.slider(
-        _rows, "Cloud cover", 0.0, 1.0, clouds["coverage"] as float,
-        func(value: float) -> void: SkyClouds.set_parameter(_environment, "coverage", value)
-    )
-    MenuWidgets.slider(
-        _rows, "Cloud density", 0.0, 3.0, clouds["density"] as float,
-        func(value: float) -> void: SkyClouds.set_parameter(_environment, "density", value)
-    )
-    MenuWidgets.slider(
-        _rows, "Wind", 0.0, 0.05, clouds["wind_speed"] as float,
-        func(value: float) -> void: SkyClouds.set_parameter(_environment, "wind_speed", value),
-        "%.3f"
-    )
+    var at: int = _weather_names.find(CUSTOM)
+    if at >= 0:
+        _weather_index = at
+        _weather_control.selected = at
 
 
 ## The one thing here that is on the vehicle: its lamps.

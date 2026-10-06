@@ -15,6 +15,27 @@ shader_type sky;
 // Cost is the step counts, and the radiance pass — the one that lights the scene — runs at a
 // lower count because it is convolved into an irradiance map anyway and nobody sees its detail.
 
+// The captured skies this one may be drawn over, and how much of them shows.
+//
+// **A photograph of a real sky is the only one with a real sun-to-sky balance in it**, and a
+// marched cloud layer is the only sky whose weather a session can move. This shader is both: the
+// base is the stated gradient, or a map, or a blend of a clear map and an overcast one, and the
+// clouds, the stars and the disc are drawn over whichever it is. `panorama_gain` is what turns a
+// map's own normalised units into the gradient's, and `panorama_yaw` turns the map until its sun
+// is where this scene's sun is — see `SkyMaps`.
+uniform sampler2D panorama_clear : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D panorama_cloudy : source_color, filter_linear_mipmap, repeat_enable;
+uniform float panorama_mix : hint_range(0.0, 1.0) = 0.0;
+uniform float panorama_cloudy_mix : hint_range(0.0, 1.0) = 0.0;
+uniform float panorama_gain = 1.0;
+uniform float panorama_cloudy_gain = 1.0;
+uniform float panorama_yaw = 0.0;
+// Where a captured sky stops being sky and starts being the sun in it. The disc of the clear
+// afternoon map is 80 pixels of two million and 91% of all the light in it, and a scene lit by
+// both that disc and its own `DirectionalLight3D` is lit by two suns — one of which casts no
+// shadow. The radiance pass sees the sky with the disc taken out; the picture keeps it.
+uniform float radiance_clamp = 50.0;
+
 uniform vec3 sky_top : source_color = vec3(0.16, 0.33, 0.66);
 uniform vec3 sky_horizon : source_color = vec3(0.62, 0.72, 0.84);
 uniform vec3 ground_colour : source_color = vec3(0.42, 0.40, 0.37);
@@ -33,21 +54,13 @@ uniform float light_exposure = 1.0;
 // How much of that brightness the sky contributes as *light*, as against how much of it is
 // seen.
 //
-// **A night sky lights a white vehicle far harder than its own brightness suggests.** The sky's
-// radiance map is what every glossy surface reflects, and at a sky energy of four ten-thousandths
-// — a sky that photographs at 0.03 — a white truck panel came back at 0.57, brighter than the
-// road under its own headlights, while the terrain around it was black. Reported from a window:
-// "in the dark with a very weak moonlight we are supposed to barely see the car, but here it is
-// so bright". The cube-map pass is the one the radiance is built from, so this scales that pass
-// and leaves what a person sees alone.
+// How much of the sky's brightness is light rather than only a picture. A sky drawn to be seen
+// and lighting as much is 1.0; a night sky graded up so that there is something above the road is
+// not. The cube-map pass is the one the radiance is built from, so this scales that pass alone —
+// see `docs/guides/hard-won-facts-light.md` on the white truck this was introduced for.
 uniform float radiance_scale = 1.0;
-// How much light is falling on the clouds, as a fraction of a midday sun's.
-//
-// **A cloud is lit by the sun and the sky shader did not know the sun had set.** The marched
-// layer takes its colour from `cloud_colour` and a Beer's-law shadow, neither of which has the
-// hour in it, so a moonlit sky kept daylight-white clouds: ten times the brightness of the clear
-// sky beside them, which at midnight is a band of grey noise standing over a black world.
-// Measured at the horizon, 0.0526 against 0.0048 with the clouds taken out.
+// How much light is falling on the clouds, as a fraction of a midday sun's. A cloud is lit by
+// whatever is up, so at night it is a dim grey shape and not a white one.
 uniform float cloud_light = 1.0;
 // How bright whatever is up is drawn as a disc. One by day, a fraction under a moon.
 uniform float disc_energy = 1.0;
@@ -152,6 +165,21 @@ void sky() {
 	if (direction.y < 0.0) {
 		base = mix(sky_horizon, ground_colour, clamp(-direction.y * 4.0, 0.0, 1.0));
 	}
+	if (panorama_mix > 0.001) {
+		// Godot's own panorama convention, from `sky_material.cpp`: longitude from `atan(x, z)`
+		// running the other way, latitude from `acos(y)` down the image. The yaw is added before
+		// the division, so a positive one turns the map the way the scene's sun has moved.
+		vec2 uv = vec2(atan(direction.x, direction.z) - panorama_yaw,
+			acos(clamp(direction.y, -1.0, 1.0)));
+		uv /= vec2(-2.0 * PI, PI);
+		uv += vec2(0.5, 0.0);
+		vec3 captured = mix(texture(panorama_clear, uv).rgb * panorama_gain,
+			texture(panorama_cloudy, uv).rgb * panorama_cloudy_gain, panorama_cloudy_mix);
+		if (AT_CUBEMAP_PASS) {
+			captured = min(captured, vec3(radiance_clamp));
+		}
+		base = mix(base, captured, panorama_mix);
+	}
 
 	vec3 sun_direction = -LIGHT0_DIRECTION;
 	float to_sun = clamp(dot(direction, sun_direction), 0.0, 1.0);
@@ -254,7 +282,11 @@ void sky() {
 	// brightened four times for twice the ISO where a surface lit by the sun brightened twice,
 	// which is a sunlit-to-skylit balance that is a property of the film. The pass knows which
 	// of the two it is, so the cube-map pass gives the exposure back.
+	// The disc is drawn where the sky does not already have one in it. A captured sky holds its
+	// own sun, and a second one drawn on top is two suns in the picture and a sun in the radiance
+	// map that the clamp was there to take out: measured, it took a grey card from 13.3:1 sunlit
+	// to skylit down to 12.5:1 on an otherwise unchanged scene.
 	COLOR = colour * sky_energy
 		* (AT_CUBEMAP_PASS ? radiance_scale / max(light_exposure, 0.000001) : 1.0)
-		+ disc * disc_energy + starlight;
+		+ disc * disc_energy * (1.0 - panorama_mix) + starlight;
 }

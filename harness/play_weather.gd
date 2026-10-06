@@ -19,6 +19,13 @@ var shot: Dictionary = {}
 ## The hour the clock is at, when a session is running the day rather than a named preset. -1
 ## while a preset is what is on.
 var hour: float = -1.0
+## What this session has moved by hand, over whatever the hour or the preset says.
+##
+## **A preset is a set of values and not a mode.** A session used to pick one and then drag the
+## clock, which left the two disagreeing — a night preset with a midday sun in it — and a cloud
+## slider that went back to the preset's weather the moment the hour moved. A knob moved here
+## stays moved until a preset is chosen again, which is what clears them.
+var overrides: Dictionary = {}
 
 
 ## `with_camera` and `with_shot` are what an hour is metered through: under physical light units
@@ -40,9 +47,10 @@ func _init(wanted: String, with_camera: Camera3D = null, with_shot: Dictionary =
 
 ## What is on now: an hour when the clock is running, the preset's name otherwise.
 func current() -> String:
+    var moved: String = " custom" if not overrides.is_empty() else ""
     if hour >= 0.0:
-        return "%02d:%02d" % [int(hour), int(fposmod(hour * 60.0, 60.0))]
-    return names[index] if index < names.size() else ""
+        return "%02d:%02d%s" % [int(hour), int(fposmod(hour * 60.0, 60.0)), moved]
+    return (names[index] if index < names.size() else "") + moved
 
 
 ## Puts one hour of the day on the live scene.
@@ -52,7 +60,28 @@ func current() -> String:
 ## and nothing downstream knows whether the hour came off a clock or out of a preset.
 func set_hour(world: Node3D, wanted: float) -> void:
     hour = fposmod(wanted, 24.0)
-    _put(world, DayCycle.at(hour))
+    _put(world, state())
+
+
+## One thing a session has moved by hand, kept and applied over the hour.
+func set_override(world: Node3D, key: String, value: Variant) -> void:
+    overrides[key] = value
+    # Cloud cover is two things at once: how much marched cloud is drawn, and how far the sky
+    # itself has gone over to the overcast capture. See `SkyMaps.cloudy_share`.
+    if key == "cloud_coverage":
+        overrides["hdri_cloudy_mix"] = SkyMaps.cloudy_share(float(value))
+    _put(world, state())
+
+
+## The weather as it stands: the hour's, or the preset's, with everything moved by hand on top.
+func state() -> Dictionary:
+    var base: Dictionary = (
+        DayCycle.at(hour) if hour >= 0.0
+        else WeatherCfg.get_preset(names[index] if index < names.size() else "")
+    )
+    var out: Dictionary = base.duplicate(true)
+    out.merge(overrides, true)
+    return out
 
 
 ## Puts one preset on the live scene.
@@ -65,8 +94,9 @@ func set_hour(world: Node3D, wanted: float) -> void:
 ## built. `a_weather_switch_is_a_weather` holds the two paths together.
 func apply(world: Node3D, name: String) -> void:
     hour = -1.0
-    _put(world, WeatherCfg.get_preset(name))
+    overrides.clear()
     index = maxi(0, names.find(name))
+    _put(world, state())
     print("PLAY  weather %s" % name)
 
 

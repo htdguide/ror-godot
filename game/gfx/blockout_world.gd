@@ -56,7 +56,7 @@ static func _build_environment(weather: Dictionary, clouds: bool) -> WorldEnviro
 static func _grade_environment(env: Environment, weather: Dictionary, clouds: bool) -> void:
     if bool(weather.get("physical_sky", false)):
         env.background_mode = Environment.BG_SKY
-        env.sky = WorldSky.of(weather, clouds)
+        WorldSky.apply(env, weather, clouds)
         # The sky lights the scene: diffuse from its irradiance, specular from its
         # radiance map. This is what makes metal look like metal without a light rig.
         env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY

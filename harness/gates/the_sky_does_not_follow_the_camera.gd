@@ -82,8 +82,8 @@ func run(harness: Node) -> Dictionary:
     # because the preset's sky energy is calibrated for its captured map and means nothing to a
     # gradient. What the day cycle draws is what this leg should be photographing.
     var skies: Dictionary = {
-        "modelled": SkyClouds.material(DayCycle.at(12.0)),
-        "captured": SkyHdri.material(WeatherCfg.get_preset(SKY_OF)),
+        "modelled": SkyClouds.material(_without_a_map(DayCycle.at(12.0)), false),
+        "captured": SkyClouds.material(WeatherCfg.get_preset(SKY_OF), false),
     }
     var sun: DirectionalLight3D = harness.world.get_node_or_null(^"Sun") as DirectionalLight3D
     if sun == null:
@@ -155,6 +155,14 @@ func run(harness: Node) -> Dictionary:
     if reported.is_empty():
         return fail("neither of this project's own skies could be built")
     return ok("; ".join(reported), worst_overall)
+
+
+## The same hour with its captured sky taken away, so that the modelled leg is measuring the
+## gradient this project draws and not the photograph drawn over it.
+func _without_a_map(weather: Dictionary) -> Dictionary:
+    var out: Dictionary = weather.duplicate()
+    out["hdri_mix"] = 0.0
+    return out
 
 
 func _median(values: Array[float]) -> float:

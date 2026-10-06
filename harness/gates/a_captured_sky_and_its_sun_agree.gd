@@ -14,8 +14,14 @@ extends GateBase
 ## Measured both ways against the same map: the mirrored direction put the solar disc 2 pixels from
 ## the centre of the frame at 65,408 units, and the unmirrored one put a sky of 0.3 there.
 
-## Every weather preset that names a captured sky is held to this.
+## Every weather preset that names a captured sky is held to this, and every hour of the day
+## cycle whose sun is high enough for its captured sky to be most of what is drawn.
 const PRESET: String = "diag_origin"
+const HOURS: Array[float] = [9.0, 10.0, 12.0, 14.0, 15.0]
+## How much of an hour has to be its captured sky before this is asked of it. Nine tenths, which
+## is the band `SkyMaps.captured_share` holds to about eleven degrees of elevation: past that the
+## gradient is most of the sky and there is no photographed sun left to disagree with.
+const MOSTLY_CAPTURED: float = 0.9
 const SETTLE_FRAMES: int = 3
 ## How far the brightest direction in the sky may sit from the sun, in degrees. The disc itself is
 ## about half a degree across and a dusk map's brightest region is a glow rather than a disc, so
@@ -46,18 +52,28 @@ static func meta() -> Dictionary:
 func run(harness: Node) -> Dictionary:
     var captured: PackedStringArray = PackedStringArray()
     for name: String in WeatherCfg.PRESETS.keys():
-        if not SkyHdri.present(WeatherCfg.get_preset(name)):
+        if not SkyMaps.present(WeatherCfg.get_preset(name)):
             continue
         captured.append(name)
     if captured.is_empty():
         return ok("skipped: no captured skies in this checkout", 0)
+    # And the hours of the day cycle, which turn the same map as the sun crosses the sky: the
+    # yaw is worked out per hour, so one hour agreeing says nothing about the next.
+    for hour: float in HOURS:
+        # Only the hours a captured sky is actually most of. A map is faded out where its own sun
+        # has drifted from the hour's — see `SkyMaps.captured_share` — and an hour drawn as the
+        # stated gradient has no photographed sun to agree or disagree with.
+        if float(DayCycle.at(hour).get("hdri_mix", 0.0)) >= MOSTLY_CAPTURED:
+            captured.append("%04.1f h" % hour)
 
     var reported: PackedStringArray = PackedStringArray()
     var worst: float = 0.0
     for name: String in captured:
-        var err: String = harness.setup_for(PRESET, name)
+        var err: String = harness.setup_for(PRESET, _weather_for(name))
         if err != "":
             return fail(err)
+        if name.ends_with(" h"):
+            BlockoutWorld.apply_weather(harness.world, DayCycle.at(name.to_float()), false)
         clear_fog(harness)
         for child: Node in harness.world.get_children():
             if child is MeshInstance3D:
@@ -101,6 +117,11 @@ func run(harness: Node) -> Dictionary:
 
 
 ## Which way the brightest pixel in the frame lies, in the world.
+## A named hour is applied over whatever weather the harness built; anything else is a preset.
+func _weather_for(name: String) -> String:
+    return "noon_clear" if name.ends_with(" h") else name
+
+
 func _brightest_direction(camera: Camera3D, image: Image) -> Vector3:
     var size: Vector2i = image.get_size()
     var peak: float = 0.0

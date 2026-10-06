@@ -61,8 +61,12 @@ func run(harness: Node) -> Dictionary:
     if holder == null:
         return fail("the world has no environment, so it has no sky")
     var environment: Environment = holder.environment
-    # Gates are rendered under the stated gradient, because that is the sky every lighting bound
-    # in this project was measured against. This one is about the other sky, so it asks for it.
+    # **A gate is rendered under a sky with no weather in it**, because that is the sky every
+    # lighting bound in this project was measured against: one material draws the stated gradient,
+    # the captured skies and the marched cloud layer alike, and what a gate gets is that material
+    # with its cover at nothing. This one is about the clouds, so it asks for them — by name,
+    # rather than by inferring them from which material is up, which is how it came to photograph
+    # a cloudless sky and call it clouded.
     if SkyClouds.settings(environment).is_empty():
         var sky: Sky = Sky.new()
         sky.sky_material = SkyClouds.material(WeatherCfg.get_preset(harness.weather_name))
@@ -71,6 +75,8 @@ func run(harness: Node) -> Dictionary:
         environment.background_mode = Environment.BG_SKY
     if SkyClouds.settings(environment).is_empty():
         return fail("the sky is not a cloud sky: nothing here can be measured")
+    SkyClouds.set_parameter(environment, "coverage", RenderCfg.CLOUD_COVERAGE)
+    SkyClouds.set_parameter(environment, "density", RenderCfg.CLOUD_DENSITY)
     # Fog would close the distance and the sky with it; this is about the sky itself.
     environment.fog_enabled = false
     harness.camera.look_at_from_position(EYE, AIM, Vector3.UP)

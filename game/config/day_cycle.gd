@@ -211,6 +211,18 @@ static func at(hour: float) -> Dictionary:
             SKY_HORIZON_NIGHT, SKY_HORIZON_DUSK, SKY_HORIZON_DAY, day, warmth
         ),
         "stars": 1.0 - smoothstep(STARS_FROM_DEG, STARS_TO_DEG, elevation),
+        # The captured sky this hour is drawn over, turned until its own sun is where this hour's
+        # sun is, and faded out as that sun goes down: a photograph carries the hour it was taken
+        # at, and the hours around sunset are the ones the stated gradient is best at — it has the
+        # warm horizon and the stars coming up through it. See `SkyMaps`.
+        "hdri": SkyMaps.CLEAR["file"],
+        "hdri_gain": SkyMaps.CLEAR["gain"],
+        "hdri_mix": SkyMaps.captured_share(elevation),
+        "hdri_yaw": SkyMaps.yaw_for(SkyMaps.CLEAR, toward_light(clock)),
+        # And the overcast one, which a session blends toward as it thickens the weather. Nothing
+        # states it here: an hour of the day is not a forecast, and the panel is what asks for one.
+        "hdri_cloudy": SkyMaps.OVERCAST["file"],
+        "hdri_cloudy_gain": SkyMaps.OVERCAST["gain"],
         # What is falling on the clouds, and how bright the disc of whatever is up is drawn. Both
         # are 1.0 at every hour now: the light the sky is given is the hour's own — a quarter of a
         # lux under the moon against a hundred thousand at noon — and that is what takes a cloud

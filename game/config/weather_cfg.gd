@@ -34,7 +34,9 @@ const PRESETS: Dictionary = {
         # about 95,000 lux of direct sun on a surface facing it and about 8,000 of skylight, which
         # is 13:1, and `daylight_shadows_are_readable` measures 13.3:1 at this value. It was 5.4:1
         # with the map taken as it came.
-        "sky_energy": 0.27,
+        "sky_energy": 1.0,
+        "hdri_gain": 0.27,
+        "hdri_mix": 1.0,
         # Where this map's own sun is: the brightest tenth of a per cent of it, weighted, which
         # comes out at 40.8 degrees of elevation. Measured rather than chosen, because a sky whose
         # bright spot is in one place and whose shadows fall from another is a scene with two suns
@@ -125,10 +127,12 @@ const PRESETS: Dictionary = {
     "overcast": {
         "physical_sky": true,
         "hdri": "kloofendal_overcast_puresky_2k.hdr",
+        "hdri_mix": 1.0,
         # The cloud is the sky and the sky is the light, so this carries nearly all of it. Set
         # against the clear day's: overcast daylight is about fifteen thousand lux where a clear
         # noon is a hundred thousand, and nearly all of the fifteen is diffuse.
-        "sky_energy": 0.05,
+        "sky_energy": 1.0,
+        "hdri_gain": 0.05,
         # Where the sun is behind the cloud — the brightest tenth of a per cent of the map,
         # weighted. A disc this soft still has a direction, and a scene with no direction at all
         # has no form in it.
@@ -175,7 +179,9 @@ const PRESETS: Dictionary = {
         # horizon — so the direction below is the brightest tenth of a per cent of the sky,
         # weighted, which is where the light in the picture is coming from.
         "hdri": "qwantani_dusk_2_puresky_2k.hdr",
-        "sky_energy": 0.019,
+        "sky_energy": 1.0,
+        "hdri_gain": 0.019,
+        "hdri_mix": 1.0,
         "sun_from": Vector3(-0.577, 0.197, 0.792),
         # **A low sun is a weak sun.** The beam crosses five atmospheres at eleven degrees of
         # elevation instead of one and a half at forty, and clear-sky direct normal illuminance

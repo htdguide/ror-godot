@@ -2,10 +2,9 @@ class_name PlayRig
 extends Node
 ## Interactive controls for a human session.
 ##
-## Automated gates catch regressions; they do not say whether something looks right.
-## This is what a person is handed: a free camera, a live readout, and one key per
-## effect so that "this effect is wrong" can be told apart from "this scene is wrong"
-## without a rebuild.
+## Automated gates catch regressions; they do not say whether something looks right. This is what
+## a person is handed: a free camera, a live readout, and one key per effect, so that "this effect
+## is wrong" can be told apart from "this scene is wrong" without a rebuild.
 
 ## The map a session opens when it names none: the one Rigs of Rods itself ships, which is in
 ## the tree under GPL and therefore present on any clone.
@@ -311,6 +310,7 @@ func _build_menu(weather: String) -> PlayMenu:
         weather,
         func(name: String) -> void: _weather.apply(_world, name),
         func(hour: float) -> void: _weather.set_hour(_world, hour),
+        func(key: String, value: float) -> void: _weather.set_override(_world, key, value),
         func() -> void: get_tree().quit(0),
         func(name: String) -> void: _change_map(name),
         func(name: String) -> void: _change_vehicle(name)

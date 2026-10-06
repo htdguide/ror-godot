@@ -14,12 +14,27 @@ const SHADER_PATH: String = "res://game/shaders/sky_clouds.gdshader"
 
 
 ## The sky material for a weather preset, or null when the shader is missing.
-static func material(weather: Dictionary) -> ShaderMaterial:
+##
+## `clouds` is whether the marched layer is drawn at all. A gate asks for none — every lighting
+## figure in this project is graded against a sky without weather in it — and a session gets them;
+## `the_sky_has_weather_in_it` asks for them explicitly.
+static func material(weather: Dictionary, clouds: bool = true) -> ShaderMaterial:
     var shader: Shader = load(SHADER_PATH) as Shader
     if shader == null:
         return null
     var material: ShaderMaterial = ShaderMaterial.new()
     material.shader = shader
+    update(material, weather, clouds)
+    return material
+
+
+## Everything a weather states, put on a material that already exists.
+##
+## **A live change moves uniforms; it does not build a sky.** `_grade_environment` used to hand
+## the environment a brand-new `Sky` every time the weather changed, which with a clock a session
+## can drag meant a new sky and a new radiance map every frame — and a radiance map that has not
+## converged is a black sky over a white world, which is what a session reported seeing.
+static func update(material: ShaderMaterial, weather: Dictionary, clouds: bool = true) -> void:
     material.set_shader_parameter(
         "sky_top", weather.get("sky_top", RenderCfg.SKY_TOP) as Color
     )
@@ -47,6 +62,23 @@ static func material(weather: Dictionary) -> ShaderMaterial:
     # uniform's own note: without it the sky is exposure squared and the scene's lighting balance
     # depends on the film in the camera.
     material.set_shader_parameter("light_exposure", PhysicalCamera.exposure_scale(weather))
+    # The captured skies this one is drawn over, where the hour names them. See `SkyMaps`.
+    material.set_shader_parameter(
+        "panorama_clear", SkyMaps.texture(weather.get("hdri", "") as String)
+    )
+    material.set_shader_parameter(
+        "panorama_cloudy", SkyMaps.texture(weather.get("hdri_cloudy", "") as String)
+    )
+    material.set_shader_parameter("panorama_mix", float(weather.get("hdri_mix", 0.0)))
+    material.set_shader_parameter(
+        "panorama_cloudy_mix", float(weather.get("hdri_cloudy_mix", 0.0))
+    )
+    material.set_shader_parameter("panorama_gain", float(weather.get("hdri_gain", 1.0)))
+    material.set_shader_parameter(
+        "panorama_cloudy_gain", float(weather.get("hdri_cloudy_gain", SkyMaps.OVERCAST["gain"]))
+    )
+    material.set_shader_parameter("panorama_yaw", float(weather.get("hdri_yaw", 0.0)))
+    material.set_shader_parameter("radiance_clamp", RenderCfg.SKY_SUN_CLAMP)
     material.set_shader_parameter("sky_curve", RenderCfg.SKY_CURVE)
     material.set_shader_parameter(
         "sky_energy", float(weather.get("sky_energy", RenderCfg.SKY_ENERGY))
@@ -54,7 +86,8 @@ static func material(weather: Dictionary) -> ShaderMaterial:
     material.set_shader_parameter("cloud_colour", RenderCfg.CLOUD_LIT)
     material.set_shader_parameter("cloud_shadow", RenderCfg.CLOUD_SHADED)
     material.set_shader_parameter(
-        "coverage", float(weather.get("cloud_coverage", RenderCfg.CLOUD_COVERAGE))
+        "coverage",
+        float(weather.get("cloud_coverage", RenderCfg.CLOUD_COVERAGE)) if clouds else 0.0
     )
     material.set_shader_parameter(
         "density", float(weather.get("cloud_density", RenderCfg.CLOUD_DENSITY))
@@ -65,11 +98,12 @@ static func material(weather: Dictionary) -> ShaderMaterial:
     material.set_shader_parameter("detail_scale", RenderCfg.CLOUD_DETAIL_SCALE)
     material.set_shader_parameter("erosion", RenderCfg.CLOUD_EROSION)
     material.set_shader_parameter("wind", RenderCfg.CLOUD_WIND)
-    material.set_shader_parameter("wind_speed", RenderCfg.CLOUD_WIND_SPEED)
+    material.set_shader_parameter(
+        "wind_speed", float(weather.get("cloud_wind_speed", RenderCfg.CLOUD_WIND_SPEED))
+    )
     material.set_shader_parameter("steps", RenderCfg.CLOUD_STEPS)
     material.set_shader_parameter("radiance_steps", RenderCfg.CLOUD_RADIANCE_STEPS)
     material.set_shader_parameter("light_steps", RenderCfg.CLOUD_LIGHT_STEPS)
-    return material
 
 
 ## How cloudy the sky in an environment is, and how solid, for a panel to move. Returns {} when

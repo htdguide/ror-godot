@@ -7,6 +7,37 @@ extends RefCounted
 ## `BlockoutWorld` is geometry, lights and grading.
 
 
+## Whether this hour is drawn by the sky this project draws itself: a captured map, a marched
+## cloud layer, or both over the stated gradient. The rest — a plain colour, an atmosphere model —
+## is for the presets that are instruments rather than hours.
+static func _wants_this_projects_own(weather: Dictionary, clouds: bool) -> bool:
+    return (
+        not (weather.get("hdri", "") as String).is_empty()
+        or bool(weather.get("sky_shader", false))
+        or (clouds and RenderCfg.CLOUDS_ENABLED)
+    )
+
+
+## Everything a weather states about the sky, put on a world that already has one.
+##
+## **The material is moved rather than replaced wherever it can be.** A new `Sky` brings a new
+## radiance map with it, and a radiance map takes frames to converge: a session dragging the clock
+## was rebuilding the sky every frame and seeing a black sky over a white world while each one
+## settled. The same shader with different uniforms is the same sky a moment later.
+static func apply(environment: Environment, weather: Dictionary, clouds: bool) -> void:
+    var shaded: ShaderMaterial = (
+        environment.sky.sky_material as ShaderMaterial if environment.sky != null else null
+    )
+    if (
+        shaded != null and shaded.shader != null
+        and shaded.shader.resource_path == SkyClouds.SHADER_PATH
+        and _wants_this_projects_own(weather, clouds)
+    ):
+        SkyClouds.update(shaded, weather, clouds and RenderCfg.CLOUDS_ENABLED)
+        return
+    environment.sky = of(weather, clouds)
+
+
 ## Tells the sky what the camera is now, after a live exposure change.
 ##
 ## The sky is built from the hour, and the hour states its exposure, so a world and its camera
@@ -51,15 +82,10 @@ static func of(weather: Dictionary, clouds: bool) -> Sky:
     # An hour may ask for this project's own sky shader whatever the session is doing. The night
     # does, because it is the only sky with a radiance scale — see the uniform in
     # `sky_clouds.gdshader` — and a gate and a window have to be looking at the same night.
-    # A captured sky where the hour names one and the checkout has it. First, because it is the
-    # only sky here that carries a real sun-to-sky balance rather than stating one.
-    var captured: ShaderMaterial = SkyHdri.material(weather)
-    if captured != null:
-        return _new(captured)
-    if bool(weather.get("sky_shader", false)) or (clouds and RenderCfg.CLOUDS_ENABLED):
-        var clouded: ShaderMaterial = SkyClouds.material(weather)
-        if clouded != null:
-            return _new(clouded)
+    if _wants_this_projects_own(weather, clouds):
+        var drawn: ShaderMaterial = SkyClouds.material(weather, clouds and RenderCfg.CLOUDS_ENABLED)
+        if drawn != null:
+            return _new(drawn)
     return _new(
         _physical(weather) if bool(weather.get("physical_sky", false))
         else _gradient(weather)
