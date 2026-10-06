@@ -28,6 +28,11 @@ extends RefCounted
 ## Objects at the origin are the format's own way of saying "the whole map" — a horizon card, a
 ## ground skirt — and they are drawn like anything else. This is only the sanity bound on how far
 ## outside the map an object may be placed before the file is being read wrong.
+
+## Where a surface records that its own material asked to be kept out of the scene's fog. A note
+## rather than an instruction: see `_material`.
+const ASKED_FOR_NO_FOG: StringName = &"asked_for_no_fog"
+
 const MAX_OUTSIDE_M: float = 6000.0
 ## How big a batch is, in metres. Large enough that a tile holds several objects on a sparse map,
 ## small enough that a tile is a meaningful thing to cull. Grass uses 32 m; scenery is sparser and
@@ -372,12 +377,16 @@ static func _material(
             material.cull_mode = BaseMaterial3D.CULL_DISABLED
         if not (declared["lit"] as bool):
             material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-        # A pass that states its own fog and states it as practically none is a backdrop: a
-        # horizon ring or a ground skirt painted *as* a distance, standing ten kilometres out
-        # where this project's own haze is 99.8% and leaves a flat grey sheet. Ogre's fog is a
-        # per-pass setting, Godot's is the scene's, and the only part of that which survives the
-        # translation is whether the scene's fog applies to this surface at all.
+        # **A pass that states its own fog is a backdrop, and a backdrop stands in the same air as
+        # everything else.** These are horizon rings and ground skirts painted *as* a distance,
+        # standing ten kilometres out, and they were taken out of the scene's haze entirely: at
+        # the fog this project used to run — a visual range of 6.5 km — anything at ten was a flat
+        # grey sheet, which is what a session saw instead of a sky. The haze is clear air now
+        # (`RenderCfg.FOG_DENSITY`), so the mountains are a soft ridge behind the plain rather than
+        # a crisp cut-out standing on top of it, which is what the next session reported. What the
+        # pass asked for is kept as a note on the material rather than acted on, because it is the
+        # author describing *their* fog and not ours.
         if declared.get("no_fog", false) as bool:
-            material.disable_fog = true
+            material.set_meta(ASKED_FOR_NO_FOG, true)
     cache[name] = material
     return material

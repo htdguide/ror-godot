@@ -344,3 +344,23 @@ See `hard-won-facts.md` for the solver, the file formats, the terrain and the ga
   2.5e-6 now, and the last of those is roughly what a moonlit sky's irradiance actually is against
   a day sky's. The 21:00 and 18:00 frames come back the same as the archived ones. **When several
   unrelated-looking constants all sit at odd fractions, suspect one multiplier upstream of them.**
+- **Haze has a published scale and this project's was ten times too thick.** The meteorological
+  visual range — where contrast falls to 2% — is `3.912 / density`, so the 0.0006 this ran at is a
+  visual range of 6.5 km: a hazy day, on maps whose air is clear for fifty. Everything downstream
+  was a workaround for it. A terrain's own backdrop had to be exempted from the fog to be seen at
+  all, and once it was, the furthest thing in the frame was the clearest — crisp mountains standing
+  on top of a plain hazed to white, reported from a window in those words. At 0.00006 the range is
+  65 km, a ten-kilometre backdrop is a soft ridge behind the air in front of it, and nothing has to
+  opt out of anything.
+- **A sky's lower hemisphere is not sky, as far as the radiance map is concerned.** Painting
+  everything below the horizon with haze — which is what it looks like from inside an atmosphere —
+  also fed that haze into the irradiance, and the daylight balance fell from 12.9:1 to 9.2:1
+  without a gate going red, because the band is wide on purpose. What the lower hemisphere stands
+  for is ground bounce, and the fill light already stands for that. The cube-map pass sees 12% of
+  it; the eye sees all of it.
+- **Every gate in this project photographed a four-kilometre world.** `PhysicalCamera.build` never
+  set a far plane, so gates ran at Godot's default 4,000 m while a session ran at the configured
+  distance — and a terrain's own backdrop stands at ten kilometres, so the thing a session looks at
+  was outside every measurement ever taken of it. Found by a probe that came back with no mountains
+  in it at any fog density and no reason given. **When a render is missing something the scene
+  clearly contains, check the far plane before the thing itself.**

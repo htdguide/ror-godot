@@ -38,7 +38,7 @@ static func meta() -> Dictionary:
     return {
         "name": "a_terrain_reaches_its_own_horizon",
         "proves": "a terrain's own backdrop is inside the view distance, and what lies below the horizon from its spawn is the world rather than the sky",
-        "builds_on": ["a_backdrop_keeps_the_fog_its_material_states"],
+        "builds_on": ["a_backdrop_stands_in_the_same_air"],
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
             "every terrain's furthest placement within the view distance, and %.0f%% of the band"

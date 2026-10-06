@@ -15,14 +15,11 @@ shader_type sky;
 // Cost is the step counts, and the radiance pass — the one that lights the scene — runs at a
 // lower count because it is convolved into an irradiance map anyway and nobody sees its detail.
 
-// The captured skies this one may be drawn over, and how much of them shows.
-//
-// **A photograph of a real sky is the only one with a real sun-to-sky balance in it**, and a
-// marched cloud layer is the only sky whose weather a session can move. This shader is both: the
-// base is the stated gradient, or a map, or a blend of a clear map and an overcast one, and the
-// clouds, the stars and the disc are drawn over whichever it is. `panorama_gain` is what turns a
-// map's own normalised units into the gradient's, and `panorama_yaw` turns the map until its sun
-// is where this scene's sun is — see `SkyMaps`.
+// The captured skies this one may be drawn over, and how much of them shows. The base is the
+// stated gradient, or a map, or a blend of a clear map and an overcast one, and the clouds, the
+// stars and the disc are drawn over whichever it is. `panorama_gain` turns a map's own normalised
+// units into the gradient's and `panorama_yaw` turns the map until its sun is where this scene's
+// sun is — see `SkyMaps`.
 uniform sampler2D panorama_clear : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D panorama_cloudy : source_color, filter_linear_mipmap, repeat_enable;
 uniform float panorama_mix : hint_range(0.0, 1.0) = 0.0;
@@ -46,17 +43,15 @@ uniform vec3 sky_horizon : source_color = vec3(0.62, 0.72, 0.84);
 uniform vec3 haze_colour : source_color = vec3(0.62, 0.74, 0.88);
 const float HAZE_BELOW = 14.0;
 const float HAZE_GROUNDWARD = 0.55;
+const float HAZE_BOUNCED = 0.12;
 uniform float sky_curve = 0.12;
 uniform float sky_energy = 1.0;
 // How much of the camera's own exposure is already in `LIGHT0_ENERGY`.
 //
-// **A sky must not follow the camera.** With physical light units Godot hands this shader a light
-// energy with the camera's exposure already applied, and then applies the exposure again to
-// whatever is returned, so everything here that is drawn from the sun is exposure squared. On one
-// unchanged noon scene the sun lit a grey card at exactly twice the value for twice the ISO and
-// the sky lit it 6.2 times, which made the whole sunlit-to-skylit balance a property of the film:
-// 19.2:1 at ISO 16, 6.4:1 at 32, 2.7:1 at 64. Dividing it out here leaves the one exposure the
-// renderer applies. See `PhysicalCamera.exposure_scale`.
+// **A sky must not follow the camera.** Godot hands this shader a light energy with the camera's
+// exposure in it and applies the exposure again to what comes back, so everything drawn from the
+// sun is exposure squared: one unchanged noon scene read 19.2:1 sunlit to skylit at ISO 16, 6.4:1
+// at 32 and 2.7:1 at 64. See `PhysicalCamera.exposure_scale`.
 uniform float light_exposure = 1.0;
 // How much of that brightness the sky contributes as *light*, as against how much of it is
 // seen.
@@ -184,8 +179,13 @@ void sky() {
 		base = mix(base, captured, panorama_mix);
 	}
 	if (direction.y < 0.0) {
+		// Below the horizon is haze to the eye and ground bounce to the radiance map: a sky's
+		// lower hemisphere counted as sky is irradiance the sky does not have, measured as a
+		// daylight balance of 9.2:1 against the 12.9:1 it was calibrated to, and what it stands
+		// for is the fill light's job.
 		float down = clamp(-direction.y * HAZE_BELOW, 0.0, 1.0);
-		base = mix(base, haze_colour * mix(1.0, HAZE_GROUNDWARD, down), down);
+		float share = AT_CUBEMAP_PASS ? HAZE_BOUNCED : mix(1.0, HAZE_GROUNDWARD, down);
+		base = mix(base, haze_colour * share, down);
 	}
 
 	vec3 sun_direction = -LIGHT0_DIRECTION;

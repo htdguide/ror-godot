@@ -171,9 +171,14 @@ const CLOUD_LIGHT_STEPS: int = 4
 ## the volumetric kind is a froxel grid with its own range and cost, and what a driver on a 4 km
 ## map wants is depth cueing to the horizon.
 const FOG_ENABLED: bool = true
-## Measured against the valley: at 0.0014 the far wall of a 2 km valley is gone, and a gate that
-## counts how much of a frame is not sky called it sky. This still closes a 4 km horizon.
-const FOG_DENSITY: float = 0.0006
+## **Haze is aerial perspective and it has a published scale.** The meteorological visual range —
+## where contrast falls to 2% — is `3.912 / density`, so 0.0006 is a visual range of 6.5 km: a
+## hazy day, on a high desert whose air is clear for fifty. That is why a terrain's own backdrop
+## had to be exempted from the fog to be seen at all, and why, once it was, the mountains stood
+## crisp above a hazed plain with the depth cue running backwards. At 0.00006 the range is 65 km,
+## the ten-kilometre backdrop reads as a soft ridge behind the air in front of it, and nothing has
+## to opt out.
+const FOG_DENSITY: float = 0.00006
 const FOG_SKY_AFFECT: float = 0.35
 const FOG_COLOUR: Color = Color(0.68, 0.72, 0.78)
 ## How far the camera draws.

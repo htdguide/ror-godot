@@ -76,6 +76,12 @@ static func build(from_preset: Dictionary, weather: Dictionary = {}) -> Camera3D
     var cam: Camera3D = Camera3D.new()
     cam.name = "HarnessCamera"
     cam.attributes = attributes
+    # **How far a camera draws belongs to the camera, not to the window.** The session set this and
+    # a gate did not, so every gate in this project photographed a four-kilometre world — Godot's
+    # own default — while a session saw fourteen. A terrain's own backdrop stands at ten, so the
+    # thing a session looks at was outside every measurement ever taken of it, and a probe written
+    # to photograph that backdrop came back with no mountains in it and no reason given.
+    cam.far = RenderCfg.VIEW_DISTANCE_M
     cam.position = from_preset.get("pos", Vector3.ZERO) as Vector3
     cam.look_at_from_position(
         from_preset.get("pos", Vector3.ZERO) as Vector3,

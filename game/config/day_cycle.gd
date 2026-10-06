@@ -85,9 +85,9 @@ const SKY_ENERGY_NIGHT: float = 0.0004
 ## like a sky rather than to be a radiance, and taken as one it lit a sun-facing card at 5.7:1
 ## against the sun where clear daylight is 13:1 — a sky two and a half times too strong. The
 ## captured sky needs no such number, and measuring one against the other is how this one was
-## found: `the_sky_does_not_follow_the_camera` photographs both at noon and reads 13.4:1 modelled
-## against 13.0:1 captured at this value.
-const RADIANCE_DAY: float = 0.39
+## found: `the_sky_does_not_follow_the_camera` photographs both at noon and reads them within a
+## few per cent of each other at this value.
+const RADIANCE_DAY: float = 0.47
 const RADIANCE_NIGHT: float = 1.0
 ## The sky's own colours at noon, at the horizon's own hour, and at midnight.
 const SKY_TOP_DAY: Color = Color(0.22, 0.42, 0.78)
@@ -114,8 +114,12 @@ const AMBIENT_ENERGY_DAY: float = 1.0
 const AMBIENT_ENERGY_NIGHT: float = 0.0000025
 
 ## The haze: a pale daylight one, the colour of the sky it hangs in at night.
-const FOG_DENSITY_DAY: float = 0.0006
-const FOG_DENSITY_NIGHT: float = 0.0004
+## The day's own air, and the night's. Both are a tenth of what they were, for the reason
+## `RenderCfg.FOG_DENSITY` gives: a visual range of 6.5 km is a hazy day and this library's maps
+## are not hazy places. The night keeps proportionally more, because a night *is* thicker — what
+## a headlight stands in is the same air a little heavier.
+const FOG_DENSITY_DAY: float = 0.00006
+const FOG_DENSITY_NIGHT: float = 0.00008
 ## **The haze is the colour of the sky it stands under.** It was a stated grey of its own, half a
 ## tenth warmer and a tenth less blue than the sky at the horizon, and the two met along the line
 ## where the fogged distance ended: the far ground converged on one colour and the sky above it on

@@ -116,7 +116,7 @@ const PRESETS: Dictionary = {
         # beam is two and a half times a sunlit road and clips.
         # The haze is what the night is, not what the day is: thinner, and the colour of the
         # sky rather than of a bright overcast.
-        "fog_density": 0.0004,
+        "fog_density": 0.00008,
         "fog_colour": Color(0.006, 0.009, 0.018),
         # Air for the beams to stand in.
         "volumetric": true,
@@ -152,9 +152,10 @@ const PRESETS: Dictionary = {
         "iso": 100.0,
         "f_stop": 6.3,
         "shutter_s": 0.008,
-        # The haze an overcast day has: thick, pale, and the colour of the cloud rather than of a
-        # blue sky.
-        "fog_density": 0.0025,
+        # The haze an overcast day has: thicker than a clear one, pale, and the colour of the
+        # cloud rather than of a blue sky. 0.0004 is a visual range of ten kilometres, which is
+        # what an overcast morning has against a clear afternoon's fifty — see `RenderCfg.FOG_DENSITY`.
+        "fog_density": 0.0004,
         "fog_colour": Color(0.70, 0.72, 0.75),
     },
     # A black, unlit environment. Measurement gates encode numbers into pixels, so any

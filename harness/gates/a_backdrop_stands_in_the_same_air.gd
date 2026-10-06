@@ -1,27 +1,30 @@
 extends GateBase
-## A surface whose Ogre pass states its own fog is not buried in this project's.
+## A terrain's painted backdrop stands in the same air as the ground in front of it.
 ##
 ## **Ogre's fog is a per-pass setting and Godot's belongs to the scene.** A Rigs of Rods terrain
 ## paints its distance twice: once as haze, and once as a backdrop — a horizon ring and a ground
 ## skirt, standing ten kilometres out, with the mountains and the dust already painted into the
 ## texture. Those passes say so in their own material: `fog_override true exp 0.71 0.81 0.87
-## 0.00001 2000 3000` is a density of one part in a hundred thousand, which is 9.5% fog where
-## they stand. This project's own haze is 0.0006, which is 99.8% at the same distance, and a
-## surface at 99.8% fog is the fog colour and nothing else.
+## 0.00001 2000 3000` is a density of one part in a hundred thousand, which is 9.5% fog where they
+## stand.
 ##
-## **Reported from a window on La Paz**, in these words: "I can't see the sky with clouds on view
-## distance 12000, it looks like there is a gray texture above me, and the more distance I set,
-## the bigger is the gray thing; if I set 200 m view distance, I can't see it." Nothing was wrong
-## with the sky. La Paz's horizon ring is 10,070 m out and 1,250 m tall, so it enters the frame
-## only when the far plane passes about 7.3 km — and when it enters, it enters as a grey sheet
-## standing between the camera and the sky.
+## **This project obeyed that literally and it was wrong twice over.** At the haze it used to run
+## — 0.0006, a visual range of 6.5 km — anything at ten kilometres was the fog colour and nothing
+## else, which is what a session saw: "I can't see the sky, there is a gray texture above me, and
+## the more distance I set the bigger is the gray thing". Taking the backdrop out of the fog fixed
+## that and broke the other end: the mountains came back crisp above a plain that was hazed to
+## white, so the furthest thing in the frame was the clearest. Reported from the next session:
+## "they are like on top of it, they must be also behind the same fog as the terrain".
 ##
-## **Two claims, because either half alone passes while the map is wrong.** The first is that
-## every pass in the library that states a clear fog of its own is built without the scene's: the
-## oracle is the `.material` text, read here with no help from the parser under test. The second
-## is that it shows — the horizon band of a frame taken from La Paz's own spawn at a view distance
-## of 12 km has to vary more than the same band with the same surfaces buried again, which is the
-## negative control and is measured in the same run.
+## The fog is clear air now — `RenderCfg.FOG_DENSITY`, a visual range of 65 km — so there is
+## nothing for a backdrop to opt out of, and what the pass asked for is kept as a note on the
+## material rather than acted on. It is the author describing their fog, not ours.
+##
+## **Two claims, because either half alone passes while the map is wrong.** The first is that every
+## pass in the library that states a clear fog of its own is found: the oracle is the `.material`
+## text, read here with no help from the parser under test. The second is that those surfaces
+## stand in the scene's haze — the horizon band of a frame from La Paz's own spawn has to move
+## when the haze is taken off them, which is the control and is measured in the same run.
 
 ## How far out a backdrop stands, for judging whether a pass's own fog would hide it. La Paz's
 ## horizon ring is at 10,070 m; this is the round number under it.
@@ -52,23 +55,24 @@ const LISTED: int = 6
 
 static func meta() -> Dictionary:
     return {
-        "name": "a_backdrop_keeps_the_fog_its_material_states",
+        "name": "a_backdrop_stands_in_the_same_air",
         "proves": (
-            "every Ogre pass in the library that overrides fog with a clear one is read as"
-            + " keeping it, the objects built from those materials are drawn without the scene's"
-            + " distance haze, and the horizon backdrop they make is visible at a 12 km view"
-            + " distance"
+            "every Ogre pass in the library that overrides fog with a clear one is found, and the"
+            + " backdrop those materials build stands in the scene's own haze rather than in"
+            + " front of it"
         ),
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": (
-            "no material declaring a clear fog_override is built with fog, and the horizon band"
-            + " varies at least twice as much as the same band with those passes buried"
+            "every material declaring a clear fog_override found by the reader, and the horizon"
+            + " band moving %.0f%% of its own brightness when the haze is taken off them"
+            % (MIN_CHANGE * 100.0)
         ),
         "why": (
-            "Ogre states fog per pass and Godot states it per scene, so a horizon backdrop that"
-            + " asks to be seen through ten kilometres is drawn at this project's 99.8% and"
-            + " becomes a flat grey sheet between the camera and the sky. It appears only when"
-            + " the far plane reaches it, which is why it read as a fault in the sky."
+            "a backdrop taken out of the scene's haze is the furthest thing in the frame and the"
+            + " clearest, which runs the depth cue backwards: a session reported crisp mountains"
+            + " standing on top of a plain hazed to white. Obeying the pass literally was the fix"
+            + " for the opposite fault — a 6.5 km visual range buried the backdrop as a grey"
+            + " sheet — and the real answer was a haze thin enough that neither happens."
         ),
         "budget_s": 240.0,
         "needs_gpu": true,
@@ -106,17 +110,17 @@ func run(harness: Node) -> Dictionary:
     var moved: float = _change(honoured, buried)
     if moved < MIN_CHANGE:
         return fail(
-            "%s's horizon band moves %.1f%% of its own brightness when the backdrop's fog setting"
+            "%s's horizon band moves %.1f%% of its own brightness when the scene's haze is taken"
             % [PHOTOGRAPHED, moved * 100.0]
-            + " is buried, under the %.0f%% required: the setting is reaching nothing"
+            + " off the backdrop, under the %.0f%% required: the backdrop is not standing in it"
             % (MIN_CHANGE * 100.0),
             moved
         )
     return ok(
-        "%d passes state a clear fog of their own and keep it; %s's horizon band moves %.1f%% of"
+        "%d passes state a clear fog of their own and are found; %s's horizon band moves %.1f%%"
         % [checked, PHOTOGRAPHED, moved * 100.0]
-        + " its own brightness at a %.0f m view distance when the setting is buried, and varies"
-        % REACH_M + " %.4f against %.4f" % [_spread(honoured), _spread(buried)],
+        + " of its own brightness at a %.0f m view distance when the scene's haze is taken off"
+        % REACH_M + " them, and varies %.4f against %.4f" % [_spread(honoured), _spread(buried)],
         checked
     )
 
@@ -146,7 +150,9 @@ func _photograph(harness: Node) -> Dictionary:
     harness.camera.look_at_from_position(at, at + Vector3(1.0, 0.0, 0.0), Vector3.UP)
     for keep: bool in [true, false]:
         for material: StandardMaterial3D in unfogged:
-            material.disable_fog = keep
+            # The scene's air, taken off these surfaces and put back: what the claim is about is
+            # that a backdrop stands *in* it, so the control is the same frame without it.
+            material.disable_fog = not keep
         # **Scene-referred, through an HDR capture.** The spread of a band of display pixels is
         # as much a property of the tonemapper and the exposure as of the backdrop: the same
         # scene, re-graded when its sky became a photograph and its camera opened half a stop,
@@ -165,7 +171,7 @@ func _photograph(harness: Node) -> Dictionary:
 
 
 ## Every material of a built scene that asked to keep its own fog.
-func _unfogged(root: Node) -> Array[StandardMaterial3D]:
+func _unfogged(root: Node) -> Array[StandardMaterial3D]:  # kept name
     var out: Array[StandardMaterial3D] = []
     for node: Node in root.get_children():
         for found: StandardMaterial3D in _unfogged(node):
@@ -178,7 +184,10 @@ func _unfogged(root: Node) -> Array[StandardMaterial3D]:
             var material: StandardMaterial3D = (
                 mesh.surface_get_material(surface) as StandardMaterial3D
             )
-            if material != null and material.disable_fog and not out.has(material):
+            if (
+                material != null and material.has_meta(RorObjects.ASKED_FOR_NO_FOG)
+                and not out.has(material)
+            ):
                 out.append(material)
     return out
 
