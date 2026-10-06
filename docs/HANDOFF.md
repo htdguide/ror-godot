@@ -136,7 +136,7 @@ has just stated.
 
 ## The suite is green
 
-139 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
+140 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
 twice in one session with a worst measured drift of zero.
 
 It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%
@@ -152,7 +152,10 @@ code, the captured skies are in and calibrated against published daylight, and t
 `.gdshader` is written: `vehicle_paint.gdshader` layers a clear coat the way
 `KHR_materials_clearcoat` states and adds the sheen Godot has no property for, held by
 `a_clear_coat_keeps_the_paint_under_it` and `a_cloth_lobe_lights_the_silhouette`. What is left of
-the milestone: the water's own sky reflection, and the `dawn_mist` and `fog_bank` presets. The
+the milestone: the water's own sky reflection. `dawn_mist` and `fog_bank` are in, stated as
+visibilities — two kilometres and three hundred metres — and held by Koschmieder's law to within
+0.8% of what the frame does; how they *look* is a sweep for a person, and the blockout stage is not
+the place to do it, because its floor is unshaded and Godot does not fog an unshaded surface. The
 legacy materials now read what their authors wrote — 88 state a specular exponent and every one is
 built from it — and guess only where nothing is written, bounded to a tenth of a roughness. The perf acceptance item is met: La Paz with its
 objects, its sea and the hero truck draws in 10.67 ms at 1920x1080 across 169 draw calls

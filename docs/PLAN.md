@@ -1178,7 +1178,13 @@ Scope:
   0.93, with the Fresnel-as-metallic fix tried and rejected — see
   `docs/guides/hard-won-facts-materials.md`; distance haze and valley-floor fog.
 - **Weather presets** in `weather_cfg.gd`: `dawn_mist`, `noon_clear`, `overcast`, `golden_dusk`,
-  `night_clear`, `fog_bank` land here; `rain_storm` completes at M6/M7 once wetness and particles exist.
+  `night_clear`, `fog_bank` land here. **Done, 2026-10-07** — the last two are in, and both are
+  written as a visibility rather than as a look: Koschmieder's `V = 3.912 / k` gives a dawn mist of
+  two kilometres a density of 0.001956 and a fog bank of three hundred metres 0.01304, with the
+  WMO's own definitions deciding which is which. `the_haze_fades_contrast_by_koschmieders_law`
+  photographs a contrast ramp through the fog bank and recovers 0.01315 per metre against the
+  0.01304 stated, 0.8% apart, so a stated visual range is the one the picture has. The look of them
+  is a human call and the sweep below is where it belongs; `rain_storm` completes at M6/M7 once wetness and particles exist.
   A preset is a CLI argument, so every later gate can be run under any weather.
 
 **Decision: AgX as the default tonemapper, not ACES or Filmic.** ACES over-saturates and hue-shifts

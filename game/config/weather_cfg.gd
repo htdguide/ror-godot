@@ -158,6 +158,86 @@ const PRESETS: Dictionary = {
         "fog_density": 0.0004,
         "fog_colour": Color(0.70, 0.72, 0.75),
     },
+    # **Mist on a cold morning, which is a visibility and not a look.** The meteorological
+    # definitions are not vague: the WMO calls it fog below a kilometre of visibility and mist from
+    # one to five, so two kilometres is a mist anyone would call one. Koschmieder's law puts the
+    # density at `3.912 / 2000`, the same relation `RenderCfg.FOG_DENSITY` is set by.
+    #
+    # The light is the other half. A sun six degrees up crosses nine atmospheres, so very little
+    # direct light arrives and nearly all of it is scattered by the mist itself — which is why mist
+    # reads as bright and shadowless even though the hour is dim. The camera opens two stops past
+    # the dusk's, which is what a photographer does before sunrise.
+    "dawn_mist": {
+        # **Without this a preset has no sky at all**, only `bg_color` behind everything:
+        # `BlockoutWorld._grade_environment` reads it as "is there a sky above this hour", and a
+        # preset that leaves it out never reaches `WorldSky` — which is why nothing this preset
+        # said about its sky changed a pixel until it was set. Turbid, because that is what mist
+        # is: an atmosphere carrying far more in it than a clear day's.
+        "physical_sky": true,
+        "turbidity": 9.0,
+        "sun_from": Vector3(-0.620, 0.105, 0.778),
+        "sun_lux": 9000.0,
+        "sun_energy": 1.0,
+        "sun_color": Color(1.0, 0.82, 0.66),
+        # A low sun through mist is a light the size of a window, not a point.
+        "sun_angular_deg": 6.0,
+        "shadow_opacity": 0.35,
+        "ambient_energy": 1.0,
+        "ambient_from_sky": 1.0,
+        # Pale and nearly flat: a mist is a sky that has come down to the ground, so there is
+        # hardly a gradient left between the two.
+        "sky_top": Color(0.60, 0.63, 0.68),
+        "sky_horizon": Color(0.78, 0.76, 0.74),
+        "bg_color": Color(0.74, 0.74, 0.74),
+        "sky_energy": 1.0,
+        # **A mist is a bright thing, not a dim one.** The hour is dark and the air is a light the
+        # size of the sky, so the first metering of this preset — two stops open, the way a dusk is
+        # metered — photographed the stage with its whites against the ceiling. What a mist asks for
+        # is what an overcast day asks for.
+        "iso": 100.0,
+        "f_stop": 8.0,
+        "shutter_s": 0.008,
+        # 3.912 / 2000 m.
+        "fog_density": 0.001956,
+        "fog_colour": Color(0.78, 0.78, 0.79),
+    },
+    # **A fog bank: visibility three hundred metres, which is fog by anyone's definition.** Below a
+    # kilometre is fog to the WMO and below two hundred metres is thick fog; three hundred is a
+    # bank you drive into and slow down for. `3.912 / 300` is the density.
+    #
+    # Volumetric, and it is the one preset that asks for it: a fog this thick is a medium the light
+    # travels through rather than a tint on what is behind it, and the headlights of M5 have
+    # nothing to make a shaft in without it.
+    "fog_bank": {
+        # **Without this a preset has no sky at all**, only `bg_color` behind everything:
+        # `BlockoutWorld._grade_environment` reads it as "is there a sky above this hour", and a
+        # preset that leaves it out never reaches `WorldSky` — which is why nothing this preset
+        # said about its sky changed a pixel until it was set. Turbid, because that is what mist
+        # is: an atmosphere carrying far more in it than a clear day's.
+        "physical_sky": true,
+        "turbidity": 10.0,
+        "sun_from": Vector3(-0.35, 0.72, 0.60),
+        # The sun is up there and almost nothing of it reaches the ground: a fog bank is daylight
+        # that has been scattered until it has no direction left.
+        "sun_lux": 2500.0,
+        "sun_energy": 1.0,
+        "sun_color": Color(0.98, 0.98, 1.0),
+        "sun_angular_deg": 20.0,
+        "shadow_opacity": 0.2,
+        "ambient_energy": 1.0,
+        "ambient_from_sky": 1.0,
+        "sky_top": Color(0.70, 0.71, 0.73),
+        "sky_horizon": Color(0.76, 0.76, 0.77),
+        "bg_color": Color(0.75, 0.75, 0.76),
+        "sky_energy": 1.0,
+        "iso": 100.0,
+        "f_stop": 6.3,
+        "shutter_s": 0.008,
+        # 3.912 / 300 m.
+        "fog_density": 0.01304,
+        "fog_colour": Color(0.76, 0.76, 0.77),
+        "volumetric": true,
+    },
     # A black, unlit environment. Measurement gates encode numbers into pixels, so any
     # ambient contribution would be added to the value being read back.
     #

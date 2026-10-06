@@ -9,6 +9,18 @@ The pattern is consistent enough to state outright: **before believing a number 
 the instrument.** A photographed step wedge, an exposure bracket and a negative control cost one
 afternoon between them and have overturned four separate conclusions recorded below.
 
+- **Godot does not fog an unshaded surface.** Measured: two panels forty and a hundred and sixty
+  metres away stayed 0.2966, 0.2975, 0.2975, 0.2975 apart through a fog of three hundred metres'
+  visual range, which is a frame with no haze in it at all. Lit panels fog correctly. It is also
+  why the blockout stage shows no haze whatever the weather states — its checker floor is unshaded —
+  so the stage is not the place to judge a fog preset.
+
+- **`physical_sky` in a weather preset is not "use the atmosphere model". It is "have a sky at
+  all".** `BlockoutWorld._grade_environment` reads it as the branch between `BG_SKY` and a flat
+  `bg_color`, so a preset that omits it never reaches `WorldSky` and nothing it says about its sky
+  is read by anything — `sky_energy`, `sky_top` and `sky_horizon` all sit there doing nothing.
+  Two fog presets were written and tuned twice before their skies were found to be unreachable.
+
 See `hard-won-facts.md` for the solver, the file formats, the terrain and the gate discipline, and
 `hard-won-facts-materials.md` for what a surface's own shader does and what Godot's conventions
 are inside one.
