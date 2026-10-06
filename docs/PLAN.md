@@ -1202,6 +1202,15 @@ geometric normals only; authored normals come with re-textured hero assets.
 4. No HDR clipping: the 16-bit render target histogram from the night and sun-backlit presets shows
    no clamped channel before tonemap.
 5. Perf: ≤ 16.6 ms at 1080p on the dev Mac with one truck + terrain, draw calls logged.
+   **Met, 2026-10-07** — `a_full_scene_renders_inside_its_budget`: La Paz with its objects, its
+   sea and the hero truck draws in **10.67 ms** a frame at 1920x1080, of which 0.33 ms is the main
+   loop, across 169 draw calls, 490 objects and 280,010 primitives. Two notes on the measurement.
+   `viewport_get_measured_render_time_gpu` returns 0.000 on Metal in Godot 4.7 — its CPU companion
+   works and reads 0.415 ms, which is the main loop rather than the frame — so the clock is read
+   either side of a rendered frame with vsync disabled; left on, every frame costs exactly one
+   refresh and the number means nothing. And the gate's own bound is 33.3 ms rather than 16.6:
+   a frame time is a property of the machine measuring it, so the gate reports the target and
+   fails only on a collapse. Run to run it reads 10.67 and 10.70.
 
 **Visual verification:** a fixed 8-shot sheet (`hero_3q`, `hero_rear_low`, `cockpit`, `wheel_macro`,
 `terrain_vista`, `sun_backlit`, `dusk`, `night`) rendered before and after, assembled by ffmpeg into

@@ -136,7 +136,7 @@ has just stated.
 
 ## The suite is green
 
-136 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
+137 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
 twice in one session with a worst measured drift of zero.
 
 It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%
@@ -153,8 +153,9 @@ code, the captured skies are in and calibrated against published daylight, and t
 `KHR_materials_clearcoat` states and adds the sheen Godot has no property for, held by
 `a_clear_coat_keeps_the_paint_under_it` and `a_cloth_lobe_lights_the_silhouette`. What is left of
 the milestone: derived roughness for the legacy assets that ship no specular map, the water's own sky reflection,
-the `dawn_mist` and `fog_bank` presets, and a perf measurement at 1080p that has not been taken since
-the terrain landed. The BRDF and the image-based path now have an outside oracle —
+and the `dawn_mist` and `fog_bank` presets. The perf acceptance item is met: La Paz with its
+objects, its sea and the hero truck draws in 10.67 ms at 1920x1080 across 169 draw calls
+(`a_full_scene_renders_inside_its_budget`). The BRDF and the image-based path now have an outside oracle —
 `a_white_furnace_shows_nothing`, a white ball in a white enclosure, which has one correct answer and
 no lighting to agree about. It passes, and it measured two things worth knowing: the renderer loses
 up to 9.3% at full roughness and grazing incidence and gains nothing anywhere, and the sky Godot
