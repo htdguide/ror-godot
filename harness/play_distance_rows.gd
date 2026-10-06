@@ -8,22 +8,27 @@ extends RefCounted
 ## panel holds.
 
 ## What a session may ask to see, how thick the haze may be, and how far the grass is drawn.
-const VIEW_RANGE_M: Vector2 = Vector2(200.0, 12000.0)
+const VIEW_RANGE_M: Vector2 = Vector2(200.0, 14000.0)
 const FOG_RANGE: Vector2 = Vector2(0.0, 0.02)
 const GRASS_RANGE_M: Vector2 = Vector2(0.0, 400.0)
 
 
 ## Adds the rows to a panel. `vegetation` may be null, which is a terrain that grows nothing.
 static func build(
-    rows: VBoxContainer, environment: Environment, camera: Camera3D, vegetation: RorVegetation
+    rows: VBoxContainer, environment: Environment, camera: Camera3D,
+    vegetation: RorVegetation, world: Node3D = null
 ) -> void:
     MenuWidgets.heading(rows, "Distance")
+    # **The view distance moves the scenery, not the far plane.** It used to set `camera.far`,
+    # which clips everything: pulling it in to look at the near ground took the terrain's own
+    # painted horizon with it, and there is nothing behind a horizon to show instead. The camera
+    # reaches as far as the terrain draws and stays there; this is how far the things standing on
+    # the terrain are drawn, and the backdrop is left out of it. See `SceneryRange.set_draw_distance`.
     MenuWidgets.slider(
-        rows, "View distance", VIEW_RANGE_M.x, VIEW_RANGE_M.y,
-        camera.far if camera != null else RenderCfg.VIEW_DISTANCE_M,
+        rows, "View distance", VIEW_RANGE_M.x, VIEW_RANGE_M.y, RenderCfg.VIEW_DISTANCE_M,
         func(value: float) -> void:
-            if camera != null:
-                camera.far = value,
+            if world != null:
+                SceneryRange.set_draw_distance(world, value),
         "%.0f m"
     )
     MenuWidgets.check(

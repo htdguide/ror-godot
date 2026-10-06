@@ -163,7 +163,12 @@ func _build() -> void:
     _title()
     _world_section()
     _sky_section()
-    PlayDistanceRows.build(_rows, _environment, _camera, _vegetation)
+    # The world as well as the camera: how far a session sees is a limit on what the terrain
+    # draws, and the camera's own far plane stays where the terrain's horizon needs it.
+    PlayDistanceRows.build(
+        _rows, _environment, _camera, _vegetation,
+        _sun.get_parent() as Node3D if _sun != null else null
+    )
     _vehicle_section()
     MenuWidgets.buttons(_rows, PackedStringArray(["Resume", "Quit"]), func(index: int) -> void:
         if index == 0:

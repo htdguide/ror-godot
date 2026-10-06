@@ -30,8 +30,14 @@ extends RefCounted
 ## outside the map an object may be placed before the file is being read wrong.
 
 ## Where a surface records that its own material asked to be kept out of the scene's fog. A note
-## rather than an instruction: see `_material`.
+## rather than an instruction: see `_material`. It is also what marks a backdrop, because that is
+## what the passes which ask for it are — see `SceneryRange`.
 const ASKED_FOR_NO_FOG: StringName = &"asked_for_no_fog"
+static func _descendants(node: Node) -> Array[Node]:
+    var out: Array[Node] = [node]
+    for child: Node in node.get_children():
+        out.append_array(_descendants(child))
+    return out
 
 const MAX_OUTSIDE_M: float = 6000.0
 ## How big a batch is, in metres. Large enough that a tile holds several objects on a sparse map,

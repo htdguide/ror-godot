@@ -71,6 +71,14 @@ static func exposure_scale_of(camera: Camera3D) -> float:
 static func build(from_preset: Dictionary, weather: Dictionary = {}) -> Camera3D:
     var attributes: CameraAttributesPhysical = CameraAttributesPhysical.new()
     attributes.frustum_focal_length = float(from_preset.get("focal_mm", 35.0))
+    # **A physical camera carries its own far plane and it overrides the one on the node.**
+    # `CameraAttributesPhysical.frustum_far` defaults to 4,000 m and Godot writes it onto the
+    # `Camera3D` whenever the attributes are touched — so a camera set to draw fourteen kilometres
+    # was pulled back to four the moment an hour re-metered it. Reported from a window as the
+    # mountains disappearing when the weather is switched and never coming back: the switch
+    # re-exposes the camera, and the terrain's own backdrop stands at 12.8 km. Measured by hiding
+    # the backdrop and photographing the difference — 0.1569 as built, 0.0000 after one switch.
+    attributes.frustum_far = RenderCfg.VIEW_DISTANCE_M
     attributes.auto_exposure_enabled = false
     _expose(attributes, from_preset, weather)
     var cam: Camera3D = Camera3D.new()
