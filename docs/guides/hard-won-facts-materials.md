@@ -130,6 +130,15 @@ See `hard-won-facts-light.md` for exposure, skies and anything that measures a f
   diffuse albedo. That is the model as glTF specifies it rather than a fault in Godot, so a
   measurement must compare like angle with like angle, and a metal with a metal.
 
+- **`##` is not a comment in a `.gdshader`, and the shader still compiles.** `#` begins a
+  preprocessor directive, so a doc-comment habit carried over from GDScript silently changes what
+  the shader does: two `##` lines added above a uniform moved a measured clearcoat retention from
+  0.9495 to 0.9797, repeatably, with no error anywhere and no other edit. Shader comments are `//`.
+
+- **Godot 4 has no `specular` property on a material; it is `metallic_specular`.** `specular_mode`
+  exists beside it and only switches the lobe off. Assigning `specular` fails at runtime rather
+  than at parse time, so it reaches a gate rather than a compiler.
+
 - **A vehicle surface is not always a `StandardMaterial3D` any more**, so do not cast one.
   `MeshAssembler.material_for` returns the layered shader for the classes that need it, and
   `VehiclePaint.albedo_colour`, `.albedo_map` and `.roughness_map` read either kind. The facing

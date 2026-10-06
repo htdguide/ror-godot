@@ -1136,6 +1136,16 @@ Scope:
   `docs/guides/hard-won-facts-materials.md`.
 - Derived-map generation for legacy assets (§4): roughness from diffuse luma through a
   material-class LUT; metallic default 0 with a chrome allowlist; **no derived normal maps**.
+  **The authored half is done, 2026-10-07.** §4.2 puts the `.material` script above every guess,
+  and the script's own `specular <r> <g> <b> <shininess>` was read by nothing: 88 materials in this
+  library state an exponent and every one of them was drawn with its class's constant instead.
+  They now convert by Walter et al. (2007)'s Phong-to-microfacet equivalence — 10 is a roughness of
+  0.639, 12.5 is 0.609, 33 is 0.489 — and the stated specular colour becomes the surface's own
+  `metallic_specular`, so a pass that wrote a black specular gets no highlight, which is what ten
+  of those lines ask for. `a_pass_that_states_its_highlight_gets_it` holds it, with the expectation
+  read out of the mod's own files and the conversion transcribed from the paper rather than called
+  out of the code under test. **Still open**: roughness from diffuse luma for the materials that
+  state nothing at all, which is the guess rather than the reading.
 - One `ReflectionProbe` per actor for local specular, low update rate.
 - **The scene, v2** — the milestone where it first looks good. **The ground part of this is
   essentially done, 2026-10-01**, and not by writing a shader: Terrain3D's own material is

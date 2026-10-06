@@ -59,6 +59,27 @@ static func apply(material: StandardMaterial3D, class_name_key: String) -> void:
         material.cull_mode = BaseMaterial3D.CULL_DISABLED
 
 
+## Roughness from a stated Blinn-Phong exponent.
+##
+## **The one thing the legacy format says about how polished a surface is.** An Ogre pass writes
+## `specular <r> <g> <b> <shininess>`, and the exponent is the Blinn-Phong lobe's own width. Walter
+## et al. (2007) give the equivalence between that lobe and a microfacet one:
+##
+##     alpha = sqrt(2 / (n + 2))
+##
+## and this project, like glTF and like Godot, stores `alpha = roughness^2`, so the roughness is the
+## fourth root. Nothing in it is chosen: 10 converts to 0.639, 12.5 to 0.609, 33 to 0.489. What is
+## chosen is the band it is held inside — see `MaterialCfg.SHININESS_ROUGHNESS_MIN`.
+##
+## This beats the class's own constant, because a class is what a material is guessed to be and
+## this is what its author wrote down. A specular *map* still beats both, being per-pixel.
+static func roughness_from_shininess(shininess: float) -> float:
+    var alpha: float = sqrt(2.0 / (maxf(shininess, 0.0) + 2.0))
+    return clampf(
+        sqrt(alpha), MaterialCfg.SHININESS_ROUGHNESS_MIN, MaterialCfg.SHININESS_ROUGHNESS_MAX
+    )
+
+
 ## Turns a legacy specular map into a roughness map.
 ##
 ## Specular intensity and roughness are opposites, so the value is inverted, then

@@ -69,6 +69,9 @@ uniform float sheen : hint_range(0.0, 1.0) = 0.0;
 uniform float sheen_roughness : hint_range(0.05, 1.0) = 0.3;
 uniform vec3 sheen_colour : source_color = vec3(1.0, 1.0, 1.0);
 
+// How strong the base layer's own highlight is, as Godot's `specular` means it: 0.5 is the 4%
+// every dielectric reflects, and 0 is a pass whose author wrote a black specular colour.
+uniform float specular_amount : hint_range(0.0, 1.0) = 0.5;
 uniform float emission_energy = 0.0;
 
 // A dielectric's reflectance at normal incidence, for IOR 1.5: ((1 - 1.5) / (1 + 1.5))^2. The
@@ -131,7 +134,7 @@ void fragment() {
         : roughness;
     ROUGHNESS = mix(paint_roughness, clearcoat_roughness, clearcoat);
     BACKLIGHT = vec3(paint_roughness);
-    SPECULAR = 0.5;
+    SPECULAR = specular_amount;
     if (emission_energy > 0.0) {
         EMISSION = ALBEDO * emission_energy;
     }
@@ -168,7 +171,10 @@ void light() {
     // coat. The red channel, because that is the channel `roughness_from_specular` writes.
     float paint_roughness = BACKLIGHT.r;
     float base_alpha = max(paint_roughness * paint_roughness, MIN_ALPHA);
-    vec3 f0 = mix(vec3(DIELECTRIC_F0), ALBEDO, METALLIC);
+    // Godot's own relation between the `specular` property and a dielectric's reflectance:
+    // `0.16 * specular^2`, which is 0.04 at the default of 0.5.
+    float stated_f0 = 0.16 * specular_amount * specular_amount;
+    vec3 f0 = mix(vec3(stated_f0), ALBEDO, METALLIC);
     vec3 base_fresnel = f0 + (1.0 - f0) * pow(clamp(1.0 - v_dot_h, 0.0, 1.0), 5.0);
     vec3 base_specular = base_fresnel
         * d_ggx(n_dot_h, base_alpha)

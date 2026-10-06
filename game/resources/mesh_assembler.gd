@@ -101,6 +101,21 @@ static func material_for(
         # a vehicle's `managedmaterials` lines are parsed by the truck reader, which has no
         # such key, and only the Ogre scripts beside it carry one.
         material.albedo_color = declared["diffuse"] as Color
+    # **What the pass says about its own highlight, where it says anything.** An Ogre script may
+    # state `specular <r> <g> <b> <shininess>`, and both halves of that are authored: the exponent
+    # is how wide the highlight is, which converts exactly to a roughness, and the colour is how
+    # strong it is, which is what Godot's `specular` property scales. 31 lines in this checkout
+    # state one and nothing read them until now — every one of those materials took its class's
+    # constant instead of the number its author wrote.
+    var shininess: float = float(declared.get("shininess", -1.0))
+    if shininess >= 0.0:
+        material.roughness = MaterialClass.roughness_from_shininess(shininess)
+        # Godot's `specular` scales a dielectric's reflectance: 0.5 is the 4% every dielectric has,
+        # and 0 is the "no highlight at all" that ten of those lines ask for by stating a black
+        # specular colour.
+        material.metallic_specular = clampf(
+            (declared.get("specular", Color.BLACK) as Color).get_luminance(), 0.0, 1.0
+        )
     # A specular map is authored data, so it is used where the mod supplies one and the
     # class default stands in where it does not. **Which slot it is in depends on the effect** —
     # see `_specular_slot`.

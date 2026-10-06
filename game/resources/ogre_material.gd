@@ -72,6 +72,12 @@ static func read(path: String) -> Dictionary:
                 # placeholder instead of being painted white by this default.
                 "diffuse": Color.WHITE,
                 "has_diffuse": false,
+                # What the pass states about its own highlight: the colour of it, and the
+                # Blinn-Phong exponent beside it. Authored data rather than a guess, and the only
+                # thing in the legacy format that says anything at all about how polished a
+                # surface is. Negative means the pass never said.
+                "specular": Color.BLACK,
+                "shininess": -1.0,
                 # Whether the pass asks to be drawn without the scene's distance haze. A horizon
                 # backdrop is painted *as* a hazy distance and stands further out than any fog
                 # curve written for a 4 km map survives: at this project's own density it is
@@ -151,6 +157,16 @@ static func _take(material: Dictionary, line: String) -> void:
                 # opaque it is a grey box standing where nothing should be.
                 if (material["diffuse"] as Color).a < 1.0:
                     material["alpha"] = true
+        # `specular <r> <g> <b> <shininess>` or `specular <r> <g> <b> <a> <shininess>`. Ogre takes
+        # both, and which one it is cannot be told from the keyword — only from how many numbers
+        # follow. The exponent is always the last of them. Every one of the 31 specular lines in
+        # this checkout is the five-number form.
+        "specular":
+            if words.size() > 4 and words[1].is_valid_float():
+                material["specular"] = Color(
+                    words[1].to_float(), words[2].to_float(), words[3].to_float()
+                )
+                material["shininess"] = words[words.size() - 1].to_float()
         # `emissive <r> <g> <b> [a]` — Ogre's self-illumination, which a lamp lens carries.
         "emissive":
             if words.size() > 3 and words[1].is_valid_float():

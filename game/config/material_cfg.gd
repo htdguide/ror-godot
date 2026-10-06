@@ -92,6 +92,17 @@ const NAME_HINTS: Array = [
     ["wheel", "bare_metal"], ["rim", "bare_metal"],
 ]
 
+## The band a roughness derived from a stated Blinn-Phong exponent is held inside.
+##
+## **The conversion is exact and the inputs are not.** An exponent of 10 converts to 0.639 and one
+## of 33 to 0.489, which are reasonable; what the band is for is the ends. A legacy author writing
+## a very large exponent meant "shiny", not "a mirror of the sky", and one writing zero meant
+## "matte", not "a surface with no highlight anywhere". The 31 specular lines in this checkout
+## state 10, 12.5 and 33, so nothing here is currently clamped — the band is what keeps the next
+## mod's 2000 from turning a plastic bumper into chrome.
+const SHININESS_ROUGHNESS_MIN: float = 0.15
+const SHININESS_ROUGHNESS_MAX: float = 0.95
+
 ## How polished a clear coat is. Automotive lacquer is near-specular — what it reflects is a
 ## recognisable image of the sky and not a bloom — and the number is the coat's own, nothing to do
 ## with the paint under it.

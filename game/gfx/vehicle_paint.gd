@@ -49,6 +49,7 @@ static func from_standard(standard: StandardMaterial3D, class_key: String) -> Sh
     material.set_shader_parameter("albedo", standard.albedo_color)
     material.set_shader_parameter("metallic", standard.metallic)
     material.set_shader_parameter("roughness", standard.roughness)
+    material.set_shader_parameter("specular_amount", standard.metallic_specular)
     material.set_shader_parameter("clearcoat", float(params["clearcoat"]))
     material.set_shader_parameter("clearcoat_roughness", MaterialCfg.CLEARCOAT_ROUGHNESS)
     material.set_shader_parameter("sheen", float(params["sheen"]))
