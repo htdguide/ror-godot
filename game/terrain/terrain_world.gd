@@ -55,9 +55,16 @@ func _show_surfaces(terrain: Node3D) -> void:
         return
     material.set("show_checkered", false)
     material.set("show_colormap", false)
-    # What lies beyond the map's edge. A terrain is the size its author made it and the sky
-    # should start where it ends, or the map appears to sit inside a beige wall.
-    material.set("world_background", WORLD_BACKGROUND_NONE)
+    # What lies beyond the map's edge: the author's own ground, flat, to the horizon.
+    #
+    # **A terrain is smaller than its own horizon.** La Paz is 4 km across and the painted mountain
+    # ring it ships stands at 10,070 m, so with nothing beyond the map's edge the camera looks
+    # through the gap between them at the sky below the horizon — reported from a window as a grey
+    # line along the horizon, and it is a hole rather than a line. Extending the edge flat fills it
+    # with the ground the map is made of; the noise background was tried and rejected, because it
+    # invents a landscape the author did not make and on La Paz it put a white dune across the
+    # backdrop.
+    material.set("world_background", WORLD_BACKGROUND_FLAT)
 
 
 ## Terrain3D reads a texel's roughness from the colour map's alpha channel, so this is the

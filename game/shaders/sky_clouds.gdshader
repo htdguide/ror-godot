@@ -38,7 +38,14 @@ uniform float radiance_clamp = 50.0;
 
 uniform vec3 sky_top : source_color = vec3(0.16, 0.33, 0.66);
 uniform vec3 sky_horizon : source_color = vec3(0.62, 0.72, 0.84);
-uniform vec3 ground_colour : source_color = vec3(0.42, 0.40, 0.37);
+// What is below the horizon: the haze, darkening as it goes down. The sky used to paint a grey of
+// its own there while the ground in front of it converged on the haze, and a step between two
+// large flat areas is a line — see `a_terrain_reaches_its_own_horizon`. Darkening matters as much
+// as matching: a lower hemisphere as bright as the sky at the horizon is the brightest thing in a
+// sunset, which put `a_captured_sky_and_its_sun_agree` 19 degrees out.
+uniform vec3 haze_colour : source_color = vec3(0.62, 0.74, 0.88);
+const float HAZE_BELOW = 14.0;
+const float HAZE_GROUNDWARD = 0.55;
 uniform float sky_curve = 0.12;
 uniform float sky_energy = 1.0;
 // How much of the camera's own exposure is already in `LIGHT0_ENERGY`.
@@ -54,10 +61,8 @@ uniform float light_exposure = 1.0;
 // How much of that brightness the sky contributes as *light*, as against how much of it is
 // seen.
 //
-// How much of the sky's brightness is light rather than only a picture. A sky drawn to be seen
-// and lighting as much is 1.0; a night sky graded up so that there is something above the road is
-// not. The cube-map pass is the one the radiance is built from, so this scales that pass alone —
-// see `docs/guides/hard-won-facts-light.md` on the white truck this was introduced for.
+// How much of the sky's brightness is light rather than only a picture. A night sky graded up so
+// that there is something above the road is not 1.0 — see `docs/guides/hard-won-facts-light.md`.
 uniform float radiance_scale = 1.0;
 // How much light is falling on the clouds, as a fraction of a midday sun's. A cloud is lit by
 // whatever is up, so at night it is a dim grey shape and not a white one.
@@ -162,9 +167,7 @@ void sky() {
 	// The gradient underneath, which is what lights the scene when the clouds are thin.
 	float up = clamp(direction.y, 0.0, 1.0);
 	vec3 base = mix(sky_horizon, sky_top, pow(up, sky_curve));
-	if (direction.y < 0.0) {
-		base = mix(sky_horizon, ground_colour, clamp(-direction.y * 4.0, 0.0, 1.0));
-	}
+
 	if (panorama_mix > 0.001) {
 		// Godot's own panorama convention, from `sky_material.cpp`: longitude from `atan(x, z)`
 		// running the other way, latitude from `acos(y)` down the image. The yaw is added before
@@ -179,6 +182,10 @@ void sky() {
 			captured = min(captured, vec3(radiance_clamp));
 		}
 		base = mix(base, captured, panorama_mix);
+	}
+	if (direction.y < 0.0) {
+		float down = clamp(-direction.y * HAZE_BELOW, 0.0, 1.0);
+		base = mix(base, haze_colour * mix(1.0, HAZE_GROUNDWARD, down), down);
 	}
 
 	vec3 sun_direction = -LIGHT0_DIRECTION;

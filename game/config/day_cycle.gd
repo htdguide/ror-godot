@@ -116,9 +116,13 @@ const AMBIENT_ENERGY_NIGHT: float = 0.0000025
 ## The haze: a pale daylight one, the colour of the sky it hangs in at night.
 const FOG_DENSITY_DAY: float = 0.0006
 const FOG_DENSITY_NIGHT: float = 0.0004
-const FOG_COLOUR_DAY: Color = Color(0.68, 0.72, 0.78)
+## **The haze is the colour of the sky it stands under.** It was a stated grey of its own, half a
+## tenth warmer and a tenth less blue than the sky at the horizon, and the two met along the line
+## where the fogged distance ended: the far ground converged on one colour and the sky above it on
+## another. A step between two large flat areas is a line, which is what a session saw.
+const FOG_COLOUR_DAY: Color = SKY_HORIZON_DAY
 ## The haze a low sun comes through, which is the colour of the light that is in it.
-const FOG_COLOUR_DUSK: Color = Color(0.72, 0.46, 0.3)
+const FOG_COLOUR_DUSK: Color = SKY_HORIZON_DUSK
 ## **A haze is as dark as the sky it hangs in.** The night's own sky colour looks like the right
 ## figure here and is not: fog colour is an absolute, not something the sky's brightness scales,
 ## so a navy that reads correctly as a sky washed every distant hill to a visible grey band

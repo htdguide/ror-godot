@@ -176,9 +176,17 @@ const FOG_ENABLED: bool = true
 const FOG_DENSITY: float = 0.0006
 const FOG_SKY_AFFECT: float = 0.35
 const FOG_COLOUR: Color = Color(0.68, 0.72, 0.78)
-## How far the camera draws. A Rigs of Rods terrain is 4 km across and its own horizon mesh
-## stands at its edge, so the default far plane has to reach it.
-const VIEW_DISTANCE_M: float = 6000.0
+## How far the camera draws.
+##
+## **A terrain's own horizon stands well beyond the terrain.** La Paz is 4 km across and the
+## painted mountain ring it ships stands at 10,070 m, so a far plane of six kilometres clipped the
+## backdrop away entirely and left the sky meeting the ground with nothing between them — reported
+## from a window as a grey line along the horizon, which is what the gap between a 4 km terrain and
+## a missing 10 km backdrop looks like. The far plane has to reach the furthest thing a terrain
+## ships, not the furthest ground it has — and from a spawn that is not in the middle of the map,
+## the far side of a ring 10 km in radius is further still: measured from La Paz's own spawn,
+## 12,841 m. `a_terrain_reaches_its_own_horizon` is what holds this to what the library needs.
+const VIEW_DISTANCE_M: float = 14000.0
 
 ## --- Occlusion ------------------------------------------------------------------------------
 ##

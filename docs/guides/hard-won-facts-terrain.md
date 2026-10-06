@@ -268,3 +268,22 @@ Its companion is `hard-won-facts-mods.md`, which covers how a vehicle is read, b
   that drops objects too coarse to approximate was reading `CELL_M`, so Starling's
   `8d25UID-chapel` — which reads as 1152 by 919 by 1355 m from 1348 vertices in 506 triangles, and
   needs a 4 m cell — passed it and produced a square kilometre of boxes.
+- **A terrain is smaller than its own horizon.** La Paz is 4 km across and the painted mountain
+  ring it ships stands at 10,070 m — and from its own spawn, which is not in the middle of the map,
+  the far side of that ring is 12,841 m away. Two separate things went wrong across that gap at
+  once: the far plane stopped at 6 km, so the backdrop was clipped away entirely, and nothing was
+  drawn past the terrain's edge, so the camera looked below the horizon at the sky. Reported from a
+  window as a grey line along the horizon; it is a hole rather than a line.
+- **Measure what a terrain draws, not where it places things.** La Paz's furthest placement is
+  3,877 m from its spawn and its horizon ring stands at 10,070: the ring is one object near the
+  middle of the map with a twenty-kilometre mesh. And measure it as the distance to a thing's
+  middle plus its own half-width — the corner of an axis-aligned box around a ring is 1.41 times
+  its radius out in a direction the ring does not go, which reads as 17,012 m for that same ring.
+- **Terrain3D's flat world background is the author's own ground extended; the noise one is a
+  landscape nobody made.** Flat fills the gap between a terrain's edge and its backdrop with the
+  material the map is made of. Noise was tried and put a white dune across La Paz's backdrop.
+- **A "pure sky" HDRI is a photograph of a whole sphere.** The half below the horizon is whatever
+  was under the camera that day: in the sunset map it is a lit field measuring 1.67 against the
+  sky's own horizon band at 0.95, which is brighter than the sky it is supposed to sit under. The
+  scene draws its own ground over all of it, so nothing of it is ever seen — but anything that
+  measures a sky by looking for its brightest point has to look above the horizon only.

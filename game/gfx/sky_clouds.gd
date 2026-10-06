@@ -41,7 +41,13 @@ static func update(material: ShaderMaterial, weather: Dictionary, clouds: bool =
     material.set_shader_parameter(
         "sky_horizon", weather.get("sky_horizon", RenderCfg.SKY_HORIZON) as Color
     )
-    material.set_shader_parameter("ground_colour", RenderCfg.GROUND_HORIZON)
+    # What is below the horizon is the haze, and the haze is the sky's own horizon unless the hour
+    # states otherwise. See the uniform: a terrain is smaller than its own backdrop and the gap
+    # between them is sky.
+    material.set_shader_parameter(
+        "haze_colour",
+        weather.get("fog_colour", weather.get("sky_horizon", RenderCfg.SKY_HORIZON)) as Color
+    )
     # How much of the sky's brightness reaches the radiance map every glossy surface reflects.
     # A night states a fraction here: see the uniform's own note in the shader.
     material.set_shader_parameter(

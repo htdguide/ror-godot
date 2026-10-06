@@ -122,17 +122,24 @@ func _weather_for(name: String) -> String:
     return "noon_clear" if name.ends_with(" h") else name
 
 
+## **Above the horizon only.** A "pure sky" capture is a photograph of a whole sphere, and the half
+## below the horizon is whatever was under the camera that day — in the sunset map it is a lit
+## field brighter than the sky's own horizon band, measured at 1.67 against 0.95. The scene draws
+## its own ground over all of it and none of it is ever seen, but a gate looking for the brightest
+## pixel finds it and reports a sun nineteen degrees below where the shadows say it is.
 func _brightest_direction(camera: Camera3D, image: Image) -> Vector3:
     var size: Vector2i = image.get_size()
     var peak: float = 0.0
-    var at: Vector2i = Vector2i(-1, -1)
+    var found: Vector3 = Vector3.ZERO
     for y: int in size.y:
         for x: int in size.x:
             var colour: Color = image.get_pixel(x, y)
             var luma: float = colour.r * 0.2126 + colour.g * 0.7152 + colour.b * 0.0722
-            if luma > peak:
-                peak = luma
-                at = Vector2i(x, y)
-    if at.x < 0:
-        return Vector3.ZERO
-    return camera.project_ray_normal(Vector2(at))
+            if luma <= peak:
+                continue
+            var toward: Vector3 = camera.project_ray_normal(Vector2(x, y))
+            if toward.y <= 0.0:
+                continue
+            peak = luma
+            found = toward
+    return found

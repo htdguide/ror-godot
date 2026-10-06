@@ -46,7 +46,12 @@ static func _occlusion(env: Environment, weather: Dictionary) -> void:
 static func _haze(env: Environment, weather: Dictionary) -> void:
     env.fog_enabled = RenderCfg.FOG_ENABLED
     env.fog_density = float(weather.get("fog_density", RenderCfg.FOG_DENSITY))
-    env.fog_light_color = weather.get("fog_colour", RenderCfg.FOG_COLOUR) as Color
+    # An hour that states no haze of its own takes the colour of its own horizon, because that is
+    # what the haze is: the sky, seen through more of itself. A stated grey leaves a line where the
+    # fogged distance meets the sky above it.
+    env.fog_light_color = weather.get(
+        "fog_colour", weather.get("sky_horizon", RenderCfg.SKY_HORIZON)
+    ) as Color
     env.fog_sky_affect = RenderCfg.FOG_SKY_AFFECT
     env.volumetric_fog_enabled = bool(weather.get("volumetric", false))
     env.volumetric_fog_density = RenderCfg.VOLUMETRIC_DENSITY
