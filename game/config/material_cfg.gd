@@ -16,12 +16,16 @@ extends RefCounted
 ##   emission     float, for lamps and gauges
 
 const CLASSES: Dictionary = {
-    # Tempered from clearcoat 0.8 / roughness 0.25, which made body panels behave like
-    # mirrors: from any angle facing the sky they showed a blurred reflection of the
-    # world and read as half transparent, with the vehicle's own roll bar appearing
-    # through its bed side. A twenty-year-old truck is not a show car.
+    # **A painted panel is fully coated, and the coat is 1.0 because that is what a coat is.**
+    # This sat at 0.25 for as long as the coat was Godot's own, which does not layer: it trades
+    # the paint away for the highlight, so turning the coat up darkened the panels until they read
+    # as half transparent and the roll bar showed through the bed side. Tempering the number hid
+    # the artefact. `VehiclePaint` fixes the layering instead — measured, a full coat now keeps
+    # 0.965 of the paint head-on against the 0.96 a film at IOR 1.5 should — so the coverage can
+    # say what it means. The paint under it stays at 0.45: a twenty-year-old truck is not a show
+    # car, and that roughness is the paint, not the lacquer over it.
     "car_paint": {
-        "metallic": 0.0, "roughness": 0.45, "clearcoat": 0.25, "sheen": 0.0,
+        "metallic": 0.0, "roughness": 0.45, "clearcoat": 1.0, "sheen": 0.0,
         "transmission": false, "emission": 0.0,
     },
     "chrome": {
@@ -57,7 +61,7 @@ const CLASSES: Dictionary = {
         "transmission": true, "emission": 0.6,
     },
     "carbon": {
-        "metallic": 0.0, "roughness": 0.3, "clearcoat": 0.6, "sheen": 0.0,
+        "metallic": 0.0, "roughness": 0.3, "clearcoat": 1.0, "sheen": 0.0,
         "transmission": false, "emission": 0.0,
     },
     # What an unrecognised material gets. Deliberately dull: a wrong guess that looks
@@ -87,6 +91,15 @@ const NAME_HINTS: Array = [
     # After "wheelband", so a tyre is rubber and the rim it wraps is metal.
     ["wheel", "bare_metal"], ["rim", "bare_metal"],
 ]
+
+## How polished a clear coat is. Automotive lacquer is near-specular — what it reflects is a
+## recognisable image of the sky and not a bloom — and the number is the coat's own, nothing to do
+## with the paint under it.
+const CLEARCOAT_ROUGHNESS: float = 0.06
+
+## How wide the cloth lobe is. The Charlie distribution's roughness, which is not a
+## metallic-roughness roughness: it sets how far around the silhouette the sheen reaches.
+const SHEEN_ROUGHNESS: float = 0.3
 
 ## Roughness is derived from a specular map as 1 - specular, then pulled toward the middle
 ## of this range: a legacy specular map is an artist's intensity mask rather than a

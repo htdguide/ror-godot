@@ -75,10 +75,13 @@ func run(_harness: Node) -> Dictionary:
                 # A map the mod names and does not ship is a content gap, not a loader one.
                 absent += 1
                 continue
-            var material: StandardMaterial3D = MeshAssembler.material_for(
+            var material: Material = MeshAssembler.material_for(
                 row["name"] as String, truck, directory, dds, {}, {}
             )
-            if material != null and material.roughness_texture != null:
+            # Through `VehiclePaint` rather than off the material, because a coated surface is a
+            # `ShaderMaterial` and a plain one is not, and which it is says nothing about whether
+            # the mod's specular map reached it.
+            if material != null and VehiclePaint.roughness_map(material) != null:
                 carried += 1
                 continue
             problems.append(

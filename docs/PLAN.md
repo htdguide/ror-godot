@@ -1117,7 +1117,23 @@ Scope:
   overcast / night. Sky supplies IBL: radiance map for specular, `ambient_light_source = SKY` for
   diffuse. Radiance size and update mode pinned in config.
 - Vehicle `.gdshader`: metallic-roughness, ORM-style parameter packing, clearcoat for automotive
-  paint, per-material overrides from `material_cfg.gd`.
+  paint, per-material overrides from `material_cfg.gd`. **Done, 2026-10-06** —
+  `game/shaders/vehicle_paint.gdshader`, taken by the classes `MaterialCfg` states as more than
+  one layer and reached through `VehiclePaint`. Two things made it necessary rather than a
+  preference. Godot's own `clearcoat` does not layer: it trades the paint away for the highlight,
+  keeping 0.840 of the bare paint at full coverage where a film at IOR 1.5 accounts for 0.96, and
+  darkening the silhouette rather than reflecting anything into it — which is why this project's
+  car paint sat at a coverage of 0.25, a number picked to hide the artefact. And
+  `StandardMaterial3D` in 4.7 has no sheen property at all, so the sheen `MaterialCfg` states for
+  seats and tyres was read by nothing. The coat now composes as `KHR_materials_clearcoat` states
+  and keeps 0.952; the sheen is Estevez & Kulla's Charlie lobe, which leaves the middle of a ball
+  at 1.011x and lights its silhouette at 2.371x. `a_clear_coat_keeps_the_paint_under_it` holds the
+  first with the engine's own coat as the control, `a_cloth_lobe_lights_the_silhouette` the second.
+  **Still open**: the coat's reflection of the sky is the engine's image-based lighting at the
+  coat's roughness, not a lobe of its own. A second radiance lookup is not something a shader can
+  ask Godot for, and a second pass over the same geometry — `next_pass`, `material_overlay`, with
+  and without depth testing — drew no pixel at all. See
+  `docs/guides/hard-won-facts-materials.md`.
 - Derived-map generation for legacy assets (§4): roughness from diffuse luma through a
   material-class LUT; metallic default 0 with a chrome allowlist; **no derived normal maps**.
 - One `ReflectionProbe` per actor for local specular, low update rate.

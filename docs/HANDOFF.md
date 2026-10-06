@@ -136,7 +136,7 @@ has just stated.
 
 ## The suite is green
 
-131 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
+133 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
 twice in one session with a worst measured drift of zero.
 
 It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%
@@ -147,11 +147,23 @@ every ground texture blank, and four separate findings were all that one bug. Th
 
 ## What to do next
 
-**1. M2, the renderer milestone.** Its scope is in PLAN §1 and it is mostly untouched: the
-`WorldEnvironment` in code, HDRI skies per weather preset, the vehicle `.gdshader` with
-metallic-roughness and clearcoat, derived roughness for legacy assets, and the Khronos
-`pbr_spheres` oracle — an AI-free check of the BRDF and the IBL path against the reference image
-shipped with `glTF-Sample-Assets`.
+**1. M2, the renderer milestone.** Its scope is in PLAN §1. The `WorldEnvironment` is built in
+code, the captured skies are in and calibrated against published daylight, and the vehicle
+`.gdshader` is written: `vehicle_paint.gdshader` layers a clear coat the way
+`KHR_materials_clearcoat` states and adds the sheen Godot has no property for, held by
+`a_clear_coat_keeps_the_paint_under_it` and `a_cloth_lobe_lights_the_silhouette`. What is left of
+the milestone: the Khronos `pbr_spheres` oracle — an AI-free check of the BRDF and the IBL path
+against the reference image shipped with `glTF-Sample-Assets`, which is not vendored here yet —
+derived roughness for the legacy assets that ship no specular map, the staged water plane, the
+`dawn_mist` and `fog_bank` presets, and a perf measurement at 1080p that has not been taken since
+the terrain landed.
+
+**What the vehicle shader does not do**, and it is the next thing anyone looking at paint will
+notice: the coat's reflection of the sky is Godot's image-based lighting at the coat's roughness
+rather than a lobe of its own, because a second radiance lookup is not something a shader can ask
+Godot for and a second pass over the same geometry drew nothing at all. See the entry in
+`docs/guides/hard-won-facts-materials.md` — that file is where the shading conventions that cost
+time now live.
 
 **What M2 no longer has to do:** write a ground material at all. Terrain3D's own shader is
 metallic-roughness, and with the blank-texture bug fixed it draws the author's albedo and normal

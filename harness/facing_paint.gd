@@ -80,17 +80,20 @@ static func apply(mesh: ArrayMesh) -> void:
     for surface: int in mesh.get_surface_count():
         if FacingViews.two_sided(mesh, surface):
             continue
-        if mesh.surface_get_material(surface) is ShaderMaterial:
+        var original: Material = mesh.surface_get_material(surface)
+        # A surface already drawn by a shader of its own — vegetation, a sky, water — has no
+        # albedo this can read and keep. **A vehicle's coated paint is the exception**: it is a
+        # `ShaderMaterial` too, and skipping it would have quietly dropped the body panels out of
+        # every facing check the moment paint stopped being a `StandardMaterial3D`.
+        if original is ShaderMaterial and not VehiclePaint.is_paint(original):
             continue
-        var original: StandardMaterial3D = mesh.surface_get_material(
-            surface
-        ) as StandardMaterial3D
         var painted: ShaderMaterial = ShaderMaterial.new()
         painted.shader = shader
         if original != null:
-            painted.set_shader_parameter("albedo_colour", original.albedo_color)
-            if original.albedo_texture != null:
-                painted.set_shader_parameter("albedo_texture", original.albedo_texture)
+            painted.set_shader_parameter("albedo_colour", VehiclePaint.albedo_colour(original))
+            var albedo: Texture2D = VehiclePaint.albedo_map(original)
+            if albedo != null:
+                painted.set_shader_parameter("albedo_texture", albedo)
         mesh.surface_set_material(surface, painted)
 
 

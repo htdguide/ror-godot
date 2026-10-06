@@ -54,6 +54,10 @@ static func mesh_from(
 ## vehicle simply has a black paint scheme, which is not the same problem as wrong UVs.
 
 
+## **Returns a `Material`, which is not always a `StandardMaterial3D`.** A coated or a cloth
+## surface is two layers and the built-in material draws one, so those come back as the shader in
+## `VehiclePaint` — read one back with `VehiclePaint.albedo_map` and the rest rather than by
+## casting.
 static func material_for(
     material_name: String,
     truck: TruckParser,
@@ -61,7 +65,7 @@ static func material_for(
     dds_reader: RefCounted,
     textures: Dictionary,
     scripts: Dictionary = {}
-) -> StandardMaterial3D:
+) -> Material:
     var material: StandardMaterial3D = StandardMaterial3D.new()
     var declared: Dictionary = truck.managed_materials.get(material_name, {}) as Dictionary
     if declared.is_empty():
@@ -73,14 +77,15 @@ static func material_for(
         # have read these scripts since they were written; vehicles never did.
         declared = scripts.get(material_name, {}) as Dictionary
     var classified: Dictionary = MaterialClass.classify(material_name, declared)
-    MaterialClass.apply(material, classified["class"] as String)
+    var class_key: String = classified["class"] as String
+    MaterialClass.apply(material, class_key)
     # Which declaration this surface was built from. A vehicle's `materialflarebindings` names a
     # material and expects the lamp to light it, and by the time the meshes are built nothing else
     # remembers which surface came from which name. See `MaterialFlares`.
     material.set_meta("ogre_material", material_name)
     material.albedo_color = Color(0.7, 0.7, 0.72)
     if declared.is_empty():
-        return material
+        return _layered(material, class_key)
 
     var files: PackedStringArray = declared["textures"] as PackedStringArray
     if files.size() > 0:
@@ -108,7 +113,14 @@ static func material_for(
             material.roughness_texture = roughness
             material.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
             material.roughness = 1.0
-    return material
+    return _layered(material, class_key)
+
+
+## The last step: a class that is more than one layer deep leaves as the layered shader.
+static func _layered(material: StandardMaterial3D, class_key: String) -> Material:
+    if not VehiclePaint.wants(class_key):
+        return material
+    return VehiclePaint.from_standard(material, class_key)
 
 
 ## Which of a managed material's textures is its specular map.

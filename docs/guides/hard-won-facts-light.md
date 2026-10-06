@@ -9,7 +9,9 @@ The pattern is consistent enough to state outright: **before believing a number 
 the instrument.** A photographed step wedge, an exposure bracket and a negative control cost one
 afternoon between them and have overturned four separate conclusions recorded below.
 
-See `hard-won-facts.md` for the solver, the file formats, the terrain and the gate discipline.
+See `hard-won-facts.md` for the solver, the file formats, the terrain and the gate discipline, and
+`hard-won-facts-materials.md` for what a surface's own shader does and what Godot's conventions
+are inside one.
 - **"The terrain takes a smaller share of its light from the sky than anything standing on it"
   was never true.** It stood in this project's docs for a long time, measured at 21%, then 13.6%,
   then 111%, then 22.6%, moving with whatever else had changed — and it was a roughness mismatch
