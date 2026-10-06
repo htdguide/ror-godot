@@ -1175,6 +1175,18 @@ geometric normals only; authored normals come with re-textured hero assets.
 1. Khronos oracle gate `pbr_spheres`: render the Khronos `MetalRoughSpheres` sample asset under a
    known HDRI and compare against the reference image shipped with `glTF-Sample-Assets`. Perceptual
    diff below threshold. This is an AI-free oracle for the BRDF and the IBL path.
+   **Answered a different way, 2026-10-07** — `a_white_furnace_shows_nothing`. The reference image
+   beside a sample asset documents neither its lighting nor its exposure nor its tonemapper, so a
+   perceptual diff against it is either loose enough to prove nothing or fails for reasons that
+   have nothing to do with the BRDF, and it costs a vendored asset set to find that out. A white
+   furnace has one correct answer and nothing to agree about: a surface of albedo 1 lit from every
+   direction by the same radiance must return that radiance, at every roughness, metal or
+   dielectric. What it found: the renderer loses up to 9.3% at full roughness and grazing incidence
+   and gains nothing anywhere, which is the single-scatter deficit, and that the sky Godot draws and
+   the radiance map it lights with differ by the camera's exposure normalisation — 2.95x at this
+   project's own daylight camera. Both are in `docs/guides/hard-won-facts-materials.md`. Vendoring
+   `glTF-Sample-Assets` for a second opinion on the BRDF is still open and is now a smaller
+   question than it was.
 2. Tonemap curve gate `tonemap_curve`: sample the rendered value of a synthetic exposure wedge and
    compare numerically against the published AgX / ACES transfer values. Tolerance stated in the gate.
 3. **Done** — `a_colour_chart_survives_the_renderer`: the 24 ColorChecker patches, built from

@@ -136,7 +136,7 @@ has just stated.
 
 ## The suite is green
 
-135 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
+136 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
 twice in one session with a worst measured drift of zero.
 
 It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%
@@ -152,11 +152,13 @@ code, the captured skies are in and calibrated against published daylight, and t
 `.gdshader` is written: `vehicle_paint.gdshader` layers a clear coat the way
 `KHR_materials_clearcoat` states and adds the sheen Godot has no property for, held by
 `a_clear_coat_keeps_the_paint_under_it` and `a_cloth_lobe_lights_the_silhouette`. What is left of
-the milestone: the Khronos `pbr_spheres` oracle — an AI-free check of the BRDF and the IBL path
-against the reference image shipped with `glTF-Sample-Assets`, which is not vendored here yet —
-derived roughness for the legacy assets that ship no specular map, the water's own sky reflection,
+the milestone: derived roughness for the legacy assets that ship no specular map, the water's own sky reflection,
 the `dawn_mist` and `fog_bank` presets, and a perf measurement at 1080p that has not been taken since
-the terrain landed.
+the terrain landed. The BRDF and the image-based path now have an outside oracle —
+`a_white_furnace_shows_nothing`, a white ball in a white enclosure, which has one correct answer and
+no lighting to agree about. It passes, and it measured two things worth knowing: the renderer loses
+up to 9.3% at full roughness and grazing incidence and gains nothing anywhere, and the sky Godot
+draws is not on the same scale as the radiance map it lights with.
 
 **What the vehicle shader does not do**, and it is the next thing anyone looking at paint will
 notice: the coat's reflection of the sky is Godot's image-based lighting at the coat's roughness

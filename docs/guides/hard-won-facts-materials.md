@@ -104,6 +104,32 @@ See `hard-won-facts-light.md` for exposure, skies and anything that measures a f
   mirrors — for a flat sea, the band just under the horizon against the band just over it, which
   measures 0.93 for a mirror.
 
+- **The sky Godot draws and the radiance map it lights with do not share a scale.** A white ball in
+  a white furnace came back at 2.95 times the sky drawn directly behind it, uniformly, at every
+  roughness — and that factor is the camera's own exposure normalisation: the same enclosure
+  photographed through a camera two and a half stops away read 1.00. So a reflection may never be
+  compared against the background in the same frame unless the sky shader has been written to make
+  the two agree, which is exactly what this project's own does when it divides by `light_exposure`
+  in the cubemap pass and what a plain `ProceduralSkyMaterial` does not do. Read the enclosure off
+  a mirror instead: a mirror returns what arrives, by definition.
+
+- **The renderer loses energy at high roughness and grazing angles, and never gains it.** In a
+  white furnace, where every surface must return exactly what lights it, a fully rough dielectric
+  reads 9.3% under a smooth one at the same angle at its silhouette, and 4.3% under it at the
+  middle. That is the single-scatter deficit — one bounce per reflection, a split-sum environment
+  BRDF, and the light that would have bounced a second time inside the microsurface unaccounted
+  for. It is why a rough surface here is slightly dark at glancing angles, and it is the same
+  corner of the model as the sea reading 0.296 of the sky it mirrors at the horizon.
+  `a_white_furnace_shows_nothing` bounds it: 12% of loss is allowed and 4% of gain is not, because
+  an approximation of a hemisphere integral has somewhere for light to go and nowhere to get it
+  from.
+
+- **A white dielectric returns more than it receives, by construction.** Its silhouette reads 8.6%
+  over its own middle in a furnace, because the metallic-roughness model takes no Fresnel share out
+  of the diffuse term: at grazing the surface reflects nearly everything *and* keeps its full
+  diffuse albedo. That is the model as glTF specifies it rather than a fault in Godot, so a
+  measurement must compare like angle with like angle, and a metal with a metal.
+
 - **A vehicle surface is not always a `StandardMaterial3D` any more**, so do not cast one.
   `MeshAssembler.material_for` returns the layered shader for the classes that need it, and
   `VehiclePaint.albedo_colour`, `.albedo_map` and `.roughness_map` read either kind. The facing
