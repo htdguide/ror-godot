@@ -31,6 +31,9 @@ const CONVERGE: int = 6
 ## drifting between two captures of the same scene.
 const CHANGED: float = 0.1
 const LISTED: int = 6
+## The wave phase every capture here is taken at. Any fixed number would do; what matters is that
+## it is fixed.
+const FROZEN_WAVE_PHASE: float = 3.0
 
 
 static func meta() -> Dictionary:
@@ -74,7 +77,9 @@ func run(harness: Node) -> Dictionary:
         var declared: Dictionary = _declared(terrain)
         if declared.is_empty():
             continue
-        var built: Node3D = RorWater.build(terrain)
+        # Held still: this gate photographs the sea, and a surface that moves with the wall clock
+        # is a different surface in every frame. See `a_sea_moves_and_a_measurement_can_stop_it`.
+        var built: Node3D = RorWater.build(terrain, FROZEN_WAVE_PHASE)
         var surface: MeshInstance3D = built.get_node_or_null(^"Surface") as MeshInstance3D
         if not (declared["water"] as bool):
             dry += 1

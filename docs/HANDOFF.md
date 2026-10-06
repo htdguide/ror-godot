@@ -136,7 +136,7 @@ has just stated.
 
 ## The suite is green
 
-133 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
+135 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
 twice in one session with a worst measured drift of zero.
 
 It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%
@@ -154,8 +154,8 @@ code, the captured skies are in and calibrated against published daylight, and t
 `a_clear_coat_keeps_the_paint_under_it` and `a_cloth_lobe_lights_the_silhouette`. What is left of
 the milestone: the Khronos `pbr_spheres` oracle — an AI-free check of the BRDF and the IBL path
 against the reference image shipped with `glTF-Sample-Assets`, which is not vendored here yet —
-derived roughness for the legacy assets that ship no specular map, the staged water plane, the
-`dawn_mist` and `fog_bank` presets, and a perf measurement at 1080p that has not been taken since
+derived roughness for the legacy assets that ship no specular map, the water's own sky reflection,
+the `dawn_mist` and `fog_bank` presets, and a perf measurement at 1080p that has not been taken since
 the terrain landed.
 
 **What the vehicle shader does not do**, and it is the next thing anyone looking at paint will

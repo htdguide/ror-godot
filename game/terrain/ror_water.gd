@@ -29,9 +29,17 @@ const SHADER: String = "res://game/shaders/water.gdshader"
 const NODE_NAME: String = "RorWater"
 
 
+## The sway phase every ripple is drawn at, or negative to move with the wall clock.
+##
+## A window wants the wall clock; anything that captures a frame and measures it wants a number,
+## because a surface that animates with wall-clock time is a different surface every time it is
+## photographed. Same convention as `RorVegetation.wind_phase` and for the same reason.
+const FOLLOWS_THE_CLOCK: float = -1.0
+
+
 ## The terrain's sea as a node, and never null: a terrain that declares no water gets an empty
 ## one, so a caller never has to ask twice.
-static func build(terrain: RorTerrain) -> Node3D:
+static func build(terrain: RorTerrain, wave_phase: float = FOLLOWS_THE_CLOCK) -> Node3D:
     var root: Node3D = Node3D.new()
     root.name = NODE_NAME
     if not declares_water(terrain):
@@ -46,7 +54,7 @@ static func build(terrain: RorTerrain) -> Node3D:
     var surface: MeshInstance3D = MeshInstance3D.new()
     surface.name = "Surface"
     surface.mesh = plane
-    surface.material_override = _material()
+    surface.material_override = _material(wave_phase)
     # Centred on the map, at the height the file states. A RoR terrain starts at the origin and
     # runs positive, so its middle is half its width out along both axes.
     surface.position = Vector3(across * 0.5, height_at(terrain), across * 0.5)
@@ -77,8 +85,9 @@ static func width_of(terrain: RorTerrain) -> float:
     return (grid["spacing"] as float) * float(grid["size"] as int)
 
 
-static func _material() -> ShaderMaterial:
+static func _material(wave_phase: float) -> ShaderMaterial:
     var material: ShaderMaterial = ShaderMaterial.new()
     material.shader = load(SHADER) as Shader
     material.render_priority = 1
+    material.set_shader_parameter("wave_phase", wave_phase)
     return material

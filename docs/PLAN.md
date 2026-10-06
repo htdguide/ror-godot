@@ -1147,7 +1147,16 @@ Scope:
   left of this item: PBR rock and bark
   materials through the Terrain3D shader override; vegetation tier 1 via `Terrain3DInstancer`; the
   staged water plane (sky reflection, refraction, depth fade, shoreline term, scrolling normals) on the
-  river and lake; distance haze and valley-floor fog.
+  river and lake — **mostly done, 2026-10-07**: `water.gdshader` refracts what is under it through
+  the screen texture, takes light out of it by Beer-Lambert so the deep is a colour nobody painted
+  and the shoreline is a gradient rather than a cut, moves on a phase a measurement can hold still,
+  and sums six waves whose frequencies share no common multiple so the surface does not repeat.
+  `a_sea_swallows_light_by_beers_law` holds the depth term against the law's own shape — the ratio
+  of successive differences, which cancels the coefficients — and
+  `a_sea_moves_and_a_measurement_can_stop_it` holds the phase. **Open**: the sky reflection is the
+  engine's and falls short at the horizon, 0.296 of the sky where a mirror in the same frame reads
+  0.93, with the Fresnel-as-metallic fix tried and rejected — see
+  `docs/guides/hard-won-facts-materials.md`; distance haze and valley-floor fog.
 - **Weather presets** in `weather_cfg.gd`: `dawn_mist`, `noon_clear`, `overcast`, `golden_dusk`,
   `night_clear`, `fog_bank` land here; `rain_storm` completes at M6/M7 once wetness and particles exist.
   A preset is a CLI argument, so every later gate can be run under any weather.

@@ -60,6 +60,50 @@ See `hard-won-facts-light.md` for exposure, skies and anything that measures a f
   shader in the same scene showed immediately. Whatever the reason, the coat's sharp reflection of
   the sky is still Godot's image-based lighting and not a second lobe.
 
+- **A surface that reads the screen behind it must write `ALPHA`, and a constant will not do.**
+  Writing `ALPHA` is what puts a surface in the transparent pass, and the transparent pass is where
+  the screen texture and the depth of what is behind it exist. The sea without it came back opaque:
+  `hint_depth_texture` measured zero water everywhere and `hint_screen_texture` sampled black, so
+  it drew as a sheet of its own scattering colour with no bed, no shoreline and nothing under it.
+  `water.gdshader` takes its `ALPHA` from a uniform rather than a literal 1.0, because a constant
+  is something the compiler can fold away and take the transparent pass with it.
+
+- **A screen texture must not be mipmapped and must be read with `textureLod(..., 0.0)`.** With
+  `filter_linear_mipmap` the mip comes from the screen-space derivatives, and on a surface seen at
+  a grazing angle those are enormous: the sea picked the smallest mip, which is the average of the
+  whole frame, and painted itself one flat colour at every angle and every depth.
+
+- **`EMISSION` is in physical light units, so a screen-texture read cannot go in it.** What comes up
+  through water is light that was lit and exposed already, which is exactly what `EMISSION` is for —
+  and at a daylight exposure the normalisation is of the order of a thirty-thousandth, so an
+  emission of 1.0 renders black. Measured: a sea told to emit pure green came back with no green in
+  it. Godot exposes that normalisation to neither a shader nor a script —
+  `CameraAttributesPhysical` has no method for it — so there is nothing to divide by, and the
+  refracted view sits in `ALBEDO` where the light falling on the surface multiplies it. Outdoors
+  that is nearly right, because the same sky lit the sea bed; a shadow across the water is where it
+  is wrong.
+
+- **Godot's dielectric reflection does not reach the horizon.** On a level view over open water the
+  sea just under the horizon reads 0.296 of the sky just over it, where water that grazing reflects
+  very nearly all of it. A mirror put in the same frame reads 0.93, so the radiance map holds the
+  sky and it is the dielectric response that falls short. Computing the Fresnel share in the shader
+  from water's own index and handing it to the engine as `METALLIC` was tried: the ramp measures
+  correctly — 0.05 looking down, 0.9 at the horizon — and the sea still came out a flat milky sheet
+  with its waves washed out. Unexplained, and written down rather than guessed at twice.
+
+- **Published absorption figures are listed by wavelength and shaders are written in RGB.** Pure
+  water absorbs about 0.01 per metre at 440 nm, 0.06 at 550 and 0.35 at 650 — shortest first.
+  Entered in that order they put the largest coefficient on blue, and every shoreline in the game
+  came out with a bright orange band along it, because shallow water was absorbing everything
+  except red. Red is the one water takes first.
+
+- **A mirror is not darker than the sky; the zenith is.** A chrome ball under this project's noon
+  reads 0.425 of the sky near the top of the same frame, which looks like reflections being
+  systematically dim and is not: the ball's top mirrors the zenith and the frame's top is sky near
+  the horizon, which is brighter. Compare a reflection against the sky in the direction it actually
+  mirrors — for a flat sea, the band just under the horizon against the band just over it, which
+  measures 0.93 for a mirror.
+
 - **A vehicle surface is not always a `StandardMaterial3D` any more**, so do not cast one.
   `MeshAssembler.material_for` returns the layered shader for the classes that need it, and
   `VehiclePaint.albedo_colour`, `.albedo_map` and `.roughness_map` read either kind. The facing
