@@ -139,6 +139,21 @@ See `hard-won-facts-light.md` for exposure, skies and anything that measures a f
   exists beside it and only switches the lobe off. Assigning `specular` fails at runtime rather
   than at parse time, so it reaches a gate rather than a compiler.
 
+- **A terrain's object materials were never classified at all.** Vehicles have gone through
+  `MaterialClass` since it was written; terrain objects never did, so every pane of glass, every
+  tyre and every painted sign on every map was drawn at Godot's default roughness of 1.0, which is
+  chalk. Found by accident: a check on derived roughness came back with 3883 of 3938 materials
+  outside their class's band, because the band being compared against was Godot's default rather
+  than a class. They take the class's `metallic` and `roughness` now, and only those — transparency
+  and culling here come from the pass's own `scene_blend` and `cull_hardware`, which is authored
+  data and beats a guess from a name.
+
+- **A texture's mean brightness must be taken by resizing it, not by striding over it.** Reading
+  every eighth pixel of a level crossing's stripes samples the stripes: two strided means of the
+  same image at different steps came out 0.11 apart, which is most of the swing a derived roughness
+  is allowed to move. `Image.resize` averages every pixel into the result, costs less than walking
+  the image in GDScript, and gives the same answer whatever grid it is asked for.
+
 - **A vehicle surface is not always a `StandardMaterial3D` any more**, so do not cast one.
   `MeshAssembler.material_for` returns the layered shader for the classes that need it, and
   `VehiclePaint.albedo_colour`, `.albedo_map` and `.roughness_map` read either kind. The facing

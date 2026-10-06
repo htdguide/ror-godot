@@ -29,11 +29,28 @@ static func of(
         # untextured while the houses beside them were fine.
         declared = _texface(name)
     if not declared.is_empty():
+        # **What the surface is made of, which nothing here used to ask.** A vehicle's materials
+        # have been classified since `MaterialClass` was written and a terrain's objects never
+        # were: every pane of glass, every tyre and every painted sign on every map was drawn at
+        # Godot's default roughness of 1.0, which is chalk. PLAN §4.2 puts the class in charge of
+        # exactly what the legacy format never stored, and this is that. Only the two parameters
+        # the class is sure about are taken — what a surface is made of — because transparency and
+        # culling here are already read from the pass's own `scene_blend` and `cull_hardware`,
+        # which is authored data and beats a guess from a name.
+        var class_key: String = MaterialClass.classify(name, declared)["class"] as String
+        var params: Dictionary = MaterialCfg.CLASSES.get(
+            class_key, MaterialCfg.CLASSES["default"]
+        ) as Dictionary
+        material.metallic = float(params["metallic"])
+        material.roughness = float(params["roughness"])
         var textures: PackedStringArray = declared["textures"] as PackedStringArray
+        var albedo_path: String = (
+            "" if textures.is_empty()
+            else RorContentPath.find(textures[0], terrain.directory)
+        )
         if textures.size() > 0:
             var texture: Texture2D = RorTerrainSkin.texture_of(
-                RorContentPath.find(textures[0], terrain.directory),
-                state["dds"] as RefCounted
+                albedo_path, state["dds"] as RefCounted
             )
             if texture != null:
                 material.albedo_texture = texture
@@ -64,6 +81,12 @@ static func of(
         # `specular` scales, so a pass stating a black specular gets no highlight at all, which is
         # what ten of those lines ask for.
         var shininess: float = float(declared.get("shininess", -1.0))
+        if shininess < 0.0 and not albedo_path.is_empty():
+            # Nothing authored to read, so the texture's own brightness nudges the class's
+            # constant within a bounded swing. See `MaterialCfg.LUMA_ROUGHNESS_SWING`.
+            material.roughness = MaterialClass.roughness_from_albedo(
+                DdsImage.read(albedo_path, state["dds"] as RefCounted), material.roughness
+            )
         if shininess >= 0.0:
             material.roughness = MaterialClass.roughness_from_shininess(shininess)
             # `metallic_specular` is what Godot 4 calls the dielectric's own reflectance — there

@@ -34,10 +34,20 @@ const MAP: String = "lapaz"
 ## numbers near zero rather than a surface taking a share of the sky. The hours here are the ones
 ## that still have a sky to block, and the spread across them is what carries the claim that the
 ## darker the hour, the less the enclosed part may take.
-const HOURS: Array[float] = [17.5, 18.0, 18.35]
-const MOST_OF_THE_ROOF: Array[float] = [0.85, 0.8, 0.6]
-## Below this the frame is too dark to divide one number by another and mean anything.
-const MIN_ROOF: float = 0.002
+##
+## **The third hour moved from 18.35 to 18.20, and the reason is the measurement floor rather than
+## anything about bodywork.** At 18.35 the roof reads 0.0040 and the bed 0.0026 — 17 and 14 of 255
+## through an sRGB encode — where one 8-bit level is 0.0003, which is 7.5% of the roof. A ratio
+## with 8% of noise in it cannot be held to 60%. Swept across the dusk the share falls and then
+## climbs again as the frame runs out of light: 70% at 17.50, 52% at 18.00, 59% at 18.10, 57% at
+## 18.20 and 71% at 18.30. That climb is the floor, not the truck. 18.20's roof is 0.0138, where a
+## level is 2.2%, and `MIN_ROOF` now refuses anything darker instead of dividing two numbers near
+## zero — which is the same correction this gate's second hour already took once.
+const HOURS: Array[float] = [17.5, 18.0, 18.2]
+const MOST_OF_THE_ROOF: Array[float] = [0.85, 0.8, 0.7]
+## Below this the frame is too dark to divide one number by another and mean anything: one 8-bit
+## level has to be a small part of the roof, not a tenth of it.
+const MIN_ROOF: float = 0.010
 const CONVERGE: int = 8
 
 

@@ -80,6 +80,52 @@ static func roughness_from_shininess(shininess: float) -> float:
     )
 
 
+## Roughness nudged by how bright a material's own texture is, within its class's band.
+##
+## Returns the class's own roughness unchanged when there is no image to read. See
+## `MaterialCfg.LUMA_ROUGHNESS_SWING` for what this is and what it deliberately is not: the only
+## guess in the conversion, bounded so that it can be wrong without being visible.
+##
+## Mid-grey leaves a material where its class put it. Black moves it a full swing rougher, white a
+## full swing smoother.
+static func roughness_from_albedo(image: Image, class_roughness: float) -> float:
+    var luma: float = mean_luma(image)
+    if luma < 0.0:
+        return class_roughness
+    return clampf(
+        class_roughness + MaterialCfg.LUMA_ROUGHNESS_SWING * (1.0 - 2.0 * luma),
+        MaterialCfg.LUMA_ROUGHNESS_MIN, MaterialCfg.LUMA_ROUGHNESS_MAX
+    )
+
+
+## The mean luminance of an image, or -1.0 when there is nothing to read.
+##
+## The image is resized down first and the mean taken over that: a resize averages every pixel into
+## its result, where striding over one samples whatever the texture repeats at. See
+## `MaterialCfg.LUMA_SAMPLE_SIZE`.
+##
+## Block-compressed images are decompressed first, because `get_pixel` on one returns black and
+## says so once per pixel — see `roughness_from_specular`, which learned that the expensive way.
+static func mean_luma(image: Image) -> float:
+    return mean_luma_at(image, MaterialCfg.LUMA_SAMPLE_SIZE)
+
+
+## The same, at a stated size. Public so that a check can take its own mean at its own size rather
+## than calling the one the conversion uses.
+static func mean_luma_at(image: Image, size: int) -> float:
+    if image == null or image.get_width() == 0 or image.get_height() == 0:
+        return -1.0
+    var read: Image = image.duplicate() as Image
+    if read.is_compressed() and read.decompress() != OK:
+        return -1.0
+    read.resize(size, size, Image.INTERPOLATE_LANCZOS)
+    var total: float = 0.0
+    for y: int in size:
+        for x: int in size:
+            total += read.get_pixel(x, y).get_luminance()
+    return total / float(size * size)
+
+
 ## Turns a legacy specular map into a roughness map.
 ##
 ## Specular intensity and roughness are opposites, so the value is inverted, then

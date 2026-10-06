@@ -88,10 +88,9 @@ static func material_for(
         return _layered(material, class_key)
 
     var files: PackedStringArray = declared["textures"] as PackedStringArray
+    var albedo_path: String = "" if files.is_empty() else RorContentPath.find(files[0], mod_dir)
     if files.size() > 0:
-        var albedo: Texture2D = texture(
-            RorContentPath.find(files[0], mod_dir), dds_reader, textures
-        )
+        var albedo: Texture2D = texture(albedo_path, dds_reader, textures)
         if albedo != null:
             material.albedo_texture = albedo
             material.albedo_color = Color.WHITE
@@ -108,6 +107,13 @@ static func material_for(
     # state one and nothing read them until now — every one of those materials took its class's
     # constant instead of the number its author wrote.
     var shininess: float = float(declared.get("shininess", -1.0))
+    if shininess < 0.0 and not albedo_path.is_empty():
+        # Nothing authored to read, so the texture's own brightness nudges the class's constant
+        # within a bounded swing. The only guess in the conversion — see
+        # `MaterialCfg.LUMA_ROUGHNESS_SWING`.
+        material.roughness = MaterialClass.roughness_from_albedo(
+            _cached_image(albedo_path, dds_reader, textures), material.roughness
+        )
     if shininess >= 0.0:
         material.roughness = MaterialClass.roughness_from_shininess(shininess)
         # Godot's `specular` scales a dielectric's reflectance: 0.5 is the 4% every dielectric has,
@@ -199,6 +205,17 @@ static func _roughness_texture(
     var texture: ImageTexture = ImageTexture.create_from_image(image)
     cache[key] = texture
     return texture
+
+
+## One decoded image per path, kept in the same cache the textures use so a material's albedo is
+## not decoded twice — once to draw it and once to measure it.
+static func _cached_image(path: String, dds_reader: RefCounted, cache: Dictionary) -> Image:
+    var key: String = path + "#image"
+    if cache.has(key):
+        return cache[key] as Image
+    var image: Image = _image(path, dds_reader)
+    cache[key] = image
+    return image
 
 
 ## Decodes a DDS to an Image, without building a texture from it.

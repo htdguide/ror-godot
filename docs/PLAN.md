@@ -1144,8 +1144,18 @@ Scope:
   `metallic_specular`, so a pass that wrote a black specular gets no highlight, which is what ten
   of those lines ask for. `a_pass_that_states_its_highlight_gets_it` holds it, with the expectation
   read out of the mod's own files and the conversion transcribed from the paper rather than called
-  out of the code under test. **Still open**: roughness from diffuse luma for the materials that
-  state nothing at all, which is the guess rather than the reading.
+  out of the code under test. **The guessed half landed the same day.** Where a material states
+  nothing, its roughness moves from its class's constant by how bright its own texture is, bounded
+  to ±0.12: dirt, wear and bare substrate are darker than the finish over them, so within one class
+  a darker map is more often the rougher surface — an observation about typical assets and not a
+  fact about any one of them, which is why the bound is the point. **Per material and never per
+  pixel**: a roughness map made from the diffuse's luma paints every logo, decal and letter into
+  the gloss, which is the same failure §4.2 refuses derived normal maps for.
+  `a_derived_roughness_stays_inside_its_class` holds the blast radius rather than the truth —
+  3,938 materials derive one, 3,845 of them away from their class's constant, by at most 0.12.
+  Writing that check turned up the larger fault: **a terrain's object materials had never been
+  classified at all**, so every pane of glass and every tyre on every map was drawn at Godot's
+  default roughness of 1.0. They take their class's metallic and roughness now.
 - One `ReflectionProbe` per actor for local specular, low update rate.
 - **The scene, v2** — the milestone where it first looks good. **The ground part of this is
   essentially done, 2026-10-01**, and not by writing a shader: Terrain3D's own material is

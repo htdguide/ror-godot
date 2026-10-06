@@ -112,6 +112,36 @@ const CLEARCOAT_ROUGHNESS: float = 0.06
 ## metallic-roughness roughness: it sets how far around the silhouette the sheen reaches.
 const SHEEN_ROUGHNESS: float = 0.3
 
+## How far a texture's own brightness may move a surface's roughness away from its class's
+## constant, and the band the result is held inside.
+##
+## **This is the one derived parameter in the project that is a guess rather than a reading**, and
+## it is deliberately a small one. The reasoning is the thin end of a real observation — wear,
+## dirt and bare substrate are darker than the finish they sit on, so within one material class a
+## darker texture is more often the rougher surface — and it is wrong whenever a surface is simply
+## painted a dark colour, which a black car wing is. A swing of 0.12 either way can make a panel
+## look a little dirtier or a little fresher than its class says; it cannot turn a panel into a
+## mirror or into chalk, and that is the whole of what the bound is for.
+##
+## **Per material, from the mean, and never per pixel.** A roughness map made from the diffuse's
+## own luma paints every logo, decal and letter into the gloss, which is the same failure this
+## project refuses derived normal maps for — see PLAN §4.2. One number per material cannot emboss
+## anything.
+##
+## Authored data beats it in both directions: a specular map is per-pixel truth and a stated
+## shininess is the author's own number, and either one means this is never consulted.
+const LUMA_ROUGHNESS_SWING: float = 0.12
+const LUMA_ROUGHNESS_MIN: float = 0.1
+const LUMA_ROUGHNESS_MAX: float = 0.98
+## What a texture is resized to before its mean is taken.
+##
+## **A downsample rather than a stride.** Reading every eighth pixel of a level crossing's stripes
+## samples the stripes, not the surface: two such means of the same image taken at different steps
+## came out 0.11 apart, which is most of the swing this derivation is allowed. A resize averages
+## every pixel into the result, costs less than walking the image in GDScript, and gives the same
+## answer whatever grid it is asked for.
+const LUMA_SAMPLE_SIZE: int = 16
+
 ## Roughness is derived from a specular map as 1 - specular, then pulled toward the middle
 ## of this range: a legacy specular map is an artist's intensity mask rather than a
 ## measured reflectance, so taking it literally produces mirrors and chalk.
