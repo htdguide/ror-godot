@@ -19,6 +19,14 @@ extends RefCounted
 ## far from here any other hour has been taken.
 const REFERENCE_F_STOP: float = 8.0
 const REFERENCE_SHUTTER_S: float = 0.008
+## **The reference film is a constant and not the project's current one.** It was
+## `RenderCfg.CAMERA_ISO`, which is the sensitivity a daylight camera is set to and is tuned — and
+## a reference that moves with what it is measuring is not a reference: every preset that states
+## no film of its own came out at a scale of exactly 1.0 whatever the camera was doing, so opening
+## the camera half a stop put the sky's light back to being exposed twice. Measured, the
+## sunlit-to-skylit ratio of one unchanged scene fell from 13.3:1 to 10.4:1 on nothing but an ISO
+## change. 32 is where this project's daylight camera stood when the skies were calibrated.
+const REFERENCE_ISO: float = 32.0
 
 
 ## How much more light this hour's camera gathers than the reference one.
@@ -37,8 +45,7 @@ static func exposure_scale(weather: Dictionary) -> float:
     var shutter_s: float = float(weather.get("shutter_s", REFERENCE_SHUTTER_S))
     var iso: float = float(weather.get("iso", RenderCfg.CAMERA_ISO))
     var reference: float = (
-        RenderCfg.CAMERA_ISO * REFERENCE_SHUTTER_S
-        / (REFERENCE_F_STOP * REFERENCE_F_STOP)
+        REFERENCE_ISO * REFERENCE_SHUTTER_S / (REFERENCE_F_STOP * REFERENCE_F_STOP)
     )
     if reference <= 0.0 or f_stop <= 0.0:
         return 1.0

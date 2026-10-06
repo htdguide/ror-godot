@@ -81,7 +81,13 @@ const MOON_ANGULAR_DEG: float = 0.6
 ## radiance is the sky's own. See `PhysicalCamera.exposure_scale`.
 const SKY_ENERGY_DAY: float = 1.0
 const SKY_ENERGY_NIGHT: float = 0.0004
-const RADIANCE_DAY: float = 1.0
+## **The day's share is a grade and says so.** The modelled sky's gradient was authored to look
+## like a sky rather than to be a radiance, and taken as one it lit a sun-facing card at 5.7:1
+## against the sun where clear daylight is 13:1 — a sky two and a half times too strong. The
+## captured sky needs no such number, and measuring one against the other is how this one was
+## found: `the_sky_does_not_follow_the_camera` photographs both at noon and reads 13.4:1 modelled
+## against 13.0:1 captured at this value.
+const RADIANCE_DAY: float = 0.39
 const RADIANCE_NIGHT: float = 1.0
 ## The sky's own colours at noon, at the horizon's own hour, and at midnight.
 const SKY_TOP_DAY: Color = Color(0.22, 0.42, 0.78)

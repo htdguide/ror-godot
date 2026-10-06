@@ -25,10 +25,10 @@ const SKY_OF: String = "noon_clear"
 const SETTLE_FRAMES: int = 3
 ## The films this one scene is photographed on. Three stops, around the project's own ISO 32.
 const ISOS: Array[float] = [16.0, 32.0, 64.0, 128.0]
-## A mid-grey surface, square on to the sun, as `daylight_shadows_are_readable` measures it.
+## A mid-grey surface, square on to the sun, as `daylight_shadows_are_readable` measures it. Where
+## the sun is comes from the sun in the world: a card facing somewhere else measures the cosine.
 const ALBEDO: Color = Color(0.35, 0.35, 0.35)
 const QUAD_SIZE: float = 6.0
-const SUN_ON: Vector3 = Vector3(0.55, 0.78, 0.62)
 ## How far any one film's ratio may sit from the middle one. A tenth is far wider than the
 ## renderer's own spread — measured at 4.3% worst, and that worst is the darkest film, where the
 ## skylit sample is four thousandths of a unit — and it is a twentieth of what the fault produced:
@@ -75,65 +75,86 @@ func run(harness: Node) -> Dictionary:
     # neither light nor anything else. See `captures_carry_real_light`.
     environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
     environment.tonemap_exposure = 1.0
-    environment.sky.sky_material = SkyClouds.material(WeatherCfg.get_preset(SKY_OF))
+    # Both of this project's own skies, because the engine's double exposure is in the path
+    # rather than in either material: the modelled one, which is what every hour of the day cycle
+    # draws, and the captured one, which is what the fixed daylight presets draw.
+    # The modelled one is built from the day cycle's own noon rather than from the preset below,
+    # because the preset's sky energy is calibrated for its captured map and means nothing to a
+    # gradient. What the day cycle draws is what this leg should be photographing.
+    var skies: Dictionary = {
+        "modelled": SkyClouds.material(DayCycle.at(12.0)),
+        "captured": SkyHdri.material(WeatherCfg.get_preset(SKY_OF)),
+    }
     var sun: DirectionalLight3D = harness.world.get_node_or_null(^"Sun") as DirectionalLight3D
     if sun == null:
         return fail("the world has no sun to take away")
     for child: Node in harness.world.get_children():
         if child is MeshInstance3D:
             (child as MeshInstance3D).visible = false
-    var quad: MeshInstance3D = _quad()
+    # A directional light travels along its own -Z, so the sun itself is the other way.
+    var toward_sun: Vector3 = sun.global_transform.basis.z
+    var quad: MeshInstance3D = _quad(toward_sun)
     harness.world.add_child(quad)
     harness.camera.look_at_from_position(
-        SUN_ON.normalized() * QUAD_SIZE * 1.6, Vector3.ZERO, Vector3.UP
+        toward_sun * QUAD_SIZE * 1.6, Vector3.ZERO, Vector3.UP
     )
     var attributes: CameraAttributesPhysical = harness.camera.attributes
     if attributes == null:
         return fail("the camera is not a physical one, so it has no film to change")
 
-    var ratios: Array[float] = []
     var reported: PackedStringArray = PackedStringArray()
-    for iso: float in ISOS:
-        attributes.exposure_sensitivity = iso
-        # The sky is built from the hour and the hour states its exposure, so a camera moved
-        # afterwards has to say so. See `WorldSky.reexpose`.
-        WorldSky.reexpose(harness.world, harness.camera)
-        sun.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_AND_SKY
-        var lit: float = await _sample(harness, "iso%d_lit" % int(iso))
-        # `SKY_ONLY` leaves the atmosphere exactly as it was and removes only the direct light,
-        # which is the difference between a surface in shadow and a surface at night.
-        sun.sky_mode = DirectionalLight3D.SKY_MODE_SKY_ONLY
-        var skylit: float = await _sample(harness, "iso%d_sky" % int(iso))
-        if skylit < MIN_SKYLIT:
+    var worst_overall: float = 0.0
+    for kind: String in skies.keys():
+        var material: Material = skies[kind] as Material
+        if material == null:
+            continue
+        environment.sky.sky_material = material
+        var ratios: Array[float] = []
+        var films: PackedStringArray = PackedStringArray()
+        for iso: float in ISOS:
+            attributes.exposure_sensitivity = iso
+            # The sky is built from the hour and the hour states its exposure, so a camera moved
+            # afterwards has to say so. See `WorldSky.reexpose`.
+            WorldSky.reexpose(harness.world, harness.camera)
+            sun.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_AND_SKY
+            var lit: float = await _sample(harness, "%s_iso%d_lit" % [kind, int(iso)])
+            # `SKY_ONLY` leaves the atmosphere exactly as it was and removes only the direct
+            # light, which is the difference between a surface in shadow and one at night.
+            sun.sky_mode = DirectionalLight3D.SKY_MODE_SKY_ONLY
+            var skylit: float = await _sample(harness, "%s_iso%d_sky" % [kind, int(iso)])
+            if skylit < MIN_SKYLIT:
+                return fail(
+                    "with the %s sky at ISO %d the skylit sample is %.5f, too dark to measure a"
+                    % [kind, int(iso), skylit] + " ratio with", skylit
+                )
+            ratios.append(lit / skylit)
+            films.append("ISO %d %.3f:1" % [int(iso), lit / skylit])
+        var middle: float = _median(ratios)
+        var worst: float = 0.0
+        var worst_at: int = 0
+        for at: int in ratios.size():
+            var drift: float = absf(ratios[at] - middle) / middle
+            if drift > worst:
+                worst = drift
+                worst_at = at
+        if worst > MOST_IT_MAY_DRIFT:
+            quad.queue_free()
             return fail(
-                "at ISO %d the skylit sample is %.5f, too dark to measure a ratio with"
-                % [int(iso), skylit], skylit
+                "the %s sky's sunlit-to-skylit ratio is %.3f:1 at ISO %d against a median of"
+                % [kind, ratios[worst_at], int(ISOS[worst_at])]
+                + " %.3f:1, which is %.1f%% away and over the %.0f%% allowed: the sky is"
+                % [middle, worst * 100.0, MOST_IT_MAY_DRIFT * 100.0]
+                + " following the camera",
+                worst
             )
-        ratios.append(lit / skylit)
-        reported.append("ISO %d %.3f:1" % [int(iso), lit / skylit])
+        worst_overall = maxf(worst_overall, worst)
+        reported.append("%s (%s): median %.3f:1, worst film %.1f%% from it" % [
+            kind, ", ".join(films), middle, worst * 100.0
+        ])
     quad.queue_free()
-
-    var middle: float = _median(ratios)
-    var worst: float = 0.0
-    var worst_at: int = 0
-    for at: int in ratios.size():
-        var drift: float = absf(ratios[at] - middle) / middle
-        if drift > worst:
-            worst = drift
-            worst_at = at
-    if worst > MOST_IT_MAY_DRIFT:
-        return fail(
-            "the sunlit-to-skylit ratio is %.3f:1 at ISO %d against a median of %.3f:1, which is"
-            % [ratios[worst_at], int(ISOS[worst_at]), middle]
-            + " %.1f%% away and over the %.0f%% allowed: the sky is following the camera"
-            % [worst * 100.0, MOST_IT_MAY_DRIFT * 100.0],
-            worst
-        )
-    return ok(
-        "%s: a median of %.3f:1, worst film %.1f%% from it"
-        % [", ".join(reported), middle, worst * 100.0],
-        worst
-    )
+    if reported.is_empty():
+        return fail("neither of this project's own skies could be built")
+    return ok("; ".join(reported), worst_overall)
 
 
 func _median(values: Array[float]) -> float:
@@ -168,7 +189,7 @@ func _sample(harness: Node, name: String) -> float:
 
 ## A mid-grey card facing the sun. Square on, because a surface at a glancing angle measures the
 ## angle as much as the light.
-func _quad() -> MeshInstance3D:
+func _quad(toward_sun: Vector3) -> MeshInstance3D:
     var plane: PlaneMesh = PlaneMesh.new()
     plane.size = Vector2(QUAD_SIZE, QUAD_SIZE)
     plane.orientation = PlaneMesh.FACE_Y
@@ -180,7 +201,7 @@ func _quad() -> MeshInstance3D:
     instance.name = "SkyExposureQuad"
     instance.mesh = plane
     instance.material_override = material
-    var toward: Vector3 = SUN_ON.normalized()
+    var toward: Vector3 = toward_sun.normalized()
     instance.basis = Basis(
         toward.cross(Vector3.UP).normalized(),
         toward,

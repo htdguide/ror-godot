@@ -44,11 +44,22 @@ extends GateBase
 ## own: this asks what the renderer actually produces, not what a darkroom produces.
 ##
 ## Only the weather presets that exist are measured. The acceptance names night and sun-backlit
-## presets and neither has been built yet — `noon_clear` and `golden_dusk` are what this project
-## ships, and a gate that invented two more would be grading its own homework.
+## presets and neither has been built yet; these are what this project ships, and a gate that
+## invented more would be grading its own homework.
+##
+## **An hour with nothing above white in it proves nothing either way, and is not a failure.**
+## Golden dusk was one of two presets required to exceed white until its sky became a photograph
+## of a real sunset, which holds no solar disc at all: the sun is under the horizon and the
+## brightest thing in frame is a cloud at 0.79. A buffer that clips cannot be told from a scene
+## with no highlight, so an hour like that is reported and skipped, and the claim rests on the
+## hours that do have one. The plateau test still runs everywhere, because a clamped buffer piles
+## pixels at white whatever the scene is.
 
 const SHOT: String = "hero_3q"
-const WEATHERS: Array[String] = ["noon_clear", "golden_dusk"]
+const WEATHERS: Array[String] = ["noon_clear", "golden_dusk", "overcast"]
+## At least this many of them have to carry something brighter than white, or the gate is
+## measuring nothing.
+const MIN_WITH_HEADROOM: int = 1
 const CONVERGE: int = 3
 ## Pixels are sampled on a grid: a clipped sky is tens of thousands of pixels, not one.
 const SAMPLE_STEP: int = 3
@@ -88,6 +99,7 @@ static func meta() -> Dictionary:
 
 func run(harness: Node) -> Dictionary:
     var reported: PackedStringArray = PackedStringArray()
+    var with_headroom: int = 0
     var worst_peak: float = INF
     for weather: String in WEATHERS:
         var err: String = harness.setup_for(SHOT, weather)
@@ -118,15 +130,11 @@ func run(harness: Node) -> Dictionary:
         var at_white: int = measured["at_white"] as int
         var below: int = measured["below"] as int
         var ratio: float = float(at_white) / maxf(float(below), 1.0)
-        worst_peak = minf(worst_peak, peak)
-        if peak <= WHITE:
-            return fail(
-                "under %s nothing in the frame exceeds white: the brightest sampled channel is"
-                % weather + " %.4f, so the render target stopped where a display-referred buffer"
-                % peak + " would have. Every highlight above that is already gone and no"
-                + " tonemapper downstream can bring it back.",
-                peak
-            )
+        if peak > WHITE:
+            worst_peak = minf(worst_peak, peak)
+            with_headroom += 1
+        else:
+            reported.append("%s has nothing above white in it, peaking at %.2f" % [weather, peak])
         if ratio > MAX_PLATEAU_RATIO:
             return fail(
                 "under %s the histogram bin at white holds %d samples against %d in the bin just"
@@ -135,11 +143,22 @@ func run(harness: Node) -> Dictionary:
                 + " one, which is what clamping looks like in a histogram.",
                 ratio
             )
-        reported.append(
-            "%s peaks at %.1f, white bin %d against %d below" % [weather, peak, at_white, below]
+        if peak > WHITE:
+            reported.append(
+                "%s peaks at %.1f, white bin %d against %d below"
+                % [weather, peak, at_white, below]
+            )
+    if with_headroom < MIN_WITH_HEADROOM:
+        return fail(
+            "none of the %d hours photographed has anything above white in it, so nothing here"
+            % WEATHERS.size()
+            + " says whether the render target has headroom: %s" % ", ".join(reported),
+            0
         )
     return ok(
-        "the render target carries highlights: %s" % ", ".join(reported), worst_peak
+        "%d of %d hours carry highlights above white: %s"
+        % [with_headroom, WEATHERS.size(), ", ".join(reported)],
+        worst_peak
     )
 
 

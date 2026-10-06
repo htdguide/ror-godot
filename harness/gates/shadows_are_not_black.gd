@@ -22,9 +22,14 @@ const SETTLE_FRAMES: int = 3
 const BOX_SIZE: float = 4.0
 const GROUND_SIZE: float = 40.0
 const ALBEDO: Color = Color(0.35, 0.35, 0.35)
-## Where the camera stands, and what it looks at: the ground beside the box, from the side away
-## from the sun, so that lit ground, shadowed ground and the box's shaded face are all in shot.
-const EYE: Vector3 = Vector3(-9.0, 5.5, -9.0)
+## How far the camera stands from the box and how high, and what it looks at. **Where it stands is
+## worked out from the sun rather than written down**: it goes square to the shadow, so the
+## sunward ground is on one side of the box and the shadow on the other and neither is behind it.
+## It was a fixed corner of the world until the noon preset's sun moved to where its captured sky
+## actually has one, and then the sunlit sample landed in the shadow and the gate said the samples
+## were not where they were meant to be — which they were not.
+const EYE_DISTANCE: float = 12.7
+const EYE_HEIGHT: float = 5.5
 const AIM: Vector3 = Vector3(0.0, 1.0, 0.0)
 ## Half the side of each sampled window, in pixels.
 const WINDOW_PX: int = 24
@@ -75,18 +80,23 @@ func run(harness: Node) -> Dictionary:
     harness.world.add_child(_ground())
     var box: MeshInstance3D = _box()
     harness.world.add_child(box)
-    harness.camera.look_at_from_position(EYE, AIM, Vector3.UP)
-    await harness.advance_frames(1, "static", "shadow")
 
-    # Where the shadow falls: along the sun's own direction from the box, on the ground.
-    var toward_sun: Vector3 = -sun.global_transform.basis.z
+    # Where the shadow falls: along the sun's own direction from the box, on the ground. A
+    # directional light travels along its own -Z, so the sun itself is the other way — the same
+    # convention `a_captured_sky_and_its_sun_agree` measures the sky against.
+    var toward_sun: Vector3 = sun.global_transform.basis.z
     var away: Vector3 = Vector3(-toward_sun.x, 0.0, -toward_sun.z).normalized()
     var shadow_at: Vector3 = away * (BOX_SIZE * 0.85)
-    # The sunlit sample goes *beside* the box rather than on the far side of it: the far side is
-    # behind the box from this camera, and the first version of this gate sampled the box's own
-    # shaded face there and reported a contrast of 1.3 whatever the lighting did.
+    # Square to the shadow, so that the sunlit ground and the shadow are on opposite sides of the
+    # box and the box is between neither of them and the camera.
     var across: Vector3 = Vector3(away.z, 0.0, -away.x).normalized()
-    var lit_at: Vector3 = across * (BOX_SIZE * 1.4)
+    harness.camera.look_at_from_position(
+        across * EYE_DISTANCE + Vector3(0.0, EYE_HEIGHT, 0.0), AIM, Vector3.UP
+    )
+    await harness.advance_frames(1, "static", "shadow")
+    # The sunlit sample goes on the sun's side of the box, which from here is unoccluded ground
+    # that nothing is standing in front of.
+    var lit_at: Vector3 = -away * (BOX_SIZE * 1.4)
     # And the box's own shaded face: the middle of the side the sun cannot see.
     var shaded_face: Vector3 = away * (BOX_SIZE * 0.5 + 0.01) + Vector3(0.0, BOX_SIZE * 0.5, 0.0)
 

@@ -62,11 +62,11 @@ const SETTLE_FRAMES: int = 3
 ## A mid-grey surface: dark enough not to clip in sun, bright enough to read in shade.
 const ALBEDO: Color = Color(0.35, 0.35, 0.35)
 const QUAD_SIZE: float = 6.0
-## Where the sun sits when it is on the quad, and the same direction mirrored for when it is
-## behind it. Matches the noon preset, and the quad is turned to face it: a surface at a glancing
-## angle to the sun measures the angle as much as the light, and the physical numbers this is read
-## against are for a surface facing the sun square on.
-const SUN_ON: Vector3 = Vector3(0.55, 0.78, 0.62)
+## Where the sun sits is taken from the sun in the world rather than written down here, and the
+## quad is turned to face it: a surface at a glancing angle to the sun measures the angle as much
+## as the light, and the physical numbers this is read against are for a surface facing the sun
+## square on. It was a constant copied from the noon preset until the preset's sun moved to where
+## its captured sky actually has one, and a card facing the wrong way measures the cosine.
 
 ## The physical band, from clear-sky daylight measurements. Generously wide: what it is there to
 ## catch is a sky contributing nothing, which reads in the hundreds.
@@ -119,10 +119,12 @@ func run(harness: Node) -> Dictionary:
         return fail("the world has no sun to move")
     _hide_props(harness)
 
-    var quad: MeshInstance3D = _build_quad()
+    # A directional light travels along its own -Z, so the sun itself is the other way.
+    var toward_sun: Vector3 = sun.global_transform.basis.z
+    var quad: MeshInstance3D = _build_quad(toward_sun)
     harness.world.add_child(quad)
     harness.camera.look_at_from_position(
-        SUN_ON.normalized() * QUAD_SIZE * 1.6, Vector3.ZERO, Vector3.UP
+        toward_sun * QUAD_SIZE * 1.6, Vector3.ZERO, Vector3.UP
     )
 
     # Scene-referred first, through an HDR capture: linear, unclipped, float. This used to be a
@@ -241,7 +243,7 @@ func _sample(
     return total / float(counted)
 
 
-func _build_quad() -> MeshInstance3D:
+func _build_quad(toward_sun: Vector3) -> MeshInstance3D:
     var plane: PlaneMesh = PlaneMesh.new()
     plane.size = Vector2(QUAD_SIZE, QUAD_SIZE)
     # A plane faces up, and up is turned to face the sun: the measurement wants a surface square
@@ -255,7 +257,7 @@ func _build_quad() -> MeshInstance3D:
     instance.name = "DaylightQuad"
     instance.mesh = plane
     instance.material_override = material
-    var toward: Vector3 = SUN_ON.normalized()
+    var toward: Vector3 = toward_sun.normalized()
     instance.basis = Basis(
         toward.cross(Vector3.UP).normalized(),
         toward,

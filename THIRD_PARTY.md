@@ -134,6 +134,32 @@ has no corresponding record under `LICENSES/`.
 - Attribution: any build that ships it must credit La Paz and Klink on its own credits page,
   and the Rigs of Rods project for the formats and the physics.
 
+### Poly Haven HDRI skies (captured skies, shipped)
+- Source: https://polyhaven.com/hdris — `qwantani_afternoon_puresky`, `qwantani_dusk_2_puresky`,
+  `kloofendal_overcast_puresky`
+- Location: `assets/hdri/*_2k.hdr`
+- Pin: the 2k Radiance HDR of each, by SHA-256 —
+  `a8924a59217b2cdc775459b960d638451dc1452e874d49cbe88c32a520aa828c` (afternoon),
+  `440d1b5d29c79bea0985a13777642df6829e80399602a9d5f39bc20203ae6d1b` (dusk),
+  `312b1b04b7f10057a4f1418abc59d1166c8933cc93fc72051502edaf8d6b2fcd` (overcast)
+- Licence: **CC0 1.0** — `LICENSES/polyhaven-hdris-CC0.txt`. Attribution is not required and is
+  given anyway: Greg Zaal (photography), Jarod Guest (processing).
+- Why: a modelled sky states a look and the light follows from whatever its colours integrate to,
+  so this project's sun-to-sky balance was a number somebody chose — 5.7:1 at noon where clear
+  daylight is 13:1. A captured sky carries the balance the place had, and calibrating one against
+  published daylight is what the modelled sky's own grade was then set from. PLAN §4.4 names this
+  set and §0.5's sourcing tiers name Poly Haven CC0 as the approved source for it.
+- Why these three: "pure sky" captures with no ground in them, because this project's ground is a
+  terrain a mod author shipped and a second horizon in the sky is a seam nobody can unsee. A clear
+  afternoon, a clear sunset and an overcast morning are the three fixed daylight presets; the
+  24-hour cycle stays modelled, because there is no continuum of captures to interpolate.
+- Why 2k Radiance HDR rather than 4k EXR: 4.1 MB against 70 MB apiece for a sky whose radiance map
+  is convolved to 256 px anyway. The format is the same floating-point data in a quarter of the
+  bytes.
+- Cost if dropped: the daylight presets fall back to the modelled sky, which cannot be graded
+  against: `the_sky_does_not_follow_the_camera` records that Godot's own `PhysicalSkyMaterial`
+  responds to light as `light ^ 0.625`.
+
 ### CIE daylight locus (reference data, no files)
 - Local path: `harness/reference/daylight_locus.gd` — the formula and the published
   chromaticities, transcribed into source

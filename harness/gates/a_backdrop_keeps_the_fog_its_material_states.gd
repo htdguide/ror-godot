@@ -32,9 +32,18 @@ const REACH_M: float = 12000.0
 ## The band of the frame the backdrop stands in, as a share of its height from the top.
 const BAND_TOP: float = 0.3
 const BAND_BOTTOM: float = 0.52
-## How much more the band has to vary with the pass's own fog honoured than with it buried.
-## Measured at 0.1735 against 0.0526, which is 3.3 times; half of that is the bound.
-const MIN_RATIO: float = 2.0
+## How much of its own brightness the horizon band has to move when the backdrop's fog setting is
+## buried.
+##
+## **It used to be a ratio of two standard deviations and that measured the grading as much as the
+## backdrop.** A band drowned in fog is one colour, so the spread of the honoured frame against
+## the buried one read 3.3 times when this was written — and 1.8 times on the same unchanged fault
+## once the sky became a photograph with structure in it and the camera opened half a stop,
+## because the sky in the band varies whatever the backdrop does. What the setting does is move
+## the pixels of the surfaces that state it, so that is what is measured: the same band, the same
+## frame, with the setting honoured and buried, differenced. The fault this exists for moves them
+## by exactly nothing.
+const MIN_CHANGE: float = 0.10
 ## The map the photograph is taken on, because it is the one that reported this.
 const PHOTOGRAPHED: String = "lapaz"
 const CONVERGE: int = 6
@@ -92,21 +101,22 @@ func run(harness: Node) -> Dictionary:
     var shown: Dictionary = await _photograph(harness)
     if (shown["error"] as String) != "":
         return fail(shown["error"] as String)
-    var honoured: float = shown["honoured"] as float
-    var buried: float = shown["buried"] as float
-    if honoured < buried * MIN_RATIO:
+    var honoured: Image = shown["honoured"] as Image
+    var buried: Image = shown["buried"] as Image
+    var moved: float = _change(honoured, buried)
+    if moved < MIN_CHANGE:
         return fail(
-            "%s's horizon band varies %.4f with its own fog honoured and %.4f with it buried,"
-            % [PHOTOGRAPHED, honoured, buried]
-            + " which is %.1f times and not the %.1f required: the backdrop is still a flat sheet"
-            % [honoured / maxf(buried, 0.0001), MIN_RATIO],
-            honoured
+            "%s's horizon band moves %.1f%% of its own brightness when the backdrop's fog setting"
+            % [PHOTOGRAPHED, moved * 100.0]
+            + " is buried, under the %.0f%% required: the setting is reaching nothing"
+            % (MIN_CHANGE * 100.0),
+            moved
         )
     return ok(
-        "%d passes state a clear fog of their own and keep it; %s's horizon band varies %.4f"
-        % [checked, PHOTOGRAPHED, honoured]
-        + " at a %.0f m view distance against %.4f with the same surfaces buried"
-        % [REACH_M, buried],
+        "%d passes state a clear fog of their own and keep it; %s's horizon band moves %.1f%% of"
+        % [checked, PHOTOGRAPHED, moved * 100.0]
+        + " its own brightness at a %.0f m view distance when the setting is buried, and varies"
+        % REACH_M + " %.4f against %.4f" % [_spread(honoured), _spread(buried)],
         checked
     )
 
@@ -137,13 +147,18 @@ func _photograph(harness: Node) -> Dictionary:
     for keep: bool in [true, false]:
         for material: StandardMaterial3D in unfogged:
             material.disable_fog = keep
-        var shot: Dictionary = await harness.capture_shot(
+        # **Scene-referred, through an HDR capture.** The spread of a band of display pixels is
+        # as much a property of the tonemapper and the exposure as of the backdrop: the same
+        # scene, re-graded when its sky became a photograph and its camera opened half a stop,
+        # took this from 3.3 times to 1.8 without anything about the fog changing. What the claim
+        # is about is light, so light is what is measured.
+        var shot: Dictionary = await harness.capture_hdr(
             "backdrop/%s" % ("honoured" if keep else "buried"), "static", CONVERGE
         )
         if (shot["error"] as String) != "":
             out["error"] = shot["error"] as String
             return out
-        out["honoured" if keep else "buried"] = _spread(shot["png"] as String)
+        out["honoured" if keep else "buried"] = shot["image"] as Image
     harness.world.remove_child(objects)
     objects.queue_free()
     return out
@@ -177,10 +192,35 @@ static func _mesh_of(node: Node) -> Mesh:
     return null
 
 
+## How far the horizon band moves between two frames, as a share of its own brightness. Reported
+## alongside the spread below, which is what a person reads rather than what the claim rests on.
+func _change(honoured: Image, buried: Image) -> float:
+    if honoured == null or buried == null:
+        return 0.0
+    var difference: float = 0.0
+    var level: float = 0.0
+    var counted: int = 0
+    for y: int in range(
+        int(honoured.get_height() * BAND_TOP), int(honoured.get_height() * BAND_BOTTOM), 2
+    ):
+        for x: int in range(0, honoured.get_width(), 4):
+            var a: float = _luma(honoured.get_pixel(x, y))
+            var b: float = _luma(buried.get_pixel(x, y))
+            difference += absf(a - b)
+            level += maxf(a, b)
+            counted += 1
+    if counted == 0 or level <= 0.0:
+        return 0.0
+    return difference / level
+
+
+func _luma(pixel: Color) -> float:
+    return pixel.r * 0.2126 + pixel.g * 0.7152 + pixel.b * 0.0722
+
+
 ## How much the horizon band of a frame varies, as the standard deviation of pixel luminance.
 ## A band drowned in fog is one colour and reads near zero; a painted horizon reads far above it.
-func _spread(png: String) -> float:
-    var image: Image = Image.load_from_file(png)
+func _spread(image: Image) -> float:
     if image == null:
         return 0.0
     var values: PackedFloat32Array = PackedFloat32Array()

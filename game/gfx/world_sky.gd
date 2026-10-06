@@ -51,6 +51,11 @@ static func of(weather: Dictionary, clouds: bool) -> Sky:
     # An hour may ask for this project's own sky shader whatever the session is doing. The night
     # does, because it is the only sky with a radiance scale — see the uniform in
     # `sky_clouds.gdshader` — and a gate and a window have to be looking at the same night.
+    # A captured sky where the hour names one and the checkout has it. First, because it is the
+    # only sky here that carries a real sun-to-sky balance rather than stating one.
+    var captured: ShaderMaterial = SkyHdri.material(weather)
+    if captured != null:
+        return _new(captured)
     if bool(weather.get("sky_shader", false)) or (clouds and RenderCfg.CLOUDS_ENABLED):
         var clouded: ShaderMaterial = SkyClouds.material(weather)
         if clouded != null:

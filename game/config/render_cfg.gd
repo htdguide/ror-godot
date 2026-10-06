@@ -43,12 +43,18 @@ const SHADOW_OPACITY: float = 0.72
 ## A second directional light, from the opposite side and casting nothing, so the shaded side of
 ## an object is lit by something with a direction rather than by flat ambient alone. This is the
 ## fill of a three-point rig, and it is what stops one side of the valley reading as black.
-const FILL_ENERGY: float = 0.35
+const FILL_ENERGY: float = 1.0
 const FILL_COLOUR: Color = Color(0.72, 0.80, 0.95)
 
 ## Sky-based image lighting. The radiance map is what gives metal something to reflect and
 ## shadowed surfaces something other than flat ambient.
 const SKY_RADIANCE_SIZE: int = Sky.RADIANCE_SIZE_256
+## Where a captured sky stops being sky and starts being the sun in it, in the panorama's own
+## units. Measured over the four maps this project ships: the clear afternoon's solar disc is 80
+## pixels of two million and 91% of all the light in the map, the night map's moon 47 pixels and
+## 86%, and no part of the sky itself reaches 6. Anything above this is a disc, and a disc is the
+## `DirectionalLight3D`'s job because a disc in a radiance map casts no shadow.
+const SKY_SUN_CLAMP: float = 50.0
 const AMBIENT_FROM_SKY: float = 1.0
 const REFLECTION_FROM_SKY: float = 1.0
 
@@ -100,7 +106,7 @@ const FILL_LUX: float = 12000.0
 ## displayed; above ISO 40 La Paz's pale ground bleaches; and `daylight_shadows_are_readable`
 ## wants the shaded surface above 0.05. 32 satisfies all three with the shadow at 0.0950 and 3.5x
 ## displayed contrast against a 4x ceiling — tight, and the tightness is the finding below.
-const CAMERA_ISO: float = 32.0
+const CAMERA_ISO: float = 45.0
 
 const SKY_ENERGY: float = 1.0
 

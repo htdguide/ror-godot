@@ -16,6 +16,13 @@ const RECORD_DIR: String = "LICENSES"
 const REGISTER: String = "THIRD_PARTY.md"
 ## Every submodule must be recorded, and every addon that ships inside the game.
 const ADDON_DIR: String = "game/addons"
+## And every directory of third-party files this project ships itself.
+##
+## **A shipped asset is a dependency and was not checked as one.** Submodules and addons are
+## fetched or generated and so were the only two kinds this gate knew about; the captured skies
+## under `assets/hdri` are committed binaries from somebody else, which is exactly the case the
+## rule in PLAN §0.5 exists for. A directory here is registered if `THIRD_PARTY.md` names it.
+const ASSET_DIR: String = "assets"
 ## Marketplace content whose licence forbids use outside its own engine. Matched against
 ## file and directory names anywhere in the tree.
 const ENGINE_LOCKED: Array[String] = ["megascans", "quixel", "unrealmarketplace", "unreal_marketplace"]
@@ -67,6 +74,9 @@ func run(_harness: Node) -> Dictionary:
     for name: String in _addons(root):
         checked.append(name)
         offenders.append_array(_check(sections, "addon", name))
+    for path: String in _shipped_assets(root):
+        checked.append(path)
+        offenders.append_array(_check(sections, "asset", path))
 
     # A record file per licence, so the licence text ships with the project rather than
     # being a claim in a table.
@@ -115,6 +125,22 @@ func _addons(root: String) -> PackedStringArray:
         return out
     for name: String in dir.get_directories():
         out.append(name)
+    return out
+
+
+## Directories of third-party files this project commits. A directory Godot is told to ignore
+## holds content fetched or copied in locally — mods and terrains, which this project has no right
+## to redistribute and does not — and is not shipped, so it is not checked here.
+func _shipped_assets(root: String) -> PackedStringArray:
+    var out: PackedStringArray = PackedStringArray()
+    var dir: DirAccess = DirAccess.open(root.path_join(ASSET_DIR))
+    if dir == null:
+        return out
+    for name: String in dir.get_directories():
+        var inside: String = root.path_join(ASSET_DIR).path_join(name)
+        if FileAccess.file_exists(inside.path_join(".gdignore")):
+            continue
+        out.append("%s/%s" % [ASSET_DIR, name])
     return out
 
 

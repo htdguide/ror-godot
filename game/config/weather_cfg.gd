@@ -24,14 +24,22 @@ extends RefCounted
 
 const PRESETS: Dictionary = {
     "noon_clear": {
-        # Lit by a physical sky rather than a flat colour, so surfaces have something to
-        # reflect and shadows are filled by sky light instead of a constant.
+        # Lit by a captured sky rather than a flat colour or a model, so surfaces have something
+        # real to reflect and the shadows are filled by the light that place actually had.
         "physical_sky": true,
-        "sky_energy": 1.0,
-        # High and over the camera's shoulder, so the side being looked at is the side
-        # being lit. A sun behind the subject makes every judgement about materials a
-        # judgement about shadow instead.
-        "sun_from": Vector3(0.55, 0.78, 0.62),
+        "hdri": "qwantani_afternoon_puresky_2k.hdr",
+        # **What the map is worth as light, set from daylight rather than from taste.** A Poly
+        # Haven sky is normalised so its picture reads well and says nothing about whether it is a
+        # hundred thousand lux or fifteen, so the number is calibrated: clear-sky daylight puts
+        # about 95,000 lux of direct sun on a surface facing it and about 8,000 of skylight, which
+        # is 13:1, and `daylight_shadows_are_readable` measures 13.3:1 at this value. It was 5.4:1
+        # with the map taken as it came.
+        "sky_energy": 0.27,
+        # Where this map's own sun is: the brightest tenth of a per cent of it, weighted, which
+        # comes out at 40.8 degrees of elevation. Measured rather than chosen, because a sky whose
+        # bright spot is in one place and whose shadows fall from another is a scene with two suns
+        # in it — `a_captured_sky_and_its_sun_agree` is what holds the two together.
+        "sun_from": Vector3(-0.446, 0.654, 0.611),
         # A clear midday sun is bright, and the sky fills the shadows on its own. With a
         # physical sky the ambient term is the sky's own irradiance rather than a flat
         # colour, so it runs at full strength instead of being dialled down.
@@ -111,6 +119,40 @@ const PRESETS: Dictionary = {
         # Air for the beams to stand in.
         "volumetric": true,
     },
+    # A flat grey day, captured. The one hour in this set with no sun in it at all: the cloud deck
+    # is the light source, which is why the shadows are soft and shallow and the whole scene sits
+    # six times below a clear noon.
+    "overcast": {
+        "physical_sky": true,
+        "hdri": "kloofendal_overcast_puresky_2k.hdr",
+        # The cloud is the sky and the sky is the light, so this carries nearly all of it. Set
+        # against the clear day's: overcast daylight is about fifteen thousand lux where a clear
+        # noon is a hundred thousand, and nearly all of the fifteen is diffuse.
+        "sky_energy": 0.05,
+        # Where the sun is behind the cloud — the brightest tenth of a per cent of the map,
+        # weighted. A disc this soft still has a direction, and a scene with no direction at all
+        # has no form in it.
+        "sun_from": Vector3(-0.497, 0.384, 0.778),
+        "sun_lux": 8000.0,
+        "sun_energy": 1.0,
+        "sun_color": Color(0.95, 0.96, 1.0),
+        # A cloud deck is a light the size of the sky, so its shadow has no edge to speak of and
+        # takes little away.
+        "sun_angular_deg": 12.0,
+        "shadow_opacity": 0.45,
+        "ambient_energy": 1.0,
+        "sky_top": Color(0.62, 0.64, 0.68),
+        "sky_horizon": Color(0.72, 0.73, 0.75),
+        "bg_color": Color(0.66, 0.67, 0.70),
+        # Six times under a clear noon asks for two and a half stops, the way the hour does.
+        "iso": 100.0,
+        "f_stop": 6.3,
+        "shutter_s": 0.008,
+        # The haze an overcast day has: thick, pale, and the colour of the cloud rather than of a
+        # blue sky.
+        "fog_density": 0.0025,
+        "fog_colour": Color(0.70, 0.72, 0.75),
+    },
     # A black, unlit environment. Measurement gates encode numbers into pixels, so any
     # ambient contribution would be added to the value being read back.
     #
@@ -129,14 +171,31 @@ const PRESETS: Dictionary = {
     },
     "golden_dusk": {
         "physical_sky": true,
-        "sky_energy": 1.0,
-        "sun_from": Vector3(0.82, 0.18, 0.54),
-        "sun_energy": 0.9,
+        # A real sunset, captured. The map holds no solar disc — the sun is in the haze at the
+        # horizon — so the direction below is the brightest tenth of a per cent of the sky,
+        # weighted, which is where the light in the picture is coming from.
+        "hdri": "qwantani_dusk_2_puresky_2k.hdr",
+        "sky_energy": 0.019,
+        "sun_from": Vector3(-0.577, 0.197, 0.792),
+        # **A low sun is a weak sun.** The beam crosses five atmospheres at eleven degrees of
+        # elevation instead of one and a half at forty, and clear-sky direct normal illuminance
+        # falls from about 95,000 lux to 35,000 for it. This used to be nine tenths of a midday
+        # sun pointed at the horizon, which is a midday sun with a sunset painted behind it.
+        "sun_lux": 35000.0,
+        "sun_energy": 1.0,
         "sun_color": Color(1.0, 0.72, 0.45),
         "sky_top": Color(0.16, 0.22, 0.42),
         "sky_horizon": Color(0.86, 0.58, 0.36),
         "ambient_energy": 1.0,
         "bg_color": Color(0.26, 0.24, 0.32),
+        # **The hour states its own film, because the light is a third of a midday's.** A camera
+        # metered for noon photographs a sunset as a silhouette: the shaded side of a subject came
+        # back at 0.0176 display luma, a third of what an eight-bit image can still hold detail
+        # in. Two and a third stops open — f/6.3 at ISO 100 — is what a photographer does at this
+        # hour, and it is what the sun's own fall from 95,000 lux to 35,000 asks for.
+        "iso": 100.0,
+        "f_stop": 6.3,
+        "shutter_s": 0.008,
     },
 }
 

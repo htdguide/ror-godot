@@ -93,7 +93,16 @@ static func set_parameter(environment: Environment, name: String, value: float) 
     material.set_shader_parameter(name, value)
 
 
+## The cloud sky's own material, and only that one.
+##
+## **There is more than one shader sky now.** A captured sky is a `ShaderMaterial` too and has no
+## cloud cover to report, so a panel that asked this for one got `null` where it expected a number
+## and the window came up with the settings menu half built: "Invalid cast: could not convert
+## value to 'float'". The shader a material runs is what tells them apart.
 static func _material_of(environment: Environment) -> ShaderMaterial:
     if environment == null or environment.sky == null:
         return null
-    return environment.sky.sky_material as ShaderMaterial
+    var material: ShaderMaterial = environment.sky.sky_material as ShaderMaterial
+    if material == null or material.shader == null:
+        return null
+    return material if material.shader.resource_path == SHADER_PATH else null
