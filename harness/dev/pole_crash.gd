@@ -24,9 +24,10 @@ func _initialize() -> void:
         {"name": "wall", "half": WALL_HALF, "tri": false},
         {"name": "pole", "half": POLE_HALF, "tri": false},
         {"name": "pole/tri", "half": POLE_HALF, "tri": true},
+        {"name": "lapaz", "half": POLE_HALF, "tri": true, "hull": "lapaz"},
     ]:
         var out: Dictionary = _hit(argv[0], argv[1], against["half"] as Vector3,
-                                   bool(against["tri"]))
+                                   bool(against["tri"]), against.get("hull", "") as String)
         print("%-8s: hit %5.1f m/s, %3d bent, %2d broken, body centre %+.2f m of the obstacle, left at %4.1f m/s" % [
             against["name"], out["speed"], out["bent"], out["broken"], out["through"],
             out["stopped"]])
@@ -53,7 +54,37 @@ static func _box_triangles(at: Transform3D, half: Vector3) -> Array:
     return out
 
 
-func _hit(dir: String, file: String, half: Vector3, as_triangles: bool) -> Dictionary:
+## One of a terrain's own collision hulls, moved so that its base sits at `at`. The real thing,
+## with the winding the loader gives it.
+static func _terrain_hull(map: String, at: Vector3) -> Array:
+    var loaded: Dictionary = RorTerrainLibrary.load_named(map)
+    var terrain: RorTerrain = loaded["terrain"] as RorTerrain
+    var tris: Array[Dictionary] = RorObjectCollision.triangles(terrain)
+    if tris.is_empty():
+        return []
+    var first: String = tris[0]["name"] as String
+    var low: Vector3 = tris[0]["a"] as Vector3
+    var kept: Array = []
+    for tri: Dictionary in tris:
+        if (tri["name"] as String) != first:
+            continue
+        for key: String in ["a", "b", "c"]:
+            low = low.min(tri[key] as Vector3)
+        kept.append(tri)
+        if kept.size() >= 64:
+            break
+    var shift: Vector3 = at - low
+    var out: Array = []
+    for tri: Dictionary in kept:
+        out.append([
+            (tri["a"] as Vector3) + shift, (tri["b"] as Vector3) + shift,
+            (tri["c"] as Vector3) + shift
+        ])
+    return out
+
+
+func _hit(dir: String, file: String, half: Vector3, as_triangles: bool,
+          hull: String = "") -> Dictionary:
     var rig: Dictionary = RigBuilder.from_file(SourceScan.repo_root().path_join(dir), file, 0.0)
     var truck: TruckParser = rig["truck"] as TruckParser
     var solver: RefCounted = rig["solver"] as RefCounted
@@ -69,7 +100,10 @@ func _hit(dir: String, file: String, half: Vector3, as_triangles: bool) -> Dicti
     forward = Vector3(forward.x, 0.0, forward.z).normalized()
     var centre: Vector3 = pose.origin + forward * AT_M + Vector3(0.0, half.y, 0.0)
     var at: Transform3D = Transform3D(Basis.looking_at(-forward, Vector3.UP), centre)
-    if as_triangles:
+    if hull != "":
+        for tri: Array in _terrain_hull(hull, Vector3(centre.x, 0.0, centre.z)):
+            solver.add_collision_triangle(tri[0], tri[1], tri[2], 0)
+    elif as_triangles:
         for tri: Array in _box_triangles(at, half):
             solver.add_collision_triangle(tri[0], tri[1], tri[2], 0)
     else:

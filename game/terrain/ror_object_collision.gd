@@ -79,10 +79,18 @@ static func triangles(terrain: RorTerrain) -> Array[Dictionary]:
             placement, definition["scale"] as Vector3
         )
         for at: int in range(0, soup.size() - 2, 3):
+            # **Wound back the way the file wrote them.** `OgreMeshReader` reverses every
+            # triangle because loaded in file order a vehicle is culled from outside and drawn
+            # from inside, and that reversal is for the renderer. A collision triangle is solid on
+            # the side its normal points to, so reading the reversed mesh makes the solid side the
+            # outside of the object and a vehicle passes through until some face catches it from
+            # within. Measured by signed volume, which is the only winding test that survives a
+            # concave hull: La Paz's pole read -6.8 m3 and 46 of Starling's 56 object kinds were
+            # inside out.
             out.append({
                 "a": frame * soup[at],
-                "b": frame * soup[at + 1],
-                "c": frame * soup[at + 2],
+                "b": frame * soup[at + 2],
+                "c": frame * soup[at + 1],
                 "name": name,
             })
     return out
