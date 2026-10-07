@@ -54,12 +54,16 @@ static func build(
         truck.nodes, wheel
     )
 
-    var rim: MeshInstance3D = MeshInstance3D.new()
-    rim.name = "Rim"
-    rim.mesh = named_mesh(
+    # A plain `wheels` row names no rim mesh at all. The instance is made only once there is a
+    # mesh to put in it: made first and parented second, a rim with nothing to draw was left as an
+    # orphan node per wheel, and `every_mod_car_builds` counted 36 of them across the library.
+    var rim_mesh: ArrayMesh = named_mesh(
         wheel["mesh"] as String, truck, mod_dir, mesh_reader, dds_reader, textures, scripts
     )
-    if rim.mesh != null:
+    if rim_mesh != null:
+        var rim: MeshInstance3D = MeshInstance3D.new()
+        rim.name = "Rim"
+        rim.mesh = rim_mesh
         holder.add_child(rim)
 
     # **A flexbody wheel's tyre is not drawn here.** It is a flexbody over the wheel's own nodes,
