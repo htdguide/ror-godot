@@ -222,6 +222,44 @@ const SSAO_LIGHT_AFFECT: float = 0.15
 ## lighting itself: a surface that cannot see the sky cannot reflect it either.
 const SSAO_REFLECTION_AFFECT: float = 1.0
 
+## --- Glare, which is the lens rather than the scene --------------------------------------------
+##
+## **A bloom is a real measurement of a real lens and not a look.** Every optical system scatters a
+## little of what passes through it — off the edges of elements, off dust and coatings, off the
+## sensor's own cover glass — and what that veiling glare does is put a faint halo around anything
+## far brighter than its surroundings. It is why a headlight at night reads as *bright* rather than
+## as a white shape, and why the sun on a wing has a core you cannot look at. Without it the
+## brightest thing a frame can hold is the same white as a sheet of paper.
+##
+## **Only what is brighter than white glares.** The threshold is 1.0 because that is what white
+## means here: a surface that the film can still hold has nothing to scatter, and a highlight above
+## it has everything. Set lower, every pale surface in the scene grows a halo and the picture goes
+## soft — which is the usual way bloom is wrong.
+const GLOW_ENABLED: bool = true
+const GLOW_HDR_THRESHOLD: float = 1.0
+## How fast the glare grows once a pixel is over the threshold, and the brightest value that is
+## allowed to contribute. The cap is what stops a single blown pixel — a sun disc, a lamp filament —
+## from washing a halo across the whole frame.
+const GLOW_HDR_SCALE: float = 2.0
+const GLOW_LUMINANCE_CAP: float = 12.0
+## How much of it reaches the picture. Veiling glare in a decent lens is a per cent or two of the
+## light, so this is deliberately small: the halo should be something a frame has rather than
+## something a frame is about.
+##
+## **0.55 was not that, and the suite said so.** At that strength the hero truck's brightest hour
+## fell from six times its darkest to 3.6, because a daylight frame at this project's exposure has
+## a great deal above 1.0 in it and every bit of it was spreading. A tenth is a halo; a half is a
+## filter over the lens.
+const GLOW_INTENSITY: float = 0.1
+const GLOW_STRENGTH: float = 1.0
+const GLOW_BLOOM: float = 0.0
+## Which blur levels carry it. The middle ones: the first is a pixel wide and does nothing a
+## highlight does not already do, and the last is the size of the frame and reads as a fogged lens.
+const GLOW_LEVELS: Array[int] = [2, 3, 4]
+## Added to the picture rather than blended into it, because scattered light is light that arrived
+## on top of what was already there.
+const GLOW_BLEND: int = 0
+
 ## --- Air that catches light --------------------------------------------------------------------
 ##
 ## The froxel grid, used only by the hours that ask for it. A headlight is a shaft as well as a

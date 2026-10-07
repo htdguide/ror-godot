@@ -152,6 +152,10 @@ static func use_measurement_environment(world: Node3D) -> void:
     # would never have seen it, which is the argument for a wedge.
     environment.fog_enabled = false
     environment.volumetric_fog_enabled = false
+    # And the lens's own glare, for the same reason as the fog: it adds light to a frame, which is
+    # what it is for, and a gate asking what reaches the screen is asking about the scene rather
+    # than about the lens in front of it. See `RenderCfg.GLOW_ENABLED`.
+    environment.glow_enabled = false
     var ground: MeshInstance3D = world.get_node_or_null(^"Ground") as MeshInstance3D
     if ground != null:
         ground.visible = false

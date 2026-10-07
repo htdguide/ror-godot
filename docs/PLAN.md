@@ -1310,6 +1310,21 @@ stay in HDR linear before tonemap, where their weighting is physically meaningfu
    irradiance twice.
 3. `glow_energy`: total image energy added by glow is bounded and scales monotonically with threshold;
    no glow on sub-threshold pixels.
+   **Done, 2026-10-07** — `glare_is_what_is_brighter_than_white`, and the stack now has glare in it
+   at all: `RenderCfg.GLOW_*` with the threshold at 1.0, because that is what white means here and a
+   bloom set under it hazes every pale surface in the game and reads as a soft picture rather than
+   as a bug. A highlight eight times white puts 0.7537 of light into the dark beside it, a surface
+   just under white puts 0.0000, and raising the threshold to 7.2 leaves 94% of the halo. The
+   intensity is 0.1, which is a halo; 0.55 is a filter over the lens, and the suite said so — at
+   that strength the hero truck's brightest hour fell from six times its darkest to 3.6, because a
+   daylight frame at this project's exposure has a great deal above 1.0 in it and every bit of it
+   was spreading. Measurement gates photograph without it, the way they already photograph without
+   fog: `HarnessCapture.use_measurement_environment` turns it off, because a gate asking what
+   reaches the screen is asking about the scene rather than about the lens in front of it. The
+   sub-threshold check took three attempts to make bite: a patch's own middle barely moves however
+   low the threshold goes, and a *dark* patch puts no halo beside it at any threshold at all, so the
+   first two versions would have passed whatever the renderer did. It is read beside a patch just
+   under white, where dropping the threshold to 0.4 lights it at once.
 4. `grain_after_taa`: with TAA on, grain variance measured over 60 static frames stays within a stated
    band of the TAA-off variance — proving the grain survives temporal accumulation, i.e. it really is
    applied post-resolve.

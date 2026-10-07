@@ -12,6 +12,7 @@ extends RefCounted
 static func grade(env: Environment, weather: Dictionary) -> void:
     _occlusion(env, weather)
     _haze(env, weather)
+    _glare(env)
 
 
 ## How much of the sky a surface can actually see.
@@ -31,6 +32,23 @@ static func _occlusion(env: Environment, weather: Dictionary) -> void:
     env.ssao_sharpness = RenderCfg.SSAO_SHARPNESS
     env.ssao_light_affect = RenderCfg.SSAO_LIGHT_AFFECT
     env.ssao_ao_channel_affect = RenderCfg.SSAO_REFLECTION_AFFECT
+
+
+## The glare a lens adds to whatever is brighter than white.
+##
+## Not part of the weather: a lens is the same lens at every hour, and what changes between hours is
+## how much there is above the threshold for it to scatter. See `RenderCfg.GLOW_ENABLED`.
+static func _glare(env: Environment) -> void:
+    env.glow_enabled = RenderCfg.GLOW_ENABLED
+    env.glow_hdr_threshold = RenderCfg.GLOW_HDR_THRESHOLD
+    env.glow_hdr_scale = RenderCfg.GLOW_HDR_SCALE
+    env.glow_hdr_luminance_cap = RenderCfg.GLOW_LUMINANCE_CAP
+    env.glow_intensity = RenderCfg.GLOW_INTENSITY
+    env.glow_strength = RenderCfg.GLOW_STRENGTH
+    env.glow_bloom = RenderCfg.GLOW_BLOOM
+    env.glow_blend_mode = RenderCfg.GLOW_BLEND as Environment.GlowBlendMode
+    for level: int in 7:
+        env.set_glow_level(level + 1, 1.0 if RenderCfg.GLOW_LEVELS.has(level + 1) else 0.0)
 
 
 ## The haze across the distance, and whether the air catches light.
