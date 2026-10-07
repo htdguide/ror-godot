@@ -91,6 +91,10 @@ func _init() -> void:
 func read(text: String) -> void:
     var section: String = ""
     var beams: BeamDefaults = BeamDefaults.new()
+    # `enable_advanced_deformation` works forwards from where it stands, which upstream records as
+    # an artefact of its own on-the-fly parser that it keeps on purpose. It lets a file mean a
+    # yield stress below upstream's 400 kN floor — see `BeamDefaults.CREAK`.
+    var advanced: bool = false
     var node_defaults: NodeRows.Defaults = NodeRows.Defaults.new()
     var started: bool = false
     for raw: String in text.split("\n"):
@@ -101,19 +105,28 @@ func read(text: String) -> void:
             name = line
             started = true
             continue
-        if TruckLexer.is_section_header(line, section):
-            section = line.to_lower()
-            _append(section, line, true, beams, node_defaults)
-            continue
-        if TruckLexer.is_metadata(line):
-            continue
+        # **Directives are tested before section headers, because some of them are a bare word.**
+        # `enable_advanced_deformation` has no arguments, so a reader that asks "is this a lone
+        # word?" first files it as a section and never acts on it. 56 of this checkout's 69
+        # vehicles declare it, and it is what lets a file mean a yield stress below upstream's
+        # 400 kN floor — swallowed, every one of them had its bodywork welded solid.
         var directive: String = TruckLexer.directive_of(line)
+        if directive == "":
+            if TruckLexer.is_section_header(line, section):
+                section = line.to_lower()
+                _append(section, line, true, beams, node_defaults)
+                continue
+            if TruckLexer.is_metadata(line):
+                continue
         if directive != "":
             var arguments: PackedStringArray = TruckLexer.directive_fields(line, directive)
             # Replaced rather than mutated: the rows already recorded hold this object and
             # must keep the rates they were written under.
-            if directive == "set_beam_defaults":
+            if directive == "enable_advanced_deformation":
+                advanced = true
+            elif directive == "set_beam_defaults":
                 beams = beams.copy()
+                beams.set_advanced_deformation(advanced)
                 beams.read_defaults(arguments)
             elif directive == "set_beam_defaults_scale":
                 beams = beams.copy()

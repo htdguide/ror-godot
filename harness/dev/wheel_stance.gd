@@ -94,9 +94,10 @@ func _initialize() -> void:
             continue
         var a: int = truck.beams[beam * 2]
         var b: int = truck.beams[beam * 2 + 1]
-        print("  beam %4d %3d(%s)-%3d(%s)  file %.3f  solver rest %.3f  now %.3f  %s" % [
-            beam, a, truck.node_ids[a], b, truck.node_ids[b],
+        print("  beam %4d %3d-%3d  file %.3f  rest %.3f  now %.3f  k %.0f d %.0f deform %.0f str %.0f %s" % [
+            beam, a, b,
             rest[a].distance_to(rest[b]), solver.get_beam_rest_length(beam),
-            at[a].distance_to(at[b]),
+            at[a].distance_to(at[b]), truck.beam_spring[beam], truck.beam_damp[beam],
+            truck.beam_deform[beam], truck.beam_strength[beam],
             "BROKEN" if solver.beam_broken(beam) else "held"])
     quit(0)
