@@ -32,6 +32,7 @@ const MAX_CELL_WORLD_M: float = 3.0
 ## are it.
 static func apply(terrain: RorTerrain, solver: RefCounted) -> int:
     solver.clear_obstacles()
+    solver.clear_collision_triangles()
     var surface: int = maxi(terrain.models.index_of(SURFACE), 0)
     var added: int = 0
     for box: Dictionary in boxes(terrain):
@@ -39,7 +40,81 @@ static func apply(terrain: RorTerrain, solver: RefCounted) -> int:
             box["transform"] as Transform3D, box["half"] as Vector3, surface
         )
         added += 1
+    for tri: Dictionary in triangles(terrain):
+        solver.add_collision_triangle(
+            tri["a"] as Vector3, tri["b"] as Vector3, tri["c"] as Vector3, surface
+        )
+        added += 1
     return added
+
+
+## Every triangle of every collision mesh a terrain's objects name, in world space.
+##
+## **A hull the author shipped is collided with as triangles, which is what upstream does.** A box
+## has to choose a face to push a node out of and picks the nearest it can leave by; that is right
+## while the box is wider than the node is deep inside it, and wrong for anything thin. A pole is
+## 0.148 m deep, so a node a centimetre past its midplane is nearer the back face and the obstacle
+## throws the vehicle forward — measured, the Mazda drove 1.08 m through a box the size of La Paz's
+## own pole at 21.3 m/s. A triangle carries its own outward normal and is solid on one side, so
+## there is no midplane to flip across.
+##
+## 59 of this library's 96 object definitions ship a `beginmesh` hull against 21 that state a box,
+## so this is the shape most of its collision is authored in. Objects with neither still get the
+## derived columns in `boxes`.
+static func triangles(terrain: RorTerrain) -> Array[Dictionary]:
+    var out: Array[Dictionary] = []
+    var state: Dictionary = RorObjects.state(terrain)
+    var soups: Dictionary = {}
+    for placement: Dictionary in RorObjects.placements(terrain):
+        var name: String = placement["name"] as String
+        var definition: Dictionary = RorObjects.definition(terrain, name, state)
+        if (definition.get("error", "") as String) != "":
+            continue
+        if not _has_hull(definition):
+            continue
+        var soup: PackedVector3Array = _hull_of(terrain, name, definition, state, soups)
+        if soup.is_empty():
+            continue
+        var frame: Transform3D = RorObjects.transform_of(
+            placement, definition["scale"] as Vector3
+        )
+        for at: int in range(0, soup.size() - 2, 3):
+            out.append({
+                "a": frame * soup[at],
+                "b": frame * soup[at + 1],
+                "c": frame * soup[at + 2],
+                "name": name,
+            })
+    return out
+
+
+## Whether an object ships a collision hull of its own, rather than only a drawn mesh.
+static func _has_hull(definition: Dictionary) -> bool:
+    return not (definition["collision_meshes"] as PackedStringArray).is_empty()
+
+
+## The triangles of an object's collision meshes, in the mesh's own frame, read once per name.
+static func _hull_of(
+    terrain: RorTerrain, name: String, definition: Dictionary, state: Dictionary,
+    soups: Dictionary
+) -> PackedVector3Array:
+    if soups.has(name):
+        return soups[name] as PackedVector3Array
+    var points: PackedVector3Array = PackedVector3Array()
+    for file: String in definition["collision_meshes"] as PackedStringArray:
+        var mesh: ArrayMesh = RorObjects.mesh_of(terrain, file, state)
+        if mesh == null:
+            continue
+        for surface: int in mesh.get_surface_count():
+            var arrays: Array = mesh.surface_get_arrays(surface)
+            var corners: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
+            var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] as PackedInt32Array
+            for at: int in range(0, indices.size() - 2, 3):
+                points.append(corners[indices[at]])
+                points.append(corners[indices[at + 1]])
+                points.append(corners[indices[at + 2]])
+    soups[name] = points
+    return points
 
 
 ## Every solid box on a terrain, as {"transform", "half", "name"}.
@@ -64,6 +139,9 @@ static func boxes(terrain: RorTerrain) -> Array[Dictionary]:
         var authored: Array[Dictionary] = _authored_boxes(placement, definition)
         if not authored.is_empty():
             out.append_array(authored)
+            continue
+        # A hull is collided with as triangles instead — see `triangles`.
+        if _has_hull(definition):
             continue
         var local: Array[Dictionary] = _shape_of(terrain, name, definition, state, shapes)
         if local.is_empty():

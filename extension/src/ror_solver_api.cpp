@@ -245,6 +245,12 @@ void RorSolver::_bind_methods() {
                                   "tolerance"),
                          &RorSolver::add_slide_node);
     ClassDB::bind_method(D_METHOD("slide_node_count"), &RorSolver::slide_node_count);
+    ClassDB::bind_method(D_METHOD("add_collision_triangle", "a", "b", "c", "surface"),
+                         &RorSolver::add_collision_triangle);
+    ClassDB::bind_method(D_METHOD("clear_collision_triangles"),
+                         &RorSolver::clear_collision_triangles);
+    ClassDB::bind_method(D_METHOD("collision_triangle_count"),
+                         &RorSolver::collision_triangle_count);
     ClassDB::bind_method(D_METHOD("beam_broken", "beam"), &RorSolver::beam_broken);
     ClassDB::bind_method(D_METHOD("beam_strength", "beam"), &RorSolver::beam_strength);
     ClassDB::bind_method(D_METHOD("broken_beam_count"), &RorSolver::broken_beam_count);

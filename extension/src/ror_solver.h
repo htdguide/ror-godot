@@ -6,6 +6,7 @@
 #include "ror_obstacles.h"
 #include "ror_node.h"
 #include "ror_slidenode.h"
+#include "ror_triangles.h"
 #include "ror_steering.h"
 #include "ror_wheels.h"
 
@@ -195,6 +196,14 @@ public:
     void add_slide_node(int node, const godot::PackedInt32Array &rail, float spring,
                         float break_force, float tolerance);
     int slide_node_count() const;
+    // A terrain's own collision meshes, as triangles. `clear_collision_triangles` goes with
+    // `clear_obstacles`: a world has one set of static collision and these are half of it.
+    void add_collision_triangle(const godot::Vector3 &a, const godot::Vector3 &b,
+                                const godot::Vector3 &c, int surface) {
+        m_triangles.add(a, b, c, surface);
+    }
+    void clear_collision_triangles() { m_triangles.clear(); }
+    int collision_triangle_count() const { return m_triangles.count(); }
 
     godot::PackedVector3Array get_positions() const;
     godot::Vector3 get_node_position(int node) const;
@@ -216,6 +225,7 @@ private:
     BeamArray m_undamaged_beams;
     std::vector<int> m_undamaged_active_beams;
     SlideNodeArray m_slide_nodes;
+    RorTriangleSet m_triangles;
     RorWheelSet m_wheels;
     RorDrivetrain m_drivetrain;
     RorSteering m_steering;

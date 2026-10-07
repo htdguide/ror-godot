@@ -213,9 +213,10 @@ void RorSolver::step(float dt, int substeps) {
         m_drivetrain.step(dt, m_wheels.driven_spin() * RAD_PER_SEC_TO_RPM, i == 0);
         m_wheels.apply(m_nodes, m_drivetrain.clutch_torque(), dt);
         accumulate_beam_forces();
-        // Before the ground, because a slide node is structure: it is what holds a strut's hub
-        // on its travel, and the contact law below wants a node's structural force already in.
+        // Before the ground: a slide node is structure, and the contact laws below want a
+        // node's structural force already in.
         apply_slide_nodes(m_slide_nodes, m_nodes);
+        apply_triangle_forces(m_nodes, m_triangles, m_ground_models, dt);
         // Last, because the contact law works on the node's fully accumulated force.
         apply_ground_contact(dt);
     }
@@ -310,14 +311,13 @@ void RorSolver::add_slide_node(int node, const PackedInt32Array &rail, float spr
     slide.rail.reserve(static_cast<size_t>(rail.size()));
     for (int i = 0; i < rail.size(); ++i) { slide.rail.push_back(rail[i]); }
     slide.spring = spring;
+    slide.tolerance = tolerance;
     // Upstream's "never breaks" is an infinite force; this carries it as zero.
     slide.break_force = std::isfinite(break_force) ? break_force : 0.0f;
-    slide.tolerance = tolerance;
     m_slide_nodes.push_back(slide);
 }
 
 int RorSolver::slide_node_count() const { return static_cast<int>(m_slide_nodes.size()); }
-
 bool RorSolver::beam_broken(int beam) const {
     if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
         return false;

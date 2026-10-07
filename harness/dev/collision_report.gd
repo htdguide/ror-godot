@@ -21,8 +21,12 @@ func _initialize() -> void:
     for placement: Dictionary in RorObjects.placements(terrain):
         var key: String = placement["name"] as String
         placed[key] = int(placed.get(key, 0)) + 1
-    print("%s: %d placements of %d kinds, %d collision boxes" % [
-        name, RorObjects.placements(terrain).size(), placed.size(), boxes.size()])
+    var tris: Array[Dictionary] = RorObjectCollision.triangles(terrain)
+    for tri: Dictionary in tris:
+        var key: String = tri.get("name", "?") as String
+        per_name[key] = int(per_name.get(key, 0)) + 1
+    print("%s: %d placements of %d kinds, %d collision boxes, %d collision triangles" % [
+        name, RorObjects.placements(terrain).size(), placed.size(), boxes.size(), tris.size()])
     var solid: int = 0
     var hollow: PackedStringArray = PackedStringArray()
     for key: String in placed.keys():

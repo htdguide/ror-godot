@@ -137,9 +137,8 @@ func _populate_terrain() -> void:
         printerr("PLAY  the solver could not take the terrain: " + error)
         return
     var solid: int = RorObjectCollision.apply(loaded, _drive.solver)
-    print("PLAY  driving on %s, spawned at %v under %.2f m/s^2; %d parts of its own"
-        % [loaded.name, _drive.spawn, loaded.gravity(), solid]
-        + " scenery are solid")
+    print("PLAY  driving on %s, spawned at %v under %.2f m/s^2; %d solid scenery parts"
+        % [loaded.name, _drive.spawn, loaded.gravity(), solid])
 
 
 ## The terrain's own vegetation, in a ring of tiles that follows whoever is driving.
@@ -365,6 +364,9 @@ func _change_vehicle(name: String) -> void:
         error = _drive.use_terrain(_terrain.get("data"))
         if error != "":
             printerr("PLAY  the terrain could not be handed to %s: %s" % [name, error])
+        # A new vehicle is a new solver and the objects went to the old one, so every car taken
+        # after the first used to drive through every pole, wall and road slab on the map.
+        RorObjectCollision.apply(_terrain.get("data") as RorTerrain, _drive.solver)
     else:
         _drive.respawn()
     if _menu != null:
