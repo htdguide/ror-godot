@@ -29,7 +29,7 @@ const FALLBACK_NODE: int = 0
 ## `upstream_rotation` picks how the authored angles are composed. See `authored_rotation`: a
 ## flexbody wants upstream's order, a prop does not, and they are not the same question.
 static func placement(
-    nodes: PackedVector3Array, entry: Dictionary, upstream_rotation: bool = false
+    nodes: PackedVector3Array, entry: Dictionary, upstream_rotation: bool = true
 ) -> Transform3D:
     var origin: Vector3 = nodes[entry["ref"] as int]
     var diff_x: Vector3 = nodes[entry["nx"] as int] - origin
@@ -59,12 +59,11 @@ static func placement(
 ## than one axis was being placed by the wrong composition; the hero truck never noticed because
 ## its own numbers make the two orders agree, which is exactly how a convention bug survives.
 ##
-## **Props keep the old composition, and that is deliberate rather than tidy.** Upstream uses the
-## same Z, Y, X order for them (`ActorSpawner.cpp:1681-1683`) but builds a prop's base frame
-## differently from a flexbody's, so applying the flexbody change to props alone turns the hero
-## truck's steering column to point up and forward instead of down, which
-## `props_sit_in_the_vehicle` catches on a physical expectation. Fixing props properly means
-## porting their own placement, which is a separate piece of work with its own evidence.
+## **Props compose the same way, and used to not.** They were left on Godot's default order with
+## a note calling it deliberate, and the compensation for it was a steering rake of 121 degrees
+## where upstream states -59. Only a prop that turns about more than one axis can tell the two
+## orders apart, and in this library that is the hero truck's dashboard alone — so the one vehicle
+## the loader was calibrated on was the one being placed wrongly.
 static func authored_rotation(rot_deg: Vector3, upstream: bool) -> Basis:
     if upstream:
         return (

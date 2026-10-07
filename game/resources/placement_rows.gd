@@ -8,20 +8,19 @@ extends RefCounted
 ## two from drifting apart, which matters because the triad convention is the part that is
 ## easy to get subtly wrong.
 
-## The column rake, from upstream: a steering wheel's orientation is the dashboard's,
-## then X(-59 deg), then Y(steering * degrees-per-input). Only the rake is fixed. The
-## file's last number is that degrees-per-input figure -- 350 on the hero truck -- and
-## reading it as a fixed angle lays the wheel over on its side.
-## The column rake, measured rather than taken from upstream's -59.
+## The steering column's rake, which is upstream's own: `Quaternion(Degree(-59), UNIT_X)` in
+## `GfxActor::UpdateProps`, applied after the dashboard prop's orientation and before the steering
+## angle about Y.
 ##
-## The mesh's thinnest axis is the column, and on this wheel that axis points along the
-## stalk, not along the face — so a sign flip alone trades one fault for the other. With
-## the dashboard's own basis applied (tools/prop_axis_probe.gd), -59 puts the stalk at the
-## driver and the face into the dash; +59 gets the face right but stands the stalk up;
-## +121 = 180 - 59 points the stalk forward and 36 degrees down, which is where a steering
-## column goes. The 180 is this project's prop chain differing from upstream's by a
-## handedness, and the sign is the stalk.
-const STEERING_COLUMN_RAKE_DEG: float = 121.0
+## **It read 121 for as long as a prop's frame was built with the wrong euler order.** 121 is
+## 180 - 59, and that 180 was cancelling an error in the frame rather than describing a column.
+## The hero truck's dashboard states `-95, 0, 180` — a rotation about two axes, where `Z then Y
+## then X` and Godot's default `YXZ` disagree — and its prop frame came out 190 degrees from
+## upstream's. Every other dashboard in this library turns about one axis only, where the two
+## orders agree, so their frames were already right and the rake was wrong for all of them: the
+## 49 Ford, the Gavril Bandit, Omega and Zeta and the Spacewagon all turned their wheels the wrong
+## way, and the hero truck did not, which is how the compensation survived.
+const STEERING_COLUMN_RAKE_DEG: float = -59.0
 
 ## Upstream composes a prop's rotation Z, then Y, then X. Godot's default Euler order is
 ## YXZ, which agrees only when one of the three angles is zero. The hero truck's seatbelt
