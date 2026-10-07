@@ -235,10 +235,15 @@ func _parse_row(line: String) -> void:
         "props":
             BodyRows.prop(line, node_id_to_index, props, errors)
         # `globals` is dry mass, cargo mass and the material the body panels are drawn with.
+        #
+        # **All three, and only the third was being read.** This case took the material and
+        # returned, so the row never reached `DriveRows` and every vehicle was built with a dry
+        # mass and a cargo mass of zero.
         "globals":
             var fields: PackedStringArray = TruckLexer.fields(line)
             if fields.size() > 2:
                 cab_material = fields[2]
+            _note(_section, DriveRows.read(_section, fields, drivetrain), line)
         "managedmaterials":
             BodyRows.managed_material(line, managed_materials, errors)
         # Five sections, five field orders, and two of them generate twice as many nodes as the
