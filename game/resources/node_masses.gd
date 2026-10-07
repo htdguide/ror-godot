@@ -54,9 +54,13 @@ static func distribute(truck: TruckParser) -> PackedFloat32Array:
             masses[index] = cargo_share
 
     # Total beam half-length seen by the nodes that share the dry mass. A beam end on a
-    # tyre node contributes nothing, because the tyre is not carrying the structure.
+    # tyre node contributes nothing, because the tyre is not carrying the structure, and a
+    # virtual beam contributes nothing at either end: upstream skips `BEAM_VIRTUAL` in both
+    # passes, and a wheel's rigidity beams are virtual.
     var total_length: float = 0.0
     for i: int in range(0, truck.beams.size(), 2):
+        if truck.beam_table.virtual_beam[i / 2] != 0:
+            continue
         var a: int = truck.beams[i]
         var b: int = truck.beams[i + 1]
         var half: float = truck.nodes[a].distance_to(truck.nodes[b]) * 0.5
@@ -67,6 +71,8 @@ static func distribute(truck: TruckParser) -> PackedFloat32Array:
     var dry_mass: float = truck.drivetrain["dry_mass_kg"] as float
     if total_length > 0.0 and dry_mass > 0.0:
         for i: int in range(0, truck.beams.size(), 2):
+            if truck.beam_table.virtual_beam[i / 2] != 0:
+                continue
             var a: int = truck.beams[i]
             var b: int = truck.beams[i + 1]
             var half_mass: float = (

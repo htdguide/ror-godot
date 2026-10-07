@@ -139,6 +139,26 @@ has just stated.
 143 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
 twice in one session with a worst measured drift of zero.
 
+**Since then: a mod-library sweep, 2026-10-04 to 2026-10-08.** Twelve downloaded packs and the
+shipped Agora and DAF make a library of 69 vehicles, and nearly every loader convention calibrated
+on the hero truck was wrong on a second car: all five wheel sections, `shocks2`/`shocks3` layouts,
+`globals` masses, bare-word directives, the yield floors, prop rotation order, flexbody materials
+per submesh, slidenodes, triangle collision for shipped hulls. The last of it was **wheels folding
+under power** — 19 of 66 driveable vehicles — and the cause was the rigidity beams, see
+`hard-won-facts-mods.md`. `a_driven_wheel_stays_on_its_axle` holds it over every braced vehicle in
+the library. `harness/dev/drive_stance.gd` is the census and `fold_trace.gd` the timeline.
+
+**One gate is red, and it was red before the fold fix:** `a_terrains_own_scenery_is_solid`. The
+hero truck reaches La Paz's nearest pole at 72 km/h and its body keeps 33% of that speed against a
+20% limit. `baff012` put the poles back on derived boxes because a 0.17 m hull tunnels as
+triangles, and `fe2d29a` recorded why a thin box ejects a node forward once it is past the
+midplane — so the two known contact rules for a thin post each fail in a different way, and the
+gate stands on the box one at a speed it did not use to reach. `harness/dev/pole_crash.gd` is the
+instrument: the hero stops against a synthetic box pole of La Paz's size (body centre 0.83 m short
+of it at 32.6 m/s) and goes through the same shape built as triangles (3.75 m past, leaving at
+21.4 m/s). Not fixed in this pass; `every_mod_car_builds` was red at the same commit for an
+unrelated reason (an orphan rim node per mesh-less wheel) and is fixed.
+
 It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%
 threshold — and the cause was not what it was recorded as. See the entry on
 `Image.create_from_data` in `docs/guides/hard-won-facts.md`: one wrong `use_mipmaps` flag made

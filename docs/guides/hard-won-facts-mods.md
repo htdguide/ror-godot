@@ -331,3 +331,22 @@ built in, and node numbers depend on the order it is built in.**
   and there is no reason to store it three times. Read as an RGB-masked file it has no
   byte-aligned green or blue mask and is rejected outright, so 94 of 287 declared specular maps
   never reached a material and those surfaces drew with their class's default roughness.
+- **A wheel without its rigidity beams stands, settles, rolls, and folds the first time it is
+  driven hard.** Every wheel row names a rigidity node (`9999` for none), and upstream ties one
+  beam per ray from it to the ring on its side, typed `BEAM_VIRTUAL` — force like any beam, never
+  drawn, no share of the mass. On a rigid axle the row names the far hub, and those beams are the
+  wheel's whole camber stiffness: the axle's own nodes are collinear and a chain of collinear beams
+  is a hinge. Built without them, the Burnside Drag's rear axle turned 40 degrees within 0.4 s of
+  throttle and 80 by the end of the run — with the tyres' friction set to 0.1 as well as 1.95, so
+  it was never the ground. 19 of 66 driveable vehicles folded; with the beams, one, and that one is
+  a monorail whose guide wheels stand on vertical axles by design. Three earlier candidates were
+  each measured and ruled out before this was found (reaction torque, gearing, yielding actuators),
+  and bounding the tyre spokes fixed a real second fault without moving the lean at all. The tell
+  was `fold_trace`: the lean arrived with the first 5 kNm, before any wheelspin, and did not care
+  about grip. A fault that does not respond to the load is a stiffness fault.
+- **A negative node number is that node, in a numbered file.** Upstream's `_ParseNodeRef` takes
+  `node_id_num *= -1` in legacy import; the minus once meant "the other side" and now means
+  nothing. It survives in the wild on exactly the field that stops a wheel folding: the Sprinter's
+  and the Agora's left rear wheels name `-36` and `-65` as their rigidity node. Looked up as names,
+  neither exists, so those were the only unbraced wheels on their rigs — and the only ones that
+  folded, at 89 degrees, after every other wheel in the library was braced.

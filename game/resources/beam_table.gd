@@ -24,6 +24,10 @@ var strength: PackedFloat32Array = PackedFloat32Array()
 var plastic: PackedFloat32Array = PackedFloat32Array()
 ## Whether each beam may take a permanent set. An actuator does not: see `BeamRows.NEVER_YIELDS`.
 var deformable: PackedByteArray = PackedByteArray()
+## Whether each beam is one of upstream's `BEAM_VIRTUAL`: it carries force like any other, is
+## never drawn, and is left out of the rig's mass distribution. A wheel's rigidity beams are the
+## case that exists.
+var virtual_beam: PackedByteArray = PackedByteArray()
 ## One entry per beam that has a travel limit rather than being a plain spring: shocks, ropes and
 ## support beams. {beam, bound, short_bound, long_bound, bound_spring, bound_damp,
 ## precompression}. Without these a shock is a soft spring with no bump stop, so a suspension
@@ -53,6 +57,7 @@ func record(row: Dictionary) -> void:
     strength.append(float(row.get("strength", BeamDefaults.DEFAULT_BREAK)))
     plastic.append(float(row.get("plastic_coef", BeamDefaults.DEFAULT_PLASTIC_COEF)))
     deformable.append(1 if bool(row.get("deformable", true)) else 0)
+    virtual_beam.append(1 if bool(row.get("virtual", false)) else 0)
 
 
 func count() -> int:

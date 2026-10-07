@@ -4,9 +4,12 @@ extends GateBase
 ## **The oracle is upstream's own spawn budget**, which it computes before allocating anything —
 ## `ActorSpawner.cpp`, `CalcMemoryRequirements`:
 ##
-##     meshwheels / meshwheels2:  num_rays * 2 nodes,  num_rays * 8 beams
-##     flexbodywheels:            num_rays * 4 nodes,  num_rays * 20 beams
-##                                (rim 8, tyre 10, support 2 per ray)
+##     wheels / meshwheels / meshwheels2:  num_rays * 2 nodes,  num_rays * 8 beams
+##     wheels2:                            num_rays * 4 nodes,  num_rays * 24 beams
+##                                         (rim 10, tyre 14 per ray)
+##     flexbodywheels:                     num_rays * 4 nodes,  num_rays * 20 beams
+##                                         (rim 8, tyre 10, support 2 per ray)
+##     and one more beam per ray for any wheel whose row names a rigidity node
 ##
 ## Those numbers are not this project's opinion about what a wheel should be. They are the
 ## allocation upstream makes, in its own source, and a rig that disagrees with them is building a
@@ -22,11 +25,14 @@ extends GateBase
 ## a separate question with its own evidence; how many there are is arithmetic, and arithmetic is
 ## what a gate is good at.
 
-## Upstream's budget, by wheel kind.
-const MESH_NODES_PER_RAY: int = 2
-const MESH_BEAMS_PER_RAY: int = 8
-const FLEX_NODES_PER_RAY: int = 4
-const FLEX_BEAMS_PER_RAY: int = 20
+## Upstream's budget, by section. The rigidity beam is the one that is easy to leave out: it is
+## virtual, so nothing draws it, and a wheel without it stands and rolls and folds the first time it
+## is driven hard. See `WheelBeams.add_rigidity`.
+const NODES_PER_RAY: Dictionary = {
+    "wheels": 2, "meshwheels": 2, "meshwheels2": 2, "wheels2": 4, "flexbodywheels": 4}
+const BEAMS_PER_RAY: Dictionary = {
+    "wheels": 8, "meshwheels": 8, "meshwheels2": 8, "wheels2": 24, "flexbodywheels": 20}
+const RIGIDITY_BEAMS_PER_RAY: int = 1
 ## Below this there is nothing to judge: a fresh clone has no downloaded packs.
 const MIN_WHEELED_VEHICLES: int = 1
 
@@ -38,8 +44,12 @@ static func meta() -> Dictionary:
         "builds_on": ["wheels_carry_the_vehicle"],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": (
-            "mesh wheels %d nodes and %d beams per ray, flexbody wheels %d and %d, exactly"
-            % [MESH_NODES_PER_RAY, MESH_BEAMS_PER_RAY, FLEX_NODES_PER_RAY, FLEX_BEAMS_PER_RAY]
+            "per ray: wheels/meshwheels/meshwheels2 %d nodes and %d beams, wheels2 %d and %d,"
+            % [NODES_PER_RAY["wheels"], BEAMS_PER_RAY["wheels"], NODES_PER_RAY["wheels2"],
+               BEAMS_PER_RAY["wheels2"]]
+            + " flexbodywheels %d and %d, plus %d beam where a rigidity node is named, exactly"
+            % [NODES_PER_RAY["flexbodywheels"], BEAMS_PER_RAY["flexbodywheels"],
+               RIGIDITY_BEAMS_PER_RAY]
         ),
         "why": (
             "a flexbody wheel built as a mesh wheel has half the nodes and two fifths of the"
@@ -69,10 +79,13 @@ func run(_harness: Node) -> Dictionary:
         var wanted_beams: int = 0
         for wheel: Dictionary in truck.wheels:
             var rays: int = wheel["rays"] as int
-            var flex: bool = bool(wheel.get("flexbody", false))
-            kinds["flexbodywheels" if flex else "meshwheels"] = true
-            wanted_nodes += rays * (FLEX_NODES_PER_RAY if flex else MESH_NODES_PER_RAY)
-            wanted_beams += rays * (FLEX_BEAMS_PER_RAY if flex else MESH_BEAMS_PER_RAY)
+            var section: String = wheel["section"] as String
+            var braced: bool = int(wheel.get("rigidity_node", -1)) >= 0
+            kinds[section + (" (braced)" if braced else "")] = true
+            wanted_nodes += rays * int(NODES_PER_RAY[section])
+            wanted_beams += rays * (
+                int(BEAMS_PER_RAY[section]) + (RIGIDITY_BEAMS_PER_RAY if braced else 0)
+            )
         var made: Dictionary = WheelRig.generate(truck)
         checked += 1
         if (made["nodes"] as int) != wanted_nodes or (made["beams"] as int) != wanted_beams:

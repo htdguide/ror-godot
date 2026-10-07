@@ -32,8 +32,9 @@ const RINGS_PER_RAY: Dictionary = {
 ## every axle-to-tread beam as a SHOCK1 with a contraction limit of 0.66 and this as its extension
 ## limit — `AddWheelBeam(..., 0.66f, max_extension)` — and only `meshwheels2` passes a non-zero
 ## one. Unbounded, as these were, a spinning tyre is held on by its stated rate alone: the Burnside
-## Drag's spokes stretched 28.7% under wheelspin, the tread left the hub by 100 mm and the axle
-## laid over 88 degrees. 19 of 66 driveable vehicles did this.
+## Drag's spokes stretched 28.7% under wheelspin and the tread left the hub by 100 mm. The axle
+## laying over 88 degrees on the same run was a different fault — the rigidity beams, see
+## `WheelBeams.add_rigidity` — and bounding the spokes did not move it.
 const TYRE_MAX_EXTENSION: Dictionary = {
     "wheels": 0.0,
     "wheels2": 0.0,
@@ -74,14 +75,18 @@ static func row(section: String, fields: PackedStringArray, id_to_index: Diction
     if fields.size() < least:
         return {"error": "row has %d fields, expected at least %d" % [fields.size(), least]}
     var out: Dictionary = _plain(fields) if section == "wheels" else _two_radii(section, fields)
-    var node1: int = int(id_to_index.get(out["node1"] as String, -1))
-    var node2: int = int(id_to_index.get(out["node2"] as String, -1))
+    var node1: int = _node_ref(out["node1"] as String, id_to_index)
+    var node2: int = _node_ref(out["node2"] as String, id_to_index)
     if node1 < 0 or node2 < 0:
         return {"error": "row references an unknown node"}
     out["error"] = ""
     out["node1"] = node1
     out["node2"] = node2
-    out["arm_node"] = int(id_to_index.get(out["arm_node"] as String, -1))
+    out["arm_node"] = _node_ref(out["arm_node"] as String, id_to_index)
+    # The node the wheel is braced against so it cannot fold: `9999` is upstream's "none", and
+    # resolves to -1 here the same as any name the file never declares.
+    out["rigidity_node"] = _node_ref(out["rigidity_node"] as String, id_to_index)
+    out["section"] = section
     # Two rings per ray is a mesh wheel's layout and four is a flexbody wheel's, whatever the
     # section is called: `wheels2` is built the way a flexbody wheel is and drawn the way a plain
     # one is.
@@ -90,6 +95,20 @@ static func row(section: String, fields: PackedStringArray, id_to_index: Diction
     out["first_tread"] = -1
     out["tread_count"] = 0
     return out
+
+
+## A node reference in a wheel row, resolved the way upstream's `_ParseNodeRef` resolves one in a
+## numbered file: **a negative number is that node**, `node_id_num *= -1`. The minus is a relic of
+## a format where it meant "the other side" and the modern parser only strips it — but a file
+## written then still carries it, and it is carried on exactly the field that stops a wheel folding.
+## The Sprinter's and the Agora's left rear wheels both name `-36` and `-65` as their rigidity
+## node; read as names, neither exists, so those wheels were the only unbraced ones on their rigs
+## and the only ones that folded.
+static func _node_ref(ref: String, id_to_index: Dictionary) -> int:
+    var index: int = int(id_to_index.get(ref, -1))
+    if index < 0 and ref.begins_with("-") and ref.substr(1).is_valid_int():
+        index = int(id_to_index.get(ref.substr(1), -1))
+    return index
 
 
 ## `wheels`: "radius, width, rays, n1, n2, rigidity, braked, propulsed, arm, mass, spring, damp,
@@ -105,6 +124,7 @@ static func _plain(fields: PackedStringArray) -> Dictionary:
         "rays": fields[2].to_int(),
         "node1": fields[3],
         "node2": fields[4],
+        "rigidity_node": fields[5],
         "braked": fields[6].to_int(),
         "propulsed": fields[7].to_int(),
         "arm_node": fields[8],
@@ -137,6 +157,7 @@ static func _two_radii(section: String, fields: PackedStringArray) -> Dictionary
         "rays": fields[3].to_int(),
         "node1": fields[4],
         "node2": fields[5],
+        "rigidity_node": fields[6],
         "braked": fields[7].to_int(),
         "propulsed": fields[8].to_int(),
         "arm_node": fields[9],
