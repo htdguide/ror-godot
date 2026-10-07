@@ -71,6 +71,14 @@ static func exposure_scale_of(camera: Camera3D) -> float:
 static func build(from_preset: Dictionary, weather: Dictionary = {}) -> Camera3D:
     var attributes: CameraAttributesPhysical = CameraAttributesPhysical.new()
     attributes.frustum_focal_length = float(from_preset.get("focal_mm", 35.0))
+    # **Depth of field is opt-in, and it is opt-in because Godot leaves it off.** Nothing blurs
+    # until `frustum_focus_distance` is set — measured, a row of posts from three to forty-eight
+    # metres came back uniformly sharp through an f/1.8 lens until it was — so a preset that says
+    # nothing keeps the pinhole camera every gate here was written against, and a preset that
+    # states a focus distance gets the lens's own depth of field from its own aperture.
+    var focus: float = float(from_preset.get("focus_m", 0.0))
+    if focus > 0.0:
+        attributes.frustum_focus_distance = focus
     # **A physical camera carries its own far plane and it overrides the one on the node.**
     # `CameraAttributesPhysical.frustum_far` defaults to 4,000 m and Godot writes it onto the
     # `Camera3D` whenever the attributes are touched — so a camera set to draw fourteen kilometres

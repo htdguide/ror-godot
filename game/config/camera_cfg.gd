@@ -12,6 +12,7 @@ extends RefCounted
 ##   look_at      Vector3 world point the camera aims at
 ##   focal_mm     float focal length, 35mm-equivalent
 ##   f_stop       float aperture
+##   focus_m      float distance the lens is focused at, or absent for no depth of field at all
 ##   shutter_s    float shutter speed in seconds, also drives motion blur length
 ##   exposure     float fixed exposure multiplier
 ##   scenario     String scenario name from Scenarios

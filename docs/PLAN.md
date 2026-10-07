@@ -1285,6 +1285,17 @@ stay in HDR linear before tonemap, where their weighting is physically meaningfu
 1. `dof_coc`: for a stated focal length, f-stop, and focus distance, the measured circle-of-confusion
    diameter of a point-light target at several distances matches the thin-lens formula within a stated
    tolerance. The lens equation is the oracle; no golden image involved.
+   **Attempted and not shipped, 2026-10-07.** The mechanism is in — DOF is off until
+   `frustum_focus_distance` is set, so a camera preset opts in with `focus_m` — and the blur it
+   produces is real. The gate is not, for two reasons worth knowing before anyone tries again. A
+   point target does not survive the measurement: spread over its own circle of confusion it is a
+   sixtieth of its brightness and an 8-bit frame has nothing left in it, so the measurement has to
+   be made on an edge. And an edge's transition width is proportional to the circle of confusion
+   with a constant that depends on the shape of the bokeh, which for Godot is a hexagon at medium
+   quality and was never established — so when the measured widths came back at 2, 9 and 11 px
+   against the formula's 23, 35 and 40, there was no way to tell a renderer that under-blurs from a
+   measurement that under-reads. Establishing that constant, from a kernel of known size, is the
+   first step.
 2. `exposure_ev`: doubling the shutter time or opening one f-stop changes measured scene luminance by
    exactly one stop within tolerance. Catches the classic bug where exposure is applied twice.
 3. `glow_energy`: total image energy added by glow is bounded and scales monotonically with threshold;

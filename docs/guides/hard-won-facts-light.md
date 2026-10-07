@@ -9,6 +9,19 @@ The pattern is consistent enough to state outright: **before believing a number 
 the instrument.** A photographed step wedge, an exposure bracket and a negative control cost one
 afternoon between them and have overturned four separate conclusions recorded below.
 
+- **Depth of field is off until a focus distance is set, and then it is weaker than the lens says.**
+  Nothing blurs while `CameraAttributesPhysical.frustum_focus_distance` is unset — a row of posts
+  from three to forty-eight metres came back uniformly sharp through an f/1.8 85 mm lens — so DOF is
+  opt-in per camera preset (`focus_m`), and every gate written against a pinhole camera keeps one.
+  With it set the blur is real and grows with distance, and it is **far smaller than the thin-lens
+  formula gives**: measured as the 25–75% width of an edge at 1080 lines, 85 mm at f/1.8 focused at
+  4 m read 2, 9 and 11 px at 8, 16 and 32 m where `C = f^2|S2-S1| / (N S2 (S1-f))` on the camera's
+  own 24 mm sensor gives 23, 35 and 40. The shortfall is not a constant factor, so it is not simply
+  the shape constant of an edge measurement. **Unfinished rather than concluded**: Godot's bokeh is
+  a hexagon at medium quality and the relation between an edge's transition width and that kernel's
+  size was never established, so this is a measurement method that needs validating before the
+  engine can be said to disagree with optics. `harness/dev/dof_probe.gd` is the instrument.
+
 - **Godot does not fog an unshaded surface.** Measured: two panels forty and a hundred and sixty
   metres away stayed 0.2966, 0.2975, 0.2975, 0.2975 apart through a fog of three hundred metres'
   visual range, which is a frame with no haze in it at all. Lit panels fog correctly. It is also
