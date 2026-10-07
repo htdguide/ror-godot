@@ -57,6 +57,15 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
                 truck.beam_plastic[beam]
             )
 
+    # A strut's hub runs along a rail rather than sitting on a point. Handed over after the beams
+    # because the rail is made of nodes the beams have already placed. See `SlideNodeRows`.
+    for slide: Dictionary in truck.slide_nodes:
+        solver.add_slide_node(
+            slide["node"] as int, slide["rail"] as PackedInt32Array,
+            slide["spring"] as float, slide["break_force"] as float,
+            slide["tolerance"] as float
+        )
+
     # Which nodes a collision triangle is built on: upstream will not break the last beams
     # holding one, because a hole in the cab is worse than a beam that should have snapped.
     for node: int in truck.submeshes.cab_triangles:

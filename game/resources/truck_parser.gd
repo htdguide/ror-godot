@@ -101,6 +101,9 @@ var cinecams: PackedVector3Array = PackedVector3Array()
 ## it onto something. Nothing acts on them yet; they are kept so that the rows are read rather
 ## than mistaken for beams. See `BeamRows.tie`.
 var ties: Array[Dictionary] = []
+## Every `slidenodes` row: a node that runs along a rail instead of being pinned to one place.
+## Eight vehicles here declare them and all eight are strut cars. See `SlideNodeRows`.
+var slide_nodes: Array[Dictionary] = []
 var sections_seen: Dictionary = {}
 var sections_parsed: Dictionary = {}
 var errors: PackedStringArray = PackedStringArray()
@@ -257,6 +260,8 @@ func _parse_row(line: String) -> void:
             _parse_material_flare(line)
         "ties":
             _parse_tie(line)
+        "slidenodes":
+            _note("slidenode", SlideNodeRows.read(self, line), line)
         _:
             if DriveRows.handles(_section):
                 var error: String = DriveRows.read(_section, TruckLexer.fields(line), drivetrain)

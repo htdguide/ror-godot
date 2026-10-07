@@ -5,6 +5,7 @@
 #include "ror_heightfield.h"
 #include "ror_obstacles.h"
 #include "ror_node.h"
+#include "ror_slidenode.h"
 #include "ror_steering.h"
 #include "ror_wheels.h"
 
@@ -190,6 +191,10 @@ public:
 
     // Advances by `substeps` steps of `dt` seconds each.
     void step(float dt, int substeps);
+    // A node held against a rail: upstream's `slidenodes`. `rail` is the rail's nodes in order.
+    void add_slide_node(int node, const godot::PackedInt32Array &rail, float spring,
+                        float break_force, float tolerance);
+    int slide_node_count() const;
 
     godot::PackedVector3Array get_positions() const;
     godot::Vector3 get_node_position(int node) const;
@@ -210,6 +215,7 @@ private:
     // that predates it rather than half-repairing one.
     BeamArray m_undamaged_beams;
     std::vector<int> m_undamaged_active_beams;
+    SlideNodeArray m_slide_nodes;
     RorWheelSet m_wheels;
     RorDrivetrain m_drivetrain;
     RorSteering m_steering;
