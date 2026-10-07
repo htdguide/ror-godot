@@ -12,6 +12,8 @@ const SETTLE_SECONDS: float = 1.5
 const IMPACT_SECONDS: float = 6.0
 const AT_M: float = 22.0
 const THROTTLE: float = 1.0
+## Optional second argument: a throttle, so the same rig can be driven at the same obstacle at
+## different speeds. A thin obstacle that holds at one speed and not another is tunnelling.
 const BENT_M: float = 0.01
 ## La Paz's own pole, measured off its collision mesh: 0.17 by 0.15 m and 8.1 m tall.
 const POLE_HALF: Vector3 = Vector3(0.087, 4.05, 0.074)
@@ -20,12 +22,14 @@ const WALL_HALF: Vector3 = Vector3(9.0, 1.6, 1.0)
 
 func _initialize() -> void:
     var argv: PackedStringArray = OS.get_cmdline_user_args()
+    var throttle: float = argv[2].to_float() if argv.size() > 2 else THROTTLE
     for against: Dictionary in [
         {"name": "wall", "half": WALL_HALF, "tri": false},
         {"name": "pole", "half": POLE_HALF, "tri": false},
         {"name": "pole/tri", "half": POLE_HALF, "tri": true},
         {"name": "lapaz", "half": POLE_HALF, "tri": true, "hull": "lapaz"},
     ]:
+        _throttle = throttle
         var out: Dictionary = _hit(argv[0], argv[1], against["half"] as Vector3,
                                    bool(against["tri"]), against.get("hull", "") as String)
         print("%-8s: hit %5.1f m/s, %3d bent, %2d broken, body centre %+.2f m of the obstacle, left at %4.1f m/s" % [
@@ -83,6 +87,9 @@ static func _terrain_hull(map: String, at: Vector3) -> Array:
     return out
 
 
+var _throttle: float = THROTTLE
+
+
 func _hit(dir: String, file: String, half: Vector3, as_triangles: bool,
           hull: String = "") -> Dictionary:
     var rig: Dictionary = RigBuilder.from_file(SourceScan.repo_root().path_join(dir), file, 0.0)
@@ -110,7 +117,7 @@ func _hit(dir: String, file: String, half: Vector3, as_triangles: bool,
         solver.add_obstacle_box(at, half, 0)
     solver.start_engine()
     solver.set_gear_selector(1)
-    solver.set_throttle(THROTTLE)
+    solver.set_throttle(_throttle)
     var fastest: float = 0.0
     for _i: int in int(IMPACT_SECONDS * 60.0):
         solver.step(dt, chunk)

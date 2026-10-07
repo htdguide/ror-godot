@@ -21,8 +21,8 @@ func _initialize() -> void:
     var argv: PackedStringArray = OS.get_cmdline_user_args()
     if not argv.is_empty():
         filter = argv[0]
-    print("%-28s %5s %6s %6s  %8s %8s  %s" % [
-        "vehicle", "broke", "yield", "camber", "tread", "sag", "worst"])
+    print("%-28s %5s %6s %6s %6s %6s %6s  %s" % [
+        "vehicle", "broke", "yield", "camber", "tread", "sag", "travel", "worst"])
     var bad: int = 0
     var counted: int = 0
     for entry: Dictionary in RorVehicleLibrary.entries():
@@ -37,9 +37,10 @@ func _initialize() -> void:
         counted += 1
         if bool(line["suspect"]):
             bad += 1
-        print("%-28s %5d %6d %5.1f° %7.0f%% %7.3f  %s" % [
+        print("%-28s %5d %6d %5.1f° %5.0f%% %6.3f %6.3f  %s" % [
             name, int(line["broke"]), int(line["yielded"]), float(line["camber"]),
-            float(line["tread"]) * 100.0, float(line["sag"]), line["worst"]])
+            float(line["tread"]) * 100.0, float(line["sag"]), float(line["travel"]),
+            line["worst"]])
     print("")
     print("%d actors settled, %d with something wrong" % [counted, bad])
     quit(0)
@@ -84,11 +85,16 @@ func _settle(entry: Dictionary) -> Dictionary:
         if axis.length() > 0.0:
             var lean: float = rad_to_deg(asin(clampf(absf(axis.normalized().y), 0.0, 1.0)))
             camber = maxf(camber, lean)
+        # **The radius about the axle's own axis, not the distance to its midpoint.** A tread node
+        # is half the wheel's width to one side, so the straight-line distance to the midpoint is
+        # the hypotenuse of the radius and that offset — which read 100% of the stated radius for
+        # every vehicle in the library and hid tyres settling at three quarters of theirs.
         var mid: Vector3 = (at[wheel["node1"] as int] + at[wheel["node2"] as int]) * 0.5
+        var spin: Vector3 = (at[wheel["node2"] as int] - at[wheel["node1"] as int]).normalized()
         var mean: float = 0.0
         for i: int in int(wheel["tread_count"]):
-            var node: Vector3 = at[int(wheel["first_tread"]) + i]
-            mean += (node - mid).length()
+            var spoke: Vector3 = at[int(wheel["first_tread"]) + i] - mid
+            mean += (spoke - spin * spoke.dot(spin)).length()
         mean /= maxf(float(int(wheel["tread_count"])), 1.0)
         tread = minf(tread, mean / maxf(wheel["tire_radius"] as float, 0.0001))
 
@@ -96,6 +102,26 @@ func _settle(entry: Dictionary) -> Dictionary:
     var sag: float = 0.0
     for i: int in truck.generated_from:
         sag = maxf(sag, truck.nodes[i].y - at[i].y)
+
+    # **How far each axle has moved towards the body it hangs under.** A vehicle resting on level
+    # ground sits on its springs, and that is centimetres: an axle that has travelled a quarter of
+    # a metre has run out of suspension and the bodywork is sitting on the wheel. Measured against
+    # the body's own height rather than the world's, because the whole rig rises onto its tyres as
+    # it settles and the file's own ground is not where the ground is.
+    var rest_body: float = 0.0
+    var now_body: float = 0.0
+    for i: int in truck.generated_from:
+        rest_body += truck.nodes[i].y
+        now_body += at[i].y
+    rest_body /= maxf(float(truck.generated_from), 1.0)
+    now_body /= maxf(float(truck.generated_from), 1.0)
+    var travel: float = 0.0
+    for wheel: Dictionary in truck.wheels:
+        var a: int = wheel["node1"] as int
+        var b: int = wheel["node2"] as int
+        var was: float = (truck.nodes[a].y + truck.nodes[b].y) * 0.5 - rest_body
+        var now: float = (at[a].y + at[b].y) * 0.5 - now_body
+        travel = maxf(travel, absf(now - was))
 
     var worst: String = ""
     if solver.broken_beam_count() > 0:
@@ -106,6 +132,8 @@ func _settle(entry: Dictionary) -> Dictionary:
         worst = "a tyre is %.0f%% of its stated radius" % (tread * 100.0)
     elif sag > 0.10:
         worst = "the body sank %.0f mm" % (sag * 1000.0)
+    elif travel > 0.12:
+        worst = "an axle travelled %.0f mm into the body" % (travel * 1000.0)
     return {
         "error": "",
         "broke": solver.broken_beam_count(),
@@ -113,6 +141,7 @@ func _settle(entry: Dictionary) -> Dictionary:
         "camber": camber,
         "tread": tread,
         "sag": sag,
+        "travel": travel,
         "worst": worst,
         "suspect": worst != "",
     }
