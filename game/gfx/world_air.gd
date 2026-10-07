@@ -48,8 +48,11 @@ static func _glare(env: Environment) -> void:
     env.glow_strength = RenderCfg.GLOW_STRENGTH
     env.glow_bloom = RenderCfg.GLOW_BLOOM
     env.glow_blend_mode = RenderCfg.GLOW_BLEND as Environment.GlowBlendMode
+    # `set_glow_level` indexes from zero while the properties it writes are named `glow_levels/1`
+    # upwards, so the levels stated in config are 1-based and the call is not: asking for level 7
+    # is out of bounds and Godot says so once per frame.
     for level: int in 7:
-        env.set_glow_level(level + 1, 1.0 if RenderCfg.GLOW_LEVELS.has(level + 1) else 0.0)
+        env.set_glow_level(level, 1.0 if RenderCfg.GLOW_LEVELS.has(level + 1) else 0.0)
 
 
 ## The haze across the distance, and whether the air catches light.

@@ -25,7 +25,11 @@ const FADE_SHARE: float = 0.12
 static func set_draw_distance(root: Node, metres: float) -> int:
     var limited: int = 0
     for node: Node in _descendants(root):
-        var instance: VisualInstance3D = node as VisualInstance3D
+        # **`GeometryInstance3D`, not `VisualInstance3D`.** The visibility range lives on the
+        # geometry subclass, so a `VisualInstance3D` cast reached every drawn thing and then failed
+        # to assign to any of them: "Invalid assignment of property or key 'visibility_range_end'",
+        # once per node, every time the slider moved. The slider had never worked.
+        var instance: GeometryInstance3D = node as GeometryInstance3D
         if instance == null or is_backdrop(instance):
             continue
         instance.visibility_range_end = maxf(metres, 0.0)
