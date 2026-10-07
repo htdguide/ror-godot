@@ -14,6 +14,14 @@ extends RefCounted
 ## Which one a caller wants depends on what it is for, so every one is kept in file order and
 ## the choice is left to the caller.
 
+## How many nodes a cinecam hangs from, and where in the row they start. Upstream's `nodes[8]`.
+const MOUNTS: int = 8
+const FIRST_MOUNT_FIELD: int = 3
+const SPRING_FIELD: int = 11
+## Upstream's `RigDef::Cinecam` defaults, for a row that states no rates of its own.
+const DEFAULT_SPRING: float = 8000.0
+const DEFAULT_DAMP: float = 800.0
+
 ## The node names from the first `cameras` row, unresolved.
 var pending: PackedStringArray = PackedStringArray()
 ## Every cinecam position the file declares, in file order.
@@ -28,13 +36,41 @@ func read_cameras(fields: PackedStringArray) -> void:
     pending = PackedStringArray([fields[0], fields[1], fields[2]])
 
 
-## "x, y, z, node1..node8, spring, damp" — only the position is needed here.
-func read_cinecam(fields: PackedStringArray) -> void:
+## "x, y, z, node1..node8, spring, damp".
+##
+## **A cinecam is a node, and that is not a detail about the camera.** Upstream's
+## `ProcessCinecam` appends one node at the stated position and eight beams from it to the
+## nodes the row names, and those nodes are numbered *before* every wheel node — so a file
+## with three cinecams has its first tyre node three higher than a reader that skipped them
+## thinks. Measured on the Mazda: its hubcaps name node 332, which is the first rim node of
+## its left front wheel only once its three cinecams have been counted.
+##
+## Returns {"error", "position", "nodes", "spring", "damp"}; `nodes` are the eight node ids as
+## written, left unresolved because this is read before the wheel sections and resolving is the
+## parser's to do once every node exists.
+func read_cinecam(fields: PackedStringArray) -> Dictionary:
     if fields.size() < 3:
-        return
-    positions.append(
-        Vector3(fields[0].to_float(), fields[1].to_float(), fields[2].to_float())
+        return {"error": "row has %d fields, expected at least 3" % fields.size()}
+    var position: Vector3 = Vector3(
+        fields[0].to_float(), fields[1].to_float(), fields[2].to_float()
     )
+    positions.append(position)
+    var named: PackedStringArray = PackedStringArray()
+    for at: int in range(FIRST_MOUNT_FIELD, mini(FIRST_MOUNT_FIELD + MOUNTS, fields.size())):
+        named.append(fields[at])
+    return {
+        "error": "",
+        "position": position,
+        "nodes": named,
+        "spring": (
+            fields[SPRING_FIELD].to_float() if fields.size() > SPRING_FIELD
+            else DEFAULT_SPRING
+        ),
+        "damp": (
+            fields[SPRING_FIELD + 1].to_float() if fields.size() > SPRING_FIELD + 1
+            else DEFAULT_DAMP
+        ),
+    }
 
 
 ## Resolves the reference nodes once every node is known. Returns

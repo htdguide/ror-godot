@@ -272,3 +272,62 @@ See `hard-won-facts.md` for the solver, the terrain, the formats and the gate di
   declares 242 cab triangles and the Mazda 187, both with zero `texcoords`: collision only, and
   upstream draws nothing for them either. Half a panel is worse than none, so a group with a
   triangle over a node that has no coordinates is dropped whole.
+
+## Node numbers, and the order a file is spawned in
+
+These four were learned together, the day the Mazda's hubcaps and every Gavril's tyres turned out
+to be missing. They are one fact seen from four sides: **a file's layout is not the order it is
+built in, and node numbers depend on the order it is built in.**
+
+- **A numeric node reference is an index, not the number the node declared.** Upstream's
+  `RegisterNode` throws a numbered node's own number away and keeps its order of appearance,
+  warning about a duplicate if the two disagree; `ResolveNodeRef` then bounds-checks a numeric
+  reference and returns it unchanged. Keying a lookup table on the declared number agrees with
+  that on all 70 actors in this checkout — every one of them numbers from 0 with no gaps — and
+  stops agreeing the moment a file does not, or the moment the reader drops a node row and shifts
+  everything below it. A named node is the other case and keeps its name, because a name is the
+  only way a file can reach it.
+- **Upstream spawns keyword by keyword in a fixed order, and `ActorSpawnerFlow.cpp` is the order.**
+  Declared nodes, then `cinecam`, then `wheels`, `wheels2`, `meshwheels`, `meshwheels2`,
+  `flexbodywheels`, and only then everything that references a node — the file itself says
+  `(may reference any generated/user-defined node)` over the beams. **30 of the 70 actors here
+  write `props` or `flexbodies` above the wheel section those rows name**, so a reader that
+  resolves a row where it finds it sees a node that does not exist yet and drops the row. That is
+  the Mazda's four hubcaps and four brake discs, and all four tyres of every Gavril, which are
+  flexbodies bound to wheel nodes. `TruckDocument` cuts the file into rows and hands them back in
+  upstream's order.
+- **A row's defaults follow the file even though spawning does not.** `set_beam_defaults` applies
+  downwards from where it is written, so a row's rates must be captured as the row is read rather
+  than looked up when it is built — upstream gives every parsed row a pointer to the defaults in
+  force. Here the defaults object is replaced rather than mutated when a directive arrives, which
+  is what lets the rows above keep what they were written with.
+- **A cinecam is a node and eight beams, and skipping it shifts every generated node number.**
+  Upstream's `ProcessCinecam` appends one node at the stated position and hangs it on eight beams
+  to the nodes the row names, before any wheel node exists. The Mazda declares three cinecams and
+  its hubcaps name node 332, which is the first rim node of its left front wheel **only once those
+  three are counted**. The eight beams are not decoration either: a point mass with no member
+  holding it is not part of the rig, it is something that falls out of it.
+- **Sections upstream folds into another have to share one place in that order, not sit beside
+  it.** `texcoords` and `cab` belong to the `submesh` above them. Given a place each, every
+  `submesh` header sorted ahead of every `texcoords` row: 29 groups were opened and then all 210
+  coordinates and 154 triangles landed in the last of them, so the Starling firetruck built one
+  panel out of 29 and five more vehicles went the same way. The same applies to `flares` and
+  `commands`, which upstream auto-imports into their numbered successors.
+- **A `ties` row names one node, not two.** Upstream's `ProcessTie` takes the row's single root
+  node, pairs it with node 0 — node 1 when the root *is* node 0 — and adds a rope beam it
+  immediately disables: a tie does nothing until a player hooks it onto a ropable. Read as a
+  two-node beam row the second field is the reach length, which is why 39 rows across this library
+  reported an unknown node. The dangerous half is the row that would have *passed*: a reach
+  written as a whole number resolves as a node index and welds the rig to it.
+- **A generated beam needs its own entry in the stress tables, and an append-only array hides
+  that.** The wheel generator set a spring and a damper and nothing else, so its beams had no
+  deform or break figure. That was invisible for exactly as long as the tread was appended last,
+  where a missing entry falls off the end of the array and the solver's own default stands in.
+  Built where upstream builds it — ahead of the file's own beams — every one of those beams read
+  the entry beside it instead: the hero truck's tyres came out with a 750 N yield and went flat
+  against a wall at 2.4 m/s. A table with one row per beam is not optional bookkeeping.
+- **An 8-bit luminance DDS is a specular map.** 37 of the 659 DDS files here are `DDPF_LUMINANCE`
+  at 8 bits per pixel, and every one of them is a specular map: the map is one number per pixel
+  and there is no reason to store it three times. Read as an RGB-masked file it has no
+  byte-aligned green or blue mask and is rejected outright, so 94 of 287 declared specular maps
+  never reached a material and those surfaces drew with their class's default roughness.

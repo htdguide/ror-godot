@@ -18,6 +18,13 @@ constexpr int64_t HEADER_SIZE = 128;   // magic + 124-byte header
 constexpr int64_t PIXELFORMAT_AT = 76;
 constexpr uint32_t DDPF_FOURCC = 0x4;
 constexpr uint32_t DDPF_ALPHAPIXELS = 0x1;
+// A single-channel grey image. Mods author specular and gloss maps this way because the map is
+// one number per pixel and there is no reason to store it three times: 37 of the 659 DDS files in
+// this checkout are 8-bit luminance, and every one of them is a specular map. Read as an
+// RGB-masked file they have no byte-aligned green or blue mask and were rejected outright, so
+// every material that declared one drew with its class's default roughness instead — 94 of 287
+// declared specular maps across the library.
+constexpr uint32_t DDPF_LUMINANCE = 0x20000;
 
 uint32_t u32_at(const uint8_t *p, int64_t at) {
     uint32_t v = 0;
@@ -124,7 +131,13 @@ Dictionary DdsReader::read_file(const String &path) {
 
     // Uncompressed: convert whatever channel order the file uses into RGBA8.
     const int64_t pixel_bytes = rgb_bits / 8;
-    if (pixel_bytes != 3 && pixel_bytes != 4) {
+    const bool luminance = (pf_flags & DDPF_LUMINANCE) != 0;
+    if (luminance) {
+        if (pixel_bytes != 1 && pixel_bytes != 2) {
+            out["error"] = String("unsupported DDS luminance depth");
+            return out;
+        }
+    } else if (pixel_bytes != 3 && pixel_bytes != 4) {
         out["error"] = String("unsupported DDS bit depth");
         return out;
     }
@@ -133,6 +146,33 @@ Dictionary DdsReader::read_file(const String &path) {
         out["error"] = String("DDS payload is shorter than its own header claims");
         return out;
     }
+    // Grey goes to all three channels, so a reader that samples red, luma or any single
+    // channel gets the same number the author stored. The second byte of a 16-bit luminance
+    // file is its alpha.
+    if (luminance) {
+        PackedByteArray grey;
+        grey.resize(static_cast<int64_t>(width) * static_cast<int64_t>(height) * 4);
+        uint8_t *out_grey = grey.ptrw();
+        const uint8_t *src_grey = d + HEADER_SIZE;
+        const int64_t count = static_cast<int64_t>(width) * static_cast<int64_t>(height);
+        if (bytes.size() < HEADER_SIZE + count * pixel_bytes) {
+            out["error"] = String("DDS payload is shorter than its own header claims");
+            return out;
+        }
+        for (int64_t i = 0; i < count; ++i) {
+            const uint8_t value = src_grey[i * pixel_bytes];
+            out_grey[i * 4 + 0] = value;
+            out_grey[i * 4 + 1] = value;
+            out_grey[i * 4 + 2] = value;
+            out_grey[i * 4 + 3] = pixel_bytes == 2 ? src_grey[i * pixel_bytes + 1] : 255;
+        }
+        out["error"] = String();
+        out["mipmaps"] = 1;
+        out["format"] = static_cast<int>(Image::FORMAT_RGBA8);
+        out["data"] = grey;
+        return out;
+    }
+
     const int r_at = byte_index_of_mask(mask_r);
     const int g_at = byte_index_of_mask(mask_g);
     const int b_at = byte_index_of_mask(mask_b);

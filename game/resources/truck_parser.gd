@@ -18,7 +18,7 @@ var node_ids: PackedStringArray = PackedStringArray()
 ## hero truck states one for all 250 of its nodes, so reading these is the difference
 ## between a 1.6 tonne truck and one where every node weighs the minimass floor.
 var node_mass: PackedFloat32Array = PackedFloat32Array()
-## Per-node friction multiplier, from the `set_node_defaults` in force. The hero truck asks
+## Per-node friction multiplier, from the `setnode_defaults` in force. The hero truck asks
 ## for 0.65 on its bodywork and 1.06 on its tread, which is how a rig grips with its tyres
 ## and slides on its panels.
 var node_friction: PackedFloat32Array = PackedFloat32Array()
@@ -97,13 +97,19 @@ var has_cinecam: bool = false
 ## driver's eye. Which one a caller wants depends on what it is for, so the choice is
 ## left to the caller rather than made here.
 var cinecams: PackedVector3Array = PackedVector3Array()
+## Every `ties` row: a rope anchored at one node whose other end is loose until a player hooks
+## it onto something. Nothing acts on them yet; they are kept so that the rows are read rather
+## than mistaken for beams. See `BeamRows.tie`.
+var ties: Array[Dictionary] = []
 var sections_seen: Dictionary = {}
 var sections_parsed: Dictionary = {}
 var errors: PackedStringArray = PackedStringArray()
 
-var _node_id_to_index: Dictionary = {}
+## Node reference table: every node's index under its own number, and a named node under its
+## name as well. See `_register`.
+var node_id_to_index: Dictionary = {}
 var _cameras: CameraRows = CameraRows.new()
-var _node_defaults: NodeRows.Defaults = NodeRows.Defaults.new()
+var node_defaults: NodeRows.Defaults = NodeRows.Defaults.new()
 ## The structural rates in force where the file last set them. Public because a generated
 ## flexbody wheel builds its tread at these rather than at the tyre's — tread is carcass.
 var beam_defaults: BeamDefaults = BeamDefaults.new()
@@ -119,27 +125,45 @@ func parse_file(path: String) -> String:
     return parse_text(text)
 
 
+## Reads a vehicle file in two passes: the file is cut into rows where it stands, and the rows
+## are then walked in the order upstream spawns them.
+##
+## **The second pass is not a tidiness.** `cinecam` and the wheel sections append nodes, a
+## numeric node reference is an index into that array, and upstream numbers those generated
+## nodes by its own keyword order rather than by the file's layout — see `TruckDocument`. Walked
+## in file order instead, 30 of this checkout's 70 actors reference a wheel node from a `props`
+## or `flexbodies` row written above the wheel section, and every one of those rows was dropped.
 func parse_text(text: String) -> String:
-    var started: bool = false
-    for raw: String in text.split("\n"):
-        var line: String = TruckLexer.strip(raw)
-        if line.is_empty():
+    var document: TruckDocument = TruckDocument.new()
+    document.read(text)
+    name = document.name
+    var generated: bool = false
+    var wheels_end: int = document.order_of(TruckDocument.LAST_NODE_GENERATOR)
+    for row: Dictionary in document.in_spawn_order():
+        # Every section ordered after the last wheel section may name a node the wheels
+        # generated, so the tread has to exist before the first of them is read.
+        if not generated and int(row["order"]) > wheels_end:
+            _generate_wheels()
+            generated = true
+        _section = row["section"] as String
+        if bool(row["header"]):
+            _open_section()
             continue
-        # The first content line is the vehicle name, before any section keyword.
-        if not started:
-            name = line
-            started = true
-            continue
-        if _begin_section(line):
-            continue
-        _parse_row(line)
+        beam_defaults = row["beams"] as BeamDefaults
+        node_defaults = row["nodes"] as NodeRows.Defaults
+        _parse_row(row["line"] as String)
+    if not generated:
+        _generate_wheels()
     if nodes.is_empty():
         return "no nodes found; is '%s' a vehicle file?" % name
     _resolve_deferred()
-    # A wheel states axle nodes and a radius; the tread it stands on follows from those.
+    return ""
+
+
+## A wheel states axle nodes and a radius; the tread it stands on follows from those.
+func _generate_wheels() -> void:
     generated_from = nodes.size()
     WheelRig.generate(self)
-    return ""
 
 
 ## Sections that name nodes may appear before the nodes section itself, so their
@@ -149,7 +173,7 @@ func _resolve_deferred() -> void:
     if not cinecams.is_empty():
         cinecam_position = cinecams[0]
         has_cinecam = true
-    var resolved: Dictionary = _cameras.resolve(_node_id_to_index)
+    var resolved: Dictionary = _cameras.resolve(node_id_to_index)
     if (resolved["error"] as String) != "":
         errors.append(resolved["error"] as String)
         return
@@ -177,35 +201,18 @@ func bounds() -> AABB:
     return box
 
 
-## Opens the section this line names. Which lines count as headers, directives or data is
-## TruckLexer's job; what to do about them is this parser's.
-func _begin_section(line: String) -> bool:
-    if not TruckLexer.is_section_header(line, _section):
-        return false
-    _section = line.to_lower()
+## What opening a section does, for the two that are bookkeeping rather than data. Which lines
+## count as headers, directives or data is `TruckLexer`'s job and cutting the file into them is
+## `TruckDocument`'s; what to do about one is this parser's.
+func _open_section() -> void:
     if _section == "submesh":
         submesh_count += 1
         submeshes.begin()
     elif _section == "backmesh":
         submeshes.backmesh()
-    return true
 
 
 func _parse_row(line: String) -> void:
-    if TruckLexer.is_metadata(line):
-        return
-    var directive: String = TruckLexer.directive_of(line)
-    if directive != "":
-        var arguments: PackedStringArray = TruckLexer.directive_fields(line, directive)
-        if directive == "set_beam_defaults":
-            beam_defaults.read_defaults(arguments)
-        elif directive == "set_beam_defaults_scale":
-            beam_defaults.read_scale(arguments)
-        elif directive == "set_node_defaults":
-            _node_defaults = NodeRows.parse_defaults(arguments, _node_defaults)
-        # Every other directive is recognised so that it is not mistaken for data. Acting
-        # on them is a separate job; being silently parsed as geometry is the bug.
-        return
     sections_seen[_section] = int(sections_seen.get(_section, 0)) + 1
     match _section:
         "nodes", "nodes2":
@@ -214,16 +221,16 @@ func _parse_row(line: String) -> void:
             _parse_beam(line)
         "texcoords":
             _note("texcoord", submeshes.read_texcoord(
-                TruckLexer.fields(line), _node_id_to_index
+                TruckLexer.fields(line), node_id_to_index
             ), line)
         "cab":
             _note("cab", submeshes.read_cab(
-                TruckLexer.fields(line), _node_id_to_index
+                TruckLexer.fields(line), node_id_to_index
             ), line)
         "flexbodies":
-            BodyRows.flexbody(line, _node_id_to_index, flexbodies, errors)
+            BodyRows.flexbody(line, node_id_to_index, flexbodies, errors)
         "props":
-            BodyRows.prop(line, _node_id_to_index, props, errors)
+            BodyRows.prop(line, node_id_to_index, props, errors)
         # `globals` is dry mass, cargo mass and the material the body panels are drawn with.
         "globals":
             var fields: PackedStringArray = TruckLexer.fields(line)
@@ -238,22 +245,24 @@ func _parse_row(line: String) -> void:
         # differently with them is a flex question and not a parsing one. Without this the Mazda
         # 626, whose wheels are all `flexbodywheels`, built 14 parts and no wheels at all.
         "meshwheels2", "meshwheels":
-            _parse_mesh_wheel(line, false)
+            _note("meshwheel", WheelRig.read_row(self, line, false), line)
         # Same first eleven fields, a different tail: see `WheelRig.parse_row`.
         "flexbodywheels":
-            _parse_mesh_wheel(line, true)
+            _note("meshwheel", WheelRig.read_row(self, line, true), line)
         "cameras":
             _cameras.read_cameras(TruckLexer.fields(line))
         "minimass":
             _parse_minimass(line)
         "cinecam":
-            _cameras.read_cinecam(TruckLexer.fields(line))
+            _parse_cinecam(line)
         "axles", "interaxles":
             has_axles = true
         "flares", "flares2":
-            BodyRows.flare(line, _node_id_to_index, flares, errors, _section)
+            BodyRows.flare(line, node_id_to_index, flares, errors, _section)
         "materialflarebindings":
             _parse_material_flare(line)
+        "ties":
+            _parse_tie(line)
         _:
             if DriveRows.handles(_section):
                 var error: String = DriveRows.read(_section, TruckLexer.fields(line), drivetrain)
@@ -268,26 +277,65 @@ func _parse_row(line: String) -> void:
 
 
 func _parse_node(line: String) -> void:
-    var row: Dictionary = NodeRows.row(TruckLexer.fields(line), _node_defaults)
+    var row: Dictionary = NodeRows.row(TruckLexer.fields(line), node_defaults)
     if (row["error"] as String) != "":
         errors.append("node %s: %s" % [row["error"], line])
         return
     if bool(row["loaded"]) and not bool(row["has_mass"]):
         cargo_share_nodes.append(nodes.size())
-    _node_id_to_index[row["id"] as String] = nodes.size()
+    _register(row["id"] as String)
     node_ids.append(row["id"] as String)
     nodes.append(row["position"] as Vector3)
     node_mass.append(row["mass"] as float if bool(row["has_mass"]) else -1.0)
     node_friction.append(row["friction"] as float)
 
 
-func _node_index(id: String) -> int:
-    return int(_node_id_to_index.get(id, -1))
+## Gives a new node its place in the reference table.
+##
+## **A numbered node's number is thrown away and its order of appearance is kept.** That is
+## upstream's `RegisterNode`: a numeric node reference is an index into the node array,
+## bounds-checked and nothing more, and a declared number that disagrees with its position is
+## reported as a duplicate and overridden. Keying on the declared number instead agrees on all
+## 70 actors here — every one numbers from 0 with no gaps — and disagrees the moment a file does
+## not. A named node keeps its name too, since that is the only way a file can reach it.
+func _register(id: String) -> void:
+    var index: int = nodes.size()
+    if not id.is_valid_int():
+        node_id_to_index[id] = index
+    node_id_to_index[str(index)] = index
+
+
+## Registers a node this project generated: a cinecam's own node, or a wheel's tread and rim.
+##
+## Generated nodes are referenced by number like any other — the Mazda's hubcaps name the first
+## rim node of each wheel — so they go in the same table at the same index. `id` is only a label
+## for a reader; nothing can reach a node by it.
+func register_generated(id: String) -> void:
+    node_id_to_index[str(nodes.size())] = nodes.size()
+    node_ids.append(id)
+
+
+func _parse_cinecam(line: String) -> void:
+    var row: Dictionary = _cameras.read_cinecam(TruckLexer.fields(line))
+    if (row["error"] as String) != "":
+        errors.append("cinecam %s: %s" % [row["error"], line])
+        return
+    CinecamMount.build(self, row)
+
+
+## `ties`: a rope with one end loose. See `BeamRows.tie` for why it is not a beam row.
+func _parse_tie(line: String) -> void:
+    var row: Dictionary = BeamRows.tie(TruckLexer.fields(line), node_id_to_index)
+    if (row["error"] as String) != "":
+        errors.append("tie %s: %s" % [row["error"], line])
+        return
+    row.erase("error")
+    ties.append(row)
 
 
 func _parse_beam(line: String) -> void:
     var row: Dictionary = BeamRows.plain(
-        TruckLexer.fields(line), _node_id_to_index, beam_defaults
+        TruckLexer.fields(line), node_id_to_index, beam_defaults
     )
     if (row["error"] as String) != "":
         errors.append("beam %s: %s" % [row["error"], line])
@@ -313,36 +361,13 @@ func _parse_minimass(line: String) -> void:
         minimass_kg = fields[0].to_float()
 
 
-func _parse_mesh_wheel(line: String, flexbody: bool) -> void:
-    if line.begins_with("set_"):
-        return  # Inline defaults directives, not wheel rows.
-    var row: Dictionary = WheelRig.parse_row(
-        TruckLexer.fields(line), _node_id_to_index, flexbody
-    )
-    if (row["error"] as String) != "":
-        errors.append("meshwheel %s: %s" % [row["error"], line])
-        return
-    row.erase("error")
-    # The tread this row implies is generated after the whole file is read, by which time
-    # the directives in force here are long gone. The hero truck states
-    # `set_node_defaults -1, 1.06` immediately above its front wheels and `-1, 1.12` above
-    # its rear pair, and those two numbers are the grip its tyres have.
-    row["friction"] = _node_defaults.friction
-    # Upstream takes a meshwheels2 rim's rate from the beam defaults rather than from the
-    # wheel's own spring, which is the tyre's. The hero truck states
-    # `set_beam_defaults 4000000, 150` immediately above its wheels for exactly this.
-    row["rim_spring"] = beam_defaults.spring()
-    row["rim_damp"] = beam_defaults.damp()
-    wheels.append(row)
-
-
 ## Sections that declare a beam without being called `beams`.
 func _parse_joint(line: String) -> void:
     if not BeamRows.handles(_section):
         return
     var fields: PackedStringArray = TruckLexer.fields(line)
     var row: Dictionary = BeamRows.joint(
-        _section, fields, _node_id_to_index, beam_defaults, _joint_length(fields)
+        _section, fields, node_id_to_index, beam_defaults, _joint_length(fields)
     )
     if (row["error"] as String) != "":
         errors.append("%s %s: %s" % [_section, row["error"], line])
@@ -357,8 +382,8 @@ func _parse_joint(line: String) -> void:
 func _joint_length(fields: PackedStringArray) -> float:
     if fields.size() < 2:
         return 0.0
-    var a: int = int(_node_id_to_index.get(fields[0], -1))
-    var b: int = int(_node_id_to_index.get(fields[1], -1))
+    var a: int = int(node_id_to_index.get(fields[0], -1))
+    var b: int = int(node_id_to_index.get(fields[1], -1))
     if a < 0 or b < 0:
         return 0.0
     return nodes[a].distance_to(nodes[b])

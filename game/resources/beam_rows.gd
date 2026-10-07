@@ -1,7 +1,7 @@
 class_name BeamRows
 extends RefCounted
-## Parses the sections that declare a beam without calling it one: `shocks`, `hydros`,
-## `commands2` and `ties`.
+## Parses the sections that declare a beam without calling it one: `shocks`, `hydros` and
+## `commands2`.
 ##
 ## Each names two nodes and adds a real structural link. Skipping them does not merely
 ## lose a feature — it leaves the rig missing members. On the hero truck the doors are
@@ -25,7 +25,6 @@ const SPRING_FIELD: Dictionary = {
     "hydros": -1,
     "commands": -1,
     "commands2": -1,
-    "ties": -1,
 }
 ## The field holding the actuation factor, for the sections that have one. A hydro's is a
 ## signed fraction of its rest length per unit of steering input: the rams on opposite
@@ -128,6 +127,56 @@ static func plain(
 
 static func handles(section: String) -> bool:
     return SPRING_FIELD.has(section) or BOUND_TYPE.has(section)
+
+
+## Where a `ties` row states each of its values: "root_node, max_reach_length,
+## auto_shorten_rate, min_length, max_length, options, max_stress, group".
+const TIE_REACH_FIELD: int = 1
+const TIE_RATE_FIELD: int = 2
+const TIE_MIN_FIELD: int = 3
+const TIE_MAX_FIELD: int = 4
+const TIE_OPTIONS_FIELD: int = 5
+const TIE_STRESS_FIELD: int = 6
+const TIE_GROUP_FIELD: int = 7
+## Upstream's own default, for a row that states no limit.
+const TIE_DEFAULT_STRESS: float = 100000.0
+
+
+## A row of the `ties` section: a rope that is not attached to anything yet.
+##
+## **A tie names one node, not two, and read as a beam row it invented a member.** Upstream's
+## `ProcessTie` takes the row's single root node, pairs it with node 0 — node 1 when the root
+## *is* node 0 — and adds a rope beam that it immediately disables: a tie does nothing at all
+## until a player hooks it onto a ropable, and only then does it contract. Read here as a
+## two-node row the second field was the reach length, which is why 39 rows across this
+## checkout's corpus reported an unknown node; a row whose reach happened to be written as a
+## whole number would instead have passed, and welded the rig to whichever node that was.
+##
+## No beam is built. The beam upstream builds starts disabled and this project has no tying
+## action to enable it with, so a beam here would be a member a real rig does not have.
+## Returns {"error", "root", "reach_m", "rate", "min_length", "max_length", "options",
+## "max_stress", "group"}.
+static func tie(fields: PackedStringArray, id_to_index: Dictionary) -> Dictionary:
+    if fields.size() < 2:
+        return {"error": "row has %d fields, expected at least 2" % fields.size()}
+    var root: int = int(id_to_index.get(fields[0], -1))
+    if root < 0:
+        return {"error": "row references an unknown node"}
+    return {
+        "error": "",
+        "root": root,
+        "reach_m": fields[TIE_REACH_FIELD].to_float(),
+        "rate": _field(fields, TIE_RATE_FIELD, 0.0),
+        "min_length": _field(fields, TIE_MIN_FIELD, 0.0),
+        "max_length": _field(fields, TIE_MAX_FIELD, 0.0),
+        "options": fields[TIE_OPTIONS_FIELD] if fields.size() > TIE_OPTIONS_FIELD else "n",
+        "max_stress": _field(fields, TIE_STRESS_FIELD, TIE_DEFAULT_STRESS),
+        "group": int(_field(fields, TIE_GROUP_FIELD, -1.0)),
+    }
+
+
+static func _field(fields: PackedStringArray, at: int, fallback: float) -> float:
+    return fields[at].to_float() if fields.size() > at else fallback
 
 
 ## Returns {"error", "a", "b", "spring", "damp", "factor", "bound", "short_bound",

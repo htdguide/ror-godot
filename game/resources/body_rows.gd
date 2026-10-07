@@ -27,7 +27,10 @@ static func flexbody(
         )
         return
     var row: Dictionary = PlacementRows.head(TruckLexer.fields(line), id_to_index)
-    if not keep("flexbody", row, line, into):
+    # **Reported, not dropped.** This call passed no error list, so a flexbody that named a node
+    # this reader could not resolve went missing in silence: every Gavril's four tyres are
+    # flexbodies bound to wheel nodes, and the report said the file was clean.
+    if not keep("flexbody", row, line, into, errors):
         return
     into[into.size() - 1]["forset"] = PackedInt32Array()
 

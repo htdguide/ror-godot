@@ -103,3 +103,23 @@ func spring_unscaled() -> float:
 
 func damp_unscaled() -> float:
     return _damp
+
+
+## A snapshot of these defaults.
+##
+## `TruckDocument` hands every row the defaults in force where it was written, and spawning
+## happens later and in another order, so a directive must not reach back and change what the
+## rows above it were built with. Replacing the object rather than mutating it is what keeps
+## that true, and this is the copy it replaces it with.
+func copy() -> BeamDefaults:
+    var out: BeamDefaults = BeamDefaults.new()
+    out._spring = _spring
+    out._damp = _damp
+    out._deform = _deform
+    out._break = _break
+    out._plastic_coef = _plastic_coef
+    out._spring_scale = _spring_scale
+    out._damp_scale = _damp_scale
+    out._deform_scale = _deform_scale
+    out._break_scale = _break_scale
+    return out
