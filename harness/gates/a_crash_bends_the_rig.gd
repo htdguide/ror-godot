@@ -15,8 +15,12 @@ extends GateBase
 ## The gentle run is the control, and it is part of the gate rather than a note: a threshold that
 ## calls every drive a crash proves nothing.
 
-const MOD_DIR: String = "assets/mods/ChevyS1023"
-const TRUCK: String = "S10offroad.truck"
+## **Two vehicles, because a rig that will not bend looks exactly like one nobody crashed.** Every
+## fault found in this loader so far was invisible on the hero truck and plain on a second car.
+const VEHICLES: Array[Dictionary] = [
+    {"dir": "assets/mods/ChevyS1023", "file": "S10offroad.truck"},
+    {"dir": "assets/mods/mazda626gf", "file": "mazda626sd18i-mt.car"},
+]
 const SUBSTEP_HZ: float = 2000.0
 const SETTLE_SECONDS: float = 1.5
 const IMPACT_SECONDS: float = 6.0
@@ -62,53 +66,73 @@ static func meta() -> Dictionary:
 
 
 func run(_harness: Node) -> Dictionary:
-    var mod_dir: String = SourceScan.repo_root().path_join(MOD_DIR)
-    if not DirAccess.dir_exists_absolute(mod_dir):
-        return ok("skipped: hero asset not present at %s" % MOD_DIR, 0)
+    var reports: PackedStringArray = PackedStringArray()
+    for entry: Dictionary in VEHICLES:
+        var mod_dir: String = SourceScan.repo_root().path_join(entry["dir"] as String)
+        if not DirAccess.dir_exists_absolute(mod_dir):
+            continue
+        var outcome: Dictionary = _crash(mod_dir, entry["file"] as String)
+        if (outcome["error"] as String) != "":
+            return fail("%s: %s" % [entry["file"], outcome["error"]], outcome.get("measured", 0))
+        reports.append("%s %s" % [entry["file"], outcome["report"]])
+    if reports.is_empty():
+        return ok("skipped: none of the gate's vehicles are in this checkout", 0)
+    return ok("; ".join(reports), reports.size())
 
-    var crash: Dictionary = _drive_into_wall(mod_dir, CRASH_THROTTLE)
+
+## One vehicle, driven into a wall twice. Returns {"error", "report"}.
+func _crash(mod_dir: String, file: String) -> Dictionary:
+    var crash: Dictionary = _drive_into_wall(mod_dir, CRASH_THROTTLE, file)
     if (crash["error"] as String) != "":
-        return fail(crash["error"] as String)
-    var gentle: Dictionary = _drive_into_wall(mod_dir, GENTLE_THROTTLE)
+        return {"error": crash["error"] as String, "report": ""}
+    var gentle: Dictionary = _drive_into_wall(mod_dir, GENTLE_THROTTLE, file)
     if (gentle["error"] as String) != "":
-        return fail(gentle["error"] as String)
+        return {"error": gentle["error"] as String, "report": ""}
 
     if (crash["bent"] as int) < MIN_BENT_BEAMS:
-        return fail(
-            "hit at %.1f m/s, %d beams took a permanent set, under %d: the rig is not bending"
-            % [crash["speed"] as float, crash["bent"] as int, MIN_BENT_BEAMS],
-            crash["bent"]
-        )
+        return {
+            "error": (
+                "hit at %.1f m/s, %d beams took a permanent set, under %d: the rig is not bending"
+                % [crash["speed"] as float, crash["bent"] as int, MIN_BENT_BEAMS]
+            ),
+            "measured": crash["bent"], "report": "",
+        }
     if (gentle["bent"] as int) > MAX_GENTLE_BENT_BEAMS:
-        return fail(
-            "the gentle run at %.1f m/s bent %d beams: the threshold calls an ordinary drive a"
-            % [gentle["speed"] as float, gentle["bent"] as int] + " crash",
-            gentle["bent"]
-        )
+        return {
+            "error": (
+                "the gentle run at %.1f m/s bent %d beams: the threshold calls an ordinary drive"
+                % [gentle["speed"] as float, gentle["bent"] as int] + " a crash"
+            ),
+            "measured": gentle["bent"], "report": "",
+        }
     var broken_share: float = float(crash["broken"] as int) / float(maxi(crash["beams"] as int, 1))
     if broken_share > MAX_BROKEN_SHARE:
-        return fail(
-            "the crash broke %d of %d beams (%.0f%%): that is coming apart rather than bending"
-            % [crash["broken"] as int, crash["beams"] as int, broken_share * 100.0],
-            broken_share
-        )
-    return ok(
-        "hit at %.1f m/s: %d beams bent, worst by %.0f mm, %d broken of %d; the gentle run at"
-        % [crash["speed"] as float, crash["bent"] as int, (crash["worst"] as float) * 1000.0,
-           crash["broken"] as int, crash["beams"] as int]
-        + " %.1f m/s bent %d" % [gentle["speed"] as float, gentle["bent"] as int],
-        crash["bent"]
-    )
+        return {
+            "error": (
+                "the crash broke %d of %d beams (%.0f%%): that is coming apart rather than bending"
+                % [crash["broken"] as int, crash["beams"] as int, broken_share * 100.0]
+            ),
+            "measured": broken_share, "report": "",
+        }
+    return {
+        "error": "",
+        "report": (
+            "hit at %.1f m/s: %d bent, worst %.0f mm, %d broken of %d; gentle %.1f m/s bent %d"
+            % [crash["speed"] as float, crash["bent"] as int, (crash["worst"] as float) * 1000.0,
+               crash["broken"] as int, crash["beams"] as int, gentle["speed"] as float,
+               gentle["bent"] as int]
+        ),
+    }
 
 
 ## Drives the rig at a wall and reports what its own structure did. The wall is placed along the
 ## rig's own forward axis after it has settled, the way `obstacles_are_solid` does it: which way a
 ## placed rig faces is its own business.
-func _drive_into_wall(mod_dir: String, throttle: float) -> Dictionary:
+func _drive_into_wall(mod_dir: String, throttle: float, file: String) -> Dictionary:
     var blank: Dictionary = {
         "error": "", "bent": 0, "worst": 0.0, "broken": 0, "beams": 0, "speed": 0.0,
     }
-    var rig: Dictionary = RigBuilder.from_file(mod_dir, TRUCK, 0.0)
+    var rig: Dictionary = RigBuilder.from_file(mod_dir, file, 0.0)
     if (rig["error"] as String) != "":
         blank["error"] = rig["error"] as String
         return blank
