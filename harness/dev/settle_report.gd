@@ -53,12 +53,16 @@ func _settle(entry: Dictionary) -> Dictionary:
     )
     if failed != "":
         return {"error": failed}
-    var rig: Dictionary = RigBuilder.build(truck, 0.15)
+    # **Placed where its file puts it, not dropped onto the ground.** A drop is an impact, and an
+    # impact through a stiff damper is a force no spawn ever applies: the Gavril Zeta's third
+    # cinecam hangs on 1650 Ns/m mounts, so 0.15 m of fall tears them off and the fault being
+    # measured becomes the measurement's own. Upstream spawns an actor resting on the terrain.
+    var rig: Dictionary = RigBuilder.build(truck, 0.0)
     if (rig.get("error", "") as String) != "":
         return {"error": rig["error"] as String}
     var solver: RefCounted = rig["solver"] as RefCounted
     solver.set_ground(0.0, true)
-    RigBuilder.place(solver, truck, Vector3.ZERO, 0.0, 0.15)
+    RigBuilder.place(solver, truck, Vector3.ZERO, 0.0, 0.0)
     var before: PackedFloat32Array = _rest_lengths(solver)
     for _i: int in int(SETTLE_SECONDS * 60.0):
         solver.step(1.0 / SUBSTEP_HZ, int(SUBSTEP_HZ / 60.0))

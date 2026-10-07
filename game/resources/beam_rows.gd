@@ -61,12 +61,23 @@ const BOUND_TYPE: Dictionary = {
     "ropes": BOUND_ROPE,
     "supportbeams": BOUND_SUPPORT,
 }
-## Where a shock row states its travel: "node1, node2, springin, dampin, shortbound,
-## longbound, precomp, options". The bounds are fractions of the beam's own rest length,
-## unless the row carries the `m` option, in which case they are metres.
-const SHOCK_SHORT_BOUND_FIELD: int = 4
-const SHOCK_PRECOMPRESSION_FIELD: int = 6
-const SHOCK_OPTIONS_FIELD: int = 7
+## Where each shock section states its travel. The bounds are fractions of the beam's own rest
+## length, unless the row carries the `m` option, in which case they are metres; the field after
+## the two bounds is the pre-compression, and the one after that the options.
+##
+## **The three sections do not share a layout, and reading one with another's is not a near miss.**
+## A `shocks` row is "node1, node2, springin, dampin, shortbound, longbound, precomp, options";
+## `shocks2` puts four progression factors and a second spring and damper in between, so its
+## bounds are at 10 and 11; `shocks3` states slow and fast damping either way and reaches 12 and
+## 13. Read with the `shocks` layout, a `shocks2` row's pre-compression came out of the field
+## holding its rebound spring: the Gavril Zeta asks for 0.935 and got **36000**, which is a rest
+## length scaled thirty-six thousand times. Its body sank 950 mm and tore four shocks off. 19 of
+## this library's 69 vehicles declare `shocks2`.
+const SHOCK_BOUND_FIELD: Dictionary = {
+    "shocks": 4,
+    "shocks2": 10,
+    "shocks3": 12,
+}
 
 
 ## Upstream's SUPPORT_BEAM_LIMIT_DEFAULT, for a support beam that states no break limit.
@@ -236,20 +247,21 @@ static func joint(
         "precompression": 1.0,
     }
     if (row["bound"] as int) == BOUND_SHOCK:
-        _read_shock_travel(fields, row, length_m)
+        _read_shock_travel(section, fields, row, length_m)
     return row
 
 
-## A shock's travel and pre-compression.
+## A shock's travel and pre-compression, from the layout its own section uses.
 static func _read_shock_travel(
-    fields: PackedStringArray, row: Dictionary, length_m: float
+    section: String, fields: PackedStringArray, row: Dictionary, length_m: float
 ) -> void:
-    if fields.size() <= SHOCK_SHORT_BOUND_FIELD + 1:
+    var bound_at: int = int(SHOCK_BOUND_FIELD.get(section, -1))
+    if bound_at < 0 or fields.size() <= bound_at + 1:
         return
-    var short_bound: float = fields[SHOCK_SHORT_BOUND_FIELD].to_float()
-    var long_bound: float = fields[SHOCK_SHORT_BOUND_FIELD + 1].to_float()
+    var short_bound: float = fields[bound_at].to_float()
+    var long_bound: float = fields[bound_at + 1].to_float()
     var options: String = (
-        fields[SHOCK_OPTIONS_FIELD] if fields.size() > SHOCK_OPTIONS_FIELD else ""
+        fields[bound_at + 3] if fields.size() > bound_at + 3 else ""
     )
     # The `m` option states the bounds in metres rather than as fractions of the beam.
     if options.contains("m") and length_m > 0.0:
@@ -257,5 +269,5 @@ static func _read_shock_travel(
         long_bound /= length_m
     row["short_bound"] = maxf(short_bound, 0.0)
     row["long_bound"] = maxf(long_bound, 0.0)
-    if fields.size() > SHOCK_PRECOMPRESSION_FIELD:
-        row["precompression"] = maxf(fields[SHOCK_PRECOMPRESSION_FIELD].to_float(), 0.0)
+    if fields.size() > bound_at + 2:
+        row["precompression"] = maxf(fields[bound_at + 2].to_float(), 0.0)

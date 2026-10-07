@@ -19,10 +19,10 @@ func _initialize() -> void:
         printerr(failed)
         quit(1)
         return
-    var rig: Dictionary = RigBuilder.build(truck, 0.15)
+    var rig: Dictionary = RigBuilder.build(truck, 0.0)
     var solver: RefCounted = rig["solver"] as RefCounted
     solver.set_ground(0.0, true)
-    RigBuilder.place(solver, truck, Vector3.ZERO, 0.0, 0.15)
+    RigBuilder.place(solver, truck, Vector3.ZERO, 0.0, 0.0)
     for _i: int in int(SETTLE_SECONDS * 60.0):
         solver.step(1.0 / 2000.0, 33)
     var at: PackedVector3Array = solver.get_positions()
@@ -87,12 +87,16 @@ func _initialize() -> void:
     print("-- the cinecam mounts --")
     var rest: PackedVector3Array = truck.nodes
     for beam: int in solver.beam_count():
-        if absf(truck.beam_spring[beam] - 8000.0) > 1.0:
+        var ea: int = truck.beams[beam * 2]
+        var eb: int = truck.beams[beam * 2 + 1]
+        if not (truck.node_ids[ea].begins_with("@cinecam")
+                or truck.node_ids[eb].begins_with("@cinecam")):
             continue
         var a: int = truck.beams[beam * 2]
         var b: int = truck.beams[beam * 2 + 1]
-        print("  beam %4d %3d(%s)-%3d(%s)  rest %.3f m  now %.3f m  %s" % [
+        print("  beam %4d %3d(%s)-%3d(%s)  file %.3f  solver rest %.3f  now %.3f  %s" % [
             beam, a, truck.node_ids[a], b, truck.node_ids[b],
-            rest[a].distance_to(rest[b]), at[a].distance_to(at[b]),
+            rest[a].distance_to(rest[b]), solver.get_beam_rest_length(beam),
+            at[a].distance_to(at[b]),
             "BROKEN" if solver.beam_broken(beam) else "held"])
     quit(0)
