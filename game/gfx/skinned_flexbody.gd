@@ -43,7 +43,8 @@ func build(
     indices: PackedInt32Array,
     material: Material,
     uvs: PackedVector2Array = PackedVector2Array(),
-    normals: PackedVector3Array = PackedVector3Array()
+    normals: PackedVector3Array = PackedVector3Array(),
+    groups: Array[Dictionary] = []
 ) -> String:
     vertex_count = vertices.size()
     rest_vertices = vertices
@@ -57,13 +58,34 @@ func build(
     _uvs = uvs
     _normals = normals
     mesh = ArrayMesh.new()
-    _add_surface(vertices, indices, vertices)
+    # **One surface per submesh, each with its own material.** An Ogre mesh carries a material per
+    # submesh and 508 of this library's 913 meshes have more than one: the Mazda's bodyshell holds
+    # its paint, its lights, its indicators, its brake light and its glass in one file. Merged into
+    # a single surface they all take the first material, so the windscreen drew the body's own
+    # texture atlas stretched across it — reported from a window as the window textures being
+    # broken. Each submesh occupies a contiguous run of the concatenated vertices, so the slices
+    # are exact rather than a copy of the whole buffer per surface.
+    if groups.is_empty():
+        _add_surface(vertices, indices, vertices)
+    else:
+        for group: Dictionary in groups:
+            var first: int = group["first"] as int
+            var slice: PackedVector3Array = vertices.slice(first, first + (group["count"] as int))
+            # The group's indices are its submesh's own, which is already the numbering of the
+            # slice: the merge above offsets them into the whole mesh and this undoes nothing.
+            _add_surface(slice, group["indices"] as PackedInt32Array, slice, first)
 
     mesh_instance = MeshInstance3D.new()
     mesh_instance.name = "SkinnedFlexbody"
     mesh_instance.mesh = mesh
-    if material != null:
-        mesh_instance.material_override = material
+    # `material_override` would paint every surface the same, which is the whole fault above, so a
+    # part with its own groups sets them per surface instead.
+    if groups.is_empty():
+        if material != null:
+            mesh_instance.material_override = material
+    else:
+        for index: int in mini(groups.size(), mesh.get_surface_count()):
+            mesh.surface_set_material(index, groups[index]["material"] as Material)
     _build_bone_rest_bounds()
     parent.add_child(mesh_instance)
 
@@ -190,7 +212,8 @@ func free_resources() -> void:
 
 
 func _add_surface(
-    vertices: PackedVector3Array, indices: PackedInt32Array, reference: PackedVector3Array
+    vertices: PackedVector3Array, indices: PackedInt32Array, reference: PackedVector3Array,
+    first: int = 0
 ) -> void:
     var bone_of_vertex: PackedInt32Array = binding["bone_of_vertex"] as PackedInt32Array
     var bones: PackedInt32Array = PackedInt32Array()
@@ -200,7 +223,7 @@ func _add_surface(
     weights.resize(vertices.size() * 4)
     custom.resize(vertices.size() * 4)
     for i: int in vertices.size():
-        bones[i * 4] = bone_of_vertex[i]
+        bones[i * 4] = bone_of_vertex[first + i]
         weights[i * 4] = 1.0
         custom[i * 4] = reference[i].x
         custom[i * 4 + 1] = reference[i].y
@@ -213,10 +236,10 @@ func _add_surface(
     # whatever the shader's default normal happens to be: panels read flat, self-shadowing
     # never happens, and from the side away from the sun the vehicle looks lit through.
     # Godot skins these with the same bone transforms as the positions.
-    if _normals.size() == vertices.size():
-        arrays[Mesh.ARRAY_NORMAL] = _normals
-    if _uvs.size() == vertices.size():
-        arrays[Mesh.ARRAY_TEX_UV] = _uvs
+    if _normals.size() >= first + vertices.size():
+        arrays[Mesh.ARRAY_NORMAL] = _normals.slice(first, first + vertices.size())
+    if _uvs.size() >= first + vertices.size():
+        arrays[Mesh.ARRAY_TEX_UV] = _uvs.slice(first, first + vertices.size())
     arrays[Mesh.ARRAY_BONES] = bones
     arrays[Mesh.ARRAY_WEIGHTS] = weights
     arrays[Mesh.ARRAY_CUSTOM0] = custom

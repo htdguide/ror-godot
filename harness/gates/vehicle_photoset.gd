@@ -10,8 +10,14 @@ extends GateBase
 ## The gate checks each view actually contains the vehicle. Judging how it looks is for a
 ## person; `tools/photoset.sh` assembles the set into one sheet for that.
 
-const MOD_DIR: String = "assets/mods/ChevyS1023"
-const TRUCK: String = "S10offroad.truck"
+## **More than the hero truck.** A photoset exists so that a fault nobody is looking for shows up
+## in a view nobody thought to take, and one vehicle cannot do that for a library of 69: every
+## wheel-section fault, every material fault and every suspension fault found so far was invisible
+## on the S10 and obvious on a second car.
+const VEHICLES: Array[Dictionary] = [
+    {"dir": "assets/mods/ChevyS1023", "file": "S10offroad.truck", "tag": "s10"},
+    {"dir": "assets/mods/mazda626gf", "file": "mazda626sd18i-mt.car", "tag": "mazda"},
+]
 const BASE_PRESET: String = "hero_3q"
 const CONVERGE: int = 6
 ## Every view must show something. The interior sees less of the vehicle than the
@@ -47,16 +53,26 @@ static func meta() -> Dictionary:
 
 
 func run(harness: Node) -> Dictionary:
-    var mod_dir: String = SourceScan.repo_root().path_join(MOD_DIR)
+    var reports: PackedStringArray = PackedStringArray()
+    for entry: Dictionary in VEHICLES:
+        var outcome: Dictionary = await _photograph(harness, entry)
+        if (outcome["error"] as String) != "":
+            return fail("%s: %s" % [entry["file"], outcome["error"]], outcome.get("thin", 0))
+        reports.append("%s %s" % [entry["tag"], outcome["report"]])
+    return ok("; ".join(reports), 0)
+
+
+func _photograph(harness: Node, entry: Dictionary) -> Dictionary:
+    var mod_dir: String = SourceScan.repo_root().path_join(entry["dir"] as String)
     if not DirAccess.dir_exists_absolute(mod_dir):
-        return ok("skipped: hero asset not present at %s" % MOD_DIR, 0)
+        return {"error": "", "report": "skipped: not in this checkout"}
     var err: String = harness.setup_for(BASE_PRESET)
     if err != "":
-        return fail(err)
+        return {"error": err, "report": ""}
 
-    var built: Dictionary = VehicleBuilder.build(mod_dir, TRUCK)
+    var built: Dictionary = VehicleBuilder.build(mod_dir, entry["file"] as String)
     if (built.get("error", "") as String) != "":
-        return fail(built["error"] as String)
+        return {"error": built["error"] as String, "report": ""}
     var root: Node3D = built["root"] as Node3D
     harness.world.add_child(root)
     var truck: TruckParser = built["truck"] as TruckParser
@@ -78,21 +94,29 @@ func run(harness: Node) -> Dictionary:
         harness.camera.look_at_from_position(
             placement["pos"] as Vector3, placement["look_at"] as Vector3, Vector3.UP
         )
-        var shot: Dictionary = await harness.capture_shot("photoset/" + view, "static", CONVERGE)
+        var shot: Dictionary = await harness.capture_shot(
+            "photoset/%s/%s" % [entry["tag"], view], "static", CONVERGE
+        )
         if shot["error"] != "":
-            return fail("%s: %s" % [view, shot["error"]])
+            return {"error": "%s: %s" % [view, shot["error"]], "report": ""}
         _stamp_number(shot["png"] as String, index + 1)
         var coverage: float = _coverage(shot["png"] as String)
         report.append("%s %.0f%%" % [view, coverage * 100.0])
         if coverage < MIN_COVERAGE:
             thin.append("%s (%.1f%%)" % [view, coverage * 100.0])
 
+    harness.world.remove_child(root)
+    root.queue_free()
     if thin.size() > 0:
-        return fail(
-            "%d of %d views are effectively empty: %s" % [thin.size(), Photoset.VIEWS.size(), ", ".join(thin)],
-            thin.size()
-        )
-    return ok("%d views captured: %s" % [Photoset.VIEWS.size(), ", ".join(report)], 0)
+        return {
+            "error": (
+                "%d of %d views are effectively empty: %s"
+                % [thin.size(), Photoset.VIEWS.size(), ", ".join(thin)]
+            ),
+            "thin": thin.size(),
+            "report": "",
+        }
+    return {"error": "", "report": "%d views: %s" % [Photoset.VIEWS.size(), ", ".join(report)]}
 
 
 ## Stamps a view's number into the corner of its capture.

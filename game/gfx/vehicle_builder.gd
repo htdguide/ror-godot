@@ -242,6 +242,9 @@ static func _build_skinned_flexbody(
     var uvs: PackedVector2Array = PackedVector2Array()
     var normals: PackedVector3Array = PackedVector3Array()
     var material: Material = null
+    # One group per submesh, so each keeps the material its own file gives it. See
+    # `SkinnedFlexbody.build`.
+    var groups: Array[Dictionary] = []
     for submesh: Dictionary in result["submeshes"] as Array:
         var positions: PackedVector3Array = submesh["positions"] as PackedVector3Array
         if positions.is_empty():
@@ -262,10 +265,17 @@ static func _build_skinned_flexbody(
                 if i < submesh_normals.size()
                 else Vector3.UP
             )
+        var own: Material = MeshAssembler.material_for(
+            submesh["material"] as String, truck, mod_dir, dds_reader, textures, scripts
+        )
         if material == null:
-            material = MeshAssembler.material_for(
-                submesh["material"] as String, truck, mod_dir, dds_reader, textures, scripts
-            )
+            material = own
+        groups.append({
+            "first": offset,
+            "count": positions.size(),
+            "indices": submesh["indices"] as PackedInt32Array,
+            "material": own,
+        })
     if vertices.is_empty():
         return null
 
@@ -278,7 +288,8 @@ static func _build_skinned_flexbody(
         indices,
         material,
         uvs,
-        normals
+        normals,
+        groups
     )
     if error != "":
         return null
