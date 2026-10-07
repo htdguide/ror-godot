@@ -127,12 +127,24 @@ void fragment() {
     }
     ALBEDO = colour.rgb;
     METALLIC = metallic;
-    // **What the engine reflects the sky off is the coat, not the paint.** See the header: a
-    // coated surface has two roughnesses and Godot's image-based lighting takes one.
+    // **What the engine reflects the sky off is the coat, in the share the coat actually
+    // reflects.** A coated surface has two roughnesses and Godot's image-based lighting takes one,
+    // so this picks between them by Fresnel: a film at IOR 1.5 sends back 4% of what arrives
+    // head-on and nearly all of it at a glancing angle, so a panel seen face-on reflects the sky
+    // the way its paint does — broadly, dully — and turns into the coat's mirror only as it turns
+    // away.
+    //
+    // Handing the engine the coat's roughness outright was the first attempt, and it makes every
+    // panel a 0.06-roughness mirror of the sky at every angle. Reported from a window at 6.1 h: the
+    // truck's bed shining at dawn. The sky at that hour is almost as bright as noon's while the
+    // ground is eighteen times darker — which is what dawn is — so a body that mirrors it reads as
+    // lit from nowhere.
     float paint_roughness = roughness_textured
         ? texture(roughness_texture, UV).r
         : roughness;
-    ROUGHNESS = mix(paint_roughness, clearcoat_roughness, clearcoat);
+    float facing = max(dot(NORMAL, VIEW), 0.0001);
+    float coat_share = clearcoat * f_schlick(DIELECTRIC_F0, facing);
+    ROUGHNESS = mix(paint_roughness, clearcoat_roughness, coat_share);
     BACKLIGHT = vec3(paint_roughness);
     SPECULAR = specular_amount;
     if (emission_energy > 0.0) {

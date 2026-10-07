@@ -44,6 +44,20 @@ See `hard-won-facts-light.md` for exposure, skies and anything that measures a f
   is incorrect". A surface facing away from the light has to add nothing rather than be skipped, so
   clamp `NdotL` at zero and let the arithmetic come out as zero.
 
+- **A coated surface has two roughnesses and the engine takes one, so pick between them by
+  Fresnel.** Handing it the coat's outright makes every panel a 0.06-roughness mirror of the sky at
+  every angle, which is wrong in a way that only shows when the sky and the ground are far apart in
+  brightness: reported from a window at 6.1 h, the hero truck's bed shining at dawn. A sun 1.62
+  degrees up puts almost nothing on a horizontal panel directly, and the dawn sky is within a stop
+  and a half of noon's while the ground is eighteen times darker, so a body that mirrors the sky
+  reads as lit from nowhere. `ROUGHNESS = mix(paint, coat, clearcoat * F(NdotV))` instead: a panel
+  seen face-on reflects the sky the way its paint does, broadly and dully, and becomes the coat's
+  mirror only as it turns away. It is also what the coat actually reflects, which is the argument
+  for it. The brightest pixel on the truck at that hour fell from 0.3028 to 0.2399.
+  **The mirror-to-sky ratio was ruled out first**: measured across the dawn it holds at 0.31 to
+  0.50 from 5.9 h to noon, so the radiance map is not specially wrong at any hour and the fault was
+  in how much of it the paint was told to show.
+
 - **Image-based lighting runs at one roughness per pixel, and a coated surface has two.** The sharp
   one is the one that reads — a car body looks like a car body because the sky slides along its
   shoulder line — so `vehicle_paint.gdshader` hands `ROUGHNESS` to the engine as the coat's and
