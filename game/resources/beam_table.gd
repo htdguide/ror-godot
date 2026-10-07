@@ -22,6 +22,8 @@ var damp: PackedFloat32Array = PackedFloat32Array()
 var deform: PackedFloat32Array = PackedFloat32Array()
 var strength: PackedFloat32Array = PackedFloat32Array()
 var plastic: PackedFloat32Array = PackedFloat32Array()
+## Whether each beam may take a permanent set. An actuator does not: see `BeamRows.NEVER_YIELDS`.
+var deformable: PackedByteArray = PackedByteArray()
 ## One entry per beam that has a travel limit rather than being a plain spring: shocks, ropes and
 ## support beams. {beam, bound, short_bound, long_bound, bound_spring, bound_damp,
 ## precompression}. Without these a shock is a soft spring with no bump stop, so a suspension
@@ -50,6 +52,7 @@ func record(row: Dictionary) -> void:
     deform.append(float(row.get("deform", BeamDefaults.DEFAULT_DEFORM)))
     strength.append(float(row.get("strength", BeamDefaults.DEFAULT_BREAK)))
     plastic.append(float(row.get("plastic_coef", BeamDefaults.DEFAULT_PLASTIC_COEF)))
+    deformable.append(1 if bool(row.get("deformable", true)) else 0)
 
 
 func count() -> int:

@@ -28,6 +28,22 @@ const RINGS_PER_RAY: Dictionary = {
     "meshwheels2": 2,
     "flexbodywheels": 4,
 }
+## **How far a tyre may stretch off its own hub before the structure takes over.** Upstream bounds
+## every axle-to-tread beam as a SHOCK1 with a contraction limit of 0.66 and this as its extension
+## limit — `AddWheelBeam(..., 0.66f, max_extension)` — and only `meshwheels2` passes a non-zero
+## one. Unbounded, as these were, a spinning tyre is held on by its stated rate alone: the Burnside
+## Drag's spokes stretched 28.7% under wheelspin, the tread left the hub by 100 mm and the axle
+## laid over 88 degrees. 19 of 66 driveable vehicles did this.
+const TYRE_MAX_EXTENSION: Dictionary = {
+    "wheels": 0.0,
+    "wheels2": 0.0,
+    "meshwheels": 0.0,
+    "meshwheels2": 0.15,
+    "flexbodywheels": 0.0,
+}
+## Upstream's contraction limit on the same beams.
+const TYRE_MAX_CONTRACTION: float = 0.66
+
 ## The least fields a row of each section carries, from upstream's own `CheckNumArguments`.
 const LEAST_FIELDS: Dictionary = {
     "wheels": 14,
@@ -70,6 +86,7 @@ static func row(section: String, fields: PackedStringArray, id_to_index: Diction
     # section is called: `wheels2` is built the way a flexbody wheel is and drawn the way a plain
     # one is.
     out["flexbody"] = int(RINGS_PER_RAY[section]) == 4
+    out["max_extension"] = float(TYRE_MAX_EXTENSION.get(section, 0.0))
     out["first_tread"] = -1
     out["tread_count"] = 0
     return out

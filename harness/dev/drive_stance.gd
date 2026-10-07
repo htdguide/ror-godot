@@ -18,7 +18,8 @@ func _initialize() -> void:
     var argv: PackedStringArray = OS.get_cmdline_user_args()
     if not argv.is_empty():
         filter = argv[0]
-    print("%-28s %8s %8s %8s  %s" % ["vehicle", "rest", "driven", "worst", "verdict"])
+    print("%-28s %8s %8s %8s %8s %8s  %s" % [
+        "vehicle", "rest", "driven", "worst", "tread m/s", "road m/s", "verdict"])
     var bad: int = 0
     var counted: int = 0
     for entry: Dictionary in RorVehicleLibrary.entries():
@@ -32,8 +33,9 @@ func _initialize() -> void:
         var folded: bool = float(line["driven"]) > 15.0
         if folded:
             bad += 1
-        print("%-28s %6.1f° %6.1f° %6.1f°  %s" % [
+        print("%-28s %6.1f° %6.1f° %6.1f° %8.1f %8.1f  %s" % [
             name, float(line["rest"]), float(line["driven"]), float(line["worst"]),
+            float(line["spin"]), float(line["road"]),
             "a wheel folds under power" if folded else ""])
     print("")
     print("%d driven, %d fold a wheel under their own torque" % [counted, bad])
@@ -63,10 +65,18 @@ func _drive(entry: Dictionary) -> Dictionary:
     solver.set_gear_selector(1)
     solver.set_throttle(1.0)
     var worst: float = rest
+    var fastest_spin: float = 0.0
+    var fastest_road: float = 0.0
     for _i: int in int(DRIVE_SECONDS * 60.0):
         solver.step(dt, chunk)
         worst = maxf(worst, _lean(solver, truck))
-    return {"error": "", "rest": rest, "driven": _lean(solver, truck), "worst": worst}
+        fastest_road = maxf(fastest_road, absf(solver.road_speed()))
+        for w: int in solver.wheel_count():
+            fastest_spin = maxf(fastest_spin, absf(solver.get_wheel_speed(w)))
+    return {
+        "error": "", "rest": rest, "driven": _lean(solver, truck), "worst": worst,
+        "spin": fastest_spin, "road": fastest_road,
+    }
 
 
 ## The worst lean of any axle from the horizontal, in degrees.

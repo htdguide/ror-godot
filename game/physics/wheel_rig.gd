@@ -138,16 +138,18 @@ static func _generate_one(truck: TruckParser, wheel: Dictionary) -> void:
     var rim_spring: float = wheel.get("rim_spring", RIM_SPRING_FALLBACK) as float
     var rim_damp: float = wheel.get("rim_damp", RIM_DAMP_FALLBACK) as float
     var stress: Dictionary = _stress(wheel)
+    var reach: float = wheel.get("max_extension", 0.0) as float
     for i: int in rays:
         var o: int = outer[i]
         var n: int = inner[i]
         var next_o: int = outer[(i + 1) % rays]
         var next_n: int = inner[(i + 1) % rays]
-        # Tyre: each tread node braced to both axle nodes, so load crosses the sidewall.
-        _add_beam(truck, axis_a, o, tyre_spring, tyre_damp, stress)
-        _add_beam(truck, axis_b, n, tyre_spring, tyre_damp, stress)
-        _add_beam(truck, axis_b, o, tyre_spring, tyre_damp, stress)
-        _add_beam(truck, axis_a, n, tyre_spring, tyre_damp, stress)
+        # Tyre: each tread node braced to both axle nodes, so load crosses the sidewall. Bounded,
+        # because upstream bounds them — see `_add_tyre_beam`.
+        _add_tyre_beam(truck, axis_a, o, tyre_spring, tyre_damp, stress, reach)
+        _add_tyre_beam(truck, axis_b, n, tyre_spring, tyre_damp, stress, reach)
+        _add_tyre_beam(truck, axis_b, o, tyre_spring, tyre_damp, stress, reach)
+        _add_tyre_beam(truck, axis_a, n, tyre_spring, tyre_damp, stress, reach)
         # Rim: the tread ring's own hoop and diagonal stiffness.
         _add_beam(truck, o, n, rim_spring, rim_damp, stress)
         _add_beam(truck, o, next_o, rim_spring, rim_damp, stress)
@@ -282,6 +284,32 @@ static func _tyre_flexbody(truck: TruckParser, wheel: Dictionary, base: int) -> 
         "mesh": mesh,
         "forset": bound,
     })
+
+
+## A tyre's own spoke: the axle to one tread node, and upstream bounds it.
+##
+## `AddWheelBeam(..., 0.66f, max_extension)` makes every one of these a SHOCK1 that may be
+## compressed to two thirds of its length and stretched by `max_extension` before handing over to
+## the structural rates. The handover is to upstream's own defaults rather than the file's,
+## because a wheel beam is not a `shocks` beam: `ActorForcesEuler.cpp` takes the shock's stated
+## rates only for `BEAM_HYDRO`, and a wheel's beams are not that.
+##
+## Left unbounded, a tyre is held on by its stated rate alone and a spinning wheel throws its
+## tread off the hub.
+static func _add_tyre_beam(
+    truck: TruckParser, a: int, b: int, spring: float, damp: float, stress: Dictionary,
+    reach: float
+) -> void:
+    truck.bounded_beams.append({
+        "beam": truck.beams.size() / 2,
+        "bound": BeamRows.BOUND_SHOCK,
+        "short_bound": WheelRows.TYRE_MAX_CONTRACTION,
+        "long_bound": reach,
+        "bound_spring": BeamDefaults.DEFAULT_SPRING,
+        "bound_damp": BeamDefaults.DEFAULT_DAMP,
+        "precompression": 1.0,
+    })
+    _add_beam(truck, a, b, spring, damp, stress)
 
 
 ## A beam that is a plain spring until it is compressed past `short_bound`, then ramps towards

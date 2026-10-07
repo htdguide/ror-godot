@@ -54,7 +54,8 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
         if beam < truck.beam_deform.size():
             solver.set_beam_limits(
                 beam, truck.beam_deform[beam], truck.beam_strength[beam],
-                truck.beam_plastic[beam]
+                truck.beam_plastic[beam],
+                beam >= truck.beam_deformable.size() or truck.beam_deformable[beam] != 0
             )
 
     # A strut's hub runs along a rail rather than sitting on a point. Handed over after the beams

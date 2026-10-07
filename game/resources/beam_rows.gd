@@ -17,6 +17,17 @@ extends RefCounted
 ## section does. A hydro beam steers by changing its own rest length, so read as a plain
 ## beam it holds the steering rack rigid and the rig cannot turn at all.
 
+## **The sections upstream types `BEAM_HYDRO`, which never take a permanent set.** Its deform
+## branch is gated on `bm_type == BEAM_NORMAL`, so a hydro, a command, a tie, a rope, a trigger or
+## an animator bends elastically and breaks, and never yields. They are actuators: a ram that
+## lengthens permanently under load is a ram that has lost the geometry it was holding.
+##
+## Measured, this is what folds a wheel. 19 of 66 driveable vehicles lay an axle over under their
+## own drive torque — the Burnside Drag reaching 88 degrees — and the two hub nodes are what
+## rotate. The Burnside holds its suspension with eight `commands2`; the hero truck, which does
+## not fold, has four.
+const NEVER_YIELDS: PackedStringArray = ["hydros", "commands", "commands2"]
+
 ## Section name -> the field index its spring and damping start at, or -1 when the row
 ## carries none and the beam defaults in force apply instead.
 const SPRING_FIELD: Dictionary = {
@@ -237,6 +248,8 @@ static func joint(
             STRENGTH_SCALE.get(section, 1.0)
         ),
         "plastic_coef": defaults.plastic_coef(),
+        # Upstream's `bm_type == BEAM_NORMAL` gate on the deform branch, carried per beam.
+        "deformable": not NEVER_YIELDS.has(section),
         "factor": factor,
         "bound": int(BOUND_TYPE.get(section, BOUND_NORMAL)),
         "short_bound": 0.0,

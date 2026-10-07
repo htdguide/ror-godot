@@ -41,6 +41,8 @@ var beam_deform: PackedFloat32Array:
     get: return beam_table.deform
 var beam_strength: PackedFloat32Array:
     get: return beam_table.strength
+var beam_deformable: PackedByteArray:
+    get: return beam_table.deformable  # Whether each beam may take a permanent set.
 var beam_plastic: PackedFloat32Array:
     get: return beam_table.plastic
 ## The body panels, kept per `submesh` group so each can be drawn with its own coordinates.
@@ -236,9 +238,7 @@ func _parse_row(line: String) -> void:
             BodyRows.prop(line, node_id_to_index, props, errors)
         # `globals` is dry mass, cargo mass and the material the body panels are drawn with.
         #
-        # **All three, and only the third was being read.** This case took the material and
-        # returned, so the row never reached `DriveRows` and every vehicle was built with a dry
-        # mass and a cargo mass of zero.
+        # **Only the material was read**: this returned before `DriveRows` saw the row.
         "globals":
             var fields: PackedStringArray = TruckLexer.fields(line)
             if fields.size() > 2:

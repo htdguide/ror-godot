@@ -122,7 +122,8 @@ public:
     // What a beam yields at and what it breaks at, from the file's own `set_beam_defaults`.
     // A strength of zero leaves the beam unbreakable and undeformable, which is what every
     // beam was before this existed.
-    void set_beam_limits(int beam, float deform, float strength, float plastic_coef);
+    void set_beam_limits(int beam, float deform, float strength, float plastic_coef,
+                         bool deformable = true);
     // Whether a beam has broken, and what its rest length is now: a bent beam's rest length is
     // how the bend is recorded.
     bool beam_broken(int beam) const;

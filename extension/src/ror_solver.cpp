@@ -288,7 +288,8 @@ void RorSolver::accumulate_beam_forces() {
     }
 }
 
-void RorSolver::set_beam_limits(int beam, float deform, float strength, float plastic_coef) {
+void RorSolver::set_beam_limits(int beam, float deform, float strength, float plastic,
+                                bool deformable) {
     if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
         return;
     }
@@ -297,10 +298,9 @@ void RorSolver::set_beam_limits(int beam, float deform, float strength, float pl
     target.max_neg_stress = -deform;
     target.minmax_stress = deform;
     target.strength = strength;
-    target.plastic_coef = plastic_coef;
-    // Only ordinary structural beams deform; shocks, ropes and support beams have their own
-    // laws and upstream exempts them.
-    target.deformable = target.bound == BeamBound::NORMAL;
+    target.plastic_coef = plastic;
+    // Upstream exempts shocks, ropes and supports by bound, and hydros and commands by type.
+    target.deformable = deformable && target.bound == BeamBound::NORMAL;
 }
 
 void RorSolver::add_slide_node(int node, const PackedInt32Array &rail, float spring,
