@@ -15,25 +15,25 @@ extends GateBase
 ## carried the camera's exposure in its own radiance was caught — see `the_sky_does_not_follow_the_
 ## camera` — and the measurement there was this one, taken by hand.
 ##
-## **One light, no sky, and that is a finding rather than a convenience.** Under `noon_clear` the
-## three controls agree with each other to four decimal places and all three come back at 2.1623
-## instead of 2 — and at 1.4673 for half a stop and 4.9135 for two. One model fits all three: a
-## frame whose light is `(1 - f) * E + f * E^2` with `f` about 0.081, which is to say that eight
-## per cent of what reaches that patch is being multiplied by the camera's exposure *twice*. That
-## is the ambient term, and `BlockoutWorld` pre-multiplies it by the camera on the stated grounds
-## that Godot's own normalisation does not reach it. This measurement says it does. Lit by one
-## directional light with no sky above it, the same three controls read 2.0000, 2.0000 and 2.0000.
+## **The sky has to be re-metered with the camera, and forgetting it is what this gate caught
+## first.** Changing the aperture and photographing again gave 2.1623 instead of 2 — and 1.4673 for
+## half a stop, 4.9135 for two, which fits a frame where about eight per cent of the light is
+## multiplied by the exposure twice. That was not the renderer: it was this gate. A sky carries the
+## camera's exposure in its own radiance so that it does not follow the film, and `WorldSky.reexpose`
+## is what puts the new camera into it. Without that call the sky is still metered for the camera
+## the world was built with, and its share of the frame is exposed once by the stale number and once
+## by the new one. With it, the same three controls read 2.0084.
 ##
-## So this gate holds the lens, which is exact, and the ambient's double exposure is written up as
-## the open item it is in `docs/guides/hard-won-facts-light.md`. Putting the sky back into this
-## scene is how the fix will be checked.
+## The scene is this project's own noon rather than a lamp in the dark, because the sky is where
+## this goes wrong and a gate that avoided it would be avoiding the claim. For the record, a grey
+## patch lit by a single directional light and nothing else reads 2.0000, 2.0000 and 2.0000.
 ##
 ## The tonemapper is linear for the measurement, because a stop is a statement about the light
 ## arriving and a curve is a statement about what is done with it afterwards.
 ## `tonemap_and_exposure` holds the curve; this holds the lens.
 
 const PRESET: String = "diag_topdown"
-const WEATHER: String = "spike_black"
+const WEATHER: String = "noon_clear"
 const CONVERGE: int = 4
 ## The exposure every reading is taken against. A patch lit by a hundred thousand lux of noon has
 ## to land in the middle of the film at these, and still be there a stop either side.
@@ -112,6 +112,7 @@ func run(harness: Node) -> Dictionary:
         attributes.exposure_shutter_speed = float(named[2])
         attributes.exposure_sensitivity = float(named[3])
         harness.camera.attributes = attributes
+        WorldSky.reexpose(harness.world, harness.camera)
         # **In light rather than in display pixels.** An 8-bit frame quantises a flat patch
         # identically in every pixel of it, so averaging buys nothing and one level is 4% of a
         # reading at this level — measured, the three controls agreed with each other to four

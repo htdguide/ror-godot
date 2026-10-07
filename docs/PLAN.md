@@ -1298,14 +1298,16 @@ stay in HDR linear before tonemap, where their weighting is physically meaningfu
    first step.
 2. `exposure_ev`: doubling the shutter time or opening one f-stop changes measured scene luminance by
    exactly one stop within tolerance. Catches the classic bug where exposure is applied twice.
-   **Done, 2026-10-07** — `one_stop_is_one_stop`, and it caught the bug it was written for on its
-   first run. Aperture, shutter and film each give exactly 2.0000 on a patch lit by one directional
-   light. Put the project's own sky back above that patch and all three give 2.1623, with half a
-   stop at 1.4673 and two stops at 4.9135 — one model fits all three, `(1 - f) E + f E^2` with `f`
-   about 0.081, so eight per cent of that frame is exposed twice. It is the ambient term, which
-   `BlockoutWorld` pre-multiplies by the camera on the grounds that Godot does not. Fixing it moves
-   the balance of every lighting gate in the project, so it is written up in
-   `docs/guides/hard-won-facts-light.md` rather than changed in passing.
+   **Done, 2026-10-07** — `one_stop_is_one_stop`. Aperture, shutter and film each give 2.0084 on a
+   sunlit patch under this project's own noon, and exactly 2.0000 on a patch lit by one directional
+   light with no sky at all. Getting there turned up the thing worth knowing: a sky carries the
+   camera's exposure in its own radiance so that it does not follow the film, so a camera changed
+   after the world was built must be put back into the sky with `WorldSky.reexpose` — without that
+   the sky's share is exposed twice and a stop reads 2.1623. The first draft of the gate had exactly
+   that bug and reported it as a fault in the renderer's ambient term; it was not.
+   `docs/guides/hard-won-facts-camera.md` records both halves, including the measurement that
+   settles which ambient sources the exposure reaches: a stated colour not at all, a sky's own
+   irradiance twice.
 3. `glow_energy`: total image energy added by glow is bounded and scales monotonically with threshold;
    no glow on sub-threshold pixels.
 4. `grain_after_taa`: with TAA on, grain variance measured over 60 static frames stays within a stated
