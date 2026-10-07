@@ -238,17 +238,11 @@ func _parse_row(line: String) -> void:
                 cab_material = fields[2]
         "managedmaterials":
             BodyRows.managed_material(line, managed_materials, errors)
-        # `flexbodywheels` carries the same row as `meshwheels2` — radius, rim radius, width,
-        # rays, two nodes, a reference node, braked, propulsed, an arm node, mass, the tyre and
-        # rim rates, a side and two mesh names — and differs in that its tyre deforms with the
-        # body rather than being a rigid mesh. The rows are read the same way; what upstream does
-        # differently with them is a flex question and not a parsing one. Without this the Mazda
-        # 626, whose wheels are all `flexbodywheels`, built 14 parts and no wheels at all.
-        "meshwheels2", "meshwheels":
-            _note("meshwheel", WheelRig.read_row(self, line, false), line)
-        # Same first eleven fields, a different tail: see `WheelRig.parse_row`.
-        "flexbodywheels":
-            _note("meshwheel", WheelRig.read_row(self, line, true), line)
+        # Five sections, five field orders, and two of them generate twice as many nodes as the
+        # other three. `WheelRows` holds the layouts; this only has to name the section, because
+        # which section a row came from is part of reading it.
+        "wheels", "wheels2", "meshwheels", "meshwheels2", "flexbodywheels":
+            _note(_section, WheelRig.read_row(self, _section, line), line)
         "cameras":
             _cameras.read_cameras(TruckLexer.fields(line))
         "minimass":

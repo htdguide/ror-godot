@@ -26,110 +26,22 @@ const RIM_DAMP_FALLBACK: float = 150.0
 ## **The rates a wheel takes are the ones written above it**, so each row carries its own: the
 ## tread is generated once every row is read. The hero truck states `set_node_defaults -1, 1.06`
 ## above its front pair and `-1, 1.12` above its rear, and those are the grip its tyres have.
-static func read_row(truck: TruckParser, line: String, flexbody: bool) -> String:
-    var row: Dictionary = WheelRig.parse_row(
-        TruckLexer.fields(line), truck.node_id_to_index, flexbody
-    )
+static func read_row(truck: TruckParser, section: String, line: String) -> String:
+    var row: Dictionary = WheelRows.row(section, TruckLexer.fields(line), truck.node_id_to_index)
     if (row["error"] as String) != "":
         return row["error"] as String
     row.erase("error")
     row["friction"] = truck.node_defaults.friction
-    row["rim_spring"] = truck.beam_defaults.spring()
-    row["rim_damp"] = truck.beam_defaults.damp()
+    # Only where the section states none of its own: `wheels2` and `flexbodywheels` do.
+    if not row.has("rim_spring"):
+        row["rim_spring"] = truck.beam_defaults.spring()
+        row["rim_damp"] = truck.beam_defaults.damp()
     # What its beams bend and break at. See `_stress`.
     row["deform"] = truck.beam_defaults.deform()
     row["strength"] = truck.beam_defaults.breaking_strength()
     row["plastic"] = truck.beam_defaults.plastic_coef()
     truck.wheels.append(row)
     return ""
-
-
-## Parses a `meshwheels2` row: "tire_radius, rim_radius, width, rays, node1, node2, snode,
-## braked, propulsed, arm, mass, spring, damping, side, meshname, material". Lives here
-## rather than in the parser because the tread generated below is the only thing that
-## reads most of these fields.
-##
-## `braked`, `propulsed` and `arm` are what make a wheel a driven wheel rather than a
-## castor. The hero truck states `4, 1, 8` on its front pair and `1, 1, 15` on its rear:
-## four-wheel drive, brakes all round, and a reference arm node per wheel for the reaction
-## torque to push against. Dropped, every wheel rolls freely and no amount of engine makes
-## the rig move.
-## **A `flexbodywheels` row parses here, but its rig is not built here yet, and the difference is
-## structural.** Upstream gives a flexbody wheel `num_rays * 4` nodes and `num_rays * 20` beams —
-## eight rim beams, ten tyre beams and two support beams per ray — against a mesh wheel's
-## `num_rays * 2` nodes and `num_rays * 8` beams (`ActorSpawner.cpp`, the spawn budget). It is a
-## two-ring structure: a rim ring and a tyre ring, with the tyre sprung against the rim, which is
-## why the row carries two spring and damping pairs instead of one.
-##
-## Built as a mesh wheel it gets half the nodes and two fifths of the beams, and what that looks
-## like from the driver's seat is a wheel that wobbles and does not sit on its suspension —
-## reported from the window exactly that way. Parsing the row correctly is what lets such a
-## vehicle have wheels at all; giving it the right rig is a port of
-## `BuildWheelObjectAndNodes` and its flexbody variant, and it has not been done.
-##
-## **`flexbodywheels` is not the same row, and reading it as one is a quiet disaster.** The two
-## agree for the first eleven fields and then diverge: a mesh wheel carries
-## `spring, damping, side, mesh, material` where a flexbody wheel carries
-## `tyre spring, tyre damp, rim spring, rim damp, side, rim mesh, tyre mesh`
-## (`RigDef_Parser.cpp`, `_ParseBaseMeshWheel` against `ParseFlexBodyWheel`).
-##
-## Read with the wrong layout, the Mazda 626 took its side from a rim stiffness of 320000, its rim
-## mesh from a damping figure of 40, and its material from the letter `l`. What that looks like on
-## screen is white tyres with no rims and a car sitting on its bump stops, which is exactly how it
-## was reported — three symptoms, one misread row.
-static func parse_row(
-    fields: PackedStringArray, id_to_index: Dictionary, flexbody: bool = false
-) -> Dictionary:
-    var needed: int = 16 if not flexbody else 16
-    if fields.size() < needed:
-        return {"error": "row has %d fields, expected at least %d" % [fields.size(), needed]}
-    var node1: int = int(id_to_index.get(fields[4], -1))
-    var node2: int = int(id_to_index.get(fields[5], -1))
-    if node1 < 0 or node2 < 0:
-        return {"error": "row references an unknown node"}
-    # A flexbody wheel states the tyre and the rim separately; the rim is the stiffer pair and is
-    # what the mesh wheel's single pair corresponds to.
-    var spring: float = fields[11].to_float()
-    var damping: float = fields[12].to_float()
-    var side: String = fields[13].to_lower()
-    var mesh_name: String = fields[14]
-    var material_name: String = fields[15]
-    var tyre_mesh: String = ""
-    if flexbody:
-        side = fields[15].to_lower()
-        mesh_name = fields[16] if fields.size() > 16 else ""
-        # Field 17 is the **tyre mesh**, not a material: a flexbody wheel draws its tyre as
-        # geometry where a mesh wheel sweeps one and paints it. Passing it on as a material name
-        # is what left the Mazda with white tyres after its rims came back.
-        tyre_mesh = fields[17] if fields.size() > 17 else ""
-        material_name = ""
-    return {
-        "error": "",
-        "tire_radius": fields[0].to_float(),
-        "rim_radius": fields[1].to_float(),
-        "width": fields[2].to_float(),
-        "rays": fields[3].to_int(),
-        "node1": node1,
-        "node2": node2,
-        "braked": fields[7].to_int(),
-        "propulsed": fields[8].to_int(),
-        # A wheel with no resolvable arm node falls back to its own axle, which upstream
-        # also does: the reaction then has no lever and is skipped rather than misapplied.
-        "arm_node": int(id_to_index.get(fields[9], -1)),
-        "mass": fields[10].to_float(),
-        "spring": spring,
-        "damping": damping,
-        "side": side,
-        "mesh": mesh_name,
-        "material": material_name,
-        "tyre_mesh": tyre_mesh,
-        "flexbody": flexbody,
-        "rim_spring": fields[13].to_float() if flexbody else RIM_SPRING_FALLBACK,
-        "rim_damp": fields[14].to_float() if flexbody else RIM_DAMP_FALLBACK,
-        # Filled in by `generate` once the tread exists.
-        "first_tread": -1,
-        "tread_count": 0,
-    }
 
 
 ## Adds every wheel's tread to the rig. Returns {"nodes": int, "beams": int}.

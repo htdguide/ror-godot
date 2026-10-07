@@ -42,9 +42,9 @@ func _initialize() -> void:
         for message: String in truck.errors:
             var key: String = _kind(message)
             kinds[key] = int(kinds.get(key, 0)) + 1
-        print("%-28s %4d nodes %5d beams %2d wheels  %3d errors  coverage %.0f%%" % [
+        print("%-28s %4d nodes %5d beams %2d wheels  %3d errors  coverage %3.0f%%  %s" % [
             name, truck.nodes.size(), truck.beams.size() / 2, truck.wheels.size(),
-            truck.errors.size(), truck.coverage() * 100.0])
+            truck.errors.size(), truck.coverage() * 100.0, _drawn(entry, truck)])
     print("")
     print("%d actors, %d clean, %d errors in total" % [counted, clean, total_errors])
     var keys: Array = kinds.keys()
@@ -69,3 +69,30 @@ func _kind(message: String) -> String:
     for word: String in head.split(" ", false):
         out.append("<n>" if word.is_valid_int() or word.is_valid_float() else word)
     return " ".join(out)
+
+
+## What a vehicle actually draws, against what its file asks for.
+##
+## The parse report says the rows were read; this says they reached geometry. A row that names a
+## mesh file the pack does not ship, or a mesh this project's reader cannot open, is read cleanly
+## and draws nothing.
+static func _drawn(entry: Dictionary, truck: TruckParser) -> String:
+    var directory: String = entry["directory"] as String
+    var built: Dictionary = VehicleBuilder.build(directory, entry["file"] as String)
+    if (built.get("error", "") as String) != "":
+        return "REFUSED %s" % built["error"]
+    var root: Node3D = built["root"] as Node3D
+    var drawn: int = 0
+    for node: Node in _all(root):
+        if node is MeshInstance3D:
+            drawn += 1
+    root.queue_free()
+    return "%3d drawn of %d props + %d flexbodies + %d submeshes" % [
+        drawn, truck.props.size(), truck.flexbodies.size(), truck.submeshes.drawable()]
+
+
+static func _all(node: Node) -> Array[Node]:
+    var out: Array[Node] = [node]
+    for child: Node in node.get_children():
+        out.append_array(_all(child))
+    return out
