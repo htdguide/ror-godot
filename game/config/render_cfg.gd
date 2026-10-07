@@ -222,6 +222,16 @@ const SSAO_LIGHT_AFFECT: float = 0.15
 ## lighting itself: a surface that cannot see the sky cannot reflect it either.
 const SSAO_REFLECTION_AFFECT: float = 1.0
 
+## --- The grade, which is a decision rather than a measurement -----------------------------------
+##
+## On by default and neutral by default, which is not a contradiction: the path is live so that a
+## weather preset can hang a lookup table on it, and what it does with no table is nothing at all.
+## See `ColourGrade`.
+const GRADE_ENABLED: bool = true
+const GRADE_BRIGHTNESS: float = 1.0
+const GRADE_CONTRAST: float = 1.0
+const GRADE_SATURATION: float = 1.0
+
 ## --- Glare, which is the lens rather than the scene --------------------------------------------
 ##
 ## **A bloom is a real measurement of a real lens and not a look.** Every optical system scatters a

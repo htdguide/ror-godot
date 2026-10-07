@@ -13,6 +13,7 @@ static func grade(env: Environment, weather: Dictionary) -> void:
     _occlusion(env, weather)
     _haze(env, weather)
     _glare(env)
+    ColourGrade.apply(env, weather)
 
 
 ## How much of the sky a surface can actually see.

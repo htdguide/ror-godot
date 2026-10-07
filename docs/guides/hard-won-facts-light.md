@@ -9,6 +9,14 @@ The pattern is consistent enough to state outright: **before believing a number 
 the instrument.** A photographed step wedge, an exposure bracket and a negative control cost one
 afternoon between them and have overturned four separate conclusions recorded below.
 
+- **A colour-correction cube is indexed by texel centres, not by texel indices.** Godot samples
+  `adjustment_color_correction` at the colour itself, so texel `i` of a `side`-sample cube is read
+  for values around `(i + 0.5) / side` and must hold that value — not `i / (side - 1)`, which is the
+  obvious way to write an identity and is half a texel out everywhere. Measured, a 5% grey came back
+  at 0.0353 instead of 0.0510: short by 0.0157, against half a texel of 0.0156. The format is not
+  the trap here — the same error appears whether the cube is `FORMAT_RGBA8` or `FORMAT_RGBF` — so it
+  is worth ruling the arithmetic in before suspecting a colour space.
+
 - **Godot does not fog an unshaded surface.** Measured: two panels forty and a hundred and sixty
   metres away stayed 0.2966, 0.2975, 0.2975, 0.2975 apart through a fog of three hundred metres'
   visual range, which is a frame with no haze in it at all. Lit panels fog correctly. It is also

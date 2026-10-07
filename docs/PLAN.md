@@ -1330,6 +1330,15 @@ stay in HDR linear before tonemap, where their weighting is physically meaningfu
    applied post-resolve.
 5. `lut_neutral`: an identity LUT is a no-op to within quantisation error. Catches LUT sampling and
    colour-space mistakes, which are otherwise invisible until everything looks slightly wrong.
+   **Done, 2026-10-07** — `a_neutral_grade_changes_nothing`, and it caught one of exactly those on
+   its first run. The grading path is new with it (`ColourGrade`, applied from `WorldAir`), live and
+   neutral by default so a weather preset can hang a table on it. A 32-sample identity cube written
+   the obvious way — texel `i` holding `i / (side - 1)` — moved a 5% grey from 0.0510 to 0.0353,
+   short by 0.0157, where half a texel of a 32-sample cube is 0.0156: Godot samples the cube at the
+   colour itself, so a texel holds the value at its own *centre*, `(i + 0.5) / side`. Written that
+   way the worst channel of a thirteen-patch wedge moves 0.0039, which is one 8-bit step. A cube
+   with red and blue transposed fails it at 0.7020, so the check bites on rotations as well as on
+   offsets.
 6. Perf: the whole display-space pass ≤ 0.8 ms and DOF ≤ 1.5 ms at 1080p.
 
 **Visual verification:** the eight money shots with the stack off versus on, in one sheet; a focus-pull
