@@ -70,7 +70,7 @@ static func triangles(terrain: RorTerrain) -> Array[Dictionary]:
         var definition: Dictionary = RorObjects.definition(terrain, name, state)
         if (definition.get("error", "") as String) != "":
             continue
-        if not _has_hull(definition):
+        if not _has_hull(terrain, name, definition, state, soups):
             continue
         var soup: PackedVector3Array = _hull_of(terrain, name, definition, state, soups)
         if soup.is_empty():
@@ -96,9 +96,37 @@ static func triangles(terrain: RorTerrain) -> Array[Dictionary]:
     return out
 
 
-## Whether an object ships a collision hull of its own, rather than only a drawn mesh.
-static func _has_hull(definition: Dictionary) -> bool:
-    return not (definition["collision_meshes"] as PackedStringArray).is_empty()
+## **The slab has to fit inside the object, or the hull cannot hold anything.** A triangle is solid
+## for a node up to `SLAB_M` behind its face, and the shallowest face a node is behind wins. In an
+## object thinner than twice that, every node inside is within the slab of the faces on both sides
+## at once, so past the middle the nearest face is the one it is heading for and the object throws
+## it out the far side. La Paz's pole is a triangular prism 0.17 m across against a 0.1 m slab:
+## with its hull as triangles a vehicle drives through it, where the derived boxes it used to get
+## made it wrap around it. Reported from a window, and the reason this is a measurement and not a
+## preference for one method.
+const THINNEST_HULL_M: float = 0.25
+
+
+## Whether an object ships a collision hull this project can collide with as triangles: one of its
+## own, and thick enough to hold a node.
+static func _has_hull(terrain: RorTerrain, name: String, definition: Dictionary,
+                      state: Dictionary, soups: Dictionary) -> bool:
+    if (definition["collision_meshes"] as PackedStringArray).is_empty():
+        return false
+    var soup: PackedVector3Array = _hull_of(terrain, name, definition, state, soups)
+    if soup.is_empty():
+        return false
+    var low: Vector3 = soup[0]
+    var high: Vector3 = soup[0]
+    for point: Vector3 in soup:
+        low = low.min(point)
+        high = high.max(point)
+    var scale: Vector3 = (definition["scale"] as Vector3).abs()
+    var size: Vector3 = (high - low) * scale
+    # The two smallest dimensions: a wall is thin in one direction on purpose and still holds.
+    var sorted: Array = [size.x, size.y, size.z]
+    sorted.sort()
+    return float(sorted[1]) >= THINNEST_HULL_M
 
 
 ## The triangles of an object's collision meshes, in the mesh's own frame, read once per name.
@@ -132,6 +160,7 @@ static func boxes(terrain: RorTerrain) -> Array[Dictionary]:
     var out: Array[Dictionary] = road_boxes(terrain)
     var state: Dictionary = RorObjects.state(terrain)
     var shapes: Dictionary = {}
+    var hulls: Dictionary = {}
     for placement: Dictionary in RorObjects.placements(terrain):
         var name: String = placement["name"] as String
         var definition: Dictionary = RorObjects.definition(terrain, name, state)
@@ -148,8 +177,9 @@ static func boxes(terrain: RorTerrain) -> Array[Dictionary]:
         if not authored.is_empty():
             out.append_array(authored)
             continue
-        # A hull is collided with as triangles instead — see `triangles`.
-        if _has_hull(definition):
+        # A hull thick enough to hold a node is collided with as triangles instead — see
+        # `triangles`. A thinner one still gets the derived columns, which can.
+        if _has_hull(terrain, name, definition, state, hulls):
             continue
         var local: Array[Dictionary] = _shape_of(terrain, name, definition, state, shapes)
         if local.is_empty():
