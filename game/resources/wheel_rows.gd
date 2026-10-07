@@ -98,6 +98,13 @@ static func _plain(fields: PackedStringArray) -> Dictionary:
         "mesh": "",
         "material": fields[13],
         "tyre_mesh": "",
+        # **Both rings take the row's own rates.** `ProcessWheel` passes `wheel_def.springiness`
+        # and `wheel_def.damping` for the tyre *and* for the rim; only `meshwheels2` reaches for
+        # the beam defaults. Given the defaults instead, a rig that states none got the 9 MN/m
+        # fallback on its rim ring: the Starling pack's buses and the Daf semis broke between 200
+        # and 460 beams each, standing still.
+        "rim_spring": fields[10].to_float(),
+        "rim_damp": fields[11].to_float(),
     }
 
 
@@ -132,6 +139,12 @@ static func _two_radii(section: String, fields: PackedStringArray) -> Dictionary
         return out
     out["spring"] = fields[11].to_float()
     out["damping"] = fields[12].to_float()
+    if section == "meshwheels":
+        # `ProcessMeshWheel` gives both rings the row's rates, the same as `wheels`. Its numbered
+        # successor is the one that takes its rim from the beam defaults, and the two are a
+        # different section for exactly this kind of reason.
+        out["rim_spring"] = out["spring"]
+        out["rim_damp"] = out["damping"]
     if section == "flexbodywheels":
         # Tyre rates, then the rim's, then a side and two **meshes**: a flexbody wheel draws its
         # tyre as geometry where a mesh wheel sweeps one and paints it.

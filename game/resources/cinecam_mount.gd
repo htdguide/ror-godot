@@ -24,10 +24,11 @@ static func build(truck: TruckParser, row: Dictionary) -> void:
     var at: int = truck.nodes.size()
     truck.register_generated("@cinecam%d" % truck.cinecams.size())
     truck.nodes.append(row["position"] as Vector3)
-    # Upstream applies neither the node defaults' weight nor the row's own `node_mass` here, on
-    # purpose and with a comment saying so: the node goes through the rig's own mass
-    # distribution like any other body node.
-    truck.node_mass.append(-1.0)
+    # **Its own weight, not a share of the rig's.** The spawner leaves this node out of its mass
+    # pass on purpose, and `Actor::RecalculateNodeMasses` then overwrites it with the row's
+    # figure — so the end of upstream's two steps is the stated mass, which is what is set here.
+    # See `CameraRows.DEFAULT_MASS` for what a share of the rig's mass costs instead.
+    truck.node_mass.append(row["mass"] as float)
     truck.node_friction.append(NodeRows.FRICTION_DEFAULT)
     for mount: String in row["nodes"] as PackedStringArray:
         var to: int = int(truck.node_id_to_index.get(mount, -1))

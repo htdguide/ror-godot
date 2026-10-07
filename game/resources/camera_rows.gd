@@ -18,9 +18,19 @@ extends RefCounted
 const MOUNTS: int = 8
 const FIRST_MOUNT_FIELD: int = 3
 const SPRING_FIELD: int = 11
-## Upstream's `RigDef::Cinecam` defaults, for a row that states no rates of its own.
+const MASS_FIELD: int = 13
+## Upstream's `RigDef::Cinecam` defaults, for a row that states none of its own.
 const DEFAULT_SPRING: float = 8000.0
 const DEFAULT_DAMP: float = 800.0
+## **A cinecam node weighs this, and it does not take a share of the rig's dry mass.**
+## `Actor::RecalculateNodeMasses` distributes the dry mass over the beams and then overwrites
+## every cinecam node's mass with the row's own figure, before the minimass floor is applied. Left
+## to the distribution it lands wherever the rig's mass happens to put it — and on a vehicle whose
+## `globals` states a dry mass of zero, as the Mazda's does, that is the 0.20 kg minimass. Eight
+## mounts at 800 Ns/m on 0.2 kg is a damping ratio of 16 against an explicit integrator's bound of
+## 2 at 2 kHz: the node shakes itself apart, tears off all eight of its beams and leaves the rig.
+## Measured, it ended 14 m from a mount whose rest length is 1.9 m.
+const DEFAULT_MASS: float = 20.0
 
 ## The node names from the first `cameras` row, unresolved.
 var pending: PackedStringArray = PackedStringArray()
@@ -45,7 +55,7 @@ func read_cameras(fields: PackedStringArray) -> void:
 ## thinks. Measured on the Mazda: its hubcaps name node 332, which is the first rim node of
 ## its left front wheel only once its three cinecams have been counted.
 ##
-## Returns {"error", "position", "nodes", "spring", "damp"}; `nodes` are the eight node ids as
+## Returns {"error", "position", "nodes", "spring", "damp", "mass"}; `nodes` are the node ids as
 ## written, left unresolved because this is read before the wheel sections and resolving is the
 ## parser's to do once every node exists.
 func read_cinecam(fields: PackedStringArray) -> Dictionary:
@@ -69,6 +79,13 @@ func read_cinecam(fields: PackedStringArray) -> Dictionary:
         "damp": (
             fields[SPRING_FIELD + 1].to_float() if fields.size() > SPRING_FIELD + 1
             else DEFAULT_DAMP
+        ),
+        # Upstream ignores a stated mass of zero or less, because a trailing pseudo-comment
+        # parses as one.
+        "mass": (
+            fields[MASS_FIELD].to_float()
+            if fields.size() > MASS_FIELD and fields[MASS_FIELD].to_float() > 0.0
+            else DEFAULT_MASS
         ),
     }
 

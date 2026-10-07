@@ -17,6 +17,10 @@ extends RefCounted
 ## Used only when a wheel row carries no recorded beam defaults, which a hand-built test rig may
 ## not. Upstream's rim beams come from the beam defaults rather than the wheel's own spring, which
 ## is the tyre's; falling back to the tyre value makes the rim as soft as the sidewall.
+## Where a flexbody wheel's tyre mesh sits: half way from the first wheel node towards each of the
+## two axle nodes, which is upstream's `Ogre::Vector3(0.5f, 0.5f, 0.f)`. The offsets multiply the
+## unnormalised node differences, so this is the wheel's own centre whatever its track.
+const TYRE_OFFSET: Vector3 = Vector3(0.5, 0.5, 0.0)
 const RIM_SPRING_FALLBACK: float = 4000000.0
 const RIM_DAMP_FALLBACK: float = 150.0
 
@@ -32,10 +36,22 @@ static func read_row(truck: TruckParser, section: String, line: String) -> Strin
         return row["error"] as String
     row.erase("error")
     row["friction"] = truck.node_defaults.friction
-    # Only where the section states none of its own: `wheels2` and `flexbodywheels` do.
+    # **Unscaled, which is upstream's own asymmetry.** `ProcessMeshWheel2` reads
+    # `def.beam_defaults->springiness` and `->damping_constant` directly, not the scaled
+    # accessors it uses for ordinary beams, so a rig's `set_beam_defaults_scale` does not reach
+    # its wheels. The hero truck scales damping by 0.25: read as scaled, its rims come out at
+    # 37.5 Ns/m against the 150 its file states.
+    #
+    # Only where the section states no rim rates of its own, which `wheels2` and `flexbodywheels`
+    # do.
     if not row.has("rim_spring"):
-        row["rim_spring"] = truck.beam_defaults.spring()
-        row["rim_damp"] = truck.beam_defaults.damp()
+        row["rim_spring"] = truck.beam_defaults.spring_unscaled()
+        row["rim_damp"] = truck.beam_defaults.damp_unscaled()
+    # The tyre tread's own hoop, which upstream takes from the beam defaults whatever the row
+    # states: `float tread_spring = def.beam_defaults->springiness;`. On the Mazda that is
+    # 100000 against the 320000 its rim rate states, so the two are not interchangeable.
+    row["tread_spring"] = truck.beam_defaults.spring_unscaled()
+    row["tread_damp"] = truck.beam_defaults.damp_unscaled()
     # What its beams bend and break at. See `_stress`.
     row["deform"] = truck.beam_defaults.deform()
     row["strength"] = truck.beam_defaults.breaking_strength()
@@ -192,14 +208,16 @@ static func _generate_flexbody(truck: TruckParser, wheel: Dictionary) -> void:
         tyre_inner.append(_add_node(truck, origin_b + ray, node_mass, friction))
         ray = ray.rotated(axis, step)
 
+    _tyre_flexbody(truck, wheel, rim_outer[0])
+
     var rim_spring: float = wheel["rim_spring"] as float
     var rim_damp: float = wheel["rim_damp"] as float
     # Upstream halves the tyre rate on every rim-to-tyre beam: each tyre node is held by two of
     # them, so the pair together carry what the row states.
     var tyre_spring: float = (wheel["spring"] as float) * 0.5
     var tyre_damp: float = wheel["damping"] as float
-    var tread_spring: float = wheel.get("rim_spring", RIM_SPRING_FALLBACK) as float
-    var tread_damp: float = wheel.get("rim_damp", RIM_DAMP_FALLBACK) as float
+    var tread_spring: float = wheel.get("tread_spring", RIM_SPRING_FALLBACK) as float
+    var tread_damp: float = wheel.get("tread_damp", RIM_DAMP_FALLBACK) as float
     var stress: Dictionary = _stress(wheel)
     # Where the support beams start to resist, so the tread cannot collapse onto the rim.
     var support_short_bound: float = 1.0 - (rim_radius / maxf(tyre_radius, 0.0001)) * 0.95
@@ -236,6 +254,34 @@ static func _generate_flexbody(truck: TruckParser, wheel: Dictionary) -> void:
         _add_support_beam(
             truck, axis_b, tyre_inner[i], tyre_spring, tyre_damp, support_short_bound, stress
         )
+
+
+## The tyre of a flexbody wheel is a flexbody, and that is upstream's own answer rather than an
+## analogy. `CreateFlexBodyWheelVisuals` draws the rim mesh and then blanks the generated tyre band
+## outright — `"tracks/trans", // Use a builtin transparent material ... to effectively disable it`
+## — before handing the tyre mesh to the flexbody factory, bound to all four rings of the wheel's
+## own nodes at an offset of (0.5, 0.5, 0) from the first of them towards the two axle nodes.
+##
+## **Drawn as a rigid mesh on the rim instead, it is in the wrong place twice over.** A flexbody
+## mesh is authored in the rig's own coordinates, so parenting it to the wheel adds the wheel's
+## offset a second time, and nothing then deforms it with the tyre. Reported from a window as the
+## tyres being "completely off": a black lump sitting outboard of its own rim.
+static func _tyre_flexbody(truck: TruckParser, wheel: Dictionary, base: int) -> void:
+    var mesh: String = wheel.get("tyre_mesh", "") as String
+    if mesh == "":
+        return
+    var bound: PackedInt32Array = PackedInt32Array()
+    for i: int in 4 * (wheel["rays"] as int):
+        bound.append(base + i)
+    truck.flexbodies.append({
+        "ref": base,
+        "nx": wheel["node1"] as int,
+        "ny": wheel["node2"] as int,
+        "offset": TYRE_OFFSET,
+        "rot_deg": Vector3.ZERO,
+        "mesh": mesh,
+        "forset": bound,
+    })
 
 
 ## A beam that is a plain spring until it is compressed past `short_bound`, then ramps towards

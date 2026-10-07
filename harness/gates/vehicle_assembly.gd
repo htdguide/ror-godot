@@ -15,8 +15,16 @@ extends GateBase
 ## a tonemapper is in the pipeline: an unshaded ALBEDO is still tonemapped, so a pure blue
 ## marker no longer lands near (0, 0, 1) on screen. Hue dominance survives that.
 const MARKER_DOMINANCE: float = 0.08
-const MOD_DIR: String = "assets/mods/ChevyS1023"
-const TRUCK: String = "S10offroad.truck"
+## **More than one vehicle, because a whole-vehicle frame error is invisible on the wrong one.**
+## The hero truck's file centres its nodes on its own actor origin — its body's rest centre is
+## (-0.79, 0.78, 0.00) against an actor origin of (-0.85, 0.18, -0.36) — so a frame left out of
+## the render path moves it about six centimetres, which is inside this gate's own tolerance. The
+## Mazda's nodes run from 0 to 4.56 m along its length and its actor origin is at 1.25, so the
+## same omission puts its bodywork 2.4 m from its wheels. One vehicle cannot answer this question.
+const VEHICLES: Array[Dictionary] = [
+    {"dir": "assets/mods/ChevyS1023", "file": "S10offroad.truck"},
+    {"dir": "assets/mods/mazda626gf", "file": "mazda626sd18i-mt.car"},
+]
 const PRESET: String = "diag_topdown"
 ## Radius, in pixels, searched around a projected position for the vehicle's own colour.
 ## Generous enough to absorb projection rounding and a point's own size, far tighter than
@@ -241,18 +249,36 @@ func _marker_near(image: Image, at: Vector2) -> bool:
 
 
 func run(harness: Node) -> Dictionary:
-    var mod_dir: String = SourceScan.repo_root().path_join(MOD_DIR)
-    if not DirAccess.dir_exists_absolute(mod_dir):
-        return ok("skipped: hero asset not present at %s" % MOD_DIR, 0)
     var err: String = harness.setup_for(PRESET)
     if err != "":
         return fail(err)
     # Numbers are read back out of pixels here, so nothing else may draw into the frame.
     harness.use_measurement_environment()
+    var reports: PackedStringArray = PackedStringArray()
+    var checked: int = 0
+    for entry: Dictionary in VEHICLES:
+        var mod_dir: String = SourceScan.repo_root().path_join(entry["dir"] as String)
+        if not DirAccess.dir_exists_absolute(mod_dir):
+            continue
+        var outcome: Dictionary = await _check_vehicle(
+            harness, mod_dir, entry["file"] as String
+        )
+        if (outcome["error"] as String) != "":
+            return fail(
+                "%s: %s" % [entry["file"], outcome["error"]], outcome.get("measured", 0.0)
+            )
+        reports.append("%s %s" % [entry["file"], outcome["report"]])
+        checked += 1
+    if checked == 0:
+        return ok("skipped: none of the gate's vehicles are in this checkout", 0)
+    return ok("; ".join(reports), checked)
 
-    var result: Dictionary = VehicleBuilder.build(mod_dir, TRUCK)
+
+## One vehicle: built, placed somewhere arbitrary, and measured. Returns {"error", "report"}.
+func _check_vehicle(harness: Node, mod_dir: String, file: String) -> Dictionary:
+    var result: Dictionary = VehicleBuilder.build(mod_dir, file)
     if (result.get("error", "") as String) != "":
-        return fail(result["error"] as String)
+        return {"error": result["error"] as String, "report": ""}
     var vehicle: Node3D = result["root"] as Node3D
     harness.world.add_child(vehicle)
     # Somewhere arbitrary, to prove the check does not depend on where the vehicle is.
@@ -261,7 +287,7 @@ func run(harness: Node) -> Dictionary:
     var truck: TruckParser = result["truck"] as TruckParser
     var parts: Array[SkinnedFlexbody] = result["parts"] as Array[SkinnedFlexbody]
     if parts.is_empty():
-        return fail("no skinned parts were built")
+        return {"error": "no skinned parts were built", "report": ""}
 
     var reference: SkinnedFlexbody = parts[0]
     var reference_world: Vector3 = reference.rendered_position(0)
@@ -314,25 +340,32 @@ func run(harness: Node) -> Dictionary:
     var pixel_check: String = await _check_rendered_positions(
         harness, vehicle, truck, result["rig_to_local"] as Transform3D, parts
     )
+    harness.world.remove_child(vehicle)
+    vehicle.queue_free()
     if pixel_check != "":
-        return fail(pixel_check)
-
+        return {"error": pixel_check, "report": ""}
     if worst_wheel_mm > WHEEL_TOLERANCE_MM:
-        return fail(
-            "%s renders %.0f mm from its axle, over %.0f mm: the wheel geometry is not"
-            % [worst_wheel_what, worst_wheel_mm, WHEEL_TOLERANCE_MM]
-            + " where its own axle nodes put it",
-            worst_wheel_mm
-        )
+        return {
+            "error": (
+                "%s renders %.0f mm from its axle, over %.0f mm: the wheel geometry is not"
+                % [worst_wheel_what, worst_wheel_mm, WHEEL_TOLERANCE_MM]
+                + " where its own axle nodes put it"
+            ),
+            "measured": worst_wheel_mm,
+            "report": "",
+        }
     if worst_mm > TOLERANCE_MM:
-        return fail(
-            "%s sits %.1f mm from where the rig puts it, over %.1f mm: the vehicle is"
-            % [worst_what, worst_mm, TOLERANCE_MM]
-            + " assembled, but not where its own rig says",
-            worst_mm
-        )
-    return ok(
-        "%d parts within %.3f mm and %d wheels within %.0f mm of their rig positions"
-        % [parts.size(), worst_mm, wheel_index, worst_wheel_mm],
-        worst_mm
-    )
+        return {
+            "error": (
+                "%s sits %.1f mm from where the rig puts it, over %.1f mm: the vehicle is"
+                % [worst_what, worst_mm, TOLERANCE_MM]
+                + " assembled, but not where its own rig says"
+            ),
+            "measured": worst_mm,
+            "report": "",
+        }
+    return {
+        "error": "",
+        "report": "%d parts within %.3f mm and %d wheels within %.0f mm" % [
+            parts.size(), worst_mm, wheel_index, worst_wheel_mm],
+    }

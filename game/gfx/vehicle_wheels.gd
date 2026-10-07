@@ -62,17 +62,18 @@ static func build(
     if rim.mesh != null:
         holder.add_child(rim)
 
-    # A flexbody wheel ships its tyre as a mesh; a mesh wheel has one swept and painted.
+    # **A flexbody wheel's tyre is not drawn here.** It is a flexbody over the wheel's own nodes,
+    # built with the rig and drawn with every other flexbody — see `WheelRig._tyre_flexbody`.
+    # Upstream blanks the generated band for exactly these wheels, so there is nothing to sweep.
+    if bool(wheel.get("flexbody", false)) and (wheel.get("tyre_mesh", "") as String) != "":
+        return holder
+
+    # A mesh wheel has its tyre swept around the tread and painted with the row's own material.
     var tyre: MeshInstance3D = MeshInstance3D.new()
     tyre.name = "Tyre"
-    tyre.mesh = named_mesh(
-        wheel.get("tyre_mesh", "") as String, truck, mod_dir, mesh_reader, dds_reader,
-        textures, scripts
+    tyre.mesh = WheelBuilder.build_tyre(truck.nodes, wheel)
+    tyre.material_override = MeshAssembler.material_for(
+        wheel["material"] as String, truck, mod_dir, dds_reader, textures, scripts
     )
-    if tyre.mesh == null:
-        tyre.mesh = WheelBuilder.build_tyre(truck.nodes, wheel)
-        tyre.material_override = MeshAssembler.material_for(
-            wheel["material"] as String, truck, mod_dir, dds_reader, textures, scripts
-        )
     holder.add_child(tyre)
     return holder
