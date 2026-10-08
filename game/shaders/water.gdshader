@@ -71,8 +71,10 @@ uniform float opacity : hint_range(0.0, 1.0) = 1.0;
 
 const float MIN_DEPTH_M = 0.001;
 // Water's reflectance looking straight down into it, from its own index of refraction:
-// ((1 - 1.33) / (1 + 1.33))^2. Fresnel takes it from there to 1.0 at the horizon.
+// ((1 - 1.33) / (1 + 1.33))^2. Fresnel takes it from there to 1.0 at the horizon. Godot takes F0
+// as 0.16 * SPECULAR^2, so this is handed over as sqrt(F0 / 0.16).
 const float WATER_F0 = 0.0203;
+const float WATER_SPECULAR = 0.3562;
 // How far the refracted sample is allowed to reach, in metres of screen offset. A bend that runs
 // off the edge of what the opaque pass drew samples the sky and puts a patch of it under the
 // water.
@@ -168,19 +170,22 @@ void fragment() {
     // **A dielectric, and its reflection is the engine's.** Water is IOR 1.33, so it reflects 2%
     // of what is above it looked straight down into and nearly all of it at the horizon, and
     // Godot's image-based lighting reflects a real picture of this hour's sky rather than a stated
-    // blue.
+    // blue. `SPECULAR` is Godot's F0 knob — F0 = 0.16 * SPECULAR^2 — so water's own F0 is what it
+    // is set from. **It was 0.5 for the shader's whole life, with `WATER_F0` written beside it and
+    // unused: a reflectance of 4% looking down, twice water's.** `a_sea_reflects_the_sky_by_fresnel`
+    // measured 0.0400 against a mirror and the Fresnel equations' 0.0204, and holds every angle
+    // from straight down to 82 degrees against them now.
     //
-    // **It falls short at the horizon and that is measured, not suspected.** On a level view over
-    // open water the sea just under the horizon reads 0.296 of the sky just over it; a mirror put
-    // in the same frame reads 0.93, so the radiance map holds the sky and it is the dielectric
-    // response that does not reach 1.0 at grazing. Computing the Fresnel share here from the
-    // published index and handing it to the engine as `METALLIC` was tried — the ramp measures
-    // correctly, 0.05 looking down and 0.9 at the horizon — and the sea came out a flat milky
-    // sheet with its waves washed out of it. So the horizon is too dark, it is written down, and
-    // the fix waits on knowing why rather than on a second guess stacked on the first.
+    // The horizon reading 0.296 of the sky, recorded here for a while as a shortfall of the
+    // dielectric response that "waits on knowing why", is superseded rather than explained: it
+    // compared a sea band with a sky band under a weather sky with its haze on, and the gate
+    // compares the sea with a mirror at the same angle under a furnace sky with none. Against the
+    // mirror the response is 0.47 at 82 degrees and 0.77 at 89, where the exact equations give
+    // 0.43 and 0.90 — the engine's own fitted Fresnel, a few per cent over at mid angles and 15%
+    // under at the horizon, and the sea is doing nothing to it.
     METALLIC = 0.0;
     ROUGHNESS = surface_roughness;
-    SPECULAR = 0.5;
+    SPECULAR = WATER_SPECULAR;
 
     // **Written, and that is the point of writing it.** `ALPHA` is what puts this surface in the
     // transparent pass, and the transparent pass is where the screen texture it refracts through

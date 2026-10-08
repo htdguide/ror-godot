@@ -97,13 +97,16 @@ See `hard-won-facts-light.md` for exposure, skies and anything that measures a f
   that is nearly right, because the same sky lit the sea bed; a shadow across the water is where it
   is wrong.
 
-- **Godot's dielectric reflection does not reach the horizon.** On a level view over open water the
-  sea just under the horizon reads 0.296 of the sky just over it, where water that grazing reflects
-  very nearly all of it. A mirror put in the same frame reads 0.93, so the radiance map holds the
-  sky and it is the dielectric response that falls short. Computing the Fresnel share in the shader
-  from water's own index and handing it to the engine as `METALLIC` was tried: the ramp measures
-  correctly — 0.05 looking down, 0.9 at the horizon — and the sea still came out a flat milky sheet
-  with its waves washed out. Unexplained, and written down rather than guessed at twice.
+- **Godot's dielectric reflection does reach the horizon; a sea band against a sky band is not how
+  to measure it.** This entry used to record the sea just under the horizon reading 0.296 of the sky
+  just over it, with a mirror at 0.93, as an unexplained shortfall of the dielectric response.
+  `a_sea_reflects_the_sky_by_fresnel` measures the sea against a mirror *at the same angle* under a
+  furnace sky with no haze and finds 0.47 at 82 degrees and 0.77 at 89 against the Fresnel
+  equations' 0.43 and 0.90 — the engine's fitted Fresnel, and the sea does nothing to it. What the
+  0.296 was measuring is not re-derived; it is superseded. What the gate did find was the shader
+  stating `SPECULAR = 0.5`, a 4% reflectance where water has 2%, with `WATER_F0` written unused
+  beside it. Handing Fresnel to the engine as `METALLIC` remains the wrong fix: the ramp measures
+  right and the sea comes out a flat milky sheet, because a metal has no diffuse term.
 
 - **Published absorption figures are listed by wavelength and shaders are written in RGB.** Pure
   water absorbs about 0.01 per metre at 440 nm, 0.06 at 550 and 0.35 at 650 — shortest first.

@@ -110,21 +110,18 @@ func run(harness: Node) -> Dictionary:
     if err != "":
         return fail(err)
     clear_fog(harness)
-    # **A new `Environment`, not the world's own with its furnace settings written over it.** The
-    # weather's environment carries glow, colour adjustment, fog and an ambient of its own, and a
-    # furnace is defined by what is *not* in it: with the world's environment edited in place every
-    # ball read 2.95 times the sky behind it, uniformly, at every roughness.
+    # A new `Environment`, not the world's own edited in place: see `GateBase.furnace_environment`.
     var holder: WorldEnvironment = (
         harness.world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
     )
     if holder == null:
         return fail("the world has no environment to replace")
-    holder.environment = _a_furnace()
+    holder.environment = furnace_environment(FURNACE)
     # **Nothing else may be in the enclosure.** A floor is a surface that absorbs, a lamp is light
     # arriving from somewhere other than the walls, and either one makes this a scene rather than a
     # furnace. Hidden recursively rather than by name: with only the top-level `Ground` and the sun
     # taken out, the ball's silhouette came back at 3.2 times the furnace.
-    _empty(harness.world)
+    hide_everything(harness.world)
 
     var ball: MeshInstance3D = _ball()
     harness.world.add_child(ball)
@@ -198,50 +195,11 @@ func run(harness: Node) -> Dictionary:
     )
 
 
-## Hides everything that draws or lights, wherever it is in the tree.
-func _empty(node: Node) -> void:
-    for child: Node in node.get_children():
-        var light: Light3D = child as Light3D
-        var drawn: VisualInstance3D = child as VisualInstance3D
-        if light != null or drawn != null:
-            (child as Node3D).visible = false
-        _empty(child)
-
-
 func _environment(harness: Node) -> Environment:
     var holder: WorldEnvironment = (
         harness.world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
     )
     return null if holder == null else holder.environment
-
-
-## One radiance from every direction, and nothing else whatsoever.
-func _a_furnace() -> Environment:
-    var environment: Environment = Environment.new()
-    var sky: Sky = Sky.new()
-    sky.process_mode = Sky.PROCESS_MODE_QUALITY
-    sky.radiance_size = RenderCfg.SKY_RADIANCE_SIZE as Sky.RadianceSize
-    var paint: ProceduralSkyMaterial = ProceduralSkyMaterial.new()
-    paint.sky_top_color = Color.WHITE
-    paint.sky_horizon_color = Color.WHITE
-    paint.ground_bottom_color = Color.WHITE
-    paint.ground_horizon_color = Color.WHITE
-    # One multiplier and not three: they compound, so setting all of them makes the furnace the
-    # cube of what it says.
-    paint.sky_energy_multiplier = 1.0
-    paint.ground_energy_multiplier = 1.0
-    paint.energy_multiplier = FURNACE
-    paint.sun_angle_max = 0.0
-    sky.sky_material = paint
-    environment.background_mode = Environment.BG_SKY
-    environment.sky = sky
-    environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-    environment.ambient_light_sky_contribution = 1.0
-    environment.ambient_light_energy = 1.0
-    environment.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
-    environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
-    environment.tonemap_exposure = 1.0
-    return environment
 
 
 func _ball() -> MeshInstance3D:

@@ -95,3 +95,47 @@ func clear_fog(harness: Node) -> void:
     ) as WorldEnvironment
     if holder != null and holder.environment != null:
         holder.environment.fog_enabled = false
+
+
+## Hides everything that draws or lights, wherever it is in the tree. What a furnace or a
+## reflectance measurement needs is an enclosure with nothing in it but the thing being measured.
+static func hide_everything(node: Node) -> void:
+    for child: Node in node.get_children():
+        var light: Light3D = child as Light3D
+        var drawn: VisualInstance3D = child as VisualInstance3D
+        if light != null or drawn != null:
+            (child as Node3D).visible = false
+        hide_everything(child)
+
+
+## One radiance from every direction, and nothing else whatsoever: no sun, no fog, no glow, no
+## grading, a linear tonemapper. A furnace has one correct answer and no setup to agree about.
+## **A new `Environment`, not the world's own with these written over it** — the weather's carries
+## glow, colour adjustment, fog and an ambient of its own, and edited in place every white ball
+## read 2.95 times the sky behind it.
+static func furnace_environment(radiance: float) -> Environment:
+    var environment: Environment = Environment.new()
+    var sky: Sky = Sky.new()
+    sky.process_mode = Sky.PROCESS_MODE_QUALITY
+    sky.radiance_size = RenderCfg.SKY_RADIANCE_SIZE as Sky.RadianceSize
+    var paint: ProceduralSkyMaterial = ProceduralSkyMaterial.new()
+    paint.sky_top_color = Color.WHITE
+    paint.sky_horizon_color = Color.WHITE
+    paint.ground_bottom_color = Color.WHITE
+    paint.ground_horizon_color = Color.WHITE
+    # One multiplier and not three: they compound, so setting all of them makes the furnace the
+    # cube of what it says.
+    paint.sky_energy_multiplier = 1.0
+    paint.ground_energy_multiplier = 1.0
+    paint.energy_multiplier = radiance
+    paint.sun_angle_max = 0.0
+    sky.sky_material = paint
+    environment.background_mode = Environment.BG_SKY
+    environment.sky = sky
+    environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+    environment.ambient_light_sky_contribution = 1.0
+    environment.ambient_light_energy = 1.0
+    environment.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+    environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+    environment.tonemap_exposure = 1.0
+    return environment
