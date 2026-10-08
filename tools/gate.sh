@@ -437,7 +437,8 @@ for line in sys.stdin:
     if row.get("nested"):
         continue
     gate = row.get("gate", "?")
-    value = ("PASS" if row.get("pass") else "FAIL", repr(row.get("measured")))
+    value = ("PASS" if row.get("pass") else "FAIL", repr(row.get("measured")),
+             "wall-clock" if row.get("wall_clock") else "")
     if gate not in first:
         first[gate] = value
     elif gate not in second:
@@ -449,7 +450,7 @@ for gate, seen in sorted(extra.items()):
 for table, path in ((first, sys.argv[1]), (second, sys.argv[2])):
     with open(path, "w") as handle:
         for gate in sorted(table):
-            handle.write("\t".join([gate, table[gate][0], "-", "", table[gate][1]]) + "\n")
+            handle.write("\t".join([gate, table[gate][0], "-", "", table[gate][1], table[gate][2]]) + "\n")
 ' "$first" "$second"
     if [[ ! -s "$first" || ! -s "$second" ]]; then
         printf '%s\n' "$output" | tail -25 >&2
@@ -467,7 +468,7 @@ def rows(path):
         for line in handle:
             parts = line.rstrip("\n").split("\t")
             if len(parts) >= 5:
-                out[parts[0]] = (parts[1], parts[4])
+                out[parts[0]] = (parts[1], parts[4], parts[5] if len(parts) > 5 else "")
     return out
 
 
@@ -500,12 +501,20 @@ def as_float(text):
 a, b = rows(sys.argv[1]), rows(sys.argv[2])
 problems = []
 worst, worst_gate = 0.0, ""
+# A gate that declares its measured value a wall-clock time is held to its verdict alone. The
+# frame-time gate read 10.998 ms in order and 11.049 shuffled, and 10.960 and 10.982 twice in the
+# same order: that is a clock, not a dependence on what ran before. It is counted and printed so
+# the exemption is never silent.
+by_verdict_only = []
 for gate in sorted(set(a) | set(b)):
     if gate not in a or gate not in b:
         problems.append("%s ran in only one of the two passes" % gate)
         continue
     if a[gate][0] != b[gate][0]:
         problems.append("%s: %s in order, %s shuffled" % (gate, a[gate][0], b[gate][0]))
+        continue
+    if a[gate][2] == "wall-clock" or b[gate][2] == "wall-clock":
+        by_verdict_only.append("%s (%s / %s)" % (gate, a[gate][1], b[gate][1]))
         continue
     first_value, second_value = as_float(a[gate][1]), as_float(b[gate][1])
     if first_value is None or second_value is None:
@@ -528,6 +537,9 @@ if problems:
     for problem in problems:
         print("  " + problem)
     raise SystemExit(1)
+if by_verdict_only:
+    print("order check: %d wall-clock measurement(s) compared by verdict only: %s"
+          % (len(by_verdict_only), ", ".join(by_verdict_only)))
 print(
     "order check passed: %d gates, two passes in one session, identical verdicts; worst"
     " measured drift %.2g (%s), under %g" % (len(a), worst, worst_gate or "none", TOLERANCE)

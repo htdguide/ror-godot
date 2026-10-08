@@ -61,6 +61,10 @@ static func meta() -> Dictionary:
         ),
         "budget_s": 60.0,
         "needs_gpu": true,
+        # The measured value is a frame time off the wall clock. The order check compares this
+        # gate's verdict between its two passes and not the milliseconds: 10.96 against 10.98 in
+        # the same order is the machine, not a dependence on what ran before.
+        "measured_is_wall_clock": true,
         "milestone": "M2",
     }
 

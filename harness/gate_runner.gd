@@ -250,6 +250,8 @@ func _run_one_gate(harness: Node, name: String) -> int:
         "budget_s": meta_dict["budget_s"],
         "over_budget": over_budget,
     }
+    if bool(meta_dict.get("measured_is_wall_clock", false)):
+        row["wall_clock"] = true
     # A leak is the container's finding about this gate, not the gate's own, so it is reported
     # separately and it fails the gate that caused it. Silently carrying it means the gate that
     # runs next is blamed.

@@ -102,6 +102,17 @@ static func write_manifest(path: String, extra: Dictionary) -> String:
     return ""
 
 
+## Switches off every render effect that blends a frame with the ones before it, for a world a
+## gate measures. Volumetric fog reprojects from a history buffer that belongs to the viewport, not
+## to the world, so it survives a gate's container: with the fog an hour turns on at twilight, a
+## vehicle photographed in a second run of the same gate in one session read 0.1% off the first,
+## and `--order-check` caught it. The same frame, taken twice, has to be the same frame.
+static func make_frames_independent(root: Node3D) -> void:
+    var holder: WorldEnvironment = root.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
+    if holder != null and holder.environment != null:
+        holder.environment.volumetric_fog_temporal_reprojection_enabled = false
+
+
 ## Puts the world into a state where numbers encoded into pixels survive to the capture:
 ## linear tonemapping, a black background and no ambient light.
 ##

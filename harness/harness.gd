@@ -169,6 +169,10 @@ func _build_world(scenario: String, weather: String) -> String:
     # environment and probes out of the next one's frame.
     var host: Node = container.viewport if container != null else _main
     host.add_child(world)
+    # And a measured frame must not depend on the frames before it; a window keeps the effects
+    # that blend them, because what they smooth there is noise a person sees.
+    if container != null:
+        HarnessCapture.make_frames_independent(world)
     # The hour decides the exposure as well as the light: under physical units a camera metered
     # for midday sees nothing by moonlight. See `PhysicalCamera.reexpose`.
     camera = PhysicalCamera.build(preset, WeatherCfg.get_preset(weather))

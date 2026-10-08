@@ -137,7 +137,9 @@ gate that omits it — and it exists so that a failure is actionable and so the 
 report its own debt.
 
 Required: `name`, `proves`, `oracle`, `threshold`, `why`, `budget_s`, `needs_gpu`,
-`milestone`. Optional: `builds_on`, the gates this one covers — see the gate graph above.
+`milestone`. Optional: `builds_on`, the gates this one covers — see the gate graph above; and
+`measured_is_wall_clock`, for a gate whose measured value is a time off the clock, which
+`--order-check` then compares by verdict alone and names on every run.
 
 `oracle` is one of `external` (a third-party reference: Khronos sample renders, a
 Blender Cycles render, published transfer values, a physical formula), `computed` (a

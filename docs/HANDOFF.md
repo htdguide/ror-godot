@@ -136,9 +136,10 @@ has just stated.
 
 ## The suite is green
 
-145 gates, `--all --every`, all passing (2026-10-08, `ff2badc` plus the fix below), and
-`tools/gate.sh --order-check` runs every one of them twice in one session with a worst measured
-drift of zero.
+145 gates, `--all --every`, all passing (2026-10-08), and `tools/gate.sh --order-check` runs
+every one of them twice in one session with identical verdicts. Two things it found that day are
+in `hard-won-facts-light.md`: volumetric fog's temporal history survives a gate's container, and a
+frame-time gate has to declare itself (`measured_is_wall_clock`) rather than be held to 1e-5.
 
 **An implied gate hid a stale call for a day.** `c827e40` gave `set_beam_limits` a fifth argument
 and `beams_deform_and_break` kept calling it with four; `--all` reported it `IMPLIED` under

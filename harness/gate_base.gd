@@ -69,6 +69,11 @@ static func validate_meta(meta_dict: Dictionary) -> String:
         return "oracle '%s' is not one of %s" % [oracle, VALID_ORACLES]
     if float(meta_dict["budget_s"]) <= 0.0:
         return "budget_s must be positive"
+    # A gate whose measured value is a wall-clock time says so, and the order check then holds it
+    # to its verdict alone: a frame time is not a function of what ran before, and a 1e-5 bound on
+    # it would be asking the machine to be a clock.
+    if meta_dict.has("measured_is_wall_clock") and not (meta_dict["measured_is_wall_clock"] is bool):
+        return "measured_is_wall_clock must be true or false"
     if meta_dict.has("builds_on"):
         if not (meta_dict["builds_on"] is Array):
             return "builds_on must be an array of gate names"

@@ -55,6 +55,9 @@ static func update(material: ShaderMaterial, weather: Dictionary, clouds: bool =
     )
     # The stars, which an hour of the day turns up as its sky goes out.
     material.set_shader_parameter("stars", float(weather.get("stars", 0.0)))
+    # The clock the clouds drift on. A weather that states none follows TIME; a gate that
+    # photographs a sky with clouds in it states one, or its frames depend on the wall clock.
+    material.set_shader_parameter("cloud_phase", float(weather.get("cloud_phase", -1.0)))
     # How much light is on the clouds. A preset that says nothing is a daylight one.
     material.set_shader_parameter(
         "cloud_light", float(weather.get("cloud_light", 1.0))

@@ -30,6 +30,9 @@ const MIN_SUBJECT: float = 0.05
 const MIN_SWING: float = 6.0
 const CONVERGE: int = 6
 const LISTED: int = 6
+## The cloud phase every frame here is taken at. Any fixed number would do; what matters is that
+## it is fixed — the same rule the foliage's wind and the sea's waves already follow.
+const FROZEN_CLOUD_PHASE: float = 0.0
 
 
 static func meta() -> Dictionary:
@@ -99,6 +102,7 @@ func run(harness: Node) -> Dictionary:
     var seen: PackedFloat32Array = PackedFloat32Array()
     for hour: float in HOURS:
         var sky: Dictionary = DayCycle.at(hour)
+        sky["cloud_phase"] = FROZEN_CLOUD_PHASE
         BlockoutWorld.apply_weather(harness.world, sky, RenderCfg.CLOUDS_ENABLED)
         PhysicalCamera.reexpose(harness.camera, CameraCfg.get_preset("hero_3q"), sky)
         # The probe was taken under whatever sky was up when the vehicle was built, and this is

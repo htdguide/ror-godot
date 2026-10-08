@@ -69,6 +69,24 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   that drift, with the reasoning written down beside it, and the reasoning was wrong — so the
   loosening hid a real bug for two commits. A tolerance widened to fit an unexplained measurement
   is a bug with a comment on it. It is 1e-5 now.
+- **Volumetric fog remembers the last frame, and the memory belongs to the viewport, not the
+  world.** Godot reprojects the fog's froxels from a history buffer, and a gate's container tears
+  down the world and keeps the viewport. `DayCycle` turns the fog on for `day < 0.5` — twilight and
+  night — so `a_vehicle_photoset_through_the_day` photographed the same vehicle 0.1% differently in
+  a second run of the same gate in one session, at 05:30, 18:00 and 21:00 only: at midnight the
+  fog is near black and the history invisible, by day there is no fog. Three wrong answers came
+  first and each was measured out: a cloud phase (the numbers did not move to ten digits — the
+  clouds were not in those frames), more convergence frames (the drift grew), a wait for the sky's
+  radiance (the sky is `PROCESS_MODE_QUALITY`). `HarnessCapture.make_frames_independent` switches
+  the reprojection off for every gate world, and the two runs then agree to fifteen digits. The
+  rule the foliage and the sea taught — a measured frame must not depend on when it was taken —
+  has a second half: it must not depend on the frames before it either.
+- **A wall-clock measurement cannot be held to the order check, and saying so is better than
+  loosening it.** `a_full_scene_renders_inside_its_budget` measures a frame time: 10.998 ms in
+  order, 11.049 shuffled, 10.960 and 10.982 twice in the same order. That is the machine, not a
+  dependence on what ran before, and a 1e-5 bound on it would be asking a computer to be a clock.
+  The gate declares `measured_is_wall_clock` and the order check compares its verdict and says it
+  did, by name, on every run. The tolerance itself stays at 1e-5 for everything else.
 - **A terrain with no traction map grips like gravel, not like the first ground model.** Upstream
   keeps two defaults (`Collisions.cpp:134-135`): `defaultgm` is concrete and is for collision
   meshes, `defaultgroundgm` is gravel and is what the ground uses when landuse is absent or
