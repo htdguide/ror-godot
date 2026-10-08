@@ -350,3 +350,18 @@ built in, and node numbers depend on the order it is built in.**
   and the Agora's left rear wheels name `-36` and `-65` as their rigidity node. Looked up as names,
   neither exists, so those were the only unbraced wheels on their rigs — and the only ones that
   folded, at 89 degrees, after every other wheel in the library was braced.
+- **The archive has a portal, and it is the one upstream's client ships.** `remote_query_url`
+  defaults to `https://v2.api.rigsofrods.org`: `/resource-categories`, `/resources` (979 of them,
+  with `download_count` and `custom_fields.license`) and `/resources/<id>` for `current_files`; a
+  file downloads from `https://forum.rigsofrods.org/resources/<id>/download?file=<file_id>` with no
+  login. `tools/fetch_corpus.sh` takes the most-downloaded vehicles that way, one zip per resource.
+  Of 212 asked for, 7 did not land: three list no `current_files`, two ship archives `unzip` cannot
+  read, and two titles broke the tab-separated plan. The licence field is empty on nearly all of
+  them, which is PLAN §0.5's point: the corpus is fetched, never committed.
+- **734 actors from 205 resources all parse and build a rig, and the parser's own accounting names
+  the worklist.** Nothing refused and nothing took over 0.11 s. What it does not read, counted by
+  actor: `ropables` 448, `soundsources` 447, `contacters` 400, `exhausts` 208, `videocamera` 155,
+  `lockgroups` 122, `hooks` 117, `wings` 107, and 49 more sections; and 1238 `slidenode` rows
+  whose rail is given as a node range the reader does not take, 98 beams naming nodes the file
+  never declared, 64 `flexbody` rows short of fields. The blank-named section in the report is the
+  rows before a file's first header — its title, `fileformatversion`, comments — counted as seen.

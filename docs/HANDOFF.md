@@ -243,8 +243,8 @@ road frame has a lamp post in the middle; both are honest and both are a person'
   `submit_ms` (`a_frame_reports_its_parts`). The solver on its own thread is not started.
 - **Acceptance 4** — done: `the_solver_is_deterministic`, two interleaved runs of 600 frames with
   a crash in them, SHA-256 of every frame's positions identical, and a one-substep control differs.
-- **Acceptance 5** — `mod_corpus` over 200 archive mods, each either loading or reporting a named
-  unsupported feature. No such gate exists; `truck_parse` reads one vehicle.
+- **Acceptance 5** — done: `tools/fetch_corpus.sh` fills `assets/corpus/` from the archive's own
+  portal; `mod_corpus` loads all 734 actors of 205 resources in 28 s and names what it cannot read.
 
 Acceptance 1, 3, 6, 7 and 8 pass.
 

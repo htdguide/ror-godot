@@ -1037,7 +1037,17 @@ Scope:
    positions: identical to the bit. The instrument is checked in the same run — a third solver
    with one extra substep has to hash differently.
 5. `mod_corpus` gate over 200 archive mods: each either loads or reports a named unsupported feature;
-   zero crashes, zero hangs.
+   zero crashes, zero hangs. **Done, 2026-10-08:** `tools/fetch_corpus.sh` pulls the archive's
+   most-downloaded vehicles through the portal upstream's own client uses (`v2.api.rigsofrods.org`,
+   one zip per resource, `CORPUS.json` beside each naming source and licence) into the uncommitted
+   `assets/corpus/`; `mod_corpus` parses and rig-builds every actor it finds there. 205 resources,
+   734 actors: all 734 load, none refuse, slowest 0.11 s, 28 s for the lot. The named worklist it
+   leaves for C2: sections the parser does not read (`ropables` 448, `soundsources` 447,
+   `contacters` 400, `exhausts` 208, `videocamera` 155, `lockgroups` 122, `hooks` 117, `wings`
+   107 and 49 more), the rows it rejects (`slidenode` rail-node rows 1238, beams naming unknown
+   nodes 98, short `flexbody` rows 64), and 56 of the corpus's 10,817 `.mesh` files whose
+   submeshes the reader loses (`a_mesh_keeps_every_triangle_its_file_declares` walked it once and
+   is scoped to the library, not the corpus).
 6. `terrain_collision_agreement`: sampled across a whole shipped terrain, off the lattice on both
    axes, the height RoR's collision sees and the height Terrain3D renders agree within a stated
    tolerance, and the surface the solver grips on is the one the author's traction map paints. A

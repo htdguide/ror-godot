@@ -57,3 +57,6 @@ assets/terrains/
 # and compiled on its own by tools/build_parity.sh. Generated, never committed, for the same
 # reason the addon is — a copy in the tree could drift from the upstream it claims to be.
 build/
+
+# The mod corpus tools/fetch_corpus.sh downloads for the mod_corpus gate: archive content, not ours.
+assets/corpus/

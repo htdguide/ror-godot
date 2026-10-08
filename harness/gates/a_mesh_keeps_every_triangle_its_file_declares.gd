@@ -158,7 +158,15 @@ func _after_line(bytes: PackedByteArray, from: int) -> int:
     return -1
 
 
-## Every `.mesh` in the checkout: terrain packs, vehicle mods and the base resources alike.
+## Every `.mesh` in the checkout: terrain packs, vehicle mods and the base resources alike —
+## except the corpus. `assets/corpus` is two hundred archive mods fetched for `mod_corpus`, whose
+## claim is PLAN R6's deliberately weak one, loads or fails by name; fidelity across the archive is
+## C2's work and not this gate's. Walked over it once, 2026-10-08: 56 of 10,817 mesh files lose
+## geometry their headers declare, and that number is recorded in PLAN §1 under acceptance 5 as
+## C2's worklist rather than held here.
+const NOT_FIDELITY_SCOPE: PackedStringArray = ["assets/corpus"]
+
+
 func _mesh_files() -> PackedStringArray:
     var out: PackedStringArray = PackedStringArray()
     var roots: PackedStringArray = PackedStringArray(["assets", "resources"])
@@ -168,6 +176,9 @@ func _mesh_files() -> PackedStringArray:
 
 
 func _collect(directory: String, into: PackedStringArray) -> void:
+    for skipped: String in NOT_FIDELITY_SCOPE:
+        if directory == SourceScan.repo_root().path_join(skipped):
+            return
     for file: String in DirAccess.get_files_at(directory):
         if file.get_extension().to_lower() == "mesh":
             into.append(directory.path_join(file))
