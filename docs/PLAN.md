@@ -216,13 +216,22 @@ Three things the generated valley provided are now gone, and they are gone rathe
 A fixed set of frames that every visual milestone re-renders, so progress is legible as one
 before/after sheet. The eight named here previously — `valley_vista`, `switchback_backlit`,
 `ford_crossing`, `tunnel_headlights`, `rock_traverse`, `lake_dusk`, `rain_road`,
-`wheel_macro_mud` — named features of the deleted valley and half of them have no subject any
-more. **Re-deriving them from a shipped terrain is open work and nothing renders the sheet
-today.** `ror_terrain_photoset` renders La Paz and `park_photoset`/`valley_photoset` are gone.
+`wheel_macro_mud` — named features of the deleted valley and half of them had no subject any more.
 
-What a replacement set has to satisfy, so it is not the same mistake again: each frame is placed
-from a feature the *terrain* declares — its own spawn, its own objects, its own surfaces — or
-from a search over its own heightmap, never from a coordinate written down beside it.
+**Replaced, 2026-10-08.** `money_shots` renders eight frames and `tools/money_shots.sh` lays them
+out as one sheet, `artifacts/money-shots-sheet.png`, archived per commit by `tools/history.sh`.
+Every frame is placed from a feature the *terrain* declares or from a search over its own
+heightmap — `harness/money_shot_frames.gd` is the whole of that — never from a coordinate written
+beside it: `vista` from the heightmap's highest cell looking at the spawn; `road_into_the_sun` from
+the road point nearest the spawn, looking along the road toward the sun; `shoreline` from the
+first heightmap cell at the WaterLine with water beyond it; `hero_at_spawn`, `headlights` (night,
+lamps on, a chase eye that walks round the vehicle until it is not inside a wall) and
+`wheel_macro` (85 mm on the first axle node) at the terrn2 spawn; `object` on the terrain's own
+object nearest the spawn; `fog_road` the road again in the 300 m fog bank. La Paz is the default
+and the sheet a milestone is judged on; it declares no road points and no water line, so two of
+its frames fall back to the spawn's painted road and the lowest ground and say so in the report.
+`--terrain-dir starling-port` has both. The gate's own claims are the weak ones a photoset makes;
+the strong claim is a person's, from the sheet.
 
 ### Where the assets come from, and the licence trap
 

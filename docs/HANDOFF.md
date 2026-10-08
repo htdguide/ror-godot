@@ -230,11 +230,12 @@ the shadow gate's band is the published 10:1 to 18:1 now, where it was a 1.5-to-
 waiting for a sky it could grade against. The uncalibrated photograph reads 4.7:1 and fails it.
 The "7.2:1 still open" this file carried was written before the photographs arrived.
 
-**2. The money shots do not exist.** PLAN §0.5 named eight, and half of them named features of the
-deleted valley. Nothing renders the sheet today, so there is no before-image for the project to be
-measured against — which M1 asks for. A replacement set has to place every frame from something the
-*terrain* declares, or from a search over its own heightmap, never from a coordinate written down
-beside it. `ror_terrain_photoset` renders La Paz and is the only photoset left.
+**2. The money shots exist.** `tools/money_shots.sh` runs the `money_shots` gate and tiles its
+eight frames into `artifacts/money-shots-sheet.png`, archived per commit by `tools/history.sh`.
+Every frame is derived from the terrain (`harness/money_shot_frames.gd`) and the report says which
+feature placed each camera. La Paz is the default; `--terrain-dir starling-port` has road points
+and a water line. Starling's `object` frame is a wall (its nearest object is a building) and its
+road frame has a lamp post in the middle; both are honest and both are a person's to judge.
 
 **3. What M1 acceptance still wants**, each checked against the suite rather than remembered:
 

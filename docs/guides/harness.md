@@ -10,6 +10,7 @@ measures, compares, and decides. It is the first commit for that reason.
 
     tools/gate.sh --list              gates, camera presets and scenarios
     tools/gate.sh --chain             the gate graph: what each gate builds on
+    tools/money_shots.sh              the eight showcase frames as one sheet (PLAN §0.5)
     tools/gate.sh --all               the suite, highest tier first, as a table
     tools/gate.sh --all --every       the suite with the graph ignored: every gate runs
     tools/gate.sh --why vehicle_renders   one gate, then everything under it if it failed
