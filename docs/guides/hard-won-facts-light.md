@@ -387,3 +387,12 @@ are inside one.
   was outside every measurement ever taken of it. Found by a probe that came back with no mountains
   in it at any fog density and no reason given. **When a render is missing something the scene
   clearly contains, check the far plane before the thing itself.**
+- **A reflectance is measured against a mirror at the same angle, not against the sky.** The sky a
+  surface reflects is not the sky behind it in the frame — the zenith is darker than the horizon,
+  the radiance map is not on the drawn sky's scale, and the haze reaches the sea at the horizon
+  before it reaches the sky above it. A mirror of the same roughness in the same place returns
+  what the lighting path thinks is arriving from the reflected direction, and the surface's reading
+  over the mirror's is its reflectance and nothing else. `a_sea_reflects_the_sky_by_fresnel` does
+  this at six angles in a furnace and holds water to the Fresnel equations for n = 1.333; the first
+  run read exactly 0.0400 at normal incidence, which is `SPECULAR = 0.5` and twice water. Godot's
+  F0 is `0.16 * SPECULAR^2`: a dielectric's own F0 is handed over as `sqrt(F0 / 0.16)`.

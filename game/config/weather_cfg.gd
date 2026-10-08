@@ -205,9 +205,15 @@ const PRESETS: Dictionary = {
     # kilometre is fog to the WMO and below two hundred metres is thick fog; three hundred is a
     # bank you drive into and slow down for. `3.912 / 300` is the density.
     #
-    # Volumetric, and it is the one preset that asks for it: a fog this thick is a medium the light
-    # travels through rather than a tint on what is behind it, and the headlights of M5 have
-    # nothing to make a shaft in without it.
+    # **Not volumetric, and it was.** The froxel layer is a second fog on top of the exponential
+    # one: 96 m deep (`RenderCfg.VOLUMETRIC_LENGTH_M`) and adding about 0.003 per metre inside
+    # that, so the picture faded at 0.0161 per metre over the first 80 m and 0.0149 past it where
+    # the file states 0.01304 everywhere — a 240 m bank sold as a 300 m one, and not a single
+    # visibility at all. `the_haze_fades_contrast_by_koschmieders_law` passed over it for a day
+    # because the froxel history had not converged by the time the frame was taken; with the
+    # history switched off for measurements it read what was there. When M5's headlights want a
+    # shaft to stand in, the stated extinction has to be shared between the two layers with the
+    # froxel grid reaching the visual range, and the gate will say whether the sum is the number.
     "fog_bank": {
         # **Without this a preset has no sky at all**, only `bg_color` behind everything:
         # `BlockoutWorld._grade_environment` reads it as "is there a sky above this hour", and a
@@ -236,7 +242,7 @@ const PRESETS: Dictionary = {
         # 3.912 / 300 m.
         "fog_density": 0.01304,
         "fog_colour": Color(0.76, 0.76, 0.77),
-        "volumetric": true,
+        "volumetric": false,
     },
     # A black, unlit environment. Measurement gates encode numbers into pixels, so any
     # ambient contribution would be added to the value being read back.

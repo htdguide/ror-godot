@@ -139,7 +139,9 @@ report its own debt.
 Required: `name`, `proves`, `oracle`, `threshold`, `why`, `budget_s`, `needs_gpu`,
 `milestone`. Optional: `builds_on`, the gates this one covers — see the gate graph above; and
 `measured_is_wall_clock`, for a gate whose measured value is a time off the clock, which
-`--order-check` then compares by verdict alone and names on every run.
+`--order-check` then compares by verdict alone and names on every run. A gate red in both passes
+fails the order check too: identical verdicts were once enough, and a gate failed twice under a
+passing report.
 
 `oracle` is one of `external` (a third-party reference: Khronos sample renders, a
 Blender Cycles render, published transfer values, a physical formula), `computed` (a

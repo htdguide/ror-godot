@@ -171,11 +171,8 @@ braced vehicle. `harness/dev/drive_stance.gd` is the census and `fold_trace.gd` 
   `HarnessCapture.make_frames_independent` switches it off for gate worlds. `hard-won-facts.md`,
   beside the earlier order-check entries, with the frame-time gate's `measured_is_wall_clock`.
 
-It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%
-threshold — and the cause was not what it was recorded as. See the entry on
-`Image.create_from_data` in `docs/guides/hard-won-facts.md`: one wrong `use_mipmaps` flag made
-every ground texture blank, and four separate findings were all that one bug. The gate passes at
-22.6% on its original threshold. It was worth not widening.
+Earlier, `terrain_takes_the_light` was red at 111% against 30%, and one wrong `use_mipmaps` flag was
+all of it (`hard-won-facts.md`, `Image.create_from_data`). It passes at 22.6% on its own threshold.
 
 ## What to do next
 
@@ -183,10 +180,15 @@ every ground texture blank, and four separate findings were all that one bug. Th
 code, the captured skies are in and calibrated against published daylight, and the vehicle
 `.gdshader` is written: `vehicle_paint.gdshader` layers a clear coat the way
 `KHR_materials_clearcoat` states and adds the sheen Godot has no property for, held by
-`a_clear_coat_keeps_the_paint_under_it` and `a_cloth_lobe_lights_the_silhouette`. What is left of
-the milestone: the water's own sky reflection. `dawn_mist` and `fog_bank` are in, stated as
+`a_clear_coat_keeps_the_paint_under_it` and `a_cloth_lobe_lights_the_silhouette`. The water's sky
+reflection is held by `a_sea_reflects_the_sky_by_fresnel` — the sea against a mirror at six angles
+under a furnace sky, to the Fresnel equations for n = 1.333; it found `SPECULAR = 0.5`, twice
+water's reflectance, on day one. What is left of the milestone is a person's: the look of the haze
+and the fog, and the 7.2:1 sun-to-sky balance below. `dawn_mist` and `fog_bank` are in, stated as
 visibilities — two kilometres and three hundred metres — and held by Koschmieder's law to within
-0.8% of what the frame does; how they *look* is a sweep for a person, and the blockout stage is not
+1.6% of what the frame does, now that the fog bank is one fog rather than two (see
+`hard-won-facts.md`: a volumetric layer on top of it was a second medium, and the gate had passed on
+its unconverged history); how they *look* is a sweep for a person, and the blockout stage is not
 the place to do it, because its floor is unshaded and Godot does not fog an unshaded surface. The
 legacy materials now read what their authors wrote — 88 state a specular exponent and every one is
 built from it — and guess only where nothing is written, bounded to a tenth of a roughness. The perf acceptance item is met: La Paz with its

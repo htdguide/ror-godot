@@ -1173,17 +1173,25 @@ Scope:
   and sums six waves whose frequencies share no common multiple so the surface does not repeat.
   `a_sea_swallows_light_by_beers_law` holds the depth term against the law's own shape — the ratio
   of successive differences, which cancels the coefficients — and
-  `a_sea_moves_and_a_measurement_can_stop_it` holds the phase. **Open**: the sky reflection is the
-  engine's and falls short at the horizon, 0.296 of the sky where a mirror in the same frame reads
-  0.93, with the Fresnel-as-metallic fix tried and rejected — see
-  `docs/guides/hard-won-facts-materials.md`; distance haze and valley-floor fog.
+  `a_sea_moves_and_a_measurement_can_stop_it` holds the phase. **Sky reflection done, 2026-10-08**:
+  `a_sea_reflects_the_sky_by_fresnel` measures the sea against a mirror under a furnace sky at five
+  angles and holds it to the Fresnel equations for n = 1.333; it found the shader stating a 4%
+  reflectance where water has 2%; the "0.296 at the horizon" recorded as an engine shortfall is
+  superseded by the mirror comparison, 0.77 at 89 degrees against the equations' 0.90 — see
+  `docs/guides/hard-won-facts-light.md`. **Open**: distance haze and
+  valley-floor fog as a look, which is the human sweep.
 - **Weather presets** in `weather_cfg.gd`: `dawn_mist`, `noon_clear`, `overcast`, `golden_dusk`,
   `night_clear`, `fog_bank` land here. **Done, 2026-10-07** — the last two are in, and both are
   written as a visibility rather than as a look: Koschmieder's `V = 3.912 / k` gives a dawn mist of
   two kilometres a density of 0.001956 and a fog bank of three hundred metres 0.01304, with the
   WMO's own definitions deciding which is which. `the_haze_fades_contrast_by_koschmieders_law`
-  photographs a contrast ramp through the fog bank and recovers 0.01315 per metre against the
-  0.01304 stated, 0.8% apart, so a stated visual range is the one the picture has. The look of them
+  photographs a contrast ramp through the fog bank and recovers 0.01325 per metre against the
+  0.01304 stated, 1.6% apart, so a stated visual range is the one the picture has. **The fog bank
+  is exponential fog alone since 2026-10-08**: the volumetric layer it also carried was a second
+  medium 96 m deep adding 0.003 per metre, which made the picture a 240 m bank and no single
+  visibility, and the gate had passed over it only because the froxel history had not converged by
+  the frame it read — see `hard-won-facts.md`. When M5 wants a beam medium in fog the stated
+  extinction is shared between the layers and the gate says whether the sum is the number. The look of them
   is a human call and the sweep below is where it belongs; `rain_storm` completes at M6/M7 once wetness and particles exist.
   A preset is a CLI argument, so every later gate can be run under any weather.
 

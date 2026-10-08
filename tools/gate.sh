@@ -513,6 +513,12 @@ for gate in sorted(set(a) | set(b)):
     if a[gate][0] != b[gate][0]:
         problems.append("%s: %s in order, %s shuffled" % (gate, a[gate][0], b[gate][0]))
         continue
+    # A gate that fails in both passes has identical verdicts and is still red. This check used
+    # to call that a pass: the haze gate failed twice in one session and the order check reported
+    # "identical verdicts" over it.
+    if a[gate][0] == "FAIL":
+        problems.append("%s: FAIL in both passes (%s / %s)" % (gate, a[gate][1], b[gate][1]))
+        continue
     if a[gate][2] == "wall-clock" or b[gate][2] == "wall-clock":
         by_verdict_only.append("%s (%s / %s)" % (gate, a[gate][1], b[gate][1]))
         continue
@@ -533,7 +539,7 @@ for gate in sorted(set(a) | set(b)):
             % (gate, first_value, second_value, drift, TOLERANCE)
         )
 if problems:
-    print("ORDER CHECK FAILED -- a gate depends on what ran before it:")
+    print("ORDER CHECK FAILED -- a gate depends on what ran before it, or is red in both passes:")
     for problem in problems:
         print("  " + problem)
     raise SystemExit(1)

@@ -186,9 +186,23 @@ func _compare_sky(a: Sky, b: Sky) -> PackedStringArray:
             % [first.get_class() if first != null else "none",
                second.get_class() if second != null else "none"])
         return out
-    out.append_array(_same(
-        "sky", "energy", first.get("energy_multiplier"), second.get("energy_multiplier")
-    ))
+    # **This project's own sky is a `ShaderMaterial`, and it has no `energy_multiplier`.** Since the
+    # daylight skies became photographs every weather with an `hdri` builds one, `get()` answered
+    # null for both, and `_same` refused the null with a script error that nobody saw — the suite
+    # keeps result lines, not stderr — so the sky's energy was never compared and the gate passed
+    # on the rest. The shader's own uniform is `sky_energy`.
+    var first_energy: Variant = (
+        (first as ShaderMaterial).get_shader_parameter("sky_energy") if first is ShaderMaterial
+        else first.get("energy_multiplier")
+    )
+    var second_energy: Variant = (
+        (second as ShaderMaterial).get_shader_parameter("sky_energy") if second is ShaderMaterial
+        else second.get("energy_multiplier")
+    )
+    if first_energy == null or second_energy == null:
+        out.append("the sky states no energy this gate knows how to read (%s)" % first.get_class())
+    else:
+        out.append_array(_same("sky", "energy", float(first_energy), float(second_energy)))
     if first is PhysicalSkyMaterial:
         out.append_array(_same(
             "sky", "turbidity",

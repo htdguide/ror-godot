@@ -81,6 +81,15 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   the reprojection off for every gate world, and the two runs then agree to fifteen digits. The
   rule the foliage and the sea taught — a measured frame must not depend on when it was taken —
   has a second half: it must not depend on the frames before it either.
+- **Two fogs do not add up to one visibility, and a gate can pass on the one that has not
+  arrived yet.** `fog_bank` stated 0.01304 per metre as its exponential fog and also asked for the
+  volumetric froxel layer, which is a second medium 96 m deep adding about 0.003 per metre inside
+  that reach. The picture faded at 0.0161 over the first 80 m and 0.0149 past it; Koschmieder's
+  one `k` cannot describe that, and the stated 300 m was really 240. The gate had passed at 0.8%
+  because volumetric fog reprojects from a history that starts empty, and six frames in it was
+  mostly not there. Turning the history off for measurements (`make_frames_independent`) made the
+  gate read the fog that was actually drawn, which is the only reason it went red. The preset is
+  exponential alone now, reading 0.01325 against 0.01304.
 - **A wall-clock measurement cannot be held to the order check, and saying so is better than
   loosening it.** `a_full_scene_renders_inside_its_budget` measures a frame time: 10.998 ms in
   order, 11.049 shuffled, 10.960 and 10.982 twice in the same order. That is the machine, not a
