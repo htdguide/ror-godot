@@ -1031,7 +1031,11 @@ Scope:
    wheel impact, the maximum per-vertex difference between RoR's `FlexBody` CPU deform and
    linear-blend skinning against the same node frames is **< 1 mm**, and the 99th percentile is
    < 0.2 mm. Report a histogram. A fail here changes M3's approach — see R1/R2.
-4. Determinism gate: 600 frames, two runs, identical node-position hash.
+4. Determinism gate: 600 frames, two runs, identical node-position hash. **Done, 2026-10-08:**
+   `the_solver_is_deterministic` builds two solvers from the hero, drives them interleaved through
+   one script (throttle, a steer, a crash that breaks 23 beams, brakes) and SHA-256s every frame's
+   positions: identical to the bit. The instrument is checked in the same run — a third solver
+   with one extra substep has to hash differently.
 5. `mod_corpus` gate over 200 archive mods: each either loads or reports a named unsupported feature;
    zero crashes, zero hangs.
 6. `terrain_collision_agreement`: sampled across a whole shipped terrain, off the lattice on both

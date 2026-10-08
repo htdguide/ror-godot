@@ -241,8 +241,8 @@ road frame has a lamp post in the middle; both are honest and both are a person'
 
 - **Acceptance 2** — half done: every `HARNESS_METRIC` row carries `solver_ms`, `deform_ms` and
   `submit_ms` (`a_frame_reports_its_parts`). The solver on its own thread is not started.
-- **Acceptance 4** — a determinism gate: 600 frames, two runs, identical node-position hash. No such
-  gate exists. `capture_stability` compares two captures of an image, which is not the same claim.
+- **Acceptance 4** — done: `the_solver_is_deterministic`, two interleaved runs of 600 frames with
+  a crash in them, SHA-256 of every frame's positions identical, and a one-substep control differs.
 - **Acceptance 5** — `mod_corpus` over 200 archive mods, each either loading or reporting a named
   unsupported feature. No such gate exists; `truck_parse` reads one vehicle.
 
