@@ -37,22 +37,15 @@ extends GateBase
 ## twice and the sun once. `the_sky_does_not_follow_the_camera` holds the fixed behaviour and
 ## measures the same scene at 7.2:1 on every film within 4.2%.
 ##
-## **This gate is still photographed through `PhysicalSkyMaterial`, which is not fixed and cannot
-## be.** Godot's physical sky is a Preetham model with a tone curve applied to the sun's own
-## energy — doubling the sun's lux at a fixed exposure brightened it by 1.54, not by 2 — so its
-## response to light is a power and no multiplier outside it can straighten it. M2's HDRI sky is
-## what replaces it; until then the band below stays wide, and the number this gate reports is a
-## picture's ratio rather than a measurement of light.
-##
-## The bound on the ratio is a sanity range rather than a physical claim, and the reason is worth
-## recording. Clear-sky daylight is measured physics: a surface facing a midday sun receives about
-## 100 klx of direct light plus 15–20 klx of skylight, and the same surface turned away receives
-## only skylight — call it 8 klx. That is roughly 14:1. This scene measures about 4:1, so its sky
-## is some three times stronger than daylight's relative to its sun. Correcting that belongs with
-## M2's HDRI sky, where the balance comes from the captured environment instead of from stated
-## colours, and doing it here would darken every shadow in the project to fix a number. So the
-## range below is wide: what it is for is catching a sky that contributes nothing, or a sun that
-## does, either of which is a bug rather than a grade.
+## **The sky is a calibrated photograph now, and the band is the published one.** Since `2049461`
+## the daylight presets draw a captured sky whose gain was set against daylight — about 95 klx of
+## direct sun on a surface facing it and about 8 klx of skylight, 13:1 — and the day cycle's own
+## noon was brought to the same figure. This gate read 13.1:1 and `the_sky_does_not_follow_the_camera`
+## 13.0:1 modelled and 13.2:1 captured. Until then the band here was 1.5 to 40, a sanity range
+## that only caught a sky contributing nothing, because Godot's `PhysicalSkyMaterial` is a Preetham
+## model with a tone curve on the sun's own energy and could not be graded against; it is 10 to 18
+## now, which is the spread clear-sky daylight measurements give for this ratio. Taken as it came
+## the captured sky gave 5.4:1, and that is what the band is for.
 ##
 ## The displayed value is the claim with teeth: whatever the ratio, the shaded side has to survive
 ## the grading as something a person can see detail in.
@@ -68,10 +61,12 @@ const QUAD_SIZE: float = 6.0
 ## square on. It was a constant copied from the noon preset until the preset's sun moved to where
 ## its captured sky actually has one, and a card facing the wrong way measures the cosine.
 
-## The physical band, from clear-sky daylight measurements. Generously wide: what it is there to
-## catch is a sky contributing nothing, which reads in the hundreds.
-const MIN_SUN_TO_SKY: float = 1.5
-const MAX_SUN_TO_SKY: float = 40.0
+## The physical band: what clear-sky daylight measurements give for a surface facing the sun lit
+## by sun and sky against the same surface lit by sky alone, 10:1 to 18:1 around the 13:1 the skies
+## were calibrated to. An uncalibrated photograph read 5.4:1; a sky contributing nothing reads in
+## the hundreds.
+const MIN_SUN_TO_SKY: float = 10.0
+const MAX_SUN_TO_SKY: float = 18.0
 ## What the shaded side has to display at, after the project's tonemapper and exposure. Below this
 ## a surface is a silhouette: 0.05 is about where an 8-bit sRGB image stops holding usable detail
 ## in shadow, and the valley's walls were rendering at 0.02.

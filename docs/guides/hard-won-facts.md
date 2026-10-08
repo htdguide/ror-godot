@@ -90,6 +90,12 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   mostly not there. Turning the history off for measurements (`make_frames_independent`) made the
   gate read the fog that was actually drawn, which is the only reason it went red. The preset is
   exponential alone now, reading 0.01325 against 0.01304.
+- **A band left wide "until the sky can be graded against" has to be narrowed the day it can,
+  or it stays a sanity check forever.** `daylight_shadows_are_readable` held the sun-to-sky ratio
+  between 1.5 and 40 because Godot's `PhysicalSkyMaterial` could not be calibrated, with a note
+  saying the HDRI sky would be the fix. The HDRI skies arrived, were calibrated to 13:1, and the
+  band stayed at 1.5 to 40 for two days with the handoff still calling the balance open at 7.2:1.
+  It is the published 10 to 18 now; the control is the photograph at the gain it came with, 4.7:1.
 - **A wall-clock measurement cannot be held to the order check, and saying so is better than
   loosening it.** `a_full_scene_renders_inside_its_budget` measures a frame time: 10.998 ms in
   order, 11.049 shuffled, 10.960 and 10.982 twice in the same order. That is the machine, not a

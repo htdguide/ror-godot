@@ -219,17 +219,16 @@ prerequisite for anything.
 `blank_NRM.dds` for all four layers, so its normal maps really are flat. "Normal depth to zero
 changed nothing" was true.
 
-**M2 has started, and the first thing in it was a renderer bug rather than a feature.** Godot
-exposes a sky's light twice and a lamp's once — see `the_sky_does_not_follow_the_camera` and the
-entry in `docs/guides/hard-won-facts-light.md` — so the project's sun-to-sky balance was a
-property of the film: 19.2:1 at ISO 16 and 1.6:1 at 128 on one unchanged scene. It is fixed for
-the sky this project draws itself and holds at 7.2:1 on every film within 4.2%.
-
-Also measured and still open: the balance is 7.2:1 where clear-sky daylight is nearer 14:1, so the
-sky is about twice as strong as daylight's relative to its sun. Correcting that is the HDRI sky's
-job, because `PhysicalSkyMaterial` cannot be graded against at all: it is a Preetham model with a
-tone curve applied to the sun's own energy, measured at `light ^ 0.625`, and the daylight presets
-still photograph through it.
+**The sun-to-sky balance is 13:1 on both skies and two gates hold it.** Godot exposes a sky's
+light twice and a lamp's once (`the_sky_does_not_follow_the_camera`, `hard-won-facts-light.md`),
+so the balance used to be a property of the film — 19.2:1 at ISO 16, 1.6:1 at 128. Fixed in
+`sky_clouds.gdshader`, and then calibrated: the daylight presets are photographs whose gain is set
+against published clear-sky daylight (about 95 klx of sun on a surface facing it, 8 klx of
+skylight, 13:1), and the day cycle's own noon is brought to the same figure. Today
+`daylight_shadows_are_readable` reads 13.1:1 and the other gate 13.0:1 modelled, 13.2:1 captured;
+the shadow gate's band is the published 10:1 to 18:1 now, where it was a 1.5-to-40 sanity range
+waiting for a sky it could grade against. The uncalibrated photograph reads 4.7:1 and fails it.
+The "7.2:1 still open" this file carried was written before the photographs arrived.
 
 **2. The money shots do not exist.** PLAN §0.5 named eight, and half of them named features of the
 deleted valley. Nothing renders the sheet today, so there is no before-image for the project to be
