@@ -128,7 +128,10 @@ one command — is not archived at all. A smoke run archives 520 KB.
     tools/history.sh sheet vehicle/hero_3q.png those versions as one contact sheet
 
 The contact sheet is the useful one: one image showing a single framing across every run
-that produced it, which is how a slow drift becomes visible.
+that produced it, which is how a slow drift becomes visible. Every row also carries `solver_ms`,
+`deform_ms` and `submit_ms` — zero on a frame that drove nothing — reported into the frame by
+`PlayDrive.step` and `VehicleBuilder.apply_pose` through `HarnessMetrics.phase`, and the summary
+gives each its p50 and p99.
 
 ## Writing a gate
 

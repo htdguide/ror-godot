@@ -13,14 +13,29 @@ const USEC_PER_MSEC: float = 1000.0
 ## rendered frames pay for world construction and shader compilation.
 const WARMUP_FRAMES: int = 2
 
+## The parts of a frame that are this project's own work, in microseconds, reported into the
+## frame by whoever did them and printed with it. Every row carries all three, zero when nothing
+## ran that frame, so a parser never has to ask whether a key exists.
+const PHASES: Array[String] = ["solver", "deform", "submit"]
+
 var _frame_ms: PackedFloat64Array = PackedFloat64Array()
 var _last_usec: int = 0
 var _viewport_rid: RID
+var _phase_usec: Dictionary = {}
+var _phase_ms: Dictionary = {}
+## The last row printed, so a gate can assert on what a frame reported without parsing stdout.
+var last_sample: Dictionary = {}
 
 
 func begin(viewport: Viewport) -> void:
     _viewport_rid = viewport.get_viewport_rid()
     _last_usec = Time.get_ticks_usec()
+
+
+## Records time spent in one of this project's own phases this frame. Accumulates: a frame that
+## steps the solver twice reports the sum.
+func phase(name: String, usec: int) -> void:
+    _phase_usec[name] = int(_phase_usec.get(name, 0)) + usec
 
 
 ## Samples one frame and prints it. Returns the sample so a gate can assert on it.
@@ -34,13 +49,23 @@ func sample(frame: int, tag: String) -> Dictionary:
         "frame": frame,
         "tag": tag,
         "frame_ms": snappedf(frame_ms, 0.01),
+    }
+    for name: String in PHASES:
+        var ms: float = float(_phase_usec.get(name, 0)) / USEC_PER_MSEC
+        row[name + "_ms"] = snappedf(ms, 0.001)
+        if not _phase_ms.has(name):
+            _phase_ms[name] = PackedFloat64Array()
+        (_phase_ms[name] as PackedFloat64Array).append(ms)
+    _phase_usec.clear()
+    row.merge({
         "draw_calls": _render_info(RenderingServer.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME),
         "primitives": _render_info(RenderingServer.VIEWPORT_RENDER_INFO_PRIMITIVES_IN_FRAME),
         "objects": _render_info(RenderingServer.VIEWPORT_RENDER_INFO_OBJECTS_IN_FRAME),
         "video_mem_mb": _mem_mb(Performance.RENDER_VIDEO_MEM_USED),
         "texture_mem_mb": _mem_mb(Performance.RENDER_TEXTURE_MEM_USED),
-    }
+    })
     print(LINE_PREFIX + JSON.stringify(row))
+    last_sample = row
     return row
 
 
@@ -64,6 +89,14 @@ func summarize(extra: Dictionary) -> Dictionary:
         "frame_ms_p99": snappedf(_percentile(sorted, 0.99), 0.01),
         "frame_ms_max": snappedf(_percentile(sorted, 1.0), 0.01),
     }
+    for name: String in PHASES:
+        var series: Array[float] = []
+        var samples: PackedFloat64Array = _phase_ms.get(name, PackedFloat64Array())
+        for i: int in range(WARMUP_FRAMES, samples.size()):
+            series.append(samples[i])
+        series.sort()
+        row[name + "_ms_p50"] = snappedf(_percentile(series, 0.50), 0.001)
+        row[name + "_ms_p99"] = snappedf(_percentile(series, 0.99), 0.001)
     row.merge(extra, true)
     print(SUMMARY_PREFIX + JSON.stringify(row))
     return row

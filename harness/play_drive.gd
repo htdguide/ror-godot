@@ -21,6 +21,8 @@ var _throttle: float = 0.0
 var _brake: float = 0.0
 var _substep_remainder: float = 0.0
 var _solver_usec: int = 0
+var _deform_usec: int = 0
+var _submit_usec: int = 0
 var _selector: int = 1
 var _lit: bool = false
 ## The main beam. A second filament rather than a second switch: it only shows while the lights
@@ -106,6 +108,7 @@ func step(delta: float) -> void:
     var began: int = Time.get_ticks_usec()
     solver.step(1.0 / DriveCfg.SUBSTEP_HZ, substeps)
     _solver_usec = Time.get_ticks_usec() - began
+    Harness.metrics.phase("solver", _solver_usec)
     _apply_pose()
     _apply_cabin()
 
@@ -169,10 +172,11 @@ func hud_line() -> String:
             solver.road_speed() * 3.6,
             solver.engine_torque(),
         ]
-        + "throttle %.2f  brake %.2f  steer %+.2f  lights %s  solver %.2f ms"
+        + "throttle %.2f  brake %.2f  steer %+.2f  lights %s  solver %.2f  deform %.2f  submit %.2f ms"
         % [
             _throttle, _brake, solver.steer_state(), "on" if _lit else "off",
-            float(_solver_usec) / 1000.0,
+            float(_solver_usec) / 1000.0, float(_deform_usec) / 1000.0,
+            float(_submit_usec) / 1000.0,
         ]
     )
 
@@ -206,7 +210,11 @@ func _apply_pose() -> void:
     var angles: PackedFloat32Array = PackedFloat32Array()
     for wheel: int in solver.wheel_count():
         angles.append(solver.get_wheel_rotation(wheel))
-    VehicleBuilder.apply_pose(_built, truck, positions, angles)
+    var timed: Dictionary = VehicleBuilder.apply_pose(_built, truck, positions, angles)
+    _deform_usec = timed["deform_usec"] as int
+    _submit_usec = timed["submit_usec"] as int
+    Harness.metrics.phase("deform", _deform_usec)
+    Harness.metrics.phase("submit", _submit_usec)
     frame = ActorFrame.of(positions, truck.camera_nodes)
 
 

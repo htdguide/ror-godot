@@ -239,8 +239,8 @@ road frame has a lamp post in the middle; both are honest and both are a person'
 
 **3. What M1 acceptance still wants**, each checked against the suite rather than remembered:
 
-- **Acceptance 2** — `solver_ms`, `deform_ms` and `submit_ms` reported separately. `metrics.gd`
-  records `frame_ms` only; none of the three names appears anywhere in the tree.
+- **Acceptance 2** — half done: every `HARNESS_METRIC` row carries `solver_ms`, `deform_ms` and
+  `submit_ms` (`a_frame_reports_its_parts`). The solver on its own thread is not started.
 - **Acceptance 4** — a determinism gate: 600 frames, two runs, identical node-position hash. No such
   gate exists. `capture_stability` compares two captures of an image, which is not the same claim.
 - **Acceptance 5** — `mod_corpus` over 200 archive mods, each either loading or reporting a named

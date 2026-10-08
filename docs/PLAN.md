@@ -1022,7 +1022,11 @@ Scope:
 1. The hero truck loads from an unmodified community `.zip` and renders with legacy-equivalent
    materials (unlit-ish, diffuse-only) at 1080p.
 2. The solver runs at its original substep rate on its own thread; `HARNESS_METRIC` reports
-   `solver_ms`, `deform_ms`, `submit_ms` separately.
+   `solver_ms`, `deform_ms`, `submit_ms` separately. **Half done, 2026-10-08:** every metric row
+   carries the three, timed in `PlayDrive.step` and `VehicleBuilder.apply_pose` (deform is the
+   arithmetic, submit the renderer calls), held by `a_frame_reports_its_parts` as an identity —
+   each positive, together at most the frame. On the hero at 60 Hz: solver 0.41 ms, deform 0.49,
+   submit 0.27. The solver still runs on the main thread; the thread is the open half.
 3. LBS spike gate `flexbody_lbs_error`: for 600 recorded solver frames covering a drop, a roll, and a
    wheel impact, the maximum per-vertex difference between RoR's `FlexBody` CPU deform and
    linear-blend skinning against the same node frames is **< 1 mm**, and the 99th percentile is

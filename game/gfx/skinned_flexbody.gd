@@ -115,12 +115,17 @@ func set_pose(
     actor: Transform3D = Transform3D.IDENTITY,
     apply_to_instance: bool = true
 ) -> void:
-    var to_local: Transform3D = actor.affine_inverse()
-    var frames: Array[Transform3D] = FlexbodyBinder.bone_transforms(nodes, triads)
-    for bone: int in frames.size():
-        RenderingServer.skeleton_bone_set_transform(
-            skeleton_rid, bone, to_local * frames[bone] * bind_inverse[bone]
-        )
+    submit(local_bone_transforms(nodes, actor), actor, apply_to_instance)
+
+
+## The second half of a pose: hands bone transforms already worked out to the renderer. Split
+## from the arithmetic so a frame can time deforming and submitting separately, which M1's
+## acceptance asks of `HARNESS_METRIC`.
+func submit(
+    bones: Array[Transform3D], actor: Transform3D, apply_to_instance: bool = true
+) -> void:
+    for bone: int in bones.size():
+        RenderingServer.skeleton_bone_set_transform(skeleton_rid, bone, bones[bone])
     # A part inside a vehicle leaves the frame to the vehicle root, or it would be
     # applied twice. A standalone part carries it itself.
     if apply_to_instance and mesh_instance != null:

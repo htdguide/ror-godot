@@ -172,37 +172,52 @@ static func _descendants(node: Node) -> Array[Node]:
 ## `wheel_angles` spins the rims, one accumulated angle in radians per wheel. A wheel's
 ## drawn geometry is posed by its axle nodes, and an axle node does not rotate — so without
 ## this a vehicle drives along with its wheels standing perfectly still.
+##
+## **Two phases, timed separately.** Deform is arithmetic over the node positions — the actor
+## frame, every part's bone transforms, every prop's, lamp's and wheel's placement — and submit is
+## handing those to the renderer and the scene tree. Returns `{"deform_usec", "submit_usec"}`, which
+## is what puts `deform_ms` and `submit_ms` beside `solver_ms` in `HARNESS_METRIC`.
 static func apply_pose(
     built: Dictionary,
     truck: TruckParser,
     nodes: PackedVector3Array,
     wheel_angles: PackedFloat32Array = PackedFloat32Array()
-) -> void:
+) -> Dictionary:
+    var began: int = Time.get_ticks_usec()
     var actor: Transform3D = ActorFrame.of(nodes, truck.camera_nodes)
+    var to_local: Transform3D = actor.affine_inverse()
+    var parts: Array[SkinnedFlexbody] = built["parts"] as Array[SkinnedFlexbody]
+    var bones: Array = []
+    for part: SkinnedFlexbody in parts:
+        bones.append(part.local_bone_transforms(nodes, actor))
+    var prop_nodes: Array[Node3D] = built["prop_nodes"] as Array[Node3D]
+    var prop_frames: Array[Transform3D] = []
+    for i: int in mini(prop_nodes.size(), truck.props.size()):
+        prop_frames.append(to_local * FlexbodyBinder.placement(nodes, truck.props[i]))
+    var wheel_nodes: Array[Node3D] = built["wheel_nodes"] as Array[Node3D]
+    var wheel_frames: Array[Transform3D] = []
+    for i: int in mini(wheel_nodes.size(), truck.wheels.size()):
+        wheel_frames.append(to_local * WheelBuilder.rim_transform(nodes, truck.wheels[i]))
+    var deformed: int = Time.get_ticks_usec()
+
     var root: Node3D = built["root"] as Node3D
     # Keep whatever the caller did to place the vehicle for a camera, and change only the
     # part of the transform the rig owns.
     var placement: Vector3 = root.transform.origin - built["frame_origin"] as Vector3
     root.transform = Transform3D(actor.basis, actor.origin + placement)
     built["frame_origin"] = actor.origin
-
-    for part: SkinnedFlexbody in built["parts"] as Array[SkinnedFlexbody]:
-        part.set_pose(nodes, actor, false)
-
+    for i: int in parts.size():
+        parts[i].submit(bones[i] as Array[Transform3D], actor, false)
     # Props are rigid: they ride their node triad rather than deforming with it.
-    var to_local: Transform3D = actor.affine_inverse()
-    var prop_nodes: Array[Node3D] = built["prop_nodes"] as Array[Node3D]
-    for i: int in mini(prop_nodes.size(), truck.props.size()):
-        prop_nodes[i].transform = to_local * FlexbodyBinder.placement(nodes, truck.props[i])
-
+    for i: int in prop_frames.size():
+        prop_nodes[i].transform = prop_frames[i]
     FlareBuilder.apply_pose(built["lamps"] as Array[Node3D], truck, nodes, actor)
-
     # Wheels follow their own axle nodes, so suspension travel moves them.
-    var wheel_nodes: Array[Node3D] = built["wheel_nodes"] as Array[Node3D]
-    for i: int in mini(wheel_nodes.size(), truck.wheels.size()):
-        wheel_nodes[i].transform = to_local * WheelBuilder.rim_transform(nodes, truck.wheels[i])
+    for i: int in wheel_frames.size():
+        wheel_nodes[i].transform = wheel_frames[i]
         if i < wheel_angles.size():
             _spin_wheel(wheel_nodes[i], truck.wheels[i], wheel_angles[i])
+    return {"deform_usec": deformed - began, "submit_usec": Time.get_ticks_usec() - deformed}
 
 
 ## Turns one wheel's drawn geometry about its axle.
