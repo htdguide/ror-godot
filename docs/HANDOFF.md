@@ -136,8 +136,16 @@ has just stated.
 
 ## The suite is green
 
-143 gates, `--all --every`, all passing, and `tools/gate.sh --order-check` runs every one of them
-twice in one session with a worst measured drift of zero.
+145 gates, `--all --every`, all passing (2026-10-08, `ff2badc` plus the fix below), and
+`tools/gate.sh --order-check` runs every one of them twice in one session with a worst measured
+drift of zero.
+
+**An implied gate hid a stale call for a day.** `c827e40` gave `set_beam_limits` a fifth argument
+and `beams_deform_and_break` kept calling it with four; `--all` reported it `IMPLIED` under
+`solver_physics_oracle` on every run since, and only `--all --every` ran it. The graph's edge was
+true — the spring law does contain the yield law's prerequisite — and the gate was still broken,
+because a script error is not a physics fault. Run `--all --every` before believing a green suite
+over a change that touched the solver's API, as this file already says.
 
 **Since then: a mod-library sweep, 2026-10-04 to 2026-10-08.** Twelve downloaded packs and the
 shipped Agora and DAF make a library of 69 vehicles, and nearly every loader convention calibrated

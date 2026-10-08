@@ -148,7 +148,8 @@ func _stretch(stretch: float) -> Dictionary:
     solver.set_node_immovable(0, true)
     solver.set_node_immovable(1, true)
     var beam: int = solver.add_beam(0, 1, REST_LENGTH_M, SPRING, DAMPING)
-    solver.set_beam_limits(beam, DEFORM_N, STRENGTH_N, 0.0)
+    # A structural beam, so it may yield: the fifth argument is what `BEAM_HYDRO` actuators turn off.
+    solver.set_beam_limits(beam, DEFORM_N, STRENGTH_N, 0.0, true)
     solver.step(1.0 / SUBSTEP_HZ, 1)
     var rest_length: float = solver.get_beam_rest_length(beam)
     var broken: bool = solver.beam_broken(beam)
