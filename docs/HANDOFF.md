@@ -19,7 +19,11 @@ done: the §0.7 folder mirror, the one-window container runner, order independen
 the path CI uses is the path a person uses, and `tools/gate.sh --cmd "<line>"` runs any console
 command from a shell.
 
-**M2 is next** — PBR ground and HDRI sky.
+**M2 is in progress** — PBR ground and HDRI sky; its open items are under "What to do next". **The
+live thread for the last week (2026-10-04 to 2026-10-08) was a mod-library sweep**, C2's format
+coverage pulled forward because every loader convention calibrated on the hero truck broke on a
+second car. It is closed: 69 vehicles load, every braced wheel holds under power, and the suite is
+green on every form of run. Trust the commit log over this file for what was touched last.
 
 **Two sections were decided on 2026-10-01 and nothing in them is built.** §0.10 is now
 client-authoritative state replication on this project's own wire at 64 players, and **RoRnet
@@ -54,8 +58,10 @@ and cost an engine per tier is `harness/gate_suite.gd` now.
 
 `tools/gate.sh --order-check` runs every gate twice **in one session**, once in the graph's order
 and once in a seeded shuffle, comparing verdicts and measured values. Worst drift across the
-suite is 1.1e-7. Use `tools/gate.sh --all --every` for a number that goes in a commit message: it
-starts fresh, which a session kept open all day does not. The order after it is: M2, M2b, C1 GUI+audio, C2 format coverage+AngelScript, M3–M8,
+suite is 4.4e-8; the one frame-time gate declares `measured_is_wall_clock` and is compared by
+verdict, by name, on every run. Use `tools/gate.sh --all --every` for a number that goes in a
+commit message: it starts fresh, which a session kept open all day does not, and it runs the gates
+`--all` only implies — which is how a stale call in `beams_deform_and_break` sat unrun for a day. The order after it is: M2, M2b, C1 GUI+audio, C2 format coverage+AngelScript, M3–M8,
 C3 airplanes+boats, C4 repository, C5 multiplayer. Local milestones first; the two networked ones
 last, deliberately. The UI's design is settled in §0.11: recognisably RoR and refreshed, with the
 in-vehicle instruments under glass that reflects, backlights warm from below with the lights, and
@@ -63,8 +69,8 @@ carries a bounded inertia against the vehicle's own acceleration.
 
 ## Where things stand
 
-`./tools/gate.sh --all` is green except for one gate, named below. Run it before you start so you
-know that is still true. It walks the gate graph — a gate may declare the gates its own claim
+`./tools/gate.sh --all` is green, and so are `--all --every` and `--order-check`. Run it before you
+start so you know that is still true. It walks the gate graph — a gate may declare the gates its own claim
 contains, so a passing gate reports those as `IMPLIED` rather than running them, and a failing one
 is chased downward until the lowest failing gate names the level the fault is at. `--all --every`
 ignores the graph and runs everything, which is what a release run uses; `tools/gate.sh --why
@@ -136,34 +142,34 @@ has just stated.
 
 ## The suite is green
 
-145 gates, `--all --every`, all passing (2026-10-08), and `tools/gate.sh --order-check` runs
-every one of them twice in one session with identical verdicts. Two things it found that day are
-in `hard-won-facts-light.md`: volumetric fog's temporal history survives a gate's container, and a
-frame-time gate has to declare itself (`measured_is_wall_clock`) rather than be held to 1e-5.
+145 gates. On 2026-10-08 (`8c9a0ef`) all three forms of run pass: `--all` (96 run, 49 implied),
+`--all --every` (145), and `--order-check` (145 twice in one session, identical verdicts, worst
+drift 4.4e-8). Run all three before trusting a change to the solver's API or to anything that
+renders: each found something that day the others did not.
 
-**An implied gate hid a stale call for a day.** `c827e40` gave `set_beam_limits` a fifth argument
-and `beams_deform_and_break` kept calling it with four; `--all` reported it `IMPLIED` under
-`solver_physics_oracle` on every run since, and only `--all --every` ran it. The graph's edge was
-true — the spring law does contain the yield law's prerequisite — and the gate was still broken,
-because a script error is not a physics fault. Run `--all --every` before believing a green suite
-over a change that touched the solver's API, as this file already says.
-
-**Since then: a mod-library sweep, 2026-10-04 to 2026-10-08.** Twelve downloaded packs and the
-shipped Agora and DAF make a library of 69 vehicles, and nearly every loader convention calibrated
-on the hero truck was wrong on a second car: all five wheel sections, `shocks2`/`shocks3` layouts,
+**The mod-library sweep, 2026-10-04 to 2026-10-08.** Twelve downloaded packs and the shipped
+Agora and DAF make a library of 69 vehicles, and nearly every loader convention calibrated on the
+hero truck was wrong on a second car: all five wheel sections, `shocks2`/`shocks3` layouts,
 `globals` masses, bare-word directives, the yield floors, prop rotation order, flexbody materials
 per submesh, slidenodes, triangle collision for shipped hulls. The last of it was **wheels folding
-under power** — 19 of 66 driveable vehicles — and the cause was the rigidity beams, see
-`hard-won-facts-mods.md`. `a_driven_wheel_stays_on_its_axle` holds it over every braced vehicle in
-the library. `harness/dev/drive_stance.gd` is the census and `fold_trace.gd` the timeline.
+under power** — 19 of 66 driveable vehicles — and the cause was the rigidity beams every wheel row
+names and the loader never read (plus negative node numbers, which upstream takes the absolute
+value of); see `hard-won-facts-mods.md`. `a_driven_wheel_stays_on_its_axle` holds it over every
+braced vehicle. `harness/dev/drive_stance.gd` is the census and `fold_trace.gd` the timeline.
 
-**`a_terrains_own_scenery_is_solid` was red at `c827e40` and is rewritten, not widened.** It had
-asked the hero to lose 80% of whatever speed 30 m of full throttle came to, aimed by drift; it
-passed while the misread yield floors welded the hero solid, and failed once a 0.17 m pole could
-arrive between two node rows and meet nothing, or arrive at 72 km/h and tear through 17 beams.
-It now steers onto a dense node row and holds 25 km/h, where the truck stops with 1% of its speed.
-The three facts behind that are in `hard-won-facts-terrain.md`; `every_mod_car_builds` was red at
-the same commit for an unrelated reason (an orphan rim node per mesh-less wheel) and is fixed.
+**Three gates were found red or wrong at the end of it, and each taught something written down:**
+
+- `a_terrains_own_scenery_is_solid` asked the hero to lose 80% of whatever speed 30 m of full
+  throttle came to, aimed by drift. It passed while the misread yield floors welded the hero solid,
+  and failed once a 0.17 m pole could arrive between two node rows and meet nothing, or arrive at
+  72 km/h and tear through 17 beams. Rewritten, not widened: it steers onto a dense node row and
+  holds 25 km/h, where the truck stops with 1% of its speed. `hard-won-facts-terrain.md`.
+- `beams_deform_and_break` called `set_beam_limits` with four arguments a day after it took five,
+  and `--all` reported it `IMPLIED` the whole time. A true graph edge does not run a gate.
+- `a_vehicle_photoset_through_the_day` drifted 0.1% between two runs in one session: volumetric
+  fog's temporal history belongs to the viewport and outlives a gate's container.
+  `HarnessCapture.make_frames_independent` switches it off for gate worlds. `hard-won-facts.md`,
+  beside the earlier order-check entries, with the frame-time gate's `measured_is_wall_clock`.
 
 It had one red gate for most of a session — `terrain_takes_the_light`, reading 111% against a 30%
 threshold — and the cause was not what it was recorded as. See the entry on
@@ -248,10 +254,12 @@ Acceptance 1, 3, 6, 7 and 8 pass.
 - ~~**Procedural roads.**~~ Built: `.tobj` road points are swept into decks, shoulders and
   bridges, held by `a_road_of_points_is_swept_into_a_road`, `a_road_rests_on_the_ground_it_crosses`
   and `a_swept_road_faces_the_sky`.
-- **Hand-placed collision meshes.** A terrain can ship them and La Paz does not. Its objects are
-  solid by columns instead — `world/ror_object_collision.gd` turns each mesh into a cell of ground
-  plane and the height of the geometry in it — so a pole is a pole and a 40 m power line is two
-  poles rather than a wall. Objects scaled to cover the map are left alone.
+- **Hand-placed collision meshes.** A `beginmesh` hull is collided with as triangles when it is at
+  least 0.25 m across its second-smallest dimension, and as derived columns when thinner — a 0.17 m
+  pole tunnels as triangles under upstream's own 0.1 m slab (`ror_object_collision.gd`, `baff012`).
+  Objects with no hull are solid by columns: a 40 m power line is two poles rather than a wall, and
+  objects scaled to cover the map are left alone. **A pole still passes between a rig's node rows**;
+  that is the node model, upstream's as much as ours, and the scenery gate aims round it.
 - **Sky.** The terrn2 names a cube map from Rigs of Rods' core resources, which a terrain does not
   ship, so the scene keeps its own physical sky.
 - **Vegetation colour maps and sway.** Read and unused; plants are still and untinted.
@@ -270,9 +278,8 @@ Acceptance 1, 3, 6, 7 and 8 pass.
   frequency matches the rim hoop beams: 3.4 MN/m on a 2.03 kg node is 206 Hz with a damping ratio
   of 0.7%. Note the tension with the 2 kHz result: the rig is *stable* at 2 kHz and not *quiet*
   there. Do not fix this by raising the rate without saying so.
-  - Untried parity gap: upstream gives a meshwheels2 wheel's `axis1-outer` and `axis2-inner` tyre
-    beams SHOCK1 bounds with a 0.66 shortbound and a 0.15 max extension. The bounded beam laws
-    exist; the wheel rig does not use them.
+  - The SHOCK1 bounds on the tyre spokes (0.66 contraction, 0.15 extension for `meshwheels2`) are
+    in since `c827e40`; they did not change the ringing and were never claimed to.
 - **It rolls over more easily than the numbers say it should.** The centre of mass is 0.762 m above
   the contact patch over a 1.80 m track, a 1.18 g static rollover threshold, better than a real
   lifted S10. Every surface being `concrete` was the suspected cause and that is fixed, so this
@@ -287,7 +294,9 @@ Acceptance 1, 3, 6, 7 and 8 pass.
 - Differentials are not modelled. The hero rig's are all split, and a split differential chain
   reduces to the division `ror_wheels` already does, so this is invisible on this rig and wrong on
   one with locked or open diffs.
-- `commands2` beams hold the doors but are not key-driven, so the doors do not open.
+- `commands2` beams hold the doors but are not key-driven, so the doors do not open. They are also
+  built as plain beams where upstream builds them as hydros with their own rate and travel; the
+  fold hunt flagged this twice and ruled it out as the cause, and it is still a divergence.
 - Traction control and ABS are not implemented; neither is declared by the hero rig.
 - A vehicle that declares no `materialflarebindings` has no lit lamp glass, which is upstream's
   behaviour too — the hero truck declares none, so its lamps are the sprite and the beam and its
