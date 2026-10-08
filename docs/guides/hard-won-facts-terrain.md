@@ -287,3 +287,27 @@ Its companion is `hard-won-facts-mods.md`, which covers how a vehicle is read, b
   sky's own horizon band at 0.95, which is brighter than the sky it is supposed to sit under. The
   scene draws its own ground over all of it, so nothing of it is ever seen — but anything that
   measures a sky by looking for its brightest point has to look above the horizon only.
+- **A 0.17 m pole passes between a truck's node rows, and no contact model this project or
+  upstream has will stop it.** A rig is nodes; the hero carries its nodes in longitudinal rows —
+  body sides, frame rails, a centre line — with 25 cm of nothing between them, and a pole that
+  arrives in a gap meets no node. Driven hands-off at full throttle `a_terrains_own_scenery_is_solid`
+  put La Paz's pole 0.45 m off the rig's frame origin, straight into such a gap: 380 nodes, zero
+  contacts, 116% of its speed kept. The gate had passed for a week because the drift of the run
+  used to land a row on the pole, and because the yield floors it was then misreading welded the
+  hero solid. `harness/dev/pole_gate_trace.gd` sweeps every node's per-frame path through the boxes
+  and prints the lateral node histogram; that is how the gap was seen.
+- **What a truck does to a pole is a function of speed and the beams' stated strength, not of the
+  scenery.** Aimed at a dense row, the hero stops at 25 km/h (1% of its speed kept, 5 nodes in
+  contact), tears past at 49 (66% kept, 21 beams broken) and never slows at 72 (17 broken). A gate
+  asking for a stop at 72 km/h was asking for a truck welded solid. The gate now holds 25 km/h and
+  steers onto the rig's densest pole-wide run of nodes near its middle. The hero's own centre line
+  is a single 5 cm row of 11 nodes with 10 cm of nothing either side, and steered onto it exactly
+  the pole passed between them; the row 0.4 m to its right catches 36.
+- **Aiming a crash: steer on the bearing, hold the speed with brake as well as throttle, and lift
+  off at contact.** Moving the start sideways does not aim: the ground under La Paz's spawn is not
+  flat, so the heading the rig settles to moves with the start and the drift is not repeatable
+  (a 0.45 m move changed the crossing by +0.40 m at one throttle and +0.64 at another). Steering on
+  the lateral offset swung two metres either side of the pole at every gain tried; steering on the
+  bearing to the aim point holds it to 3 cm all the way in. Cutting the throttle at 25 km/h and
+  coasting arrived at 43, because the approach runs downhill. And a speed controller left running
+  against a stopped truck drives it round the pole and away at 40 km/h.
