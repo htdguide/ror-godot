@@ -1321,6 +1321,11 @@ the window opens at golden dusk as the handoff always said — the play path had
 Then a main menu (`MainMenu`): start a game as a vehicle, a map and a weather in turn; a graphics
 page (`GraphicsSettings`: window mode, vsync, fps cap, render scale, FSR 2, anti-aliasing, shadow
 quality, distances; saved in the user data folder); quit. The production build opens on it.
+"The fps on full screen is horrible": `the_frame_costs_what_each_feature_costs` measures the
+full scene at the dev Mac's fullscreen pixel count feature by feature (37 ms; the table is in
+hard-won-facts.md), and the graphics defaults are set from it — automatic render scale to 1440
+rows under FSR 2, a 4096 atlas, fill shadows from High, clouds at medium — 17.8 ms for the same
+frame. The look under those defaults is the person's to judge.
 
 ---
 

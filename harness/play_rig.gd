@@ -72,6 +72,7 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
     _map.drive = _drive
     _graphics.load_from()
     _graphics.apply(get_viewport(), _world)
+    _weather.after_put = func() -> void: _graphics.apply(get_viewport(), _world, _map.vegetation)
     # Nothing named on the command line: the game opens on its menu rather than on a world.
     if not Harness.args.values.has("vehicle") and not Harness.args.values.has("terrain-dir"):
         _map.name = ""

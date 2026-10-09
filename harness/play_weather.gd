@@ -26,6 +26,9 @@ var hour: float = -1.0
 ## slider that went back to the preset's weather the moment the hour moved. A knob moved here
 ## stays moved until a preset is chosen again, which is what clears them.
 var overrides: Dictionary = {}
+## Called after every weather put onto the scene. A weather rebuilds the sky and regrades the
+## lights, and the graphics settings have to go back on over it.
+var after_put: Callable
 
 
 ## `with_camera` and `with_shot` are what an hour is metered through: under physical light units
@@ -112,6 +115,8 @@ func _put(world: Node3D, weather: Dictionary) -> void:
     ActorProbe.recapture(
         world, float(weather.get("probe_intensity", ActorProbe.INTENSITY))
     )
+    if after_put.is_valid():
+        after_put.call()
 
 
 ## The next preset in the list, applied.

@@ -371,4 +371,16 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   built before the move and never rebuilt; the production checkout, built fresh, had Terrain3D
   compiled and absent. The same stale-root trap `extension/SConstruct` had, and the reason a
   fresh checkout is the only test of a build script.
+- **Fullscreen on the dev Mac is 3.7 times the pixels of every frame-time gate, and the cost
+  table is `the_frame_costs_what_each_feature_costs`.** At 3648x2052 the full scene at golden
+  dusk was 37 ms: render scale is 21 of them, the marched clouds 8.8, the terrain shader 7.9,
+  the fill light's shadow 3.7, SSAO 2.8, an 8192 shadow atlas +5.6, TAA +2.5, MSAA 4x +7.5,
+  grass 0.8. The first graphics defaults had the 8192 atlas and TAA on, which was 8 ms a frame
+  nobody asked for. The measured defaults — automatic render scale to 1440 rows under FSR 2
+  (which costs 2 ms at 1:1, so it is on only when there is something to upscale), a 4096 atlas,
+  no fill shadow below High, clouds at 20 steps and 2 light steps — draw the same frame in
+  17.8 ms. Driven five seconds at full throttle with the chase camera on and the grass refilling,
+  the way a person sees it: 35.9 ms median and 57.7 worst with everything on, 18.8 and 32.8
+  under the defaults; the worst frames are the grass tiles refilling. A settings file carries a
+  version; one from older defaults is not read.
 

@@ -46,7 +46,6 @@ func run(_harness: Node) -> Dictionary:
     config.save(SCRATCH)
     var loaded: GraphicsSettings = GraphicsSettings.new()
     loaded.load_from(SCRATCH)
-    DirAccess.remove_absolute(ProjectSettings.globalize_path(SCRATCH))
     for key: String in settings.values:
         if key == "grass_distance_m":
             continue
@@ -56,6 +55,14 @@ func run(_harness: Node) -> Dictionary:
         problems.append("an unknown key was kept")
     if loaded.values["grass_distance_m"] != GraphicsSettings.DEFAULTS["grass_distance_m"]:
         problems.append("a missing key was not defaulted")
+    # A file written over older defaults is not trusted at all.
+    config.set_value(GraphicsSettings.SECTION, "version", 1)
+    config.save(SCRATCH)
+    var stale: GraphicsSettings = GraphicsSettings.new()
+    stale.load_from(SCRATCH)
+    DirAccess.remove_absolute(ProjectSettings.globalize_path(SCRATCH))
+    if stale.values["render_scale"] != GraphicsSettings.DEFAULTS["render_scale"]:
+        problems.append("a settings file of an older version was taken as current")
 
     var viewport: SubViewport = SubViewport.new()
     var expected: Array = [
@@ -77,6 +84,17 @@ func run(_harness: Node) -> Dictionary:
     loaded.apply_to_viewport(viewport)
     if not is_equal_approx(viewport.scaling_3d_scale, 0.6) or viewport.scaling_3d_mode != Viewport.SCALING_3D_MODE_FSR2:
         problems.append("scale 0.6 with FSR 2 read back as %.2f mode %d" % [viewport.scaling_3d_scale, viewport.scaling_3d_mode])
+    # Automatic scale: a 1080-row window draws at 1:1 and bilinear (FSR 2 at 1:1 is 2 ms for
+    # nothing); a 2234-row fullscreen retina window draws at 1440 rows, upscaled.
+    if not is_equal_approx(GraphicsSettings.scale_for(1080.0), 1.0):
+        problems.append("auto scale for 1080 rows is %.3f" % GraphicsSettings.scale_for(1080.0))
+    if absf(GraphicsSettings.scale_for(2234.0) - 1440.0 / 2234.0) > 0.001:
+        problems.append("auto scale for 2234 rows is %.3f" % GraphicsSettings.scale_for(2234.0))
+    loaded.set_value("render_scale", 0.0)
+    viewport.size = Vector2i(1920, 1080)
+    loaded.apply_to_viewport(viewport)
+    if not is_equal_approx(viewport.scaling_3d_scale, 1.0) or viewport.scaling_3d_mode != Viewport.SCALING_3D_MODE_BILINEAR:
+        problems.append("auto scale on a 1080-row viewport read back as %.2f mode %d" % [viewport.scaling_3d_scale, viewport.scaling_3d_mode])
     viewport.free()
     if not problems.is_empty():
         return fail("; ".join(problems), problems.size())

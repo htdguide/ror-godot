@@ -36,6 +36,8 @@ var _stepped: bool = false
 ## A steer held by a script instead of the keys, as a photograph wants the wheels turned. NAN
 ## leaves the keys in charge.
 var scripted_steer: float = NAN
+## And a throttle, for a measurement that drives: NAN leaves the keys in charge.
+var scripted_throttle: float = NAN
 ## The solver's state as of this frame's step: node positions, wheel angles and the drivetrain's
 ## readings. Everything drawn or shown is drawn from this and not from the solver, so that nothing
 ## asks the solver anything while it is stepping. See `begin` and `finish`.
@@ -257,6 +259,8 @@ func hud_line() -> String:
 
 func _read_controls(delta: float) -> void:
     var wants_throttle: bool = Input.is_key_pressed(KEY_UP)
+    if not is_nan(scripted_throttle):
+        wants_throttle = scripted_throttle > 0.0
     var wants_brake: bool = Input.is_key_pressed(KEY_DOWN)
     _throttle = clampf(
         _throttle + (DriveCfg.THROTTLE_RATE if wants_throttle else -DriveCfg.THROTTLE_RATE) * delta,
