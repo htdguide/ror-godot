@@ -11,6 +11,14 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROD_DIR="${PROD_DIR:-$(dirname "$REPO_ROOT")/ror-godot-prod}"
 BRANCH="prod"
+GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
+
+# Godot's class_name cache is per checkout and built by an import pass; a fresh or freshly
+# merged worktree opened without one cannot find its own classes ("Could not find type
+# HarnessArgs"). tools/gate.sh does this on its own; a window does not.
+refresh_classes() {
+    "$GODOT" --path "$PROD_DIR" --headless --import >/dev/null 2>&1 || true
+}
 
 case "${1:-}" in
     setup)
@@ -27,6 +35,7 @@ case "${1:-}" in
         ( cd "$PROD_DIR/extension" && scons target=template_debug -j"$(sysctl -n hw.ncpu)" ) || exit 1
         echo "prod.sh: building Terrain3D in $PROD_DIR"
         ( cd "$PROD_DIR" && tools/build_terrain3d.sh ) || exit 1
+        refresh_classes
         echo "prod.sh: $PROD_DIR is the production build ($(cd "$PROD_DIR" && tools/profile.sh))."
         echo "prod.sh: vehicles go in $PROD_DIR/mods/, maps in $PROD_DIR/maps/."
         ;;
@@ -34,6 +43,7 @@ case "${1:-}" in
         [[ -d "$PROD_DIR" ]] || { echo "prod.sh: no production checkout at $PROD_DIR; run setup" >&2; exit 1; }
         ( cd "$PROD_DIR" && git merge --ff main ) || exit 1
         ( cd "$PROD_DIR/extension" && scons target=template_debug -j"$(sysctl -n hw.ncpu)" >/dev/null ) || exit 1
+        refresh_classes
         echo "prod.sh: prod is at $(git -C "$PROD_DIR" rev-parse --short HEAD)"
         ;;
     status)
