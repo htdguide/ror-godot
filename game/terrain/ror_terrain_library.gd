@@ -45,6 +45,7 @@ static func entries() -> Array[Dictionary]:
     for base: String in roots():
         if not DirAccess.dir_exists_absolute(base):
             continue
+        ContentUnpack.unpack_all(base)
         for directory: String in DirAccess.get_directories_at(base):
             var full: String = base.path_join(directory)
             for terrn2: String in _terrn2_names_in(full):

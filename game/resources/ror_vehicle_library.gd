@@ -42,6 +42,8 @@ static func entries() -> Array[Dictionary]:
     for base: String in roots():
         if not DirAccess.dir_exists_absolute(base):
             continue
+        # A zip dropped in the folder is a pack: unpacked beside itself, once.
+        ContentUnpack.unpack_all(base)
         for directory: String in DirAccess.get_directories_at(base):
             var full: String = base.path_join(directory)
             for file: String in _actor_files_in(full):

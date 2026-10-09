@@ -26,8 +26,8 @@ of Rods repository load from their original files.
 ## Download
 
 [Releases](https://github.com/htdguide/ror-godot/releases) carry a Windows x86_64 zip and a macOS universal `.app`. Nothing is
-bundled: vehicles go in `mods/`, maps in `maps/`, beside the executable, one unpacked folder per
-pack. The game lists what it finds. Rigs of Rods content is fetched from the
+bundled: vehicles go in `mods/`, maps in `maps/`, beside the executable, one folder or one zip
+per pack; a zip is unpacked on its own. The game lists what it finds. Rigs of Rods content is fetched from the
 [Rigs of Rods repository](https://forum.rigsofrods.org/resources/) and keeps its own licences.
 
 ## How it is built

@@ -125,7 +125,8 @@ A plain `tools/play.sh` (and the production build) opens on a main menu — `Mai
 game as vehicle, map, weather in turn; `GraphicsSettings` saved to `user://settings.cfg`; quit —
 held by `the_main_menu_hands_over_a_start` and `the_graphics_settings_round_trip_and_apply`;
 an empty list links the hero and two maps and every list ends with an Open folder button
-(`an_empty_library_says_where_to_get_content`).
+(`an_empty_library_says_where_to_get_content`); a zip dropped in a content folder is unpacked
+beside itself once, hostile entries refused (`ContentUnpack`, `a_zip_dropped_in_the_folder_is_content`).
 Graphics defaults are measured (`the_frame_costs_what_each_feature_costs`): retina 37 → 17.8 ms.
 Sessions open at golden dusk unless `--weather` says otherwise (they opened at noon until
 2026-10-09: the play path never asked `_default_weather`). A map change shows a loading screen
@@ -265,8 +266,7 @@ What M1 still owes is human: 5 below.
   objects scaled to cover the map are left alone. **A pole still passes between a rig's node rows**;
   that is the node model, upstream's as much as ours, and the scenery gate aims round it.
 - **Sky**: the terrn2's core cube map ships with no terrain; own sky. **Vegetation colour maps and sway**: read, unused.
-- **The last sample row and column.** Terrain3D's regions tile on a power of two, so a 2049 sample
-  page is imported as 2048 cells and La Paz is 2 m short of its stated 4000 m.
+- **The last sample row and column.** Terrain3D tiles on a power of two: 2049 samples import as 2048 cells, La Paz 2 m short.
 - **The traction map is nearest-sampled** at 3.9 m per pixel on La Paz, where upstream filters it
   bilinearly; surface edges are a pixel blocky.
 - **The `grid` special object.** Upstream stamps `grid.odef` 100 times in a 10x10 at 50 m spacing

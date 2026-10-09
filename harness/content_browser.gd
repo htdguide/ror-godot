@@ -115,11 +115,11 @@ static func _nothing_here(into: VBoxContainer, what: String, suggestions: Array[
         into.add_child(link)
 
 
-## The last row of every list: a button that opens the folder the content goes in, and the one
-## rule about what goes there. The folder is made if it is not there yet, so the button never
-## opens nothing.
+## The last row of every list: a button that opens the folder the content goes in, and what goes
+## there — a folder or a zip per pack; `ContentUnpack` unpacks a zip the next time the list is
+## read. The folder is made if it is not there yet, so the button never opens nothing.
 static func _folder_row(into: VBoxContainer, folder: String) -> void:
-    MenuWidgets.note(into, "Unpacked folders go in here, one per pack — not zips:")
+    MenuWidgets.note(into, "Packs go in here, one folder or one zip each; a zip is unpacked on its own:")
     MenuWidgets.note(into, "        " + folder)
     var button: Button = Button.new()
     button.text = OPEN_FOLDER
