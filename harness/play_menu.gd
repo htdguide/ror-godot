@@ -139,6 +139,16 @@ func is_open() -> bool:
     return _panel != null and _panel.visible
 
 
+## Shows a preset as the one that is on — chosen by the session rather than here, as after a map
+## change puts the starting weather back — and refreshes the rows to it.
+func show_weather(name: String) -> void:
+    var at: int = _weather_names.find(name)
+    if at >= 0 and _weather_control != null:
+        _weather_index = at
+        _weather_control.selected = at
+    refresh()
+
+
 ## Puts the weather that is on onto every weather row. Called when a preset or an hour is chosen
 ## and when the panel opens, so what the sliders say is what the world is doing.
 func refresh() -> void:

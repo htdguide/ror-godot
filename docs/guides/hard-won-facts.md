@@ -360,3 +360,15 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   every key the renderer reads and refreshed from `PlayWeather.state()` on every preset, hour and
   open, and the gate reads the renderer's source for the key set so the table cannot grade itself.
 
+- **A map change has to remove what every builder adds, and the list goes stale the day a
+  builder is added.** The session's removal list named objects, roads and trees; the sea came
+  later and stayed up through every map change. The list is one constant beside the builders
+  now and a gate reads the builders' source for their root names. And the weather goes back on
+  *after* the new map is built: the backdrop ring is unlit and takes the hour's dimming at
+  grade time, so a map built under a night preset came in at full daylight brightness.
+- **`tools/build_terrain3d.sh` installed into `game/addons/`, a folder nothing loads, since the
+  PLAN 0.7 tree mirror moved `addons/` to the root.** Dev never noticed because its addon was
+  built before the move and never rebuilt; the production checkout, built fresh, had Terrain3D
+  compiled and absent. The same stale-root trap `extension/SConstruct` had, and the reason a
+  fresh checkout is the only test of a build script.
+

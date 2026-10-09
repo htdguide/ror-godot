@@ -33,6 +33,9 @@ var _substep_remainder: float = 0.0
 var _deform_usec: int = 0
 var _submit_usec: int = 0
 var _stepped: bool = false
+## A steer held by a script instead of the keys, as a photograph wants the wheels turned. NAN
+## leaves the keys in charge.
+var scripted_steer: float = NAN
 ## The solver's state as of this frame's step: node positions, wheel angles and the drivetrain's
 ## readings. Everything drawn or shown is drawn from this and not from the solver, so that nothing
 ## asks the solver anything while it is stepping. See `begin` and `finish`.
@@ -271,6 +274,8 @@ func _read_controls(delta: float) -> void:
     solver.set_throttle(_throttle)
     solver.set_brake(_brake)
     solver.set_parking_brake(Input.is_key_pressed(KEY_SPACE))
+    if not is_nan(scripted_steer):
+        steer = scripted_steer
     solver.set_steer_command(DriveCfg.steer_command(steer))
 
 

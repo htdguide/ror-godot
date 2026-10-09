@@ -15,7 +15,6 @@ var _camera: Camera3D
 var _world: Node3D
 var _hud: Label
 ## What is loaded now, so the menu can mark it and a map change knows what to rebuild.
-var _map_name: String = ""
 var _vehicle_name: String = ""
 var _weather: PlayWeather
 var _looking: bool = false
@@ -26,12 +25,8 @@ var _shots: int = 0
 var _drive: PlayDrive = null
 var _view: PlayCamera = PlayCamera.new()
 var _menu: PlayMenu
-var _terrain: Node3D = null
-var _terrain_pending: bool = false
-## The terrain's own files, kept after the scene is built: a screenshot's sidecar reports the
-## ground height and surface under the camera, and only the loaded terrain knows them.
-var _loaded: RorTerrain = null
-var _vegetation: RorVegetation = null
+## The map: its terrain, its scenery, the screen that covers a change. See `PlayMap`.
+var _map: PlayMap = PlayMap.new()
 ## What the terrain is solid as: the F8 overlay, and where a vehicle may stand.
 var _solid: PlaySolid = PlaySolid.new()
 
@@ -47,7 +42,7 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
     _weather = PlayWeather.new(
         weather, camera, CameraCfg.get_preset(Harness.args.get_string("shot", "diag_origin"))
     )
-    _map_name = Harness.args.get_string("terrain-dir", BuildProfile.default_map())
+    _map.name = Harness.args.get_string("terrain-dir", BuildProfile.default_map())
     DisplayServer.window_set_title("ror-godot [%s]" % BuildProfile.label())
     _hud = PlayHud.build(self)
     if not vehicle.is_empty():
@@ -67,117 +62,22 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
         SkyClouds.set_parameter(
             holder.environment, "wind_speed", RenderCfg.CLOUD_WIND_SPEED_PLAYING
         )
-    _build_terrain()
+    var screen: PlayLoading = PlayLoading.new()
+    add_child(screen)
+    _map.setup(self, _world, _menu, _solid, _weather, weather, screen)
+    _map.drive = _drive
+    _map.build()
     PlayHud.print_help(_drive)
 
 
-## Adds the world, when this session asked for one and Terrain3D is installed. It cannot be
-## populated yet: a Terrain3D has no data until it has been inside a World3D for a frame. The
-## world is always a Rigs of Rods terrain — `--map <name>`, defaulting to the map the game ships:
-## a place someone else built and drove is the only world worth checking a reader against.
-func _build_terrain() -> void:
-    if not Harness.args.has_flag("terrain"):
-        return
-    if _map_name == "":
-        print("PLAY  no map named and none bundled: the flat plane. Maps go in %s" % BuildProfile.maps_hint())
-        return
-    _terrain = TerrainWorld.create()
-    if _terrain == null:
-        printerr("PLAY  --terrain asked for, but Terrain3D is not installed."
-            + " Run tools/build_terrain3d.sh")
-        return
-    _world.add_child(_terrain)
-    _terrain_pending = true
-
-
-func _populate_terrain() -> void:
-    _terrain_pending = false
-    var loaded: RorTerrain = _load_terrain()
-    if loaded == null:
-        return
-    _loaded = loaded
-    var error: String = Harness.terrain.populate(_terrain, loaded)
-    if error != "":
-        printerr("PLAY  the terrain could not be built: " + error)
-        return
-    # The blockout plane would otherwise sit inside the terrain and the rig would rest on
-    # whichever happened to be higher.
-    var ground: MeshInstance3D = _world.get_node_or_null(^"Ground") as MeshInstance3D
-    if ground != null:
-        ground.visible = false
-    _world.add_child(RorObjects.build(loaded))
-    # The roads the terrain draws from a line of points rather than from placed objects. Port
-    # Starling describes most of its network that way.
-    _world.add_child(RorProceduralRoad.build(loaded))
-    # The forests the terrain paints with a density map. Russia asks for two fir species.
-    _world.add_child(RorTrees.build(loaded))
-    # The sea the terrain declares. Port Starling spawns four metres above its own waterline.
-    _world.add_child(RorWater.build(loaded))
-    _grow_vegetation(loaded)
-    # `--collision` draws what the terrain is solid as, over whatever is drawn.
-    _solid.setup(loaded)
-    if Harness.args.has_flag("collision"):
-        print("PLAY  " + _solid.show_boxes(_world, true))
-    # `--facing` dresses the scenery in the object gates' facing paint: a face keeps its texture
-    # from the front and draws its axis in a primary colour from behind.
-    if Harness.args.has_flag("facing"):
-        var dressed: int = FacingPaint.dress(_world)
-        print("PLAY  facing paint on %d meshes: any bright primary is the back of a face" % dressed)
-    if _drive == null:
-        return
-    # Where a vehicle starts, and under what gravity, before the terrain is handed over: taking
-    # the terrain puts the rig down, and it has to be put down where the terrain says.
-    _drive.spawn = PlaySolid.clear_spawn(loaded)
-    _drive.solver.set_gravity(Vector3(0.0, loaded.gravity(), 0.0))
-    error = _drive.use_terrain(_terrain.get("data"))
-    if error != "":
-        printerr("PLAY  the solver could not take the terrain: " + error)
-        return
-    var solid: int = RorObjectCollision.apply(loaded, _drive.solver)
-    print("PLAY  driving on %s, spawned at %v under %.2f m/s^2; %d solid scenery parts"
-        % [loaded.name, _drive.spawn, loaded.gravity(), solid])
-
-
-## The terrain's own vegetation, in a ring of tiles that follows whoever is driving.
-func _grow_vegetation(loaded: RorTerrain) -> void:
-    var vegetation: RorVegetation = RorVegetation.new()
-    var grown: String = vegetation.setup(loaded)
-    if grown != "":
-        vegetation.free()
-        return
-    _world.add_child(vegetation)
-    vegetation.focus_on(loaded.start_position())
-    _vegetation = vegetation
-    if _menu != null:
-        _menu.set_vegetation(vegetation)
-
-
-## The terrain `--map` asks for, or upstream's own shipped default map when this session named
-## none. Null when it cannot be loaded.
-##
-## The name is a library name — a `.terrn2` under `assets/terrains/` or in upstream's own shipped
-## content — or a path to a directory holding one. A terrain that will not load is reported and
-## the library is listed, rather than opening a window onto nothing.
-func _load_terrain() -> RorTerrain:
-    # The map the menu last asked for, or the one the command line named.
-    var wanted: String = _map_name
-    var loaded: Dictionary = RorTerrainLibrary.load_named(wanted)
-    if (loaded["error"] as String) != "":
-        printerr("PLAY  %s" % loaded["error"])
-        for summary: Dictionary in RorTerrainLibrary.summaries():
-            printerr("PLAY    %s (%s)" % [summary["name"], summary["title"]])
-        return null
-    return loaded["terrain"] as RorTerrain
-
-
 func _process(delta: float) -> void:
-    if _terrain_pending and _frames > 1:
-        _populate_terrain()
+    if _map.pending and _frames > 1:
+        _map.populate()
     # Step posted first, vehicle posed last, same frame. See `PlayDrive.begin`.
     if _drive != null:
         _drive.begin(delta)
-    if _vegetation != null:
-        _vegetation.focus_on(_camera.global_position)
+    if _map.vegetation != null:
+        _map.vegetation.focus_on(_camera.global_position)
     if _view.mode == PlayCamera.Mode.FREE:
         _view.fly(delta)
     if _drive != null:
@@ -270,6 +170,12 @@ func _screenshot() -> void:
     var path: String = HarnessCapture.resolve_dir("human").path_join(
         "play-%s-%d.png" % [stamp.replace("T", "-"), _shots]
     )
+    # The HUD stays out of the picture: what it says is in the sidecar, and a picture meant for a
+    # loading screen or a bug report is the scene, not the readout over it.
+    var shown: bool = _hud.visible
+    _hud.visible = false
+    await RenderingServer.frame_post_draw
+    await RenderingServer.frame_post_draw
     # A picture of a fault is handed over to be acted on, and a picture alone does not say which
     # of a map's hundreds of objects the untextured thing in the middle of it is. `PlayShot`
     # writes that down beside it.
@@ -277,13 +183,14 @@ func _screenshot() -> void:
         "viewport": get_viewport(),
         "camera": _camera,
         "world": _world,
-        "terrain": _loaded,
-        "map": _map_name,
+        "terrain": _map.loaded,
+        "map": _map.name,
         "vehicle": _vehicle_name,
         "weather": _weather.current(),
         "mode": PlayCamera.Mode.keys()[_view.mode],
         "drive": _drive,
     })
+    _hud.visible = shown
     if error != "":
         printerr("PLAY  screenshot failed: " + error)
         return
@@ -313,7 +220,7 @@ func _build_menu(weather: String) -> PlayMenu:
         func(name: String) -> void: _change_vehicle(name),
         func() -> Dictionary: return _weather.state()
     )
-    menu.set_loaded(_map_name, _vehicle_name)
+    menu.set_loaded(_map.name, _vehicle_name)
     return menu
 
 
@@ -355,44 +262,27 @@ func _change_vehicle(name: String) -> void:
         printerr("PLAY  %s cannot be driven: %s" % [name, error])
         return
     _drive = drive
+    _map.drive = drive
     _drive.spawn = at
     _drive.spawn_heading = heading
     _vehicle_name = name
     _view.set_mode(PlayCamera.Mode.CHASE)
-    if _terrain != null and _terrain.get("data") != null:
-        error = _drive.use_terrain(_terrain.get("data"))
+    if _map.terrain != null and _map.terrain.get("data") != null:
+        error = _drive.use_terrain(_map.terrain.get("data"))
         if error != "":
             printerr("PLAY  the terrain could not be handed to %s: %s" % [name, error])
         # A new vehicle is a new solver and the objects went to the old one, so every car taken
         # after the first used to drive through every pole, wall and road slab on the map.
-        RorObjectCollision.apply(_terrain.get("data") as RorTerrain, _drive.solver)
+        RorObjectCollision.apply(_map.terrain.get("data") as RorTerrain, _drive.solver)
     else:
         _drive.respawn()
     if _menu != null:
-        _menu.set_loaded(_map_name, _vehicle_name)
+        _menu.set_loaded(_map.name, _vehicle_name)
     print("PLAY  driving %s" % name)
 
 
-## Loads another map, keeping the vehicle. The terrain, its scenery and its grass all go.
+## Puts another map up. The map holder does the work; the session only tells the panel.
 func _change_map(name: String) -> void:
-    if name == _map_name:
-        return
-    _map_name = name
-    for child: Node in _world.get_children():
-        if (
-            child.name.begins_with("RorObjects")
-            or child.name.begins_with("RorProceduralRoads")
-            or child.name.begins_with("RorTrees")
-            or child == _terrain
-        ):
-            _world.remove_child(child)
-            child.queue_free()
-    if _vegetation != null:
-        _vegetation.clear()
-        _vegetation = null
-    _terrain = null
-    _loaded = null
-    _build_terrain()
+    _map.change(name)
     if _menu != null:
-        _menu.set_loaded(_map_name, _vehicle_name)
-    print("PLAY  loading %s" % name)
+        _menu.set_loaded(_map.name, _vehicle_name)

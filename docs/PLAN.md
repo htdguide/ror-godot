@@ -1314,6 +1314,10 @@ the ten-point look sweep "all of it looks great". Four findings, each closed the
   far-plane clip took the mountains. A `Far plane` row now sits beside it, named as what it is.
 Still the person's: the look of the haze and the fog with the new rows, and the money-shot sheet.
 M2 is not closed by this; only the user closes it.
+Later the same day, two more asks: a map change now shows a loading screen (`PlayLoading`, the
+hero on a road at dusk from `loading_shot`) and puts the opening weather back over the new map
+(`PlayMap`; the old map's sea used to stay, `a_map_change_leaves_nothing_of_the_old_map`), and
+the window opens at golden dusk as the handoff always said — the play path had never asked for it.
 
 ---
 

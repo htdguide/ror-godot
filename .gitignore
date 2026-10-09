@@ -71,3 +71,8 @@ mods/*
 !mods/README.md
 maps/*
 !maps/README.md
+
+# The loading screen picture: a render of community content, made by tools/loading_shot.sh.
+assets/ui/*
+!assets/ui/README.md
+!assets/ui/.gdignore

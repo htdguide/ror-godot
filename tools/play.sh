@@ -70,7 +70,9 @@ for i in "${!args[@]}"; do
         want_terrain=0
     fi
 done
-args=("${args[@]}")
+# Reindexed after the unsets; the `+` form keeps `set -u` quiet when nothing is left, which is
+# a production build opened with no hero to open.
+args=(${args[@]+"${args[@]}"})
 [[ $want_terrain -eq 1 ]] && args+=("--terrain")
 
 printf '{"pid": %d, "purpose": "human session", "started": "%s", "args": "%s"}\n' \

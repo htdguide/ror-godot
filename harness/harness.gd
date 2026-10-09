@@ -231,7 +231,8 @@ func _run_capture() -> void:
         _die(EXIT_USAGE, err)
         return
     var scenario: String = args.get_string("scenario", preset.get("scenario", "static") as String)
-    var weather: String = args.get_string("weather", preset.get("weather", "noon_clear") as String)
+    # A window opens at the hour a person wants to look at; a gate at its preset's own.
+    var weather: String = args.get_string("weather", _default_weather())
     err = _build_world(scenario, weather)
     if err != "":
         _die(EXIT_USAGE, err)

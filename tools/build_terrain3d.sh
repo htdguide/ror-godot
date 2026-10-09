@@ -17,7 +17,10 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE="$REPO_ROOT/vendor/terrain3d"
 ADDON_SOURCE="$SOURCE/project/addons/terrain_3d"
-ADDON_TARGET="$REPO_ROOT/game/addons/terrain_3d"
+# At the repository root, where Godot wants addons/ and where project.godot moved with the PLAN
+# 0.7 tree mirror. This said game/addons until 2026-10-09, and a fresh checkout built the addon
+# into a folder nothing loads.
+ADDON_TARGET="$REPO_ROOT/addons/terrain_3d"
 # Godot picks the debug library when the editor or a debug build asks for it, so both
 # targets are built: a release-only install fails to load under `--gate`.
 TARGETS=("template_debug" "template_release")

@@ -50,10 +50,8 @@ gates is one line for the agent and three for the person watching. `console_fron
 
 **One window, all day.** `tools/dev.sh` opens a session and leaves it open; `tools/send.sh "<any
 console command>"` runs in it from another shell, and so does the console in the window itself.
-`gate run rig_steers` in an open session is under a second where a fresh engine pays startup,
-shader compilation and terrain import first. The whole suite is `gate all` — one window, 77 s.
-`tools/gate.sh --all` does the same thing in one launch; the scheduling that used to live in bash
-and cost an engine per tier is `harness/gate_suite.gd` now.
+`gate run rig_steers` in an open session is under a second. The whole suite is `gate all` — one
+window; `tools/gate.sh --all` does the same in one launch (`harness/gate_suite.gd`).
 
 `tools/gate.sh --order-check` runs every gate twice **in one session**, once in the graph's order
 and once in a seeded shuffle, comparing verdicts and measured values. Worst drift across the
@@ -126,8 +124,11 @@ glass switched to the lit frame its author drew — a reflection probe per actor
 objects as solid columns,
 a terrain's own vegetation in a ring that follows the driver, and recovery from a roll.
 
-Sessions open at golden dusk unless `--weather` says otherwise: a window is not a gate, and the low
-sun is the hour that shows a vehicle off. `Esc` opens the settings panel — weather, gravity, sun,
+Sessions open at golden dusk unless `--weather` says otherwise (they opened at noon until
+2026-10-09: the play path never asked `_default_weather`). A map change shows a loading screen
+(`PlayLoading`, picture from `tools/loading_shot.sh`), removes all of the old map (`PlayMap`,
+held by `a_map_change_leaves_nothing_of_the_old_map`) and puts the opening weather back over the
+new one. `Esc` opens the settings panel — weather, gravity, sun,
 shadows, sky brightness, exposure, cloud cover and density, wind, view distance, fog, grass
 distance, lamps — with Resume and Quit in it. Controls: `G` drive, `B` reverse, `H` neutral, `I`
 ignition, `N` or `L` lights, `R` recover upright, Backspace respawn, `Z`/`C`/`X` indicators,
@@ -140,7 +141,7 @@ has just stated.
 
 ## The suite is green
 
-153 gates. On 2026-10-09 all three forms of run pass: `--all --every` (153) and `--order-check`
+156 gates. On 2026-10-09 all three forms of run pass: `--all --every` (156) and `--order-check`
 (153 twice in one session, identical verdicts, worst drift 2.2e-7; two wall-clock gates compared
 by verdict). Run all three before trusting a change to the solver's API or to anything that
 renders: the order check caught a day-old gate measuring a wall-clock share undeclared.
@@ -262,9 +263,8 @@ Acceptance 1, 3, 6, 7 and 8 pass. **M1's list is complete**; what it still owes 
   Objects with no hull are solid by columns: a 40 m power line is two poles rather than a wall, and
   objects scaled to cover the map are left alone. **A pole still passes between a rig's node rows**;
   that is the node model, upstream's as much as ours, and the scenery gate aims round it.
-- **Sky.** The terrn2 names a cube map from Rigs of Rods' core resources, which a terrain does not
-  ship, so the scene keeps its own physical sky.
-- **Vegetation colour maps and sway.** Read and unused; plants are still and untinted.
+- **Sky.** The terrn2 names a core-resources cube map no terrain ships; the scene keeps its own sky.
+- **Vegetation colour maps and sway.** Read, unused: plants still and untinted.
 - **The last sample row and column.** Terrain3D's regions tile on a power of two, so a 2049 sample
   page is imported as 2048 cells and La Paz is 2 m short of its stated 4000 m.
 - **The traction map is nearest-sampled** at 3.9 m per pixel on La Paz, where upstream filters it
