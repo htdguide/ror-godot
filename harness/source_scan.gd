@@ -23,7 +23,12 @@ static func repo_root() -> String:
     # project reads by absolute path — base content, the loading picture, mods and maps — sits
     # in the folder beside the executable instead. See tools/release.sh for what goes there.
     if OS.has_feature("template"):
-        return OS.get_executable_path().get_base_dir().simplify_path().trim_suffix("/")
+        var beside: String = OS.get_executable_path().get_base_dir().simplify_path()
+        # A macOS executable lives three folders down inside its own .app; the content folders
+        # a person fills sit beside the bundle, not inside it.
+        if beside.ends_with("/Contents/MacOS"):
+            beside = beside.get_base_dir().get_base_dir().get_base_dir()
+        return beside.trim_suffix("/")
     return ProjectSettings.globalize_path("res://").simplify_path().trim_suffix("/")
 
 

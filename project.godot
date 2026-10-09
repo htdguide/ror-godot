@@ -38,3 +38,7 @@ renderer/rendering_method="forward_plus"
 ; balance a sun against a sky by hand exists because this was off. See PLAN M2.
 lights_and_shadows/use_physical_light_units=true
 textures/default_filters/anisotropic_filtering_level=3
+; Apple Silicon has no S3TC: a universal or arm64 macOS export refuses to build without the
+; ETC2/ASTC path imported as well. Both stay on, which is what a project exporting to both
+; Windows and macOS has to do.
+textures/vram_compression/import_etc2_astc=true

@@ -28,12 +28,13 @@ untracked `profile.cfg`; `tools/prod.sh merge` is the only way work reaches it, 
 
 ## Releases
 
-`tools/release.sh windows` exports a Windows x86_64 build from the checkout it is run in — meant
-for the production one — into `release/ror-godot-windows-<sha>.zip`: the pack, the solver's DLL
-cross-built with mingw, Terrain3D's own Windows binaries, Rigs of Rods' base content, and empty
-`mods/` and `maps/` folders beside the executable. A shipped build is the production build
-whatever made it. It needs Godot's 4.7.2 export templates and `brew install mingw-w64`. The dev
-Mac cannot run the result; it is tested on a Windows machine.
+`tools/release.sh windows` and `tools/release.sh macos` export a build from the checkout they run
+in — meant for the production one — into `release/ror-godot-<platform>-<sha>.zip`: the pack, the
+solver's library (a mingw cross-build for Windows, a universal dylib for macOS), Terrain3D's own
+binaries, Rigs of Rods' base content, and empty `mods/` and `maps/` folders beside the executable
+(beside the `.app` on macOS). A shipped build is the production build whatever made it. They need
+Godot's 4.7.2 export templates, and the Windows one `brew install mingw-w64`. The macOS app is
+ad-hoc signed and runs here; the Windows build is tested on a Windows machine.
 
 ## Layout
 
