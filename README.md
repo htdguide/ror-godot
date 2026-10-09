@@ -16,6 +16,16 @@ road. The softbody solver is Rigs of Rods' own laws, checked against upstream's 
 extracted. `./tools/gate.sh --all` runs the suite; `tools/play.sh --truck` opens a window and hands
 over the controls. See [docs/HANDOFF.md](docs/HANDOFF.md) for where to pick up.
 
+## Two builds: dev and prod
+
+The same code runs as two checkouts. **dev** is this one: the harness fixtures, Rigs of Rods' own
+shipped test map from the submodule, and content under `assets/mods/` and `assets/terrains/`.
+**prod** bundles no content at all — vehicles go in its `mods/`, maps in its `maps/`, put there by
+whoever runs it — so nothing with a licence this project cannot vouch for is ever inside the
+build. `tools/prod.sh setup` creates it at `../ror-godot-prod` on the `prod` branch, marked by an
+untracked `profile.cfg`; `tools/prod.sh merge` is the only way work reaches it, on your word;
+`tools/prod.sh play` opens it. The window title and HUD say which build is up.
+
 ## Layout
 
     extension/             the GDExtension: Rigs of Rods' solver, decoupled from OGRE

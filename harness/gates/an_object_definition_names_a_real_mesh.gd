@@ -101,7 +101,7 @@ func _definition_directories() -> PackedStringArray:
     var base: String = SourceScan.repo_root().path_join(RorContentPath.BASE_ROOT)
     for directory: String in RorContentPath.BASE_DIRECTORIES:
         out.append(base.path_join(directory))
-    for root: String in RorVehicleLibrary.CONTENT_ROOTS:
+    for root: String in BuildProfile.mod_roots():
         var path: String = SourceScan.repo_root().path_join(root)
         for pack: String in DirAccess.get_directories_at(path):
             out.append(path.path_join(pack))

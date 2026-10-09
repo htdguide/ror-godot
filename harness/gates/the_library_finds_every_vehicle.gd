@@ -23,7 +23,7 @@ extends GateBase
 const ACTOR_EXTENSIONS: PackedStringArray = [
     "truck", "car", "load", "airplane", "boat", "trailer", "train", "fixed",
 ]
-const CONTENT_ROOTS: PackedStringArray = ["assets/mods", "assets/terrains"]
+## The roots are the build profile's; the walk of them is this gate's own.
 ## Below this the checkout has no content worth browsing and the gate skips rather than failing:
 ## a fresh clone has no downloaded packs and that is not a fault in the library.
 const MIN_FOR_A_VERDICT: int = 2
@@ -37,7 +37,7 @@ static func meta() -> Dictionary:
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
             "the library's entries and an independent scan of %d roots agree as sets, and every"
-            % CONTENT_ROOTS.size() + " entry has a non-empty title"
+            % BuildProfile.mod_roots().size() + " entry has a non-empty title"
         ),
         "why": (
             "a vehicle goes missing from a browser quietly: a pack whose actor is a `.car`, a"
@@ -114,9 +114,10 @@ func run(_harness: Node) -> Dictionary:
 func _scan() -> Dictionary:
     var out: Dictionary = {}
     var roots: PackedStringArray = PackedStringArray()
-    for relative: String in CONTENT_ROOTS:
+    for relative: String in BuildProfile.mod_roots():
         roots.append(SourceScan.repo_root().path_join(relative))
-    roots.append(SourceScan.repo_root().path_join(RorVehicleLibrary.SHIPPED_ROOT))
+    if BuildProfile.shipped_root() != "":
+        roots.append(SourceScan.repo_root().path_join(BuildProfile.shipped_root()))
     var seen_names: Dictionary = {}
     for base: String in roots:
         if not DirAccess.dir_exists_absolute(base):

@@ -8,7 +8,6 @@ extends Node
 
 ## The map a session opens when it names none: the one Rigs of Rods itself ships, which is in
 ## the tree under GPL and therefore present on any clone.
-const DEFAULT_MAP: String = "simple2"
 
 const HUD_REFRESH_FRAMES: int = 10
 
@@ -48,7 +47,8 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
     _weather = PlayWeather.new(
         weather, camera, CameraCfg.get_preset(Harness.args.get_string("shot", "diag_origin"))
     )
-    _map_name = Harness.args.get_string("terrain-dir", DEFAULT_MAP)
+    _map_name = Harness.args.get_string("terrain-dir", BuildProfile.default_map())
+    DisplayServer.window_set_title("ror-godot [%s]" % BuildProfile.label())
     _hud = PlayHud.build(self)
     if not vehicle.is_empty():
         # `--vehicle <dir>:<file>` is how a session names one; the library keys on the basename.
@@ -77,6 +77,9 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
 ## a place someone else built and drove is the only world worth checking a reader against.
 func _build_terrain() -> void:
     if not Harness.args.has_flag("terrain"):
+        return
+    if _map_name == "":
+        print("PLAY  no map named and none bundled: the flat plane. Maps go in %s" % BuildProfile.maps_hint())
         return
     _terrain = TerrainWorld.create()
     if _terrain == null:
@@ -111,16 +114,12 @@ func _populate_terrain() -> void:
     # The sea the terrain declares. Port Starling spawns four metres above its own waterline.
     _world.add_child(RorWater.build(loaded))
     _grow_vegetation(loaded)
-    # `--collision` draws what the terrain is solid as, over whatever is drawn. A box with
-    # nothing in it is geometry that is missing; drawn geometry with no box is something a
-    # vehicle will drive through.
+    # `--collision` draws what the terrain is solid as, over whatever is drawn.
     _solid.setup(loaded)
     if Harness.args.has_flag("collision"):
         print("PLAY  " + _solid.show_boxes(_world, true))
-    # `--facing` dresses the scenery in the same paint the object gates photograph with: a face
-    # keeps its texture from the front and draws its axis in a primary colour from behind. A wall
-    # turned the wrong way is otherwise empty sky, which looks exactly like correct empty sky, so
-    # there is nothing to point at in a screenshot without this.
+    # `--facing` dresses the scenery in the object gates' facing paint: a face keeps its texture
+    # from the front and draws its axis in a primary colour from behind.
     if Harness.args.has_flag("facing"):
         var dressed: int = FacingPaint.dress(_world)
         print("PLAY  facing paint on %d meshes: any bright primary is the back of a face" % dressed)

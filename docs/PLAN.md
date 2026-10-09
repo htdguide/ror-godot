@@ -296,6 +296,15 @@ thing in frame. That contrast is the strongest argument for moving the hero-asse
 and it is scheduled immediately after M3 for that reason (see R10).
 
 
+**The production build bundles nothing (2026-10-09).** Two checkouts of one code, told apart by an
+untracked `profile.cfg` (`BuildProfile`): *dev* carries the fixtures, the submodule's shipped test
+map and `assets/mods` / `assets/terrains`; *prod*, on the `prod` branch at `../ror-godot-prod`, reads
+vehicles from its own `mods/` and maps from its own `maps/`, reads no shipped content, and opens on
+the flat plane under the sky when those are empty. Nothing reaches `prod` except `tools/prod.sh
+merge`, on the user's word, so a session's experiments stay on dev. Every content lookup asks the
+profile; `the_build_profile_decides_where_content_lives` reads the source for any folder named
+elsewhere.
+
 ## 0.6 Terrain3D as the terrain layer
 
 Asset-library entry #3892 is **Terrain3D** by TokisanGames: a C++ GDExtension clipmap terrain system,

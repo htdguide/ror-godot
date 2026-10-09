@@ -27,10 +27,8 @@ extends RefCounted
 const ACTOR_EXTENSIONS: PackedStringArray = [
     "truck", "car", "load", "airplane", "boat", "trailer", "train", "fixed",
 ]
-## Where content is unpacked, and where upstream's own shipped vehicles sit. Both roots are
-## searched for vehicles because a downloaded pack decides for itself what it contains.
-const CONTENT_ROOTS: PackedStringArray = ["assets/mods", "assets/terrains"]
-const SHIPPED_ROOT: String = "vendor/rigs-of-rods/content"
+## Where content is unpacked, and where upstream's own shipped vehicles sit, is the build
+## profile's to say: see `BuildProfile`. The production build bundles nothing.
 
 
 ## Every vehicle this checkout holds: {"name", "file", "directory", "kind"}, in a stable order.
@@ -41,11 +39,7 @@ const SHIPPED_ROOT: String = "vendor/rigs-of-rods/content"
 static func entries() -> Array[Dictionary]:
     var out: Array[Dictionary] = []
     var seen: Dictionary = {}
-    var roots: PackedStringArray = PackedStringArray()
-    for relative: String in CONTENT_ROOTS:
-        roots.append(SourceScan.repo_root().path_join(relative))
-    roots.append(SourceScan.repo_root().path_join(SHIPPED_ROOT))
-    for base: String in roots:
+    for base: String in roots():
         if not DirAccess.dir_exists_absolute(base):
             continue
         for directory: String in DirAccess.get_directories_at(base):
@@ -66,6 +60,17 @@ static func entries() -> Array[Dictionary]:
     out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
         return (a["name"] as String) < (b["name"] as String)
     )
+    return out
+
+
+## The absolute directories vehicles are looked for in, the shipped content last.
+static func roots() -> PackedStringArray:
+    var out: PackedStringArray = PackedStringArray()
+    for relative: String in BuildProfile.mod_roots():
+        out.append(SourceScan.repo_root().path_join(relative))
+    var shipped: String = BuildProfile.shipped_root()
+    if shipped != "":
+        out.append(SourceScan.repo_root().path_join(shipped))
     return out
 
 

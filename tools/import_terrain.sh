@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Puts a Rigs of Rods terrain into this checkout's terrain library.
 #
-#   tools/import_terrain.sh <archive.zip>     unpack an archive into assets/terrains/
+#   tools/import_terrain.sh <archive.zip>     unpack an archive into the maps library
 #   tools/import_terrain.sh <directory>       copy an unpacked terrain in
 #   tools/import_terrain.sh --list            what the library holds
 #
@@ -13,7 +13,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LIBRARY="$REPO_ROOT/assets/terrains"
+LIBRARY="$REPO_ROOT/$("$REPO_ROOT/tools/profile.sh" maps)"
 GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 
 list_terrains() {

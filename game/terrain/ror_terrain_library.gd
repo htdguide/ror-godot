@@ -21,14 +21,19 @@ extends RefCounted
 ## starts a vehicle — because that is what a person choosing between them wants, and because a
 ## terrain that cannot answer those is a terrain that will not load.
 
-## Where a downloaded terrain is unpacked, and where upstream's own shipped content sits.
-const TERRAIN_ROOT: String = "assets/terrains"
-const SHIPPED_ROOT: String = "vendor/rigs-of-rods/content"
-
-
-## Where downloaded terrains live in this checkout.
+## Where downloaded terrains live in this checkout: the build profile's to say (`BuildProfile`).
 static func root() -> String:
-    return SourceScan.repo_root().path_join(TERRAIN_ROOT)
+    return SourceScan.repo_root().path_join(BuildProfile.terrain_root())
+
+
+## The directories terrains are looked for in: the library, then upstream's shipped content
+## where the build bundles it. The production build bundles none.
+static func roots() -> PackedStringArray:
+    var out: PackedStringArray = PackedStringArray([root()])
+    var shipped: String = BuildProfile.shipped_root()
+    if shipped != "":
+        out.append(SourceScan.repo_root().path_join(shipped))
+    return out
 
 
 ## Every terrain this checkout holds: {"name", "directory"}, in a stable order.
@@ -37,7 +42,7 @@ static func root() -> String:
 static func entries() -> Array[Dictionary]:
     var out: Array[Dictionary] = []
     var seen: Dictionary = {}
-    for base: String in [root(), SourceScan.repo_root().path_join(SHIPPED_ROOT)]:
+    for base: String in roots():
         if not DirAccess.dir_exists_absolute(base):
             continue
         for directory: String in DirAccess.get_directories_at(base):

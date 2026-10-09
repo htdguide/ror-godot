@@ -45,7 +45,14 @@ want_terrain=0
 for i in "${!args[@]}"; do
     if [[ "${args[$i]}" == "--truck" ]]; then
         args[$i]="--vehicle"
-        args=("${args[@]:0:$((i+1))}" "assets/mods/ChevyS1023:S10offroad.truck" "${args[@]:$((i+1))}")
+        # The hero, wherever this build keeps its vehicles. A build without it opens with none.
+        hero="$("$REPO_ROOT/tools/profile.sh" mods)/ChevyS1023"
+        if [[ -f "$REPO_ROOT/$hero/S10offroad.truck" ]]; then
+            args=("${args[@]:0:$((i+1))}" "$hero:S10offroad.truck" "${args[@]:$((i+1))}")
+        else
+            echo "play.sh: no hero vehicle at $hero; opening without one (Drive tab lists what there is)"
+            unset 'args[i]'
+        fi
         want_terrain=1
         break
     fi
@@ -69,7 +76,7 @@ args=("${args[@]}")
 printf '{"pid": %d, "purpose": "human session", "started": "%s", "args": "%s"}\n' \
     "$$" "$(date -u +%FT%TZ)" "$*" > "$track_file"
 
-echo "play.sh: opening a window. Close it to end the session."
+echo "play.sh: opening a $("$REPO_ROOT/tools/profile.sh") window. Close it to end the session."
 "$GODOT" --path "$PROJECT_DIR" --resolution "$RESOLUTION" -- --play ${args[@]+"${args[@]}"} &
 engine_pid=$!
 wait "$engine_pid"

@@ -32,7 +32,7 @@ const BROKEN_COLOUR: Color = Color(1.0, 0.55, 0.5)
 static func vehicles(into: VBoxContainer, current: String, on_pick: Callable) -> void:
     var packs: Dictionary = _by_pack(RorVehicleLibrary.summaries())
     if packs.is_empty():
-        MenuWidgets.note(into, "No vehicles. Unpack one into assets/mods/ and reopen this.")
+        MenuWidgets.note(into, "No vehicles. Unpack one into %s and reopen this." % BuildProfile.mods_hint())
         return
     for pack: String in packs.keys():
         MenuWidgets.heading(into, pack)
@@ -51,7 +51,7 @@ static func vehicles(into: VBoxContainer, current: String, on_pick: Callable) ->
 static func maps(into: VBoxContainer, current: String, on_pick: Callable) -> void:
     var packs: Dictionary = _by_pack(RorTerrainLibrary.summaries())
     if packs.is_empty():
-        MenuWidgets.note(into, "No maps. Unpack one into assets/terrains/ and reopen this.")
+        MenuWidgets.note(into, "No maps. Unpack one into %s and reopen this." % BuildProfile.maps_hint())
         return
     for pack: String in packs.keys():
         MenuWidgets.heading(into, pack)

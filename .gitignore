@@ -60,3 +60,14 @@ build/
 
 # The mod corpus tools/fetch_corpus.sh downloads for the mod_corpus gate: archive content, not ours.
 assets/corpus/
+
+# The build profile: an untracked file that marks the production checkout (tools/prod.sh writes
+# it). Dev is what a checkout is without one. See game/config/build_profile.gd.
+profile.cfg
+
+# The production build's content folders: whoever runs it puts vehicles and maps here. Only the
+# notes that say so are committed.
+mods/*
+!mods/README.md
+maps/*
+!maps/README.md

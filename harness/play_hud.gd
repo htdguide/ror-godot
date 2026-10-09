@@ -35,8 +35,9 @@ static func build(into: Node) -> Label:
 static func text(viewport: Viewport, weather: String, footer: String) -> String:
     var viewport_rid: RID = viewport.get_viewport_rid()
     return (
-        "%s | %s | %s\n%.1f fps  %.2f ms\ndraw calls %d  primitives %d\nvideo %.0f MB  texture %.0f MB\n%s"
+        "%s | %s | %s | %s\n%.1f fps  %.2f ms\ndraw calls %d  primitives %d\nvideo %.0f MB  texture %.0f MB\n%s"
         % [
+            BuildProfile.label(),
             RenderingServer.get_video_adapter_name(),
             RenderingServer.get_current_rendering_driver_name(),
             weather,
