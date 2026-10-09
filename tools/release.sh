@@ -27,6 +27,10 @@ ZIP="$REPO_ROOT/release/ror-godot-$PLATFORM-$SHA.zip"
 TEMPLATES="$HOME/Library/Application Support/Godot/export_templates/4.7.2.stable"
 
 [[ -d "$TEMPLATES" ]] || { echo "release.sh: no export templates at $TEMPLATES" >&2; exit 1; }
+# The exporter scans the whole project folder, release/ included, and a previous platform's
+# output in it — Rigs of Rods' .material scripts under vendor/ beside its executable — reads as
+# "unrecognized binary resource" and fails the export. A .gdignore keeps Godot out of release/.
+mkdir -p "$REPO_ROOT/release" && touch "$REPO_ROOT/release/.gdignore"
 [[ "$PROFILE" == "prod" ]] || echo "release.sh: note: this checkout is $PROFILE; the build ships as prod regardless"
 
 # What the game reads beside its executable, laid beside whatever the exporter wrote.
