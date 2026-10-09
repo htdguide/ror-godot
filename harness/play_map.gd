@@ -149,6 +149,11 @@ func _hand_to_vehicle(wanted: RorTerrain) -> void:
         % [wanted.name, drive.spawn, wanted.gravity(), solid])
 
 
+## The weather every load ends by putting on. The main menu's third choice sets it.
+func set_opening_weather(weather_name: String) -> void:
+    _initial_weather = weather_name
+
+
 ## Puts another map up, where this one was. Ignored while one is still being built.
 func change(wanted: String) -> void:
     if wanted == name:

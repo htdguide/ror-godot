@@ -27,6 +27,10 @@ var _view: PlayCamera = PlayCamera.new()
 var _menu: PlayMenu
 ## The map: its terrain, its scenery, the screen that covers a change. See `PlayMap`.
 var _map: PlayMap = PlayMap.new()
+## The graphics options, applied at start and whenever moved, and the menu the game opens to
+## when nothing on the command line said what to drive or where.
+var _graphics: GraphicsSettings = GraphicsSettings.new()
+var _main_menu: MainMenu = null
 ## What the terrain is solid as: the F8 overlay, and where a vehicle may stand.
 var _solid: PlaySolid = PlaySolid.new()
 
@@ -66,8 +70,26 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
     add_child(screen)
     _map.setup(self, _world, _menu, _solid, _weather, weather, screen)
     _map.drive = _drive
+    _graphics.load_from()
+    _graphics.apply(get_viewport(), _world)
+    # Nothing named on the command line: the game opens on its menu rather than on a world.
+    if not Harness.args.values.has("vehicle") and not Harness.args.values.has("terrain-dir"):
+        _map.name = ""
+        _main_menu = MainMenu.new()
+        add_child(_main_menu)
+        _main_menu.setup(_graphics, _start_game, func() -> void: get_tree().quit(0),
+            func() -> void: _graphics.apply(get_viewport(), _world, _map.vegetation))
+        _main_menu.open()
     _map.build()
     PlayHud.print_help(_drive)
+
+
+## The main menu's three choices, made: the vehicle, then the map under the chosen weather.
+func _start_game(choice: Dictionary) -> void:
+    _change_vehicle(choice["vehicle"] as String)
+    _map.set_opening_weather(choice["weather"] as String)
+    _change_map(choice["map"] as String)
+    Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _process(delta: float) -> void:
@@ -91,6 +113,9 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+    # The main menu owns the window while it is up: no look, no keys, no in-game panel.
+    if _main_menu != null and _main_menu.is_open():
+        return
     if event is InputEventMouseButton:
         var button: InputEventMouseButton = event as InputEventMouseButton
         if not button.pressed:

@@ -31,7 +31,7 @@ func _init() -> void:
     _root.set_anchors_preset(Control.PRESET_FULL_RECT)
     _root.mouse_filter = Control.MOUSE_FILTER_STOP
     add_child(_root)
-    _backdrop()
+    backdrop(_root)
     _band()
     _root.visible = false
 
@@ -58,12 +58,13 @@ func is_open() -> bool:
     return _root.visible
 
 
-## The picture, or a gradient where there is none, and a fade into the band over it.
-func _backdrop() -> void:
+## The picture, or a gradient where there is none, and a fade into the band over it. Static so
+## the main menu stands on the same picture.
+static func backdrop(root: Control) -> void:
     var ground: ColorRect = ColorRect.new()
     ground.color = Color(0.03, 0.035, 0.05)
     ground.set_anchors_preset(Control.PRESET_FULL_RECT)
-    _root.add_child(ground)
+    root.add_child(ground)
     var path: String = SourceScan.repo_root().path_join(IMAGE)
     var picture: TextureRect = TextureRect.new()
     picture.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -82,7 +83,7 @@ func _backdrop() -> void:
         dusk.fill_from = Vector2(0.5, 0.85)
         dusk.fill_to = Vector2(0.5, 0.0)
         picture.texture = dusk
-    _root.add_child(picture)
+    root.add_child(picture)
     var fade: TextureRect = TextureRect.new()
     fade.set_anchors_preset(Control.PRESET_FULL_RECT)
     fade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -94,7 +95,7 @@ func _backdrop() -> void:
     shade.fill_from = Vector2(0.5, 0.45)
     shade.fill_to = Vector2(0.5, 1.0)
     fade.texture = shade
-    _root.add_child(fade)
+    root.add_child(fade)
 
 
 ## The band along the bottom: the map's name, the bar, and what the bar is doing.

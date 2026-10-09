@@ -8,6 +8,8 @@ a person drives it, and no such milestone is closed by the agent.
 
 ## Running one
 
+    tools/play.sh                         the main menu: start a game (vehicle, map, weather),
+                                          graphics, quit — what the production build opens on
     tools/play.sh --truck                 the test park, driving
     tools/play.sh --truck --valley        Valley One instead
     tools/play.sh --shot diag_grid_wide

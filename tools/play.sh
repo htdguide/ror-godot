@@ -41,7 +41,9 @@ trap cleanup EXIT INT TERM
 # is the one the game itself ships, which is in the tree as a submodule and therefore present
 # on any clone; --map <name> picks another from the library under assets/terrains/.
 args=("$@")
-want_terrain=0
+# A world by default: the main menu a plain `tools/play.sh` opens on starts a game on a map, and
+# that needs the terrain layer up. `--no-terrain` is the flat plane for whoever wants it.
+want_terrain=1
 for i in "${!args[@]}"; do
     if [[ "${args[$i]}" == "--truck" ]]; then
         args[$i]="--vehicle"

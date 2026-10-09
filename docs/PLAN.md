@@ -1318,6 +1318,9 @@ Later the same day, two more asks: a map change now shows a loading screen (`Pla
 hero on a road at dusk from `loading_shot`) and puts the opening weather back over the new map
 (`PlayMap`; the old map's sea used to stay, `a_map_change_leaves_nothing_of_the_old_map`), and
 the window opens at golden dusk as the handoff always said — the play path had never asked for it.
+Then a main menu (`MainMenu`): start a game as a vehicle, a map and a weather in turn; a graphics
+page (`GraphicsSettings`: window mode, vsync, fps cap, render scale, FSR 2, anti-aliasing, shadow
+quality, distances; saved in the user data folder); quit. The production build opens on it.
 
 ---
 

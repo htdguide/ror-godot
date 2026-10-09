@@ -121,6 +121,9 @@ glass switched to the lit frame its author drew — a reflection probe per actor
 objects as solid columns,
 a terrain's own vegetation in a ring that follows the driver, and recovery from a roll.
 
+A plain `tools/play.sh` (and the production build) opens on a main menu — `MainMenu`: start a
+game as vehicle, map, weather in turn; `GraphicsSettings` saved to `user://settings.cfg`; quit —
+held by `the_main_menu_hands_over_a_start` and `the_graphics_settings_round_trip_and_apply`.
 Sessions open at golden dusk unless `--weather` says otherwise (they opened at noon until
 2026-10-09: the play path never asked `_default_weather`). A map change shows a loading screen
 (`PlayLoading`, picture from `tools/loading_shot.sh`), removes all of the old map (`PlayMap`,
