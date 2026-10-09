@@ -381,6 +381,9 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   no fill shadow below High, clouds at 20 steps and 2 light steps — draw the same frame in
   17.8 ms. Driven five seconds at full throttle with the chase camera on and the grass refilling,
   the way a person sees it: 35.9 ms median and 57.7 worst with everything on, 18.8 and 32.8
-  under the defaults; the worst frames are the grass tiles refilling. A settings file carries a
-  version; one from older defaults is not read.
+  under the defaults; the worst frames were the grass tiles refilling — six tiles a call at 2.4 ms
+  of GDScript each, a 14 ms hitch every sixteen metres. A call has a 1.5 ms budget now and builds
+  nearest first (`grass_refills_within_its_frame_budget`: worst call 3.6 ms at 120 km/h, ring
+  whole 13 frames after stopping). A settings file carries a version; one from older defaults is
+  not read.
 

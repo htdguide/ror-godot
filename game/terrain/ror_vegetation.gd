@@ -27,10 +27,12 @@ const FADE_M: float = 40.0
 const MAX_PER_TILE: int = 4000
 ## How far the focus moves before the ring is worked out again.
 const REBUILD_AFTER_M: float = TILE_M * 0.5
-## How many tiles may be built in one call. A full ring is sixty-odd tiles and several thousand
-## plants; built in one frame that is a visible hitch every time the driver crosses a tile, so
-## the ring fills in over the following frames instead.
-const TILES_PER_CALL: int = 6
+## How long one `focus_on` may spend building tiles. A tile is about 2.4 ms of GDScript on La
+## Paz (two layers, density images, a height per plant), and six of them a call — the old
+## rule — was a 14 ms hitch every sixteen metres, the worst frames of every drive. One tile a
+## frame keeps up with 120 km/h: a 16 m move invalidates a row of fifteen tiles, and the next
+## row is thirty frames away. The ring is filled nearest first, so what is missing is far.
+const BUILD_BUDGET_MS: float = 1.5
 ## Placement hash, the same shape the valley's trees use: position in, one deterministic number
 ## out, no RNG.
 const HASH_SALT: int = 0x9E3779B9
@@ -51,6 +53,8 @@ var _range_limit_m: float = MAX_RANGE_M
 var _focus: Vector3 = Vector3(INF, 0.0, INF)
 ## The ring the focus asks for, which may still be filling in.
 var _wanted: Dictionary = {}
+## The wanted tiles not yet built, nearest the focus first.
+var _queue: Array[Vector2i] = []
 
 
 ## Grows a terrain's vegetation. Returns "" when there is something to grow, or a reason there is
@@ -93,14 +97,28 @@ func focus_on(at: Vector3) -> void:
             if node != null:
                 node.queue_free()
             _tiles.erase(key)
-    var built: int = 0
-    for key: Vector2i in _wanted.keys():
-        if _tiles.has(key):
+        _queue = []
+        var centre: Vector2 = Vector2(at.x, at.z) / TILE_M - Vector2(0.5, 0.5)
+        for key: Vector2i in _wanted.keys():
+            if not _tiles.has(key):
+                _queue.append(key)
+        _queue.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+            return Vector2(a).distance_squared_to(centre) < Vector2(b).distance_squared_to(centre)
+        )
+    # Nearest first, until the budget is spent; the rest wait for the next frame.
+    var began: int = Time.get_ticks_usec()
+    while not _queue.is_empty():
+        var key: Vector2i = _queue.pop_front()
+        if _tiles.has(key) or not _wanted.has(key):
             continue
         _build_tile(key)
-        built += 1
-        if built >= TILES_PER_CALL:
+        if float(Time.get_ticks_usec() - began) / 1000.0 >= BUILD_BUDGET_MS:
             return
+
+
+## Tiles still to build around the focus. Zero once the ring is whole.
+func pending() -> int:
+    return _queue.size()
 
 
 ## Fills the whole ring at once, however many tiles that is. What a gate and a photograph want:
@@ -111,6 +129,7 @@ func fill() -> void:
     for key: Vector2i in _wanted.keys():
         if not _tiles.has(key):
             _build_tile(key)
+    _queue = []
 
 
 ## Which tiles a focus asks for.
