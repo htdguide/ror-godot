@@ -12,28 +12,23 @@ authoritative. It was re-scoped on 2026-09-30 from a renderer rewrite to a clien
 and §1's ordering are the new parts and the decisions table records what was superseded. Then
 `docs/architecture/bridge.md` and `docs/decisions/`.
 
-**Next milestone is D0, the dev environment** (§0.8), and all seven of its acceptance items are
-done: the §0.7 folder mirror, the one-window container runner, order independence, no leaks, the
-`static_state` lint, one command table behind three front ends, and one JSONL line per command.
-`tools/gate.sh` is a client of that table too: `--gate a,b,c` is sugar for `gate run a b c`, so
-the path CI uses is the path a person uses, and `tools/gate.sh --cmd "<line>"` runs any console
+**State on 2026-10-09 evening.** D0 (§0.8) is done. **M1's acceptance list is complete** (the
+solver thread was its last item) after a week's mod-library sweep that pulled C2's format
+coverage forward: 69 library vehicles and 734 archive actors load. **M2 is in progress** and had
+its first human look-sweep that day: verdict "all of it looks great", four findings closed (PLAN
+§1, M2). **Two builds exist**: this dev checkout, and a production checkout at
+`../ror-godot-prod` (branch `prod`, `tools/prod.sh`) that bundles no content and receives work
+only by `tools/prod.sh merge` on the user's word — see README. The last day's work, in order:
+the solver thread, the sweep's fixes, the production build, a loading screen and a map change
+that resets the weather. Trust the commit log over this file for what was touched last.
+`tools/gate.sh --gate a,b,c` is sugar for `gate run a b c`; `--cmd "<line>"` runs any console
 command from a shell.
 
-**M2 is in progress** — PBR ground and HDRI sky; its open items are under "What to do next".
-**M1's acceptance list closed on 2026-10-09** (the solver thread was its last item), after a week's
-mod-library sweep that pulled C2's format coverage forward: 69 library vehicles and 734 archive
-actors load. Trust the commit log over this file for what was touched last.
-
-**Two sections were decided on 2026-10-01 and nothing in them is built.** §0.10 is now
-client-authoritative state replication on this project's own wire at 64 players, and **RoRnet
-compatibility is retired** — it records the oracle that cost and the four things that have to
-replace it. §0.12 is the scale design: float32 gives 11.9 mm at 100 km and beam forces are
-differences of positions, so the fix is per-actor frames that follow the actor, with islands,
-sleeping, and a causality bound from a 1000 km/h v_max. **Its first prerequisite does not exist: a
-hard node-velocity clamp.** Without one the bound is an assumption rather than a theorem. Read
-§0.12's order-of-work before starting any of it — step 2 is two cheap measurements that decide
-whether the rest is urgent at all, because at La Paz scale the relative beam error is ~5e-4, which
-is coarser than this project's own tolerances.
+**Two sections were decided on 2026-10-01 and nothing in them is built.** §0.10: client-
+authoritative replication on this project's own wire at 64 players; RoRnet compatibility retired.
+§0.12: the scale design (per-actor frames, islands, sleeping, a causality bound from a 1000 km/h
+v_max); its first prerequisite, a hard node-velocity clamp, does not exist. Read §0.12's
+order-of-work first — step 2 is two cheap measurements that decide whether any of it is urgent.
 
 **The console.** `tools/play.sh` and `--console` open it; ` or F1 drops it down over whatever is
 running, without pausing it. `help` lists the twelve commands, Tab completes and cycles, Up
@@ -231,25 +226,23 @@ the shadow gate's band is the published 10:1 to 18:1 now, where it was a 1.5-to-
 waiting for a sky it could grade against. The uncalibrated photograph reads 4.7:1 and fails it.
 The "7.2:1 still open" this file carried was written before the photographs arrived.
 
-**2. The money shots exist.** `tools/money_shots.sh` runs the `money_shots` gate and tiles its
+**2. What the user asks for next is the thread.** The look-sweep's leftovers are theirs (haze and
+fog with the new panel rows, the money-shot sheet); M2 closes only on their word. Open code
+items from the day: the sweep's human findings (5 below); the `loading_shot` gate's own picture
+is flat and overexposed where the hand-taken one is not, which says the gate's framing (road
+point nearest the spawn, sun 50° round) is not yet a photograph. The money shots:
+`tools/money_shots.sh` runs the `money_shots` gate and tiles its
 eight frames into `artifacts/money-shots-sheet.png`, archived per commit by `tools/history.sh`.
 Every frame is derived from the terrain (`harness/money_shot_frames.gd`) and the report says which
 feature placed each camera. La Paz is the default; `--terrain-dir starling-port` has road points
 and a water line. Starling's `object` frame is a wall (its nearest object is a building) and its
 road frame has a lamp post in the middle; both are honest and both are a person's to judge.
 
-**3. M1's acceptance items**, each checked against the suite:
-
-- **Acceptance 2** — done: every `HARNESS_METRIC` row carries `solver_ms`, `solver_wait_ms`,
-  `deform_ms` and `submit_ms` (`a_frame_reports_its_parts`), and the solver steps on its own
-  thread (`RorSolver.step_async`; `the_solver_steps_on_its_own_thread` holds a threaded run equal
-  to the bit to a synchronous one over 180 frames). `PlayDrive` draws the last completed step.
-- **Acceptance 4** — done: `the_solver_is_deterministic`, two interleaved 600-frame runs with a
-  crash, SHA-256 of every frame's positions identical; a one-substep control differs.
-- **Acceptance 5** — done: `tools/fetch_corpus.sh` fills `assets/corpus/` from the archive's own
-  portal; `mod_corpus` loads all 734 actors of 205 resources in 28 s and names what it cannot read.
-
-Acceptance 1, 3, 6, 7 and 8 pass. **M1's list is complete**; what it still owes is in 5 below.
+**3. M1's acceptance items all hold in the suite.** 2: `a_frame_reports_its_parts` (solver,
+wait, deform, submit per row) and `the_solver_steps_on_its_own_thread` (threaded run bit-equal to
+a synchronous one, posed positions this frame's). 4: `the_solver_is_deterministic`. 5:
+`tools/fetch_corpus.sh` + `mod_corpus`, 734 actors of 205 archive resources. 1, 3, 6, 7, 8 pass.
+What M1 still owes is human: 5 below.
 
 **4. What a loaded terrain does not have yet**, each named rather than forgotten:
 
