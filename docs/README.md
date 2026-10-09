@@ -12,10 +12,14 @@ document that outgrows the cap is split rather than extended.
 
 ## Current contents
 
-- `PLAN.md` (repository root of this tree) — the approved project plan, frozen as the record of what
-  was agreed and why. It is exempt from the 400-line cap as a historical document, and it will be
-  decomposed into `architecture/` documents and numbered ADRs under `decisions/` during M0. Once that
-  decomposition exists, the architecture documents are authoritative and the plan is history.
+- `HANDOFF.md` — where the project stands and where to pick up. Read first.
+- `PLAN.md` — the approved plan, authoritative for scope; exempt from the cap as a record.
+- `architecture/bridge.md` — how the solver is wrapped and driven.
+- `decisions/0001`–`0005` — material classification, flexbody as skinning, two deformation
+  paths, measured bone counts, Godot's winding.
+- `guides/harness.md` — running and writing gates; `guides/human-sessions.md` — the window.
+- `guides/hard-won-facts*.md` — what cost time to learn: light, materials, mods, terrain, the rest.
+- `images/` — the README's screenshot.
 
 ## Rules
 
