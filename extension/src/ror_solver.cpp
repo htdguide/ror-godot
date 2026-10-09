@@ -21,6 +21,7 @@ constexpr float RAD_PER_SEC_TO_RPM = 9.5492965855137f;
 } // namespace
 
 int RorSolver::add_node(const Vector3 &position, float mass) {
+    sync();
     RorNode node;
     node.position = position;
     node.mass = mass > 0.0f ? mass : 1.0f;
@@ -29,6 +30,7 @@ int RorSolver::add_node(const Vector3 &position, float mass) {
 }
 
 int RorSolver::add_beam(int node_a, int node_b, float rest_length, float spring, float damping) {
+    sync();
     if (node_a < 0 || node_b < 0 || node_a >= static_cast<int>(m_nodes.size()) ||
         node_b >= static_cast<int>(m_nodes.size())) {
         return -1;
@@ -51,102 +53,73 @@ int RorSolver::add_beam(int node_a, int node_b, float rest_length, float spring,
 }
 
 void RorSolver::set_gravity(const Vector3 &gravity) {
+    sync();
     m_gravity = gravity;
 }
 
 void RorSolver::set_ground(float height, bool enabled) {
+    sync();
     m_ground_height = height;
     m_ground_enabled = enabled;
 }
 
-void RorSolver::set_ground_friction(float adhesion_velocity, float static_friction, float sliding_friction,
-                                    float hydrodynamic_friction, float stribeck_velocity, float strength) {
-    set_ground_model(0, adhesion_velocity, static_friction, sliding_friction, hydrodynamic_friction,
-                     stribeck_velocity, m_ground_models[0].alpha, strength);
-}
-
-bool RorSolver::set_surface_map(const PackedByteArray &surfaces, int width, int depth) {
-    return m_heightfield.set_surfaces(surfaces, width, depth);
-}
-int RorSolver::ground_model_count() const { return static_cast<int>(m_ground_models.size()); }
-int RorSolver::surface_at(const Vector3 &position) const {
-    return m_heightfield.surface_at(position);
-}
-
 void RorSolver::set_fuselage_drag(int front_node, float width, bool enabled) {
+    sync();
     m_fuselage_node = front_node;
     m_fuselage_width = width;
     m_fuselage_enabled = enabled && front_node >= 0 && width > 0.0f;
 }
 
-void RorSolver::set_ground_fluid(int index, float solid_ground_level, float fluid_density,
-                                 float flow_consistency_index, float flow_behavior_index,
-                                 float drag_anisotropy) {
-    ground_model_at(m_ground_models, index, [&](RorGroundModel &model) {
-        model.solid_ground_level = solid_ground_level;
-        model.fluid_density = fluid_density;
-        model.flow_consistency_index = flow_consistency_index;
-        model.flow_behavior_index = flow_behavior_index;
-        model.drag_anisotropy = drag_anisotropy;
-    });
-}
-
-void RorSolver::set_ground_model(int index, float adhesion_velocity, float static_friction,
-                                 float sliding_friction, float hydrodynamic_friction,
-                                 float stribeck_velocity, float alpha, float strength) {
-    ground_model_at(m_ground_models, index, [&](RorGroundModel &model) {
-        model.adhesion_velocity = adhesion_velocity;
-        model.static_friction = static_friction;
-        model.sliding_friction = sliding_friction;
-        model.hydrodynamic_friction = hydrodynamic_friction;
-        model.stribeck_velocity = stribeck_velocity;
-        model.alpha = alpha;
-        model.strength = strength;
-    });
-}
-
 void RorSolver::set_air_drag(float coefficient, bool enabled) {
+    sync();
     m_air_drag = coefficient;
     m_air_drag_enabled = enabled;
 }
 
 void RorSolver::set_node_immovable(int node, bool immovable) {
+    sync();
     if (node >= 0 && node < static_cast<int>(m_nodes.size())) {
         m_nodes[node].immovable = immovable;
     }
 }
 
 void RorSolver::set_node_position(int node, const Vector3 &position) {
+    sync();
     if (node >= 0 && node < static_cast<int>(m_nodes.size())) {
         m_nodes[node].position = position;
     }
 }
 
 void RorSolver::set_node_velocity(int node, const Vector3 &velocity) {
+    sync();
     if (node >= 0 && node < static_cast<int>(m_nodes.size())) {
         m_nodes[node].velocity = velocity;
     }
 }
 
 void RorSolver::set_node_mass(int node, float mass) {
+    sync();
     if (node >= 0 && node < static_cast<int>(m_nodes.size()) && mass > 0.0f) {
         m_nodes[node].mass = mass;
     }
 }
 
 void RorSolver::set_node_friction(int node, float friction_coef) {
+    sync();
     if (node >= 0 && node < static_cast<int>(m_nodes.size())) {
         m_nodes[node].friction_coef = friction_coef;
     }
 }
 
 void RorSolver::add_node_force(int node, const Vector3 &force) {
+    sync();
     if (node >= 0 && node < static_cast<int>(m_nodes.size())) {
         m_nodes[node].forces += force;
     }
 }
 
 void RorSolver::set_beam_rest_length(int beam, float length) {
+    sync();
     if (beam >= 0 && beam < static_cast<int>(m_beams.size())) {
         m_beams[beam].rest_length = length;
     }
@@ -154,6 +127,7 @@ void RorSolver::set_beam_rest_length(int beam, float length) {
 
 void RorSolver::set_beam_bounds(int beam, int bound_type, float short_bound, float long_bound,
                                 float bound_spring, float bound_damp, float precompression) {
+    sync();
     if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
         return;
     }
@@ -170,6 +144,7 @@ void RorSolver::set_beam_bounds(int beam, int bound_type, float short_bound, flo
 }
 
 float RorSolver::get_beam_rest_length(int beam) const {
+    sync();
     if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
         return 0.0f;
     }
@@ -177,6 +152,7 @@ float RorSolver::get_beam_rest_length(int beam) const {
 }
 
 float RorSolver::get_beam_reference_length(int beam) const {
+    sync();
     if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
         return 0.0f;
     }
@@ -184,6 +160,7 @@ float RorSolver::get_beam_reference_length(int beam) const {
 }
 
 float RorSolver::get_beam_length(int beam) const {
+    sync();
     if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
         return 0.0f;
     }
@@ -199,7 +176,7 @@ float RorSolver::get_beam_length(int beam) const {
 // Upstream's order, and each step is one whole pass of it. The drivetrain runs at the
 // same rate as the rest: its clutch couples an engine of 0.12 kg m2 to the road through a
 // stiff spring, and at frame rate that system does not integrate.
-void RorSolver::step(float dt, int substeps) {
+void RorSolver::step_now(float dt, int substeps) {
     // The obstacles near the rig, found once per call rather than per substep: they never move,
     // the rig moves centimetres inside one call, and testing every box against every node at
     // 2 kHz would cost more than the simulation it is protecting.
@@ -290,6 +267,7 @@ void RorSolver::accumulate_beam_forces() {
 
 void RorSolver::set_beam_limits(int beam, float deform, float strength, float plastic,
                                 bool deformable) {
+    sync();
     if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
         return;
     }
@@ -305,6 +283,7 @@ void RorSolver::set_beam_limits(int beam, float deform, float strength, float pl
 
 void RorSolver::add_slide_node(int node, const PackedInt32Array &rail, float spring,
                                float break_force, float tolerance) {
+    sync();
     if (node < 0 || node >= static_cast<int>(m_nodes.size()) || rail.size() < 2) { return; }
     RorSlideNode slide;
     slide.node = node;
@@ -317,8 +296,12 @@ void RorSolver::add_slide_node(int node, const PackedInt32Array &rail, float spr
     m_slide_nodes.push_back(slide);
 }
 
-int RorSolver::slide_node_count() const { return static_cast<int>(m_slide_nodes.size()); }
+int RorSolver::slide_node_count() const {
+    sync();
+    return static_cast<int>(m_slide_nodes.size());
+}
 bool RorSolver::beam_broken(int beam) const {
+    sync();
     if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
         return false;
     }
@@ -326,6 +309,7 @@ bool RorSolver::beam_broken(int beam) const {
 }
 
 float RorSolver::beam_strength(int beam) const {
+    sync();
     if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
         return 0.0f;
     }
@@ -333,6 +317,7 @@ float RorSolver::beam_strength(int beam) const {
 }
 
 int RorSolver::broken_beam_count() const {
+    sync();
     int count = 0;
     for (const RorBeam &beam : m_beams) {
         if (beam.broken) {
@@ -343,6 +328,7 @@ int RorSolver::broken_beam_count() const {
 }
 
 void RorSolver::set_node_cab(int node, bool is_cab) {
+    sync();
     if (node < 0 || node >= static_cast<int>(m_nodes.size())) {
         return;
     }
@@ -387,69 +373,6 @@ void RorSolver::apply_bound_law(const RorBeam &beam, float extension, float &spr
             }
             return;
     }
-}
-
-bool RorSolver::set_heightfield(const PackedFloat32Array &heights, int width, int depth,
-                                const Vector3 &origin, float spacing) {
-    return m_heightfield.set_field(heights, width, depth, origin, spacing);
-}
-
-int RorSolver::add_obstacle_box(const Transform3D &transform, const Vector3 &half_extents,
-                                int surface) {
-    return m_obstacles.add_box(transform, half_extents, surface);
-}
-
-void RorSolver::clear_obstacles() {
-    m_obstacles.clear();
-}
-
-Dictionary RorSolver::obstacle_contact(const Vector3 &position) {
-    Dictionary out;
-    const Vector3 margin(0.001f, 0.001f, 0.001f);
-    m_obstacles.select(position - margin, position + margin);
-    float penetration = 0.0f;
-    Vector3 normal;
-    int surface = 0;
-    const bool hit = m_obstacles.contact(position, penetration, normal, surface);
-    out["hit"] = hit;
-    out["penetration"] = penetration;
-    out["normal"] = normal;
-    out["surface"] = surface;
-    return out;
-}
-
-int RorSolver::obstacle_count() const {
-    return static_cast<int>(m_obstacles.count());
-}
-
-void RorSolver::clear_heightfield() {
-    m_heightfield.clear();
-}
-
-float RorSolver::ground_height_at(const Vector3 &position) const {
-    if (!m_heightfield.enabled()) {
-        return m_ground_height;
-    }
-    return m_heightfield.height_at(position);
-}
-
-Vector3 RorSolver::ground_normal_at(const Vector3 &position) const {
-    if (!m_heightfield.enabled()) {
-        return Vector3(0.0f, 1.0f, 0.0f);
-    }
-    return m_heightfield.normal_at(position);
-}
-
-Vector3 RorSolver::ground_contact_probe(const Vector3 &velocity, const Vector3 &forces, float mass,
-                                        float friction_coef, const Vector3 &normal,
-                                        float penetration, float dt) const {
-    RorNode node;
-    node.velocity = velocity;
-    node.forces = forces;
-    node.mass = mass;
-    node.friction_coef = friction_coef;
-    // Model 0: the parity comparison is against upstream's default surface.
-    return ground_contact_force(node, normal, penetration, dt, m_ground_models[0]);
 }
 
 // The world bounds of the rig, grown by the distance it could travel inside one call, handed to
@@ -512,6 +435,7 @@ void RorSolver::apply_obstacle_contact(float dt) {
 }
 
 PackedVector3Array RorSolver::get_positions() const {
+    sync();
     PackedVector3Array out;
     out.resize(static_cast<int64_t>(m_nodes.size()));
     for (size_t i = 0; i < m_nodes.size(); ++i) {
@@ -521,6 +445,7 @@ PackedVector3Array RorSolver::get_positions() const {
 }
 
 Vector3 RorSolver::get_node_position(int node) const {
+    sync();
     if (node < 0 || node >= static_cast<int>(m_nodes.size())) {
         return Vector3();
     }
@@ -528,6 +453,7 @@ Vector3 RorSolver::get_node_position(int node) const {
 }
 
 Vector3 RorSolver::get_node_velocity(int node) const {
+    sync();
     if (node < 0 || node >= static_cast<int>(m_nodes.size())) {
         return Vector3();
     }
@@ -535,6 +461,7 @@ Vector3 RorSolver::get_node_velocity(int node) const {
 }
 
 float RorSolver::get_node_mass(int node) const {
+    sync();
     if (node < 0 || node >= static_cast<int>(m_nodes.size())) {
         return 0.0f;
     }
@@ -542,14 +469,17 @@ float RorSolver::get_node_mass(int node) const {
 }
 
 int RorSolver::node_count() const {
+    sync();
     return static_cast<int>(m_nodes.size());
 }
 
 int RorSolver::beam_count() const {
+    sync();
     return static_cast<int>(m_beams.size());
 }
 
 float RorSolver::total_mass() const {
+    sync();
     float mass = 0.0f;
     for (const RorNode &node : m_nodes) {
         mass += node.mass;
@@ -558,6 +488,7 @@ float RorSolver::total_mass() const {
 }
 
 float RorSolver::total_energy() const {
+    sync();
     float energy = 0.0f;
     for (const RorNode &node : m_nodes) {
         if (node.immovable) {

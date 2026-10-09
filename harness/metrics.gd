@@ -14,9 +14,11 @@ const USEC_PER_MSEC: float = 1000.0
 const WARMUP_FRAMES: int = 2
 
 ## The parts of a frame that are this project's own work, in microseconds, reported into the
-## frame by whoever did them and printed with it. Every row carries all three, zero when nothing
-## ran that frame, so a parser never has to ask whether a key exists.
-const PHASES: Array[String] = ["solver", "deform", "submit"]
+## frame by whoever did them and printed with it. Every row carries all four, zero when nothing
+## ran that frame, so a parser never has to ask whether a key exists. `solver` is the step's
+## own time on whichever thread ran it; `solver_wait` is what the frame spent waiting for it,
+## which is the solver's whole cost to the frame once it runs on its own thread.
+const PHASES: Array[String] = ["solver", "solver_wait", "deform", "submit"]
 
 var _frame_ms: PackedFloat64Array = PackedFloat64Array()
 var _last_usec: int = 0

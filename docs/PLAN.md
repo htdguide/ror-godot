@@ -946,7 +946,7 @@ local milestone, then the two networked ones.
 | # | Milestone | Why here |
 | --- | --- | --- |
 | M0 | CLI harness | done; nothing else could be committed before it |
-| M1 | Softbody bridge + a rig on screen | done but for three acceptance items, listed in its section |
+| M1 | Softbody bridge + a rig on screen | done; every acceptance item holds in the suite (2026-10-09) |
 | **D0** | **The dev environment** (§0.8) | **done 2026-09-30.** Every milestone after it is built and gated inside it, so it comes before them rather than being retrofitted. Carries the §0.7 tree mirror, because moving files is cheapest before there are more of them. |
 | M2 | PBR + HDR + tonemap + IBL sky | **next.** First after D0: it is the highest visual payoff per unit work, and it closes the one red gate in the suite (`terrain_takes_the_light`, §0.5) |
 | M2b | Physical camera and the post stack | follows M2 directly; same pipeline |
@@ -1022,11 +1022,21 @@ Scope:
 1. The hero truck loads from an unmodified community `.zip` and renders with legacy-equivalent
    materials (unlit-ish, diffuse-only) at 1080p.
 2. The solver runs at its original substep rate on its own thread; `HARNESS_METRIC` reports
-   `solver_ms`, `deform_ms`, `submit_ms` separately. **Half done, 2026-10-08:** every metric row
-   carries the three, timed in `PlayDrive.step` and `VehicleBuilder.apply_pose` (deform is the
-   arithmetic, submit the renderer calls), held by `a_frame_reports_its_parts` as an identity —
-   each positive, together at most the frame. On the hero at 60 Hz: solver 0.41 ms, deform 0.49,
-   submit 0.27. The solver still runs on the main thread; the thread is the open half.
+   `solver_ms`, `deform_ms`, `submit_ms` separately. **Done, 2026-10-09.** The metrics came
+   first (2026-10-08): every row carries the three, timed in `PlayDrive.step` and
+   `VehicleBuilder.apply_pose` (deform is the arithmetic, submit the renderer calls), held by
+   `a_frame_reports_its_parts`. Then the thread: `RorSolver.step_async` posts a frame's
+   substeps to a `std::thread` of the solver's own, every other entry point waits for it first
+   (`sync`), and `PlayDrive.step` takes a snapshot of the last completed step, posts the next,
+   and poses the vehicle from the snapshot while the solver runs — upstream's model, the drawn
+   state one step behind. Rows now carry `solver_wait_ms` too, and the identity the parts gate
+   holds is this thread's: wait + deform + submit ≤ frame, with `solver_ms` the step's own time
+   on its thread. `the_solver_steps_on_its_own_thread` holds that the thread changed nothing but
+   where: a threaded PlayDrive against a synchronous one, 180 frames equal to the bit; the
+   step's thread id differs from the caller's; and a bare solver posted a step and read in the
+   same breath answers with the stepped positions (its negative control: drop one `sync`, and
+   the read is torn at frame 0). On the hero at 60 Hz: solver 0.47 ms on its thread, the frame
+   waits 0.000 ms of it. `--deterministic` keeps the solver on one thread, as §3.2 says.
 3. LBS spike gate `flexbody_lbs_error`: for 600 recorded solver frames covering a drop, a roll, and a
    wheel impact, the maximum per-vertex difference between RoR's `FlexBody` CPU deform and
    linear-blend skinning against the same node frames is **< 1 mm**, and the 99th percentile is

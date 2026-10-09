@@ -22,6 +22,7 @@ std::vector<float> to_vector(const PackedFloat32Array &array) {
 
 int RorSolver::add_wheel(int axis_a, int axis_b, int first_tread, int tread_count, int arm_node, float radius,
                          int drive, int brake) {
+    sync();
     const int nodes = static_cast<int>(m_nodes.size());
     if (axis_a < 0 || axis_b < 0 || axis_a >= nodes || axis_b >= nodes || first_tread < 0 ||
         first_tread + tread_count > nodes || tread_count <= 0) {
@@ -59,18 +60,22 @@ int RorSolver::add_wheel(int axis_a, int axis_b, int first_tread, int tread_coun
 }
 
 void RorSolver::set_has_axles(bool has_axles) {
+    sync();
     m_wheels.set_has_axles(has_axles);
 }
 
 void RorSolver::set_brake_forces(float foot, float handbrake) {
+    sync();
     m_wheels.set_brake_forces(foot, handbrake);
 }
 
 int RorSolver::wheel_count() const {
+    sync();
     return m_wheels.count();
 }
 
 float RorSolver::get_wheel_speed(int wheel) const {
+    sync();
     if (wheel < 0 || wheel >= m_wheels.count()) {
         return 0.0f;
     }
@@ -78,6 +83,7 @@ float RorSolver::get_wheel_speed(int wheel) const {
 }
 
 float RorSolver::get_wheel_rotation(int wheel) const {
+    sync();
     if (wheel < 0 || wheel >= m_wheels.count()) {
         return 0.0f;
     }
@@ -85,6 +91,7 @@ float RorSolver::get_wheel_rotation(int wheel) const {
 }
 
 float RorSolver::get_wheel_torque(int wheel) const {
+    sync();
     if (wheel < 0 || wheel >= m_wheels.count()) {
         return 0.0f;
     }
@@ -95,6 +102,7 @@ float RorSolver::get_wheel_torque(int wheel) const {
 
 void RorSolver::configure_engine(float min_rpm, float max_rpm, float torque, float diff_ratio, float reverse_gear,
                                  float neutral_gear, const PackedFloat32Array &forward_gears) {
+    sync();
     m_drivetrain.configure(min_rpm, max_rpm, torque, diff_ratio, reverse_gear, neutral_gear,
                            to_vector(forward_gears));
 }
@@ -102,6 +110,7 @@ void RorSolver::configure_engine(float min_rpm, float max_rpm, float torque, flo
 void RorSolver::set_engine_options(float inertia, const String &type, float clutch_force, float clutch_time,
                                    float shift_time, float post_shift_time, float idle_rpm, float stall_rpm,
                                    float braking_torque) {
+    sync();
     const CharString utf8 = type.utf8();
     const char kind = utf8.length() > 0 ? utf8.get_data()[0] : 't';
     m_drivetrain.set_options(inertia, kind, clutch_force, clutch_time, shift_time, post_shift_time, idle_rpm,
@@ -109,86 +118,106 @@ void RorSolver::set_engine_options(float inertia, const String &type, float clut
 }
 
 void RorSolver::set_torque_curve(const PackedFloat32Array &rpm, const PackedFloat32Array &ratio) {
+    sync();
     m_drivetrain.set_torque_curve(to_vector(rpm), to_vector(ratio));
 }
 
 void RorSolver::start_engine() {
+    sync();
     m_drivetrain.start();
 }
 
 void RorSolver::stop_engine() {
+    sync();
     m_drivetrain.stop();
 }
 
 void RorSolver::set_throttle(float throttle) {
+    sync();
     m_drivetrain.set_throttle(throttle);
 }
 
 void RorSolver::set_brake(float brake) {
+    sync();
     m_wheels.set_brake(brake);
 }
 
 void RorSolver::set_parking_brake(bool on) {
+    sync();
     m_wheels.set_parking_brake(on);
 }
 
 void RorSolver::set_gear_selector(int selector) {
+    sync();
     m_drivetrain.set_selector(selector);
 }
 
 float RorSolver::engine_rpm() const {
+    sync();
     return m_drivetrain.rpm();
 }
 
 float RorSolver::engine_max_rpm() const {
+    sync();
     return m_drivetrain.max_rpm();
 }
 
 int RorSolver::engine_gear() const {
+    sync();
     return m_drivetrain.gear();
 }
 
 int RorSolver::engine_gear_count() const {
+    sync();
     return m_drivetrain.gear_count();
 }
 
 float RorSolver::engine_clutch() const {
+    sync();
     return m_drivetrain.clutch();
 }
 
 float RorSolver::engine_torque() const {
+    sync();
     return m_drivetrain.clutch_torque();
 }
 
 bool RorSolver::engine_running() const {
+    sync();
     return m_drivetrain.running();
 }
 
 bool RorSolver::has_engine() const {
+    sync();
     return m_drivetrain.configured();
 }
 
 float RorSolver::road_speed() const {
+    sync();
     return m_wheels.driven_speed();
 }
 
 // --- Steering -------------------------------------------------------------------
 
 void RorSolver::add_hydro(int beam, float factor) {
+    sync();
     if (beam >= 0 && beam < static_cast<int>(m_beams.size())) {
         m_steering.add_hydro(beam, factor);
     }
 }
 
 int RorSolver::hydro_count() const {
+    sync();
     return m_steering.count();
 }
 
 void RorSolver::set_steer_command(float command) {
+    sync();
     m_steering.set_command(command);
 }
 
 float RorSolver::steer_state() const {
+    sync();
     return m_steering.state();
 }
 
@@ -303,6 +332,13 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("steer_state"), &RorSolver::steer_state);
 
     ClassDB::bind_method(D_METHOD("step", "dt", "substeps"), &RorSolver::step);
+    ClassDB::bind_method(D_METHOD("step_async", "dt", "substeps"), &RorSolver::step_async);
+    ClassDB::bind_method(D_METHOD("sync"), &RorSolver::sync);
+    ClassDB::bind_method(D_METHOD("step_pending"), &RorSolver::step_pending);
+    ClassDB::bind_method(D_METHOD("take_step_usec"), &RorSolver::take_step_usec);
+    ClassDB::bind_method(D_METHOD("take_wait_usec"), &RorSolver::take_wait_usec);
+    ClassDB::bind_method(D_METHOD("last_step_thread"), &RorSolver::last_step_thread);
+    ClassDB::bind_method(D_METHOD("caller_thread"), &RorSolver::caller_thread);
     ClassDB::bind_method(D_METHOD("get_positions"), &RorSolver::get_positions);
     ClassDB::bind_method(D_METHOD("get_node_position", "node"), &RorSolver::get_node_position);
     ClassDB::bind_method(D_METHOD("get_node_velocity", "node"), &RorSolver::get_node_velocity);

@@ -6,6 +6,7 @@
 #include "ror_obstacles.h"
 #include "ror_node.h"
 #include "ror_slidenode.h"
+#include "ror_step_worker.h"
 #include "ror_triangles.h"
 #include "ror_steering.h"
 #include "ror_wheels.h"
@@ -15,6 +16,9 @@
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
 #include <godot_cpp/variant/vector3.hpp>
+
+#include <atomic>
+#include <cstdint>
 
 namespace rorgd {
 
@@ -191,8 +195,28 @@ public:
     void set_steer_command(float command);
     float steer_state() const;
 
-    // Advances by `substeps` steps of `dt` seconds each.
+    // Advances by `substeps` steps of `dt` seconds each, on the calling thread.
     void step(float dt, int substeps);
+
+    // --- Threading --------------------------------------------------------------
+    // The same step on the solver's own thread, while the caller gets on with its frame. Every
+    // other entry point waits for it first, so a caller that reads positions straight after
+    // posting gets the stepped ones and loses the overlap; one that reads them before posting
+    // keeps it. PlayDrive is that caller. See ror_solver_thread.cpp.
+    void step_async(float dt, int substeps);
+    // Waits for a posted step. Every entry point calls this; it is public for a caller that
+    // wants to wait on purpose.
+    void sync() const;
+    bool step_pending() const;
+    // Microseconds the completed steps took since the last call, on whichever thread ran them.
+    // Waits for a pending step first, so the step it reports is the step that is done.
+    int64_t take_step_usec();
+    // Microseconds the calling thread spent blocked on the worker since the last call.
+    int64_t take_wait_usec();
+    // A hash of the thread that ran the last step, and of the thread asking. Two numbers in the
+    // same space so a gate can compare them; they mean nothing else.
+    int64_t last_step_thread() const;
+    int64_t caller_thread() const;
     // A node held against a rail: upstream's `slidenodes`. `rail` is the rail's nodes in order.
     void add_slide_node(int node, const godot::PackedInt32Array &rail, float spring,
                         float break_force, float tolerance);
@@ -201,10 +225,17 @@ public:
     // `clear_obstacles`: a world has one set of static collision and these are half of it.
     void add_collision_triangle(const godot::Vector3 &a, const godot::Vector3 &b,
                                 const godot::Vector3 &c, int surface) {
+        sync();
         m_triangles.add(a, b, c, surface);
     }
-    void clear_collision_triangles() { m_triangles.clear(); }
-    int collision_triangle_count() const { return m_triangles.count(); }
+    void clear_collision_triangles() {
+        sync();
+        m_triangles.clear();
+    }
+    int collision_triangle_count() const {
+        sync();
+        return m_triangles.count();
+    }
 
     godot::PackedVector3Array get_positions() const;
     godot::Vector3 get_node_position(int node) const;
@@ -247,6 +278,15 @@ private:
     float m_fuselage_width = 0.0f;
     bool m_fuselage_enabled = false;
 
+    // The worker that runs `step_async`, and what the two clocks around a step record. Mutable
+    // because waiting is something a const reader has to be able to do.
+    mutable RorStepWorker m_worker;
+    mutable int64_t m_wait_usec = 0;
+    std::atomic<int64_t> m_step_usec{0};
+    std::atomic<int64_t> m_step_thread{0};
+
+    // The step itself, with no waiting and no timing: what both `step` and the worker run.
+    void step_now(float dt, int substeps);
     void integrate(float dt);
     void apply_air_drag();
     static void apply_bound_law(const RorBeam &beam, float extension, float &spring, float &damping);

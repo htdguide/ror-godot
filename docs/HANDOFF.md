@@ -19,11 +19,10 @@ done: the §0.7 folder mirror, the one-window container runner, order independen
 the path CI uses is the path a person uses, and `tools/gate.sh --cmd "<line>"` runs any console
 command from a shell.
 
-**M2 is in progress** — PBR ground and HDRI sky; its open items are under "What to do next". **The
-live thread for the last week (2026-10-04 to 2026-10-08) was a mod-library sweep**, C2's format
-coverage pulled forward because every loader convention calibrated on the hero truck broke on a
-second car. It is closed: 69 vehicles load, every braced wheel holds under power, and the suite is
-green on every form of run. Trust the commit log over this file for what was touched last.
+**M2 is in progress** — PBR ground and HDRI sky; its open items are under "What to do next".
+**M1's acceptance list closed on 2026-10-09** (the solver thread was its last item), after a week's
+mod-library sweep that pulled C2's format coverage forward: 69 library vehicles and 734 archive
+actors load. Trust the commit log over this file for what was touched last.
 
 **Two sections were decided on 2026-10-01 and nothing in them is built.** §0.10 is now
 client-authoritative state replication on this project's own wire at 64 players, and **RoRnet
@@ -61,11 +60,10 @@ and once in a seeded shuffle, comparing verdicts and measured values. Worst drif
 suite is 4.4e-8; the one frame-time gate declares `measured_is_wall_clock` and is compared by
 verdict, by name, on every run. Use `tools/gate.sh --all --every` for a number that goes in a
 commit message: it starts fresh, which a session kept open all day does not, and it runs the gates
-`--all` only implies — which is how a stale call in `beams_deform_and_break` sat unrun for a day. The order after it is: M2, M2b, C1 GUI+audio, C2 format coverage+AngelScript, M3–M8,
-C3 airplanes+boats, C4 repository, C5 multiplayer. Local milestones first; the two networked ones
-last, deliberately. The UI's design is settled in §0.11: recognisably RoR and refreshed, with the
-in-vehicle instruments under glass that reflects, backlights warm from below with the lights, and
-carries a bounded inertia against the vehicle's own acceleration.
+`--all` only implies — which is how a stale call in `beams_deform_and_break` sat unrun for a day.
+The order after it is: M2, M2b, C1 GUI+audio, C2 format coverage+AngelScript, M3–M8, C3
+airplanes+boats, C4 repository, C5 multiplayer. Local milestones first; the two networked ones
+last, deliberately. The UI's design is settled in §0.11.
 
 ## Where things stand
 
@@ -142,10 +140,10 @@ has just stated.
 
 ## The suite is green
 
-145 gates. On 2026-10-08 (`8c9a0ef`) all three forms of run pass: `--all` (96 run, 49 implied),
-`--all --every` (145), and `--order-check` (145 twice in one session, identical verdicts, worst
-drift 4.4e-8). Run all three before trusting a change to the solver's API or to anything that
-renders: each found something that day the others did not.
+151 gates. On 2026-10-09 all three forms of run pass: `--all --every` (151) and `--order-check`
+(151 twice in one session, identical verdicts, worst drift 6.2e-7; two wall-clock gates compared
+by verdict). Run all three before trusting a change to the solver's API or to anything that
+renders: the order check caught a day-old gate measuring a wall-clock share undeclared.
 
 **The mod-library sweep, 2026-10-04 to 2026-10-08.** Twelve downloaded packs and the shipped
 Agora and DAF make a library of 69 vehicles, and nearly every loader convention calibrated on the
@@ -237,16 +235,18 @@ feature placed each camera. La Paz is the default; `--terrain-dir starling-port`
 and a water line. Starling's `object` frame is a wall (its nearest object is a building) and its
 road frame has a lamp post in the middle; both are honest and both are a person's to judge.
 
-**3. What M1 acceptance still wants**, each checked against the suite rather than remembered:
+**3. M1's acceptance items**, each checked against the suite:
 
-- **Acceptance 2** — half done: every `HARNESS_METRIC` row carries `solver_ms`, `deform_ms` and
-  `submit_ms` (`a_frame_reports_its_parts`). The solver on its own thread is not started.
-- **Acceptance 4** — done: `the_solver_is_deterministic`, two interleaved runs of 600 frames with
-  a crash in them, SHA-256 of every frame's positions identical, and a one-substep control differs.
+- **Acceptance 2** — done: every `HARNESS_METRIC` row carries `solver_ms`, `solver_wait_ms`,
+  `deform_ms` and `submit_ms` (`a_frame_reports_its_parts`), and the solver steps on its own
+  thread (`RorSolver.step_async`; `the_solver_steps_on_its_own_thread` holds a threaded run equal
+  to the bit to a synchronous one over 180 frames). `PlayDrive` draws the last completed step.
+- **Acceptance 4** — done: `the_solver_is_deterministic`, two interleaved 600-frame runs with a
+  crash, SHA-256 of every frame's positions identical; a one-substep control differs.
 - **Acceptance 5** — done: `tools/fetch_corpus.sh` fills `assets/corpus/` from the archive's own
   portal; `mod_corpus` loads all 734 actors of 205 resources in 28 s and names what it cannot read.
 
-Acceptance 1, 3, 6, 7 and 8 pass.
+Acceptance 1, 3, 6, 7 and 8 pass. **M1's list is complete**; what it still owes is in 5 below.
 
 **4. What a loaded terrain does not have yet**, each named rather than forgotten:
 

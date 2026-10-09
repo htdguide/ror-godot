@@ -16,13 +16,26 @@ var truck: TruckParser
 ## The vehicle's own frame after the last pose, for a camera to follow.
 var frame: Transform3D = Transform3D.IDENTITY
 
+## Whether the solver steps on this thread or on its own. PLAN §3.2 says `--deterministic` forces
+## one thread, and this is where the harness grants it. The thread changes where the arithmetic
+## runs and not what it is — `the_solver_steps_on_its_own_thread` hashes the two against each
+## other — so the flag is policy rather than a fix.
+var synchronous: bool = Harness.args.has_flag("deterministic")
+## What the solver cost last frame, on whichever thread ran it, and how long this thread waited
+## for it. Public so a gate can read a frame's figures without parsing the metric line.
+var solver_usec: int = 0
+var wait_usec: int = 0
+
 var _built: Dictionary = {}
 var _throttle: float = 0.0
 var _brake: float = 0.0
 var _substep_remainder: float = 0.0
-var _solver_usec: int = 0
 var _deform_usec: int = 0
 var _submit_usec: int = 0
+## The solver's state as of the last completed step: node positions, wheel angles and the
+## drivetrain's readings. Everything drawn or shown is drawn from this and not from the solver,
+## so that nothing asks the solver anything while it is stepping. See `step`.
+var _state: Dictionary = {}
 var _selector: int = 1
 var _lit: bool = false
 ## The main beam. A second filament rather than a second switch: it only shows while the lights
@@ -47,6 +60,7 @@ func setup(built: Dictionary) -> String:
     solver.start_engine()
     solver.set_gear_selector(_selector)
     _cockpit = Cockpit.build(built["root"] as Node3D, truck, built)
+    _snapshot()
     _apply_pose()
     return ""
 
@@ -95,6 +109,12 @@ func use_terrain(data: Object) -> String:
     return ""
 
 
+## One frame. The solver is Rigs of Rods' model: physics on its own thread, the last completed
+## state drawn. This frame waits for the step posted last frame — every solver call does — reads
+## the controls onto the settled rig, takes the state it is going to draw, posts this frame's
+## substeps, and poses the vehicle from that state while the solver runs. What is drawn is one
+## step behind the solver, as it is upstream; what is measured is the step's own time on its own
+## thread, and separately the time this thread spent waiting for it.
 func step(delta: float) -> void:
     _seconds += delta
     _read_controls(delta)
@@ -103,14 +123,38 @@ func step(delta: float) -> void:
     var wanted: float = delta * DriveCfg.SUBSTEP_HZ + _substep_remainder
     var substeps: int = mini(int(wanted), DriveCfg.MAX_SUBSTEPS_PER_FRAME)
     _substep_remainder = wanted - float(substeps)
+    if substeps > 0 and synchronous:
+        solver.step(1.0 / DriveCfg.SUBSTEP_HZ, substeps)
+    _snapshot()
+    if substeps > 0 and not synchronous:
+        solver.step_async(1.0 / DriveCfg.SUBSTEP_HZ, substeps)
+    wait_usec = solver.take_wait_usec()
+    Harness.metrics.phase("solver", solver_usec)
+    Harness.metrics.phase("solver_wait", wait_usec)
     if substeps <= 0:
         return
-    var began: int = Time.get_ticks_usec()
-    solver.step(1.0 / DriveCfg.SUBSTEP_HZ, substeps)
-    _solver_usec = Time.get_ticks_usec() - began
-    Harness.metrics.phase("solver", _solver_usec)
     _apply_pose()
     _apply_cabin()
+
+
+## Copies out what this frame draws and shows, before the next step is posted. Waits for a
+## pending step, which is where a frame pays for a solver slower than itself.
+func _snapshot() -> void:
+    solver_usec = solver.take_step_usec()
+    var angles: PackedFloat32Array = PackedFloat32Array()
+    for wheel: int in solver.wheel_count():
+        angles.append(solver.get_wheel_rotation(wheel))
+    _state = {
+        "positions": solver.get_positions(),
+        "angles": angles,
+        "steer": solver.steer_state(),
+        "rpm": solver.engine_rpm(),
+        "road_speed": solver.road_speed(),
+        "torque": solver.engine_torque(),
+        "clutch": solver.engine_clutch(),
+        "gear": solver.engine_gear(),
+        "running": solver.engine_running(),
+    }
 
 
 func on_key(keycode: Key) -> bool:
@@ -165,18 +209,18 @@ func hud_line() -> String:
     return (
         "%s  gear %s  %4.0f rpm  clutch %.2f  wheels %.0f km/h  %.0f Nm\n"
         % [
-            "ON" if solver.engine_running() else "OFF",
+            "ON" if bool(_state.get("running", false)) else "OFF",
             _gear_name(),
-            solver.engine_rpm(),
-            solver.engine_clutch(),
-            solver.road_speed() * 3.6,
-            solver.engine_torque(),
+            float(_state.get("rpm", 0.0)),
+            float(_state.get("clutch", 0.0)),
+            float(_state.get("road_speed", 0.0)) * 3.6,
+            float(_state.get("torque", 0.0)),
         ]
-        + "throttle %.2f  brake %.2f  steer %+.2f  lights %s  solver %.2f  deform %.2f  submit %.2f ms"
+        + "throttle %.2f  brake %.2f  steer %+.2f  lights %s  solver %.2f  wait %.2f  deform %.2f  submit %.2f ms"
         % [
-            _throttle, _brake, solver.steer_state(), "on" if _lit else "off",
-            float(_solver_usec) / 1000.0, float(_deform_usec) / 1000.0,
-            float(_submit_usec) / 1000.0,
+            _throttle, _brake, float(_state.get("steer", 0.0)), "on" if _lit else "off",
+            float(solver_usec) / 1000.0, float(wait_usec) / 1000.0,
+            float(_deform_usec) / 1000.0, float(_submit_usec) / 1000.0,
         ]
     )
 
@@ -203,13 +247,12 @@ func _read_controls(delta: float) -> void:
     solver.set_steer_command(DriveCfg.steer_command(steer))
 
 
+## Poses the vehicle from the last snapshot. Asks the solver nothing.
 func _apply_pose() -> void:
-    var positions: PackedVector3Array = solver.get_positions()
+    var positions: PackedVector3Array = _state.get("positions", PackedVector3Array())
     if positions.is_empty() or not is_finite(positions[0].length()):
         return
-    var angles: PackedFloat32Array = PackedFloat32Array()
-    for wheel: int in solver.wheel_count():
-        angles.append(solver.get_wheel_rotation(wheel))
+    var angles: PackedFloat32Array = _state.get("angles", PackedFloat32Array())
     var timed: Dictionary = VehicleBuilder.apply_pose(_built, truck, positions, angles)
     _deform_usec = timed["deform_usec"] as int
     _submit_usec = timed["submit_usec"] as int
@@ -225,7 +268,7 @@ func _set_selector(selector: int) -> void:
 
 
 func _gear_name() -> String:
-    var gear: int = solver.engine_gear()
+    var gear: int = int(_state.get("gear", 0))
     if gear < 0:
         return "R"
     if gear == 0:
@@ -252,6 +295,7 @@ func _recover() -> void:
         DriveCfg.RECOVER_CLEARANCE_M
     )
     solver.start_engine()
+    _snapshot()
     _apply_pose()
     print("DRIVE  recovered")
 
@@ -262,6 +306,7 @@ func _respawn() -> void:
     _lit = false
     _main_beam = false
     solver.start_engine()
+    _snapshot()
     _apply_pose()
     print("DRIVE  respawned")
 
@@ -278,5 +323,7 @@ func _apply_cabin() -> void:
         "right": _right_indicator,
         "seconds": _seconds,
     })
-    Cockpit.turn_wheel(_built, truck, solver.steer_state())
-    Cockpit.update(_cockpit, solver.engine_rpm(), solver.road_speed(), _lit)
+    Cockpit.turn_wheel(_built, truck, float(_state.get("steer", 0.0)))
+    Cockpit.update(
+        _cockpit, float(_state.get("rpm", 0.0)), float(_state.get("road_speed", 0.0)), _lit
+    )

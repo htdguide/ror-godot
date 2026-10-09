@@ -130,9 +130,11 @@ one command — is not archived at all. A smoke run archives 520 KB.
 
 The contact sheet is the useful one: one image showing a single framing across every run
 that produced it, which is how a slow drift becomes visible. Every row also carries `solver_ms`,
-`deform_ms` and `submit_ms` — zero on a frame that drove nothing — reported into the frame by
-`PlayDrive.step` and `VehicleBuilder.apply_pose` through `HarnessMetrics.phase`, and the summary
-gives each its p50 and p99.
+`solver_wait_ms`, `deform_ms` and `submit_ms` — zero on a frame that drove nothing — reported into
+the frame by `PlayDrive.step` and `VehicleBuilder.apply_pose` through `HarnessMetrics.phase`, and
+the summary gives each its p50 and p99. `solver_ms` is the step's own time on the solver's thread;
+`solver_wait_ms` is what the frame spent waiting for it, which is the solver's whole cost to the
+frame now that it has a thread.
 
 ## Writing a gate
 

@@ -31,7 +31,8 @@ over the controls. See [docs/HANDOFF.md](docs/HANDOFF.md) for where to pick up.
 - Godot 4.7.2 (installed at /Applications/Godot.app on the dev machine)
 - macOS on Apple Silicon is the only supported development platform for now. Linux is deferred but
   not designed out; see the platform rules in the plan.
-- A C++ toolchain for the GDExtension: clang (present), plus scons and Python (scons not yet installed)
+- A C++ toolchain for the GDExtension: clang, scons and Python. `cd extension && scons
+  target=template_debug` rebuilds `bin/librorbridge*.dylib`, which is not committed.
 - ffmpeg for movie contact sheets (not yet installed)
 
 ## Licence

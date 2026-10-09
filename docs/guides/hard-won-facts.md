@@ -328,3 +328,20 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   hour at a time and a vehicle from four sides at nine of those hours — added about six hundred
   captured frames, the engine reached the limit mid-run and quit cleanly, and the truncated run
   read as green. The limit is 60000 now, and the tally is what notices if it is ever reached.
+
+- **A solver on its own thread is safe by making every entry point wait, not by making the
+  caller careful.** `RorSolver.step_async` posts a frame's substeps to the solver's `std::thread`;
+  `sync()` is the first statement of every other method, so a caller that asks for positions
+  while a step runs gets the stepped ones and merely loses the overlap. The alternative — a
+  contract that nothing touches the solver between post and wait — was broken on the first day by
+  a gate that set the throttle right after `drive.step()`. `PlayDrive` keeps the overlap by taking
+  a snapshot of everything it draws or shows before it posts, and drawing from that.
+- **The gate that holds the thread could not see a missing guard until it read the solver
+  itself.** Reading positions after `PlayDrive.step` returns passed with the guard removed from
+  `get_positions`, three runs out of three: the frame's own deform and submit (0.8 ms) outlast
+  the step (0.47 ms), so the read always landed after it. The check that bites posts a step to a
+  bare solver and reads it in the same breath; torn at frame 0 without the guard.
+- **`git checkout <file>` on a file with uncommitted work is an undo of the work.** Said here
+  because it cost a rebuild: a control that edited one line of `ror_solver.cpp` was "restored"
+  that way and took the day's guards with it. Restore a control from a copy of the working file.
+
