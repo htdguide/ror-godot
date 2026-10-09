@@ -29,10 +29,27 @@ const BROKEN_COLOUR: Color = Color(1.0, 0.55, 0.5)
 
 
 ## The vehicle list. `on_pick` is called with a vehicle's name.
-static func vehicles(into: VBoxContainer, current: String, on_pick: Callable) -> void:
-    var packs: Dictionary = _by_pack(RorVehicleLibrary.summaries())
+## Where to get something when there is nothing: the hero truck and the two maps this project
+## is developed on, on the Rigs of Rods repository under their own licences.
+const VEHICLE_SUGGESTIONS: Array[Dictionary] = [
+    {"title": "Chevrolet S10", "url": "https://forum.rigsofrods.org/resources/chevrolet-s10.282/"},
+]
+const MAP_SUGGESTIONS: Array[Dictionary] = [
+    {"title": "La Paz", "url": "https://forum.rigsofrods.org/resources/lapaz.398/"},
+    {"title": "Starling Island", "url": "https://forum.rigsofrods.org/resources/starling-island.532/"},
+]
+const OPEN_FOLDER: String = "Open folder"
+
+
+## `summaries` defaults to the library's own; a gate hands in an empty one to see the empty page.
+static func vehicles(
+    into: VBoxContainer, current: String, on_pick: Callable,
+    summaries: Array[Dictionary] = RorVehicleLibrary.summaries()
+) -> void:
+    var packs: Dictionary = _by_pack(summaries)
     if packs.is_empty():
-        MenuWidgets.note(into, "No vehicles. Unpack one into %s and reopen this." % BuildProfile.mods_hint())
+        _nothing_here(into, "vehicles", VEHICLE_SUGGESTIONS)
+        _folder_row(into, vehicles_folder())
         return
     for pack: String in packs.keys():
         MenuWidgets.heading(into, pack)
@@ -48,10 +65,17 @@ static func vehicles(into: VBoxContainer, current: String, on_pick: Callable) ->
 
 
 ## The map list. `on_pick` is called with a terrain's name.
-static func maps(into: VBoxContainer, current: String, on_pick: Callable) -> void:
-    var packs: Dictionary = _by_pack(RorTerrainLibrary.summaries())
+    _folder_row(into, vehicles_folder())
+
+
+static func maps(
+    into: VBoxContainer, current: String, on_pick: Callable,
+    summaries: Array[Dictionary] = RorTerrainLibrary.summaries()
+) -> void:
+    var packs: Dictionary = _by_pack(summaries)
     if packs.is_empty():
-        MenuWidgets.note(into, "No maps. Unpack one into %s and reopen this." % BuildProfile.maps_hint())
+        _nothing_here(into, "maps", MAP_SUGGESTIONS)
+        _folder_row(into, maps_folder())
         return
     for pack: String in packs.keys():
         MenuWidgets.heading(into, pack)
@@ -67,6 +91,46 @@ static func maps(into: VBoxContainer, current: String, on_pick: Callable) -> voi
 
 
 ## One pickable row: a button carrying the title, with its details under it.
+    _folder_row(into, maps_folder())
+
+
+## The folder vehicles are read from, absolute, for a button to open and a note to name.
+static func vehicles_folder() -> String:
+    return SourceScan.repo_root().path_join(BuildProfile.mod_roots()[0])
+
+
+static func maps_folder() -> String:
+    return SourceScan.repo_root().path_join(BuildProfile.terrain_root())
+
+
+## An empty library says where to get something, with a link per suggestion that opens the
+## page in the browser.
+static func _nothing_here(into: VBoxContainer, what: String, suggestions: Array[Dictionary]) -> void:
+    MenuWidgets.note(into, "No %s yet. Some to start with, from the Rigs of Rods repository:" % what)
+    for suggestion: Dictionary in suggestions:
+        var link: LinkButton = LinkButton.new()
+        link.text = suggestion["title"] as String
+        link.uri = suggestion["url"] as String
+        link.add_theme_color_override("font_color", PACK_COLOUR)
+        into.add_child(link)
+
+
+## The last row of every list: a button that opens the folder the content goes in, and the one
+## rule about what goes there. The folder is made if it is not there yet, so the button never
+## opens nothing.
+static func _folder_row(into: VBoxContainer, folder: String) -> void:
+    MenuWidgets.note(into, "Unpacked folders go in here, one per pack — not zips:")
+    MenuWidgets.note(into, "        " + folder)
+    var button: Button = Button.new()
+    button.text = OPEN_FOLDER
+    button.custom_minimum_size = Vector2(0, 32)
+    button.pressed.connect(func() -> void:
+        DirAccess.make_dir_recursive_absolute(folder)
+        OS.shell_open(folder)
+    )
+    into.add_child(button)
+
+
 static func _row(
     into: VBoxContainer, title: String, detail: String, error: String, is_current: bool,
     on_pick: Callable, name: String
