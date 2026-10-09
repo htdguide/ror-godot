@@ -345,3 +345,18 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   because it cost a rebuild: a control that edited one line of `ror_solver.cpp` was "restored"
   that way and took the day's guards with it. Restore a control from a copy of the working file.
 
+- **Drawing last frame's physics is one frame of lag, and under varying frame times it is a
+  stutter.** The solver thread's first form was upstream's model — post this frame's step, draw
+  the last completed one — and with vsync off the window runs 9 to 13 ms, so the lag varied
+  frame to frame; every vehicle judders and no gate can tell, because gates hold positions and
+  not when they are drawn. Post first, pose last, same frame; the overlap is whatever the session
+  does in between, and at 0.5 ms a step that was never the point.
+- **A `Range` set from a script does not emit `value_changed` in this build**, in a headless tree
+  or in one with a window, for `HSlider`, `SpinBox` and `ProgressBar` alike; a drag does. A gate
+  that wants to prove a slider is wired calls the handler the signal holds
+  (`value_changed.get_connections()`), which is the handler a drag would call.
+- **A panel that is not refreshed from the state it edits teaches nobody anything.** Picking a
+  preset changed the world and left every slider behind; the rows are now built from one table of
+  every key the renderer reads and refreshed from `PlayWeather.state()` on every preset, hour and
+  open, and the gate reads the renderer's source for the key set so the table cannot grade itself.
+

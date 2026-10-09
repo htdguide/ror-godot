@@ -29,8 +29,6 @@ const GRAVITY_PRESETS: Dictionary = {
     "Moon": -1.62,
     "Heavy": -20.0,
 }
-const SUN_ELEVATION_RANGE: Vector2 = Vector2(-10.0, 89.0)
-const SUN_AZIMUTH_RANGE: Vector2 = Vector2(-180.0, 180.0)
 ## How far a session may push the view, and how thick the haze may get.
 const PANEL_WIDTH: int = 380
 const PANEL_MAX_HEIGHT: int = 720
@@ -64,6 +62,10 @@ const CUSTOM: String = "Custom"
 var _on_quit: Callable
 var _on_map: Callable
 var _on_vehicle: Callable
+## Returns the weather that is on, as the dictionary the renderer reads. The rows are refreshed
+## from it whenever a preset or the hour is chosen, and whenever the panel opens.
+var _state_of: Callable
+var _weather_rows: PlayWeatherRows = null
 ## What is loaded now, so the lists can mark it. Set by the session, which is the only thing that
 ## knows: the panel is told rather than guessing from the scene.
 var _current_map: String = ""
@@ -85,8 +87,10 @@ func setup(
     on_sky: Callable,
     on_quit: Callable,
     on_map: Callable = Callable(),
-    on_vehicle: Callable = Callable()
+    on_vehicle: Callable = Callable(),
+    state_of: Callable = Callable()
 ) -> void:
+    _state_of = state_of
     _environment = environment
     _sun = sun
     _drive = drive
@@ -120,6 +124,7 @@ func toggle() -> void:
     _panel.visible = not _panel.visible
     if _panel.visible:
         _rebuild_content()
+        refresh()
     # The mouse has to come back before anything can be clicked: a captured cursor is how a
     # driver looks around, and a panel nobody can click is a panel nobody can use.
     if _panel.visible:
@@ -132,6 +137,13 @@ func close() -> void:
 
 func is_open() -> bool:
     return _panel != null and _panel.visible
+
+
+## Puts the weather that is on onto every weather row. Called when a preset or an hour is chosen
+## and when the panel opens, so what the sliders say is what the world is doing.
+func refresh() -> void:
+    if _weather_rows != null and _state_of.is_valid():
+        _weather_rows.refresh(_state_of.call() as Dictionary)
 
 
 ## --------------------------------------------------------------------------------
@@ -163,6 +175,14 @@ func _build() -> void:
     _title()
     _world_section()
     _sky_section()
+    _weather_rows = PlayWeatherRows.new()
+    _weather_rows.build(
+        _rows, _state_of.call() as Dictionary if _state_of.is_valid() else {},
+        func(key: String, value: Variant) -> void:
+            _mark_custom()
+            if _on_sky.is_valid():
+                _on_sky.call(key, value)
+    )
     # The world as well as the camera: how far a session sees is a limit on what the terrain
     # draws, and the camera's own far plane stays where the terrain's horizon needs it.
     PlayDistanceRows.build(
@@ -240,6 +260,7 @@ func _world_section() -> void:
             # on: there is nothing to apply that is not already applied.
             if _on_weather.is_valid() and _weather_names[index] != CUSTOM:
                 _on_weather.call(_weather_names[index])
+                refresh()
     )
     var names: Array = GRAVITY_PRESETS.keys()
     var gravity_names: PackedStringArray = PackedStringArray()
@@ -253,40 +274,16 @@ func _world_section() -> void:
         _rows, "  m/s²", GRAVITY_MIN, GRAVITY_MAX, EARTH_GRAVITY,
         func(value: float) -> void: _set_gravity(value), "%.2f"
     )
-    MenuWidgets.slider(
-        _rows, "Sun elevation", SUN_ELEVATION_RANGE.x, SUN_ELEVATION_RANGE.y, _sun_elevation(),
-        func(value: float) -> void: _aim_sun(value, _sun_azimuth()), "%.0f°"
-    )
-    MenuWidgets.slider(
-        _rows, "Sun azimuth", SUN_AZIMUTH_RANGE.x, SUN_AZIMUTH_RANGE.y, _sun_azimuth(),
-        func(value: float) -> void: _aim_sun(_sun_elevation(), value), "%.0f°"
-    )
-    MenuWidgets.slider(
-        _rows, "Sun brightness", 0.0, 4.0, _sun.light_energy if _sun != null else 1.0,
-        func(value: float) -> void:
-            if _sun != null:
-                _sun.light_energy = value
-    )
     MenuWidgets.check(
         _rows, "Shadows", _sun != null and _sun.shadow_enabled,
         func(on: bool) -> void:
             if _sun != null:
                 _sun.shadow_enabled = on
     )
-    # The fill, which until now could not be touched from here at all.
-    #
-    # It is a second directional light, it is a cool blue against a warm sun, and unlike most
-    # fills it casts a shadow of its own with half the sun's range. That makes it the first thing
-    # to try when something on the ground looks like a region rather than a shape — a reported
-    # rectangle under the vehicle is what showed there was no way to test it.
+    # The fill's shadow. The fill is a second directional light, a cool blue against a warm sun,
+    # and unlike most fills it casts a shadow of its own with half the sun's range; its lux, trim
+    # and colour are weather rows below, and this is the one thing about it that is not.
     var fill: DirectionalLight3D = _fill()
-    MenuWidgets.slider(
-        _rows, "Fill brightness", 0.0, 4.0, fill.light_energy if fill != null else 0.0,
-        func(value: float) -> void:
-            var light: DirectionalLight3D = _fill()
-            if light != null:
-                light.light_energy = value
-    )
     MenuWidgets.check(
         _rows, "Fill shadows", fill != null and fill.shadow_enabled,
         func(on: bool) -> void:
@@ -314,11 +311,8 @@ func _sky_section() -> void:
             _hour = value
             _mark_custom()
             if _on_hour.is_valid():
-                _on_hour.call(value),
-        func(key: String, value: float) -> void:
-            _mark_custom()
-            if _on_sky.is_valid():
-                _on_sky.call(key, value)
+                _on_hour.call(value)
+            refresh()
     )
 
 
@@ -347,32 +341,3 @@ func _set_gravity(value: float) -> void:
     if _drive == null or _drive.solver == null:
         return
     _drive.solver.set_gravity(Vector3(0.0, value, 0.0))
-
-
-## Where the sun is now, as elevation and azimuth in degrees, read back from the light so the
-## sliders start where the weather preset put it.
-func _sun_elevation() -> float:
-    if _sun == null:
-        return 45.0
-    var toward: Vector3 = -_sun.global_transform.basis.z
-    return rad_to_deg(asin(clampf(-toward.y, -1.0, 1.0)))
-
-
-func _sun_azimuth() -> float:
-    if _sun == null:
-        return 0.0
-    var toward: Vector3 = -_sun.global_transform.basis.z
-    return rad_to_deg(atan2(-toward.x, -toward.z))
-
-
-## Points the sun, from where it is in the sky rather than from Euler angles: "up and over that
-## shoulder" is something a person can reason about and a pitch and a yaw are not.
-func _aim_sun(elevation_deg: float, azimuth_deg: float) -> void:
-    if _sun == null:
-        return
-    var elevation: float = deg_to_rad(elevation_deg)
-    var azimuth: float = deg_to_rad(azimuth_deg)
-    var toward_sun: Vector3 = Vector3(
-        cos(elevation) * sin(azimuth), sin(elevation), cos(elevation) * cos(azimuth)
-    ).normalized()
-    _sun.look_at_from_position(_sun.position, _sun.position - toward_sun, Vector3.UP)

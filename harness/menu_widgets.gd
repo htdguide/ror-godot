@@ -40,12 +40,15 @@ static func slider(
     var control: HSlider = HSlider.new()
     control.min_value = low
     control.max_value = high
-    control.step = (high - low) / 200.0
+    # No step: a slider that snaps shows a preset's 0.001956 as 0.0020, and a refresh that
+    # writes a weather onto it has to be able to say exactly what the weather says.
+    control.step = 0.0
     control.value = clampf(value, low, high)
     control.custom_minimum_size = Vector2(CONTROL_WIDTH, 0)
     control.size_flags_vertical = Control.SIZE_SHRINK_CENTER
     var readout: Label = Label.new()
     readout.text = format % control.value
+    readout.set_meta("format", format)
     readout.custom_minimum_size = Vector2(READOUT_WIDTH, 0)
     control.value_changed.connect(func(changed: float) -> void:
         readout.text = format % changed
@@ -53,6 +56,31 @@ static func slider(
     )
     row.add_child(control)
     row.add_child(readout)
+    return control
+
+
+## Moves a slider without its readout's partner being told: `refresh` writes, and a write that
+## wrote back would re-apply the weather once per control.
+static func set_slider(control: HSlider, value: float) -> void:
+    control.set_value_no_signal(clampf(value, control.min_value, control.max_value))
+    var row: HBoxContainer = control.get_parent() as HBoxContainer
+    if row != null and row.get_child_count() >= 3:
+        var readout: Label = row.get_child(2) as Label
+        if readout != null and readout.has_meta("format"):
+            readout.text = (readout.get_meta("format") as String) % control.value
+
+
+## A colour, as a swatch that opens a picker.
+static func colour(
+    into: VBoxContainer, text: String, value: Color, on_change: Callable
+) -> ColorPickerButton:
+    var row: HBoxContainer = _row(into, text)
+    var control: ColorPickerButton = ColorPickerButton.new()
+    control.color = value
+    control.edit_alpha = false
+    control.custom_minimum_size = Vector2(CONTROL_WIDTH, 24)
+    control.color_changed.connect(func(picked: Color) -> void: on_change.call(picked))
+    row.add_child(control)
     return control
 
 

@@ -140,8 +140,8 @@ has just stated.
 
 ## The suite is green
 
-151 gates. On 2026-10-09 all three forms of run pass: `--all --every` (151) and `--order-check`
-(151 twice in one session, identical verdicts, worst drift 6.2e-7; two wall-clock gates compared
+153 gates. On 2026-10-09 all three forms of run pass: `--all --every` (153) and `--order-check`
+(153 twice in one session, identical verdicts, worst drift 2.2e-7; two wall-clock gates compared
 by verdict). Run all three before trusting a change to the solver's API or to anything that
 renders: the order check caught a day-old gate measuring a wall-clock share undeclared.
 
@@ -187,15 +187,18 @@ visibilities — two kilometres and three hundred metres — and held by Koschmi
 1.6% of what the frame does, now that the fog bank is one fog rather than two (see
 `hard-won-facts.md`: a volumetric layer on top of it was a second medium, and the gate had passed on
 its unconverged history); how they *look* is a sweep for a person, and the blockout stage is not
-the place to do it, because its floor is unshaded and Godot does not fog an unshaded surface. The
+the place to do it, because its floor is unshaded and Godot does not fog an unshaded surface.
+**The first look-sweep happened on 2026-10-09** — verdict "all of it looks great"; its four findings
+(a facade mirroring the dawn sun, a stutter from the solver thread's one-frame lag, a panel that
+did not show the preset it was on, a view distance that no longer clips) are closed and recorded
+under M2 in PLAN; the panel now has a row for every key a weather states. The
 legacy materials now read what their authors wrote — 88 state a specular exponent and every one is
 built from it — and guess only where nothing is written, bounded to a tenth of a roughness. The perf acceptance item is met: La Paz with its
 objects, its sea and the hero truck draws in 10.67 ms at 1920x1080 across 169 draw calls
-(`a_full_scene_renders_inside_its_budget`). The BRDF and the image-based path now have an outside oracle —
-`a_white_furnace_shows_nothing`, a white ball in a white enclosure, which has one correct answer and
-no lighting to agree about. It passes, and it measured two things worth knowing: the renderer loses
-up to 9.3% at full roughness and grazing incidence and gains nothing anywhere, and the sky Godot
-draws is not on the same scale as the radiance map it lights with.
+(`a_full_scene_renders_inside_its_budget`). The BRDF and the image-based path have an outside oracle,
+`a_white_furnace_shows_nothing`: a white ball in a white enclosure, one correct answer. It passes,
+and measured that the renderer loses up to 9.3% at full roughness and grazing incidence and gains
+nothing anywhere, and that Godot's drawn sky is not on the scale of the radiance map it lights with.
 
 **What the vehicle shader does not do**, and it is the next thing anyone looking at paint will
 notice: the coat's reflection of the sky is Godot's image-based lighting at the coat's roughness
@@ -213,9 +216,8 @@ Rigs of Rods `.otc` format carries roughness, so a single constant is the honest
 than a number this project invents. `res://shaders/terrain3d_override.gdshader` is no longer a
 prerequisite for anything.
 
-**One of the four old findings was not collateral**, and it is worth not re-chasing: La Paz ships
-`blank_NRM.dds` for all four layers, so its normal maps really are flat. "Normal depth to zero
-changed nothing" was true.
+**Not worth re-chasing:** La Paz ships `blank_NRM.dds` for all four layers, so its normal maps
+really are flat. "Normal depth to zero changed nothing" was true.
 
 **The sun-to-sky balance is 13:1 on both skies and two gates hold it.** Godot exposes a sky's
 light twice and a lamp's once (`the_sky_does_not_follow_the_camera`, `hard-won-facts-light.md`),
@@ -250,12 +252,10 @@ Acceptance 1, 3, 6, 7 and 8 pass. **M1's list is complete**; what it still owes 
 
 **4. What a loaded terrain does not have yet**, each named rather than forgotten:
 
-- ~~**Water.**~~ Built: `RorWater` reads `Water` and `WaterLine` and puts a surface at the height
-  the file states, held by `a_terrain_has_the_water_its_file_declares`. What it still is not is
-  polished — the ripples tile, nothing reflects in it, and it does not move.
-- ~~**Procedural roads.**~~ Built: `.tobj` road points are swept into decks, shoulders and
-  bridges, held by `a_road_of_points_is_swept_into_a_road`, `a_road_rests_on_the_ground_it_crosses`
-  and `a_swept_road_faces_the_sky`.
+- ~~**Water.**~~ Built: `RorWater` reads `Water` and `WaterLine`, held by
+  `a_terrain_has_the_water_its_file_declares`; it reflects the sky by Fresnel now. The ripples tile.
+- ~~**Procedural roads.**~~ Built: `.tobj` road points swept into decks, shoulders and bridges;
+  three `a_road_*` / `a_swept_road_*` gates hold them.
 - **Hand-placed collision meshes.** A `beginmesh` hull is collided with as triangles when it is at
   least 0.25 m across its second-smallest dimension, and as derived columns when thinner — a 0.17 m
   pole tunnels as triangles under upstream's own 0.1 m slab (`ror_object_collision.gd`, `baff012`).

@@ -32,9 +32,10 @@ var _brake: float = 0.0
 var _substep_remainder: float = 0.0
 var _deform_usec: int = 0
 var _submit_usec: int = 0
-## The solver's state as of the last completed step: node positions, wheel angles and the
-## drivetrain's readings. Everything drawn or shown is drawn from this and not from the solver,
-## so that nothing asks the solver anything while it is stepping. See `step`.
+var _stepped: bool = false
+## The solver's state as of this frame's step: node positions, wheel angles and the drivetrain's
+## readings. Everything drawn or shown is drawn from this and not from the solver, so that nothing
+## asks the solver anything while it is stepping. See `begin` and `finish`.
 var _state: Dictionary = {}
 var _selector: int = 1
 var _lit: bool = false
@@ -109,13 +110,24 @@ func use_terrain(data: Object) -> String:
     return ""
 
 
-## One frame. The solver is Rigs of Rods' model: physics on its own thread, the last completed
-## state drawn. This frame waits for the step posted last frame — every solver call does — reads
-## the controls onto the settled rig, takes the state it is going to draw, posts this frame's
-## substeps, and poses the vehicle from that state while the solver runs. What is drawn is one
-## step behind the solver, as it is upstream; what is measured is the step's own time on its own
-## thread, and separately the time this thread spent waiting for it.
+## One frame, in one call: `begin` and then `finish`. A session that has work of its own between
+## the two — the camera, the grass, the HUD — calls them apart, and the solver runs on its thread
+## while that work is done.
 func step(delta: float) -> void:
+    begin(delta)
+    finish()
+
+
+## Reads the controls onto the rig and posts this frame's substeps to the solver's thread.
+##
+## **The step is posted first and drawn last, inside one frame.** The first version of this drew
+## the *last* frame's step and posted this frame's, which is Rigs of Rods' own model and is one
+## frame of lag; under frame times that vary — a window with vsync off runs 9 to 13 ms — the lag
+## varies with them, and a session saw every vehicle stutter. The thread gate could not: it holds
+## positions, not when they are drawn. So the rig drawn in a frame is the rig the solver has at
+## the end of that frame, and what the thread overlaps is whatever the session does between
+## `begin` and `finish`, which is honest about how little that is at 0.5 ms a step.
+func begin(delta: float) -> void:
     _seconds += delta
     _read_controls(delta)
     # Substeps follow wall-clock time rather than a fixed count per frame, so the rig
@@ -123,22 +135,37 @@ func step(delta: float) -> void:
     var wanted: float = delta * DriveCfg.SUBSTEP_HZ + _substep_remainder
     var substeps: int = mini(int(wanted), DriveCfg.MAX_SUBSTEPS_PER_FRAME)
     _substep_remainder = wanted - float(substeps)
-    if substeps > 0 and synchronous:
+    _stepped = substeps > 0
+    if not _stepped:
+        return
+    if synchronous:
         solver.step(1.0 / DriveCfg.SUBSTEP_HZ, substeps)
-    _snapshot()
-    if substeps > 0 and not synchronous:
+    else:
         solver.step_async(1.0 / DriveCfg.SUBSTEP_HZ, substeps)
+
+
+## Waits for the step, takes the state it produced, and poses the vehicle from it. What is
+## measured is the step's own time on its own thread, and separately the time this thread spent
+## waiting for it here.
+func finish() -> void:
+    _snapshot()
     wait_usec = solver.take_wait_usec()
     Harness.metrics.phase("solver", solver_usec)
     Harness.metrics.phase("solver_wait", wait_usec)
-    if substeps <= 0:
+    if not _stepped:
         return
     _apply_pose()
     _apply_cabin()
 
 
-## Copies out what this frame draws and shows, before the next step is posted. Waits for a
-## pending step, which is where a frame pays for a solver slower than itself.
+## The node positions the vehicle was last posed from. A gate compares them with the solver's
+## own, which is how "drawn this frame, not last" is held.
+func posed_positions() -> PackedVector3Array:
+    return _state.get("positions", PackedVector3Array()) as PackedVector3Array
+
+
+## Copies out what this frame draws and shows. Waits for a pending step, which is where a frame
+## pays for a solver slower than the work it overlapped.
 func _snapshot() -> void:
     solver_usec = solver.take_step_usec()
     var angles: PackedFloat32Array = PackedFloat32Array()

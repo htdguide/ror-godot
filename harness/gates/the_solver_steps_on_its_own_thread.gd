@@ -9,7 +9,8 @@ extends GateBase
 ## that bites — a position read halfway through a substep is a position no step ever produced.
 ##
 ## So two vehicles are driven side by side through the same drop onto the same kerb, one with the
-## solver on its thread and one with it on this one, and every frame's positions are compared,
+## solver on its thread and one with it on this one, and every frame's positions are compared —
+## the solver's, and the ones the vehicle was posed from, which have to be this frame's —
 ## with a SHA-256 of each run for the record. The oracle is identity: the runs are equal to the
 ## bit. The thread is checked as an OS fact rather than a flag — the hash of the std::thread::id
 ## that ran the step differs from the caller's on the threaded drive and equals it on the other.
@@ -91,6 +92,10 @@ func run(harness: Node) -> Dictionary:
         var a: PackedByteArray = threaded.solver.get_positions().to_byte_array()
         on_this_thread.step(FRAME_S)
         var b: PackedByteArray = on_this_thread.solver.get_positions().to_byte_array()
+        # And the rig posed this frame is this frame's rig, not the last one's: a frame of lag
+        # under frame times that vary is a stutter, which a session found and no gate could.
+        if threaded.posed_positions().to_byte_array() != a:
+            return fail("frame %d: the threaded drive posed last frame's positions" % frame, frame)
         digests[0].update(a)
         digests[1].update(b)
         if a != b:

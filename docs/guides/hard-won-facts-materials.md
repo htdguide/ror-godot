@@ -177,3 +177,13 @@ See `hard-won-facts-light.md` for exposure, skies and anything that measures a f
   checks skipped every `ShaderMaterial` on purpose — vegetation and water have no albedo they can
   read — and that skip would have quietly dropped the body panels out of every facing gate the day
   paint stopped being a built-in material.
+
+- **A name says what a texture has in it, not what the surface is made of.** Starling's office
+  block is one opaque submesh painted with `window_chicago_lightgrey.dds`, brick and mullions and
+  all; `window` classed the whole facade as glass at roughness 0.05, and a vertical wall at that
+  roughness mirrors any sun low enough — a blown disc three storeys across under `dawn_mist`,
+  invisible at noon because the reflection of a high sun off a wall points at the ground. The
+  format states glass as a pass that blends, and that is authored; `RorObjectMaterial` refuses
+  the glass and lamp classes to an opaque pass whatever it is called. 132 of 140 such surfaces
+  across the shipped terrains were mirrors (the other 8 state their own exponent).
+

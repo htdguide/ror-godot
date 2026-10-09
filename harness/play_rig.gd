@@ -72,11 +72,9 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
 
 
 ## Adds the world, when this session asked for one and Terrain3D is installed. It cannot be
-## populated yet: a Terrain3D has no data until it has been inside a World3D for a frame.
-##
-## Which world is always a Rigs of Rods terrain — `--map <name>`, defaulting to the map the game
-## itself ships. This project used to generate two worlds of its own and they are gone: a place
-## someone else built and drove is the only world worth checking a reader against.
+## populated yet: a Terrain3D has no data until it has been inside a World3D for a frame. The
+## world is always a Rigs of Rods terrain — `--map <name>`, defaulting to the map the game ships:
+## a place someone else built and drove is the only world worth checking a reader against.
 func _build_terrain() -> void:
     if not Harness.args.has_flag("terrain"):
         return
@@ -176,13 +174,16 @@ func _load_terrain() -> RorTerrain:
 func _process(delta: float) -> void:
     if _terrain_pending and _frames > 1:
         _populate_terrain()
+    # Step posted first, vehicle posed last, same frame. See `PlayDrive.begin`.
     if _drive != null:
-        _drive.step(delta)
-        _view.follow(_drive, delta)
+        _drive.begin(delta)
     if _vegetation != null:
         _vegetation.focus_on(_camera.global_position)
     if _view.mode == PlayCamera.Mode.FREE:
         _view.fly(delta)
+    if _drive != null:
+        _drive.finish()
+        _view.follow(_drive, delta)
     _frames += 1
     if _hud.visible and _frames % HUD_REFRESH_FRAMES == 0:
         _hud.text = PlayHud.text(
@@ -310,7 +311,8 @@ func _build_menu(weather: String) -> PlayMenu:
         func(key: String, value: float) -> void: _weather.set_override(_world, key, value),
         func() -> void: get_tree().quit(0),
         func(name: String) -> void: _change_map(name),
-        func(name: String) -> void: _change_vehicle(name)
+        func(name: String) -> void: _change_vehicle(name),
+        func() -> Dictionary: return _weather.state()
     )
     menu.set_loaded(_map_name, _vehicle_name)
     return menu
@@ -318,11 +320,9 @@ func _build_menu(weather: String) -> PlayMenu:
 
 ## Puts another vehicle on the map, where this one is standing.
 ##
-## The map stays: a session changing cars is comparing them on the same ground, and reloading a
-## terrain to do it would cost seconds and lose where the person was standing. The new vehicle
+## The map stays: a session changing cars is comparing them on the same ground. The new vehicle
 ## takes over the old one's place and heading, and **that place becomes its spawn**, so the reset
-## key puts it back here rather than at the map's start — which is what a person means when they
-## pick a car at the top of a hill.
+## key puts it back here rather than at the map's start.
 func _change_vehicle(name: String) -> void:
     var entry: Dictionary = RorVehicleLibrary.find(name)
     if entry.is_empty():

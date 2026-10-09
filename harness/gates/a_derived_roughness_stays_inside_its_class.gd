@@ -84,6 +84,11 @@ func run(_harness: Node) -> Dictionary:
                 continue
             derived += 1
             var class_key: String = MaterialClass.classify(name, declared)["class"] as String
+            # The rule the loader applies, stated again here rather than asked of it: a pass that
+            # does not blend is not glass or a lamp whatever its name says, because a facade atlas
+            # named `window` is brick too (`an_opaque_facade_is_not_glass`).
+            if (class_key == "glass" or class_key == "lamp") and not bool(declared.get("alpha", false)):
+                class_key = "default"
             var class_roughness: float = float((MaterialCfg.CLASSES.get(
                 class_key, MaterialCfg.CLASSES["default"]
             ) as Dictionary)["roughness"])

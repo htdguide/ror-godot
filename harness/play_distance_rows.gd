@@ -7,9 +7,8 @@ extends RefCounted
 ## environment's haze and the vegetation's own range, and none of them touch anything else the
 ## panel holds.
 
-## What a session may ask to see, how thick the haze may be, and how far the grass is drawn.
+## What a session may ask to see, and how far the grass is drawn.
 const VIEW_RANGE_M: Vector2 = Vector2(200.0, 14000.0)
-const FOG_RANGE: Vector2 = Vector2(0.0, 0.02)
 const GRASS_RANGE_M: Vector2 = Vector2(0.0, 400.0)
 
 
@@ -31,17 +30,15 @@ static func build(
                 SceneryRange.set_draw_distance(world, value),
         "%.0f m"
     )
-    MenuWidgets.check(
-        rows, "Fog", environment.fog_enabled,
-        func(on: bool) -> void: environment.fog_enabled = on
-    )
+    # And the far plane itself, named as what it is. A session reported "view distance stopped
+    # working" the day it stopped clipping the terrain and the mountains: the camera's clip is
+    # a different thing from how far scenery is drawn, and both are a person's to move.
     MenuWidgets.slider(
-        rows, "Fog thickness", FOG_RANGE.x, FOG_RANGE.y, environment.fog_density,
-        func(value: float) -> void:
-            environment.fog_density = value
-            environment.fog_enabled = value > 0.0,
-        "%.4f"
+        rows, "Far plane", VIEW_RANGE_M.x, VIEW_RANGE_M.y, camera.far,
+        func(value: float) -> void: camera.far = value,
+        "%.0f m"
     )
+    # The fog's thickness and colour are weather rows; this is the one fog number that is not.
     MenuWidgets.slider(
         rows, "Fog in the sky", 0.0, 1.0, environment.fog_sky_affect,
         func(value: float) -> void: environment.fog_sky_affect = value

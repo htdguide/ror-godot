@@ -1287,6 +1287,25 @@ geometric normals only; authored normals come with re-textured hero assets.
 `terrain_vista`, `sun_backlit`, `dusk`, `night`) rendered before and after, assembled by ffmpeg into
 one before/after contact sheet the agent reads in a single Read call.
 
+**Human session 1, 2026-10-09** (`tools/play.sh --truck --map lapaz`, then Starling): verdict on
+the ten-point look sweep "all of it looks great". Four findings, each closed the same day:
+- A blown white disc three storeys across on Starling's office block under `dawn_mist`. The
+  facade is one opaque submesh whose atlas is named `window_…`, classed glass by name at
+  roughness 0.05, mirroring a sun six degrees up. An opaque pass is no longer glass or a lamp by
+  name alone (`RorObjectMaterial`); held by `an_opaque_facade_is_not_glass`, 140 such surfaces.
+- Every vehicle stuttered. The solver thread (M1 acceptance 2, that morning) drew the previous
+  frame's step, and frame times vary with vsync off, so the lag varied. `PlayDrive` now posts the
+  step first and poses last in the same frame; the thread gate holds that the posed positions
+  are this frame's. The gates could not see it; the person did in a minute.
+- Choosing a weather changed the world and not the panel, and most of what a preset states had no
+  row. `PlayWeatherRows` builds a row per key the renderer reads from a weather, refreshed on
+  every preset, hour and panel open; `the_panel_shows_the_weather_it_is_on` reads the renderer's
+  source for the keys and holds the controls to the preset.
+- "View distance stopped working": it moves scenery and not the terrain or backdrop since the
+  far-plane clip took the mountains. A `Far plane` row now sits beside it, named as what it is.
+Still the person's: the look of the haze and the fog with the new rows, and the money-shot sheet.
+M2 is not closed by this; only the user closes it.
+
 ---
 
 ### M2b — Physical camera and the post-processing stack

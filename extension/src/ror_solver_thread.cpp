@@ -5,15 +5,14 @@
 
 // The solver on its own thread: M1 acceptance 2's second half.
 //
-// Rigs of Rods runs its physics on threads of its own and draws the last completed state, and
-// that is the model here. `step_async` hands the frame's substeps to a worker and returns; the
-// caller poses the vehicle from the positions it already has and gets on with deforming and
-// submitting while the solver runs. The next frame waits for the step before it touches
-// anything, and `sync` is what every other entry point calls first, so a caller that asks for
-// positions straight after posting gets the stepped ones and simply loses the overlap. The
-// thread changes where the arithmetic runs and not what it is — the worker runs the same
-// sequential `step_now` — which `the_solver_steps_on_its_own_thread` holds by hashing a
-// threaded run against a synchronous one.
+// `step_async` hands the frame's substeps to a worker and returns; the caller gets on with the
+// rest of its frame and waits for the step before it poses the vehicle. `sync` is what every
+// other entry point calls first, so a caller that asks for positions straight after posting gets
+// the stepped ones and simply loses the overlap. The thread changes where the arithmetic runs and
+// not what it is — the worker runs the same sequential `step_now` — which
+// `the_solver_steps_on_its_own_thread` holds by hashing a threaded run against a synchronous one.
+// (Drawing the *last* frame's step, which is Rigs of Rods' own model, was tried first and
+// stuttered under varying frame times; see PlayDrive.begin.)
 //
 // Timing is taken here on whichever thread runs the step, with a monotonic clock, so a frame can
 // report what the solver cost and, separately, how long the frame waited for it.

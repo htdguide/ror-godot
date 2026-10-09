@@ -14,7 +14,8 @@ a person drives it, and no such milestone is closed by the agent.
     tools/play.sh --weather golden_dusk
 
 In the park: `F5` chase camera, `F6` free camera, `F7` the driver's seat. `L` lights, `Z`/`C`
-indicators, `X` both off. `M` opens the environment panel — weather, gravity, sun, fog, exposure —
+indicators, `X` both off. `Esc` or `M` opens the settings panel — a row for every number a weather
+states, refreshed to whatever preset or hour is chosen, so a preset can be read as well as seen —
 which writes to the live scene and not to the project, so nothing has to be put back afterwards.
 
 The window is tracked while it lives and untracked when it closes, so

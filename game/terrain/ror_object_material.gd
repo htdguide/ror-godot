@@ -10,6 +10,8 @@ extends RefCounted
 ## What Blender's Ogre exporter puts between a material's name and the texture it was painted
 ## with.
 const TEXFACE_MARK: String = "/TEXFACE/"
+## Classes a name alone may not give an opaque pass. See `of`.
+const OPAQUE_IS_NOT: PackedStringArray = ["glass", "lamp"]
 
 
 ## The material a submesh names, built from the terrain's own scripts.
@@ -38,6 +40,15 @@ static func of(
         # culling here are already read from the pass's own `scene_blend` and `cull_hardware`,
         # which is authored data and beats a guess from a name.
         var class_key: String = MaterialClass.classify(name, declared)["class"] as String
+        # **An opaque pass is not glass, whatever it is called.** A modular building's whole
+        # facade is one submesh painted with one atlas, and the atlas is named after what is in
+        # it — Starling's `window_chicago_lightgrey.dds` covers the brick as well as the panes.
+        # Classed as glass by that name it was built at roughness 0.05, and a vertical wall at
+        # that roughness is a mirror of any low sun: a session in `dawn_mist` saw a blown white
+        # disc the size of three storeys on the office block. Real glass in this format is a
+        # pass that blends, and that is authored data; a name is a hint, and the hint loses.
+        if OPAQUE_IS_NOT.has(class_key) and not (declared["alpha"] as bool):
+            class_key = "default"
         var params: Dictionary = MaterialCfg.CLASSES.get(
             class_key, MaterialCfg.CLASSES["default"]
         ) as Dictionary
