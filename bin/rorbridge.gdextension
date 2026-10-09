@@ -1,0 +1,14 @@
+[configuration]
+
+entry_symbol = "rorbridge_library_init"
+; Built against godot-cpp 4.5 while the engine is 4.7. GDExtension is forward compatible,
+; so declaring the older API as the minimum keeps one binary loadable on both.
+compatibility_minimum = "4.4"
+
+[libraries]
+
+macos.debug = "res://bin/librorbridge.macos.template_debug.universal.dylib"
+macos.release = "res://bin/librorbridge.macos.template_release.universal.dylib"
+; Cross-built on the dev Mac with mingw by tools/release.sh; never run here.
+windows.debug.x86_64 = "res://bin/librorbridge.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://bin/librorbridge.windows.template_release.x86_64.dll"

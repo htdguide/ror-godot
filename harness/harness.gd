@@ -69,7 +69,12 @@ var _screen: TextureRect = null
 
 func begin(main: Node) -> void:
     _main = main
-    args = HarnessArgs.new(OS.get_cmdline_user_args())
+    var raw: PackedStringArray = OS.get_cmdline_user_args()
+    # An exported build opened by a person has no arguments and is not a capture: it is the
+    # game, on a world, with the panel to pick content from. The harness stays in it unchanged.
+    if raw.is_empty() and OS.has_feature("template"):
+        raw = PackedStringArray(["--play", "--terrain"])
+    args = HarnessArgs.new(raw)
     if args.error != "":
         _die(EXIT_USAGE, "argument error: " + args.error)
         return
@@ -185,14 +190,10 @@ func _build_world(scenario: String, weather: String) -> String:
     return ""
 
 
-## Moves to another camera preset without rebuilding the world.
-##
-## Changing where the camera stands is no reason to throw the scene away, and treating it as one
-## bit twice in opposite directions: a second `setup_for` first gave two worlds and the *front*
-## view, then — once the stale world was freed — the rear view of an empty field, the vehicle
-## having been parented to the world just freed. `make_current` is explicit because a viewport
-## keeps whichever camera entered first, which is how that stayed invisible. See
-## `hard-won-facts.md`.
+## Moves to another camera preset without rebuilding the world. A second `setup_for` once gave
+## two worlds, then the rear view of an empty field (the vehicle parented to the world just
+## freed). `make_current` is explicit because a viewport keeps whichever camera entered first,
+## which is how that stayed invisible. See `hard-won-facts.md`.
 func use_camera(shot: String) -> String:
     if world == null or not is_instance_valid(world):
         return "there is no world to put a camera in; call setup_for first"
@@ -295,16 +296,10 @@ func render_viewport() -> Viewport:
     return container.viewport if container != null else get_viewport()
 
 
-## Captures the frame as linear light rather than as display pixels: an OpenEXR, unclipped, with
-## no sRGB transfer on it.
-##
-## The viewport is switched to an HDR render target for the capture and switched back after, so
-## every other gate keeps the 8-bit display-referred capture it was written against. Opt-in
-## deliberately: an HDR target changes what a PNG written from it would mean, and most gates are
-## asking about the displayed image and are right to.
-##
-## Returns {"error", "exr", "image"}. `image` is the float image, which is what a measurement
-## should read; the file is for a person and for tooling.
+## Captures the frame as linear light: an OpenEXR, unclipped, no sRGB transfer. The viewport is
+## switched to an HDR target for the capture and back after, so every other gate keeps the 8-bit
+## display-referred capture it was written against. Returns {"error", "exr", "image"}: `image`
+## is the float image a measurement should read; the file is for a person and for tooling.
 func capture_hdr(out_dir: String, scenario: String, converge: int) -> Dictionary:
     var viewport: Viewport = render_viewport()
     var was_hdr: bool = viewport.use_hdr_2d

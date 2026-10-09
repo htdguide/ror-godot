@@ -19,6 +19,11 @@ const SKIP_DIRS: Array[String] = [
 ## was while the project lived in `game/`, and which silently returned the repository's *parent*
 ## for one commit of the move.
 static func repo_root() -> String:
+    # An exported build has no repository: `res://` is inside the pack, and everything this
+    # project reads by absolute path — base content, the loading picture, mods and maps — sits
+    # in the folder beside the executable instead. See tools/release.sh for what goes there.
+    if OS.has_feature("template"):
+        return OS.get_executable_path().get_base_dir().simplify_path().trim_suffix("/")
     return ProjectSettings.globalize_path("res://").simplify_path().trim_suffix("/")
 
 

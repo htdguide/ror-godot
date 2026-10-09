@@ -14,6 +14,30 @@
 # Windows, Linux and WebAssembly binaries out of the tree.
 set -uo pipefail
 
+# `--windows`: the Windows binaries of the same pinned release, from Terrain3D's own release
+# page rather than a cross-build — the addon's published zip is built by its authors for every
+# platform, and a release of this project ships their binary beside their licence. Only the two
+# DLLs are taken; the rest of the zip is what the source build already installs.
+if [[ "${1:-}" == "--windows" ]]; then
+    REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    TAG="v1.0.2-stable"
+    TARGET="$REPO_ROOT/addons/terrain_3d/bin"
+    [[ -d "$TARGET" ]] || { echo "build_terrain3d.sh: build the addon first (no $TARGET)" >&2; exit 1; }
+    tmp="$(mktemp -d)"
+    echo "build_terrain3d.sh: fetching Terrain3D $TAG for Windows"
+    gh release download "$TAG" -R TokisanGames/Terrain3D -p "Terrain3D_${TAG}.zip" -D "$tmp" || exit 1
+    ( cd "$tmp" && unzip -q "Terrain3D_${TAG}.zip" ) || exit 1
+    found=0
+    for dll in libterrain.windows.release.x86_64.dll libterrain.windows.debug.x86_64.dll; do
+        src="$(find "$tmp" -name "$dll" | head -1)"
+        [[ -f "$src" ]] && cp "$src" "$TARGET/$dll" && found=$((found + 1))
+    done
+    rm -rf "$tmp"
+    [[ $found -eq 2 ]] || { echo "build_terrain3d.sh: the release zip held $found of 2 Windows DLLs" >&2; exit 1; }
+    echo "build_terrain3d.sh: installed 2 Windows DLLs to addons/terrain_3d/bin"
+    exit 0
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE="$REPO_ROOT/vendor/terrain3d"
 ADDON_SOURCE="$SOURCE/project/addons/terrain_3d"

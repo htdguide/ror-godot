@@ -1,14 +1,18 @@
 # Godot
 .godot/
 *.translation
-export_presets.cfg
 .import/
 
 # Build output. bin/ holds the built GDExtension and its .gdextension descriptor; it is at
 # the repository root rather than under game/ since the PLAN 0.7 tree mirror, and it is
 # rebuilt by scons rather than committed.
 build/
-/bin/
+# The descriptor is source: it says which library loads on which platform. Only the binaries
+# beside it are built. (`/bin/*` rather than `/bin/`: a file inside an ignored directory cannot
+# be un-ignored.)
+/bin/*
+!/bin/rorbridge.gdextension
+!/bin/rorbridge.gdextension.uid
 *.o
 *.os
 *.obj
@@ -76,3 +80,6 @@ maps/*
 assets/ui/*
 !assets/ui/README.md
 !assets/ui/.gdignore
+
+# Exported builds (tools/release.sh): the zip and the folder it is made from.
+release/

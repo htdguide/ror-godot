@@ -80,7 +80,8 @@ map Rigs of Rods itself opens with: `simple2-terrain` (`simple2` gravel, `simple
 `simple2_w` flooded), 1024 m, `Flat=1`. It is what `tools/play.sh --truck` opens with no
 arguments; `a_shipped_map_drives_from_a_fresh_clone` holds it. **That is the dev build.** The production build
 (`tools/prod.sh`, branch `prod`, `../ror-godot-prod`) bundles nothing and reads `mods/` and
-`maps/`; see README and PLAN §0.5.
+`maps/`; see README and PLAN §0.5. `tools/release.sh windows` exports it for Windows (README,
+"Releases"); nothing here can run the result, so a Windows machine is the oracle for it.
 
 **It drives.** `tools/play.sh --truck` opens a window and hands over the controls: throttle, brakes,
 steering, gears, ignition, lights, respawn, chase camera and a HUD. The solver has the force sources

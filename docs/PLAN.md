@@ -84,7 +84,7 @@ own container, and a console both the user and the agent drive.
 | Engine fork | Stock Godot first. Fork only where proven impossible, patch set kept minimal and listed. |
 | Legacy content | Runtime compatibility shim: existing `.truck` / `.zip` / OGRE assets load unmodified. |
 | Target | **Superseded 2026-09-30.** Was: tech demo, one hero vehicle, one terrain, no multiplayer/UI/game-mode work. Now: an alternative client with full vehicle and map support, a GUI, audio, the online repository and RoRnet multiplayer. Local milestones first; the two networked ones last. |
-| Platform | **macOS only for now.** The dev Mac is the sole authority for pixels, timings, and logic gates. No Linux/`xvfb`/lavapipe lane — deferred for speed, kept cheap to add later via the portability rules in §3.5. |
+| Platform | **macOS only for now** as the development platform: the dev Mac is the sole authority for pixels, timings, and logic gates. No Linux/`xvfb`/lavapipe lane — deferred for speed, kept cheap to add later via the portability rules in §3.5. A Windows x86_64 build is exported from the production checkout (`tools/release.sh windows`, 2026-10-09): the solver cross-built with mingw, Terrain3D's own binaries, nothing run or measured here. |
 | Hero asset | An existing community truck with its original diffuse-only textures, unchanged. |
 | Frame budget | 1080p, 60 fps, one truck + terrain. |
 | Folder layout | **Mirrors upstream's `source/main/` literally**, so an RoR developer opening this project finds the file they expect. `project.godot` moves to the repo root to make that possible. Spec in §0.7. |

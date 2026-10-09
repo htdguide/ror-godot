@@ -40,6 +40,10 @@ static func parse(text: String) -> String:
 
 ## The profile this checkout is running as.
 static func name() -> String:
+    # A shipped build is the production build whatever file sits beside it: nothing bundled,
+    # content from the folders beside the executable.
+    if OS.has_feature("template"):
+        return PROD
     var path: String = SourceScan.repo_root().path_join(FILE)
     if not FileAccess.file_exists(path):
         return DEV
