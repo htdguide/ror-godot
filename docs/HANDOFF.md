@@ -12,15 +12,18 @@ authoritative. It was re-scoped on 2026-09-30 from a renderer rewrite to a clien
 and §1's ordering are the new parts and the decisions table records what was superseded. Then
 `docs/architecture/bridge.md` and `docs/decisions/`.
 
-**State on 2026-10-09 evening.** D0 (§0.8) is done. **M1's acceptance list is complete** (the
-solver thread was its last item) after a week's mod-library sweep that pulled C2's format
-coverage forward: 69 library vehicles and 734 archive actors load. **M2 is in progress** and had
-its first human look-sweep that day: verdict "all of it looks great", four findings closed (PLAN
-§1, M2). **Two builds exist**: this dev checkout, and a production checkout at
-`../ror-godot-prod` (branch `prod`, `tools/prod.sh`) that bundles no content and receives work
-only by `tools/prod.sh merge` on the user's word — see README. The last day's work, in order:
-the solver thread, the sweep's fixes, the production build, a loading screen and a map change
-that resets the weather. Trust the commit log over this file for what was touched last.
+**State on 2026-10-10.** D0 (§0.8) is done. **M1's acceptance list is complete** after a week's
+mod-library sweep that pulled C2's format coverage forward: 69 library vehicles and 734 archive
+actors load. **M2 is in progress**; its first human look-sweep (2026-10-09) said "all of it looks
+great" and its four findings are closed (PLAN §1, M2). **The project is public and released**:
+github.com/htdguide/ror-godot, release `v0.1.1` with a Windows x86_64 zip and a macOS universal
+`.app`, bundling no content. **Two checkouts**: this dev one, and production at
+`../ror-godot-prod` (branch `prod`, `tools/prod.sh`) that bundles nothing and receives work only
+by `tools/prod.sh merge` on the user's word; `tools/release.sh windows|macos` exports from it.
+Since the sweep: the solver thread, the production build, a loading screen, a main menu (vehicle,
+map, weather; graphics options measured against their cost), a map change that resets the
+weather, content lists that link the hero and two maps when empty and open their folder, zips
+dropped in a content folder unpacked on their own. Trust the commit log over this file.
 `tools/gate.sh --gate a,b,c` is sugar for `gate run a b c`; `--cmd "<line>"` runs any console
 command from a shell.
 
@@ -145,10 +148,11 @@ has just stated.
 
 ## The suite is green
 
-156 gates. On 2026-10-09 all three forms of run pass: `--all --every` (156) and `--order-check`
-(153 twice in one session, identical verdicts, worst drift 2.2e-7; two wall-clock gates compared
-by verdict). Run all three before trusting a change to the solver's API or to anything that
-renders: the order check caught a day-old gate measuring a wall-clock share undeclared.
+162 gates, all green at `d05e809`. The last `--all --every` (156) and `--order-check` (153 twice,
+worst drift 2.2e-7) were on 2026-10-09 before the menu, grass and content work; since then only
+`--all`, and on 2026-10-10 the machine's memory pressure (two VMs swapping) stopped three runs
+early, so the tail ran as `--cmd "gate run …"` batches. **Run `--all --every` and `--order-check`
+on a quiet machine before the next change to anything that renders or steps the solver.**
 
 **The mod-library sweep, 2026-10-04 to 2026-10-08.** Twelve downloaded packs and the shipped
 Agora and DAF make a library of 69 vehicles, and nearly every loader convention calibrated on the
@@ -173,9 +177,6 @@ braced vehicle. `harness/dev/drive_stance.gd` is the census and `fold_trace.gd` 
   fog's temporal history belongs to the viewport and outlives a gate's container.
   `HarnessCapture.make_frames_independent` switches it off for gate worlds. `hard-won-facts.md`,
   beside the earlier order-check entries, with the frame-time gate's `measured_is_wall_clock`.
-
-Earlier, `terrain_takes_the_light` was red at 111% against 30%, and one wrong `use_mipmaps` flag was
-all of it (`hard-won-facts.md`, `Image.create_from_data`). It passes at 22.6% on its own threshold.
 
 ## What to do next
 
@@ -267,8 +268,7 @@ What M1 still owes is human: 5 below.
   that is the node model, upstream's as much as ours, and the scenery gate aims round it.
 - **Sky**: the terrn2's core cube map ships with no terrain; own sky. **Vegetation colour maps and sway**: read, unused.
 - **The last sample row and column.** Terrain3D tiles on a power of two: 2049 samples import as 2048 cells, La Paz 2 m short.
-- **The traction map is nearest-sampled** at 3.9 m per pixel on La Paz, where upstream filters it
-  bilinearly; surface edges are a pixel blocky.
+- **The traction map is nearest-sampled** (3.9 m/pixel on La Paz; upstream filters bilinearly).
 - **The `grid` special object.** Upstream stamps `grid.odef` 100 times in a 10x10 at 50 m spacing
   (`TerrainObjectManager.cpp:602`); `simple2.tobj` asks for it and no `grid.odef` ships in the
   submodule, so the shipped map draws no objects. Upstream logs the same miss.
