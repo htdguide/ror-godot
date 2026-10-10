@@ -829,6 +829,27 @@ any of them**, because on a 4 km map the relative beam error is ~5e-4, which is 
 project's own tolerances — so it is entirely possible that none of this is urgent and all of it is a
 large-world prerequisite.
 
+**Step 2 measured, 2026-10-11, and it is urgent.** `harness/dev/distance_probe.gd` settles the
+hero on flat ground at seven distances and watches one second substep by substep:
+
+| distance | worst node | body node | beams bent / broken | frame wander |
+| --- | --- | --- | --- | --- |
+| 50 m | 0.463 m/s, 248 Hz | 0.058 m/s | 7 / 0 | 3.8 mm |
+| 1 km | 1.035 m/s | 0.467 m/s | 12 / 0 | 10.6 mm |
+| 3915.8 m (La Paz's spawn) | 1.966 m/s, 248 Hz | 1.745 m/s | 78 / 1 | 12.6 mm |
+| 10 km | 7.762 m/s | 7.762 m/s | 262 / 30 | 12.5 mm |
+| 100 km | 50.4 m/s | 40.7 m/s | 1033 / 197 | 227 mm |
+| 1000 km and up | 277.8 m/s (the clamp) | the clamp | ~1400 / 400+ | metres |
+
+The beams go first, and they go on the map the project is built against: a truck parked at La Paz's
+own spawn rings four times harder than at the origin, its body thirty times, and settling alone
+bends 78 beams. The ground query is not it — against an exact 1-in-50 plane it is within 0.0003 mm
+at every distance, and the same run on a plane with no heightfield is identical to the bit. The
+"tyres ring" finding (1.646 m/s at 248 Hz, taken on La Paz) is the 3915.8 m row; the 0.492 m/s it
+was brought to matches the 50 m row. Vertex jitter and depth were not reached. **So step 3,
+per-actor frames, is scheduled next**, held by a gate that settles the rig at La Paz's spawn and
+asks for what it does at 50 m.
+
 ### Splitscreen, as the test for all of it
 
 **Two vehicles in one window, one on WASD and one on the arrow keys.** The cheapest honest test of

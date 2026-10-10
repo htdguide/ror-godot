@@ -278,7 +278,8 @@ What M1 still owes is human: 5 below.
   maths took it to 0.492 m/s at 2 kHz, and the worst body node from 0.156 to 0.066 m/s. Its
   frequency matches the rim hoop beams: 3.4 MN/m on a 2.03 kg node is 206 Hz with a damping ratio
   of 0.7%. Note the tension with the 2 kHz result: the rig is *stable* at 2 kHz and not *quiet*
-  there. Do not fix this by raising the rate without saying so.
+  there. Do not fix this by raising the rate without saying so. **Most of it is float32 distance**:
+  at La Paz's spawn (3.9 km) it rings 1.97 m/s, at 50 m 0.46 (PLAN §0.12 step 2).
   - The SHOCK1 bounds on the tyre spokes (0.66 contraction, 0.15 extension for `meshwheels2`) are
     in since `c827e40`; they did not change the ringing and were never claimed to.
 - **It rolls over more easily than the numbers say it should.** The centre of mass is 0.762 m above
