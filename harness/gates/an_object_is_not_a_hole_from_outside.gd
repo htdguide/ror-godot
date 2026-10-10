@@ -40,6 +40,16 @@ extends GateBase
 ## and the owner of this project has ruled those three classes correct content. So the number is
 ## reported and the stills are the product. The gate that carries a verdict about winding is
 ## `a_reversed_solid_is_caught`, whose oracle is a solid the engine makes itself.
+##
+## **Open: the reported number depends on what ran before it (2026-10-11).** Alone, or after the
+## first 65 gates in name order, `a1da0UID-tunapicker.mesh` reads 23% from the right — its bow is
+## marked as back faces. After the 106 gates that follow it in name order it reads under 1%, the
+## bow drawn as front. `--order-check` flags it once seed 7 lands it there. Ruled out: the mesh
+## reader (twelve reads under heap churn, one hash, `harness/dev/reader_repeat_probe.gd`), the
+## material and path lookups (per call, from files), the camera and the viewport (fresh per gate).
+## No single predecessor reproduces it — a bisection by halves converged on a gate that alone
+## changes nothing — so it is cumulative. Suspects left are on the GPU side: which pipeline draws
+## the facing shader in the first frames, or a depth contest on a doubled hull skin.
 
 ## Which terrain, unless one is named. Every distinct mesh it places is photographed.
 ##
