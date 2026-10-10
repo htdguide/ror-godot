@@ -76,7 +76,7 @@ bool RorObstacles::occupied(const Vector3 &point, const RorObstacleBox &of, int 
                     ALIGNED_COS) {
             continue;
         }
-        const Vector3 offset = point - box.origin;
+        const Vector3 offset = m_frame.from(point, box.origin);
         const Vector3 local(offset.dot(box.basis.get_column(0)), offset.dot(box.basis.get_column(1)),
                             offset.dot(box.basis.get_column(2)));
         if (std::abs(static_cast<float>(local.x)) < box.half.x &&
@@ -94,7 +94,7 @@ bool RorObstacles::contact(const Vector3 &position, float &penetration, Vector3 
     float deepest = 0.0f;
     for (const int index : m_near) {
         const RorObstacleBox &box = m_boxes[static_cast<size_t>(index)];
-        const Vector3 offset = position - box.origin;
+        const Vector3 offset = m_frame.from(position, box.origin);
         // Into the box's own frame, where the test is three comparisons.
         const Vector3 local(offset.dot(box.basis.get_column(0)), offset.dot(box.basis.get_column(1)),
                             offset.dot(box.basis.get_column(2)));

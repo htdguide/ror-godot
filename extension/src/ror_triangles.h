@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ror_frame.h"
 #include "ror_ground.h"
 #include "ror_node.h"
 
@@ -43,6 +44,8 @@ public:
     void add(const godot::Vector3 &a, const godot::Vector3 &b, const godot::Vector3 &c,
              int surface);
     int count() const { return static_cast<int>(m_triangles.size()); }
+    // The frame `contact` positions are relative to. Triangles stay in world space, as added.
+    void set_frame(const RorFrame &frame) { m_frame = frame; }
     // The shallowest triangle this point is inside the collision slab of. False when none is.
     bool contact(const godot::Vector3 &position, float &penetration, godot::Vector3 &normal,
                  int &surface) const;
@@ -61,6 +64,7 @@ private:
 
     std::vector<RorTriangle> m_triangles;
     std::unordered_map<int64_t, std::vector<int>> m_cells;
+    RorFrame m_frame;
 };
 
 // Applies the contact law to every node standing inside a triangle's slab.

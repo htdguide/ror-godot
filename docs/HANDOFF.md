@@ -30,9 +30,9 @@ command from a shell.
 **Two sections were decided on 2026-10-01 and almost nothing in them is built.** §0.10: client-
 authoritative replication on this project's own wire at 64 players; RoRnet compatibility retired.
 §0.12: the scale design (per-actor frames, islands, sleeping, a causality bound from a 1000 km/h
-v_max); its first prerequisite, a hard node-velocity clamp, is in (`RorSolver::set_speed_limit`,
-`no_node_outruns_the_speed_limit`, 2026-10-10). Read §0.12's order-of-work next — step 2 is two
-cheap measurements that decide whether any of the rest is urgent.
+v_max). Steps 1-3 are in: the speed clamp (`no_node_outruns_the_speed_limit`), the distance
+measurement (`harness/dev/distance_probe.gd`), and per-actor frames (`ror_frame.h`,
+`a_rig_far_from_the_origin_is_the_rig_at_it`) — a rig at La Paz's spawn no longer rings 4x.
 
 **The console.** `tools/play.sh` and `--console` open it; ` or F1 drops it down over whatever is
 running, without pausing it. `help` lists the twelve commands, Tab completes and cycles, Up
@@ -149,9 +149,9 @@ has just stated.
 
 ## The suite is green
 
-163 gates. At the speed-limit commit (2026-10-10, two VMs idle) `--all --every` is 163 of 163 and
-`--order-check` 163 twice with identical verdicts, worst drift 8.8e-8. **Run both on a quiet
-machine before the next change to anything that renders or steps the solver.**
+164 gates; `--all --every` 164 of 164 at the frames commit (2026-10-11). `--order-check` has one
+drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
+in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 
 **The mod-library sweep, 2026-10-04 to 2026-10-08.** Twelve downloaded packs and the shipped
 Agora and DAF make a library of 69 vehicles, and nearly every loader convention calibrated on the
@@ -278,10 +278,10 @@ What M1 still owes is human: 5 below.
   maths took it to 0.492 m/s at 2 kHz, and the worst body node from 0.156 to 0.066 m/s. Its
   frequency matches the rim hoop beams: 3.4 MN/m on a 2.03 kg node is 206 Hz with a damping ratio
   of 0.7%. Note the tension with the 2 kHz result: the rig is *stable* at 2 kHz and not *quiet*
-  there. Do not fix this by raising the rate without saying so. **Most of it is float32 distance**:
-  at La Paz's spawn (3.9 km) it rings 1.97 m/s, at 50 m 0.46 (PLAN §0.12 step 2).
-  - The SHOCK1 bounds on the tyre spokes (0.66 contraction, 0.15 extension for `meshwheels2`) are
-    in since `c827e40`; they did not change the ringing and were never claimed to.
+  there. Do not fix this by raising the rate without saying so. **Most of it was float32 distance**:
+  at La Paz's spawn it rang 1.97 m/s against 0.46 at 50 m; frames make it 0.48 (PLAN §0.12).
+  - **It makes a parked truck creep downhill** at half its friction limit: 3.1 m in 3 s at 0.5 g
+    on La Paz asphalt (`harness/dev/lean_probe.gd`); tread damping x3 gives 0.22 m. Upstream's law.
 - **It rolls over more easily than the numbers say it should.** The centre of mass is 0.762 m above
   the contact patch over a 1.80 m track, a 1.18 g static rollover threshold, better than a real
   lifted S10. Every surface being `concrete` was the suspected cause and that is fixed, so this

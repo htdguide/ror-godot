@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ror_frame.h"
 #include "ror_ground.h"
 
 #include <godot_cpp/variant/transform3d.hpp>
@@ -39,6 +40,10 @@ public:
 
     // Narrows the set to the boxes whose bounds overlap the given world bounds, and keeps it.
     // Every contact query afterwards tests only those, until the next call.
+    // The frame `contact` positions are relative to. Boxes stay in world space and are measured
+    // from in double; `select` still takes world bounds, being a broad phase with metres to spare.
+    void set_frame(const RorFrame &frame) { m_frame = frame; }
+
     void select(const godot::Vector3 &min, const godot::Vector3 &max);
     size_t selected() const { return m_near.size(); }
 
@@ -60,6 +65,7 @@ private:
 
     std::vector<RorObstacleBox> m_boxes;
     std::vector<int> m_near;
+    RorFrame m_frame;
 };
 
 // The ground contact law again, against the static boxes: a ramp's face, a wall, the top of a

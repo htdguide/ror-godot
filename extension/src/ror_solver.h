@@ -63,6 +63,21 @@ public:
     // on any run the limit did not touch, which is how a gate tells a clamp that changed nothing
     // from one that rewrote the run.
     int64_t speed_limit_hits() const;
+    // Whether the rig's frame follows it (PLAN §0.12, ror_frame.h). On by default. Off, the
+    // frame stays where it is — at the world origin, for a solver that has not moved it — and
+    // `set_frame_origin` is ignored, so nodes are stored in world coordinates as they were before
+    // frames existed: the control a gate compares against.
+    void set_frame_follows(bool follows);
+    // How many times the frame has moved since the solver was built.
+    int64_t frame_moves() const;
+    // Puts the frame at the whole step nearest a world point given in double, re-expressing the
+    // nodes so none of them moves, and reads where it is. With `set_node_local_position` this is
+    // how a caller places a rig far from the origin without its world position passing through a
+    // float32 Vector3 first: at 100 km that rounding alone is 7.8 mm, and it bent 127 beams.
+    void set_frame_origin(double x, double z);
+    double frame_origin_x() const;
+    double frame_origin_z() const;
+    void set_node_local_position(int node, const godot::Vector3 &local);
     // A flat hard ground at `height`. Upstream's contact law, not a penalty spring: see
     // ror_ground.h for why that distinction decides whether a rig is stable.
     void set_ground(float height, bool enabled);
@@ -130,6 +145,11 @@ public:
     void add_node_force(int node, const godot::Vector3 &force);
     // Actuation. Changing a beam's rest length is how upstream moves a rig from within.
     void set_beam_rest_length(int beam, float length);
+    // A beam's two nodes and its damping, read and set: for probes that change one family of
+    // beams to see whether it is the cause of something, never for building a rig.
+    godot::Vector2i get_beam_nodes(int beam) const;
+    float get_beam_damping(int beam) const;
+    void set_beam_damping(int beam, float damping);
     // Gives a beam a travel range and what happens outside it. `bound_type` is a BeamBound.
     // `precompression` scales the beam's rest and reference length, which is how a shock is
     // installed already under load. See ror_node.h for what each bound type means.
@@ -283,6 +303,11 @@ private:
     static constexpr float DEFAULT_SPEED_LIMIT = 1000.0f / 3.6f;
     float m_speed_limit = DEFAULT_SPEED_LIMIT;
     int64_t m_speed_limit_hits = 0;
+    // Where the nodes are stored relative to; see ror_frame.h. Positions in and out of the
+    // public API are world positions and are converted at the boundary.
+    RorFrame m_frame;
+    bool m_frame_follows = true;
+    int64_t m_frame_moves = 0;
     float m_ground_height = 0.0f;
     bool m_ground_enabled = false;
     // Upstream's DEFAULT_DRAG.
@@ -308,6 +333,8 @@ private:
     void apply_ground_contact(float dt);
     void apply_obstacle_contact(float dt);
     void select_nearby_obstacles();
+    void follow_frame();
+    void shift_frame(double shift_x, double shift_z);
 };
 
 } // namespace rorgd

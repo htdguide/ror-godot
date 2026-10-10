@@ -387,3 +387,13 @@ mesh or material is read and built. Split out when this one hit the 400-line cap
   whole 13 frames after stopping). A settings file carries a version; one from older defaults is
   not read.
 
+- **A rig 4 km from the origin was already a precision problem, and nobody had looked.** La Paz
+  spawns the hero at x = 3915.8, where float32 resolves 0.24 mm; beam forces difference node
+  positions, so the settled rig rang 1.97 m/s against 0.46 at the origin and bent 78 beams from
+  nothing. The human "tyres ring" finding was mostly this. Per-actor frames (`ror_frame.h`) fixed
+  it — and only after placement stopped passing world positions through a float32 `Vector3`,
+  which at 100 km is 7.8 mm of rounding at spawn. `distance_probe.gd`; the gate is the far-rig one.
+- **A parked, braked truck creeps downhill at half its friction limit, and a lean test measures
+  that, not grip.** The tread's 248 Hz ring meets upstream's static branch, which cancels a node's
+  tangential force but brakes a moving one by `1 - exp(-v / adhesion velocity)` (La Paz asphalt:
+  8 m/s). `lean_probe.gd`: lone block holds, truck slides 3.1 m at 0.5 g; tread damping x3 0.22 m.

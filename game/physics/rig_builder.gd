@@ -159,14 +159,21 @@ static func place(
     # the dirt the rig began inside the pad, its suspension fully compressed, and shot into the
     # air on every reset. Reported from a window in those words.
     var ground: float = maxf(solver.ground_height_at(origin), origin.y)
+    # **Relative to the rig's own frame, worked out in GDScript's 64-bit floats.** A world
+    # position handed over as a Vector3 is rounded to float32 first — 0.24 mm at La Paz's spawn,
+    # 7.8 mm at 100 km — and a rig placed with that much error in every node starts out strained
+    # and bends 127 beams settling at 100 km. See PLAN §0.12, per-actor frames.
+    solver.set_frame_origin(origin.x, origin.z)
+    var frame_x: float = solver.frame_origin_x()
+    var frame_z: float = solver.frame_origin_z()
     for i: int in truck.nodes.size():
         var placed: Vector3 = upright * truck.nodes[i]
-        solver.set_node_position(
+        solver.set_node_local_position(
             i,
             Vector3(
-                origin.x + placed.x,
+                origin.x - frame_x + placed.x,
                 ground + clearance + placed.y - lowest,
-                origin.z + placed.z
+                origin.z - frame_z + placed.z
             )
         )
         solver.set_node_velocity(i, Vector3.ZERO)

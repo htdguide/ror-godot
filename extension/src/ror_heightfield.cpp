@@ -45,8 +45,8 @@ int RorHeightfield::surface_at(const Vector3 &position) const {
     if (m_surfaces.empty()) {
         return 0;
     }
-    const float u = (static_cast<float>(position.x) - static_cast<float>(m_origin.x)) / m_spacing;
-    const float v = (static_cast<float>(position.z) - static_cast<float>(m_origin.z)) / m_spacing;
+    const double u = grid_u(position);
+    const double v = grid_v(position);
     const int x = std::max(0, std::min(static_cast<int>(std::floor(u + 0.5f)), m_width - 1));
     const int z = std::max(0, std::min(static_cast<int>(std::floor(v + 0.5f)), m_depth - 1));
     return m_surfaces[static_cast<size_t>(z) * static_cast<size_t>(m_width) + static_cast<size_t>(x)];
@@ -58,6 +58,16 @@ void RorHeightfield::clear() {
     m_width = 0;
     m_depth = 0;
     m_enabled = false;
+}
+
+double RorHeightfield::grid_u(const Vector3 &position) const {
+    return (m_frame.world_x(position.x) - static_cast<double>(m_origin.x)) /
+           static_cast<double>(m_spacing);
+}
+
+double RorHeightfield::grid_v(const Vector3 &position) const {
+    return (m_frame.world_z(position.z) - static_cast<double>(m_origin.z)) /
+           static_cast<double>(m_spacing);
 }
 
 float RorHeightfield::sample(int x, int z) const {
@@ -72,12 +82,12 @@ float RorHeightfield::height_at(const Vector3 &position) const {
     if (!m_enabled) {
         return 0.0f;
     }
-    const float u = (static_cast<float>(position.x) - static_cast<float>(m_origin.x)) / m_spacing;
-    const float v = (static_cast<float>(position.z) - static_cast<float>(m_origin.z)) / m_spacing;
+    const double u = grid_u(position);
+    const double v = grid_v(position);
     const int x = static_cast<int>(std::floor(u));
     const int z = static_cast<int>(std::floor(v));
-    const float fx = u - static_cast<float>(x);
-    const float fz = v - static_cast<float>(z);
+    const float fx = static_cast<float>(u - static_cast<double>(x));
+    const float fz = static_cast<float>(v - static_cast<double>(z));
     const float h00 = sample(x, z);
     const float h10 = sample(x + 1, z);
     const float h01 = sample(x, z + 1);

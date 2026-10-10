@@ -231,6 +231,16 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_speed_limit", "metres_per_second"), &RorSolver::set_speed_limit);
     ClassDB::bind_method(D_METHOD("speed_limit"), &RorSolver::speed_limit);
     ClassDB::bind_method(D_METHOD("speed_limit_hits"), &RorSolver::speed_limit_hits);
+    ClassDB::bind_method(D_METHOD("set_frame_follows", "follows"), &RorSolver::set_frame_follows);
+    ClassDB::bind_method(D_METHOD("get_beam_nodes", "beam"), &RorSolver::get_beam_nodes);
+    ClassDB::bind_method(D_METHOD("get_beam_damping", "beam"), &RorSolver::get_beam_damping);
+    ClassDB::bind_method(D_METHOD("set_beam_damping", "beam", "damping"), &RorSolver::set_beam_damping);
+    ClassDB::bind_method(D_METHOD("frame_moves"), &RorSolver::frame_moves);
+    ClassDB::bind_method(D_METHOD("set_frame_origin", "x", "z"), &RorSolver::set_frame_origin);
+    ClassDB::bind_method(D_METHOD("frame_origin_x"), &RorSolver::frame_origin_x);
+    ClassDB::bind_method(D_METHOD("frame_origin_z"), &RorSolver::frame_origin_z);
+    ClassDB::bind_method(D_METHOD("set_node_local_position", "node", "local"),
+                         &RorSolver::set_node_local_position);
     ClassDB::bind_method(D_METHOD("set_ground", "height", "enabled"), &RorSolver::set_ground);
     ClassDB::bind_method(D_METHOD("set_ground_friction", "adhesion_velocity", "static_friction",
                                   "sliding_friction", "hydrodynamic_friction", "stribeck_velocity", "strength"),

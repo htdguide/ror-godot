@@ -58,8 +58,12 @@ bool RorTriangleSet::contact(const Vector3 &position, float &penetration, Vector
     if (m_triangles.empty()) {
         return false;
     }
-    const auto cell = m_cells.find(key_of(static_cast<int>(std::floor(position.x / CELL_M)),
-                                          static_cast<int>(std::floor(position.z / CELL_M))));
+    // The world position in double, for the cell and the bounds; the triangle itself is measured
+    // from in double too, so nothing here differences two floats of world magnitude.
+    const double world_x = m_frame.world_x(position.x);
+    const double world_z = m_frame.world_z(position.z);
+    const auto cell = m_cells.find(key_of(static_cast<int>(std::floor(world_x / CELL_M)),
+                                          static_cast<int>(std::floor(world_z / CELL_M))));
     if (cell == m_cells.end()) {
         return false;
     }
@@ -68,11 +72,11 @@ bool RorTriangleSet::contact(const Vector3 &position, float &penetration, Vector
     float shallowest = SLAB_M;
     for (const int index : cell->second) {
         const RorTriangle &tri = m_triangles[static_cast<size_t>(index)];
-        if (position.x < tri.low.x || position.x > tri.high.x || position.y < tri.low.y ||
-            position.y > tri.high.y || position.z < tri.low.z || position.z > tri.high.z) {
+        if (world_x < tri.low.x || world_x > tri.high.x || position.y < tri.low.y ||
+            position.y > tri.high.y || world_z < tri.low.z || world_z > tri.high.z) {
             continue;
         }
-        const Vector3 point = tri.forward.xform(position - tri.a);
+        const Vector3 point = tri.forward.xform(m_frame.from(position, tri.a));
         // Inside the triangle's own footprint, and behind its face by less than the slab: `u`
         // and `v` are barycentric, `point.z` is the distance along the unit normal.
         if (point.x < 0.0f || point.y < 0.0f || point.x + point.y > 1.0f) {

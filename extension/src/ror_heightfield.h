@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ror_frame.h"
+
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/vector3.hpp>
@@ -28,6 +30,9 @@ public:
     bool enabled() const { return m_enabled; }
     int width() const { return m_width; }
     int depth() const { return m_depth; }
+    // The frame the positions handed to the queries below are relative to. The field itself
+    // stays where the world put it; a query measures from its corner in double.
+    void set_frame(const RorFrame &frame) { m_frame = frame; }
 
     // Ground height under a world position, bilinearly interpolated. Positions outside the
     // field clamp to its edge rather than falling through it.
@@ -48,6 +53,9 @@ public:
 
 private:
     float sample(int x, int z) const;
+    // Grid coordinates of a frame-local position, in cells from the field's corner.
+    double grid_u(const godot::Vector3 &position) const;
+    double grid_v(const godot::Vector3 &position) const;
 
     std::vector<float> m_heights;
     std::vector<uint8_t> m_surfaces;
@@ -55,6 +63,7 @@ private:
     int m_depth = 0;
     godot::Vector3 m_origin;
     float m_spacing = 1.0f;
+    RorFrame m_frame;
     bool m_enabled = false;
 };
 

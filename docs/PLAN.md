@@ -648,8 +648,8 @@ glass may cost that gate. Inertia moves the housing, never the value.
 ## 0.12 Scale — precision, interaction, and the seam between servers
 
 **The requirement: performance-bound, not design-bound.** A faster machine should reach further
-and simulate more, with no constant in the code deciding where the world stops. Nothing here is
-built; this section is the design the work will be measured against.
+and simulate more, with no constant in the code deciding where the world stops. This section is
+the design the work is measured against; steps 1 to 3 of its order of work are built (2026-10-11).
 
 ### The problem, stated correctly
 
@@ -752,6 +752,33 @@ For the aggregate idea — distant groups replaced by their summary rather than 
 name is Barnes-Hut and the Fast Multipole Method, which for contact degenerates to a BVH plus the
 certificates above.
 
+### Parallelism: SMP across islands, not inside a rig; SIMD deferred
+
+**Asked 2026-10-11 whether SIMD and symmetric multiprocessing fit; decided on the numbers.**
+
+- **One rig is cheap and short.** The hero steps in 0.45 ms a frame at 2 kHz on one thread, scalar
+  (`a_frame_reports_its_parts`): about 14 us a substep for ~2,000 beams. A substep is several
+  dependent passes — integrate, beams, wheels, contact — so threading inside it pays a barrier of
+  1-5 us per pass against 14 us of work, and splitting the beam scatter across threads needs
+  colouring or per-thread accumulators summed in a fixed order, or `the_solver_is_deterministic`
+  breaks. **Not done.**
+- **SMP across islands is the fit.** Separate actors share nothing between contacts, so one island
+  per worker needs no locks and stays deterministic as long as the island list is ordered the same
+  way every step. Per-actor frames (step 3) already made each actor self-contained. This machine
+  has 8 performance cores: in principle eight vehicles step for the price of one. **Scheduled with
+  step 4 (islands)**, first exercised by splitscreen, needed by traffic and C5's 64 players. Its
+  gate: N actors stepped on N workers bit-equal to the same N stepped serially, and the wall time
+  of N under 1.5x one.
+- **SIMD is deferred until a profile asks for it.** The beam pass gathers and scatters by node
+  index, so vectors fill badly; a structure-of-arrays node layout might buy 1.5-2x at a large
+  rewrite. `fast_invSqrt` and `approx_exp` vectorise bit-exactly (they are integer operations on
+  the bit pattern), so fidelity is not the obstacle — cost is. Revisit when many actors make the
+  beam pass the top of a profile.
+- **Neither is a fix for the parked-truck creep** (`lean_probe.gd`): that is the tyre ringing
+  against upstream's contact law, and speed only matters if the substep rate is raised, which
+  is a fidelity decision. At 6 kHz the solver would cost ~1.35 ms a frame scalar — affordable
+  already.
+
 ### Rendering at 100 km
 
 Required: correct if a player is there. float32 ULP at 100 km is 11.9 mm, which is visible vertex
@@ -818,8 +845,8 @@ actors instead of copied per solver. Most of what makes a persistent world hard 
    settled at 50 m and at 3915 m from the origin, same probe — does the tyre ring change? And the
    same rig at 1 km, 100 km and 10 000 km — what breaks first, beams, the ground query, vertex
    jitter or depth? Today the order is a guess; one gate makes it a list.
-3. Per-actor frames, with the heightfield and obstacles frame-local.
-4. Islands and sleeping.
+3. Per-actor frames, with the heightfield and obstacles frame-local. Done 2026-10-11; see below.
+4. Islands and sleeping, with SMP across islands (see "Parallelism" above).
 5. Certificates.
 6. The `precision=double` build and the two world-space shaders.
 7. The seam.
@@ -849,6 +876,25 @@ at every distance, and the same run on a plane with no heightfield is identical 
 was brought to matches the 50 m row. Vertex jitter and depth were not reached. **So step 3,
 per-actor frames, is scheduled next**, held by a gate that settles the rig at La Paz's spawn and
 asks for what it does at 50 m.
+
+**Step 3 built, 2026-10-11, as designed above with one change of mechanism.** `ror_frame.h`:
+each `RorSolver` stores its nodes relative to a frame origin held in double, always a whole
+multiple of 64 m, moved at the start of each `step` once the first node is more than 64 m from
+it; the shift is exact. Positions in and out of the public API are world and converted at the
+boundary. **The static world is not shifted**: the heightfield, the boxes and the collision
+triangles stay where the world put them, and each query takes `local + frame - world point` in
+double, so nothing in the hot path differences two floats of world magnitude and no spatial hash
+is rebuilt on a frame move. The heightfield's grid coordinate is double too — in float it is
+0.5 mm coarse across a 2048-cell map. **Placement had to change as well**: a world position
+handed over as a float32 `Vector3` is already rounded, and at 100 km that rounding alone bent
+127 beams on a rig that otherwise settled perfectly; `RigBuilder.place` now moves the frame
+(`set_frame_origin`, doubles) and writes frame-local positions worked out in GDScript's 64-bit
+floats. After both, `distance_probe.gd` reads 7 beams bent and a tread ring of 0.48 to 0.60 m/s
+at every distance from 50 m to 10 000 km. `a_rig_far_from_the_origin_is_the_rig_at_it` holds it
+against an envelope of five near-origin placements, with the frame pinned to the origin as its
+in-run control (1.966 m/s, 78 bent, 1 broken), and drives the rig from 100 km across two frame
+moves. What is still world-space float32: every position the solver hands out, so the render path
+and vertex jitter are step 6's, and the frame does not yet exist outside the solver.
 
 ### Splitscreen, as the test for all of it
 

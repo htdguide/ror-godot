@@ -23,7 +23,7 @@ constexpr float RAD_PER_SEC_TO_RPM = 9.5492965855137f;
 int RorSolver::add_node(const Vector3 &position, float mass) {
     sync();
     RorNode node;
-    node.position = position;
+    node.position = m_frame.to_local(position);
     node.mass = mass > 0.0f ? mass : 1.0f;
     m_nodes.push_back(node);
     return static_cast<int>(m_nodes.size()) - 1;
@@ -101,7 +101,7 @@ void RorSolver::set_node_immovable(int node, bool immovable) {
 void RorSolver::set_node_position(int node, const Vector3 &position) {
     sync();
     if (node >= 0 && node < static_cast<int>(m_nodes.size())) {
-        m_nodes[node].position = position;
+        m_nodes[node].position = m_frame.to_local(position);
     }
 }
 
@@ -195,6 +195,7 @@ void RorSolver::step_now(float dt, int substeps) {
     // The obstacles near the rig, found once per call rather than per substep: they never move,
     // the rig moves centimetres inside one call, and testing every box against every node at
     // 2 kHz would cost more than the simulation it is protecting.
+    follow_frame();
     select_nearby_obstacles();
     for (int i = 0; i < substeps; ++i) {
         integrate(dt);
@@ -419,7 +420,7 @@ void RorSolver::select_nearby_obstacles() {
         max.z = std::max(max.z, node.position.z);
     }
     const Vector3 margin(OBSTACLE_MARGIN_M, OBSTACLE_MARGIN_M, OBSTACLE_MARGIN_M);
-    m_obstacles.select(min - margin, max + margin);
+    m_obstacles.select(m_frame.to_world(min) - margin, m_frame.to_world(max) + margin);
 }
 
 void RorSolver::apply_ground_contact(float dt) {
@@ -466,7 +467,7 @@ PackedVector3Array RorSolver::get_positions() const {
     PackedVector3Array out;
     out.resize(static_cast<int64_t>(m_nodes.size()));
     for (size_t i = 0; i < m_nodes.size(); ++i) {
-        out[static_cast<int64_t>(i)] = m_nodes[i].position;
+        out[static_cast<int64_t>(i)] = m_frame.to_world(m_nodes[i].position);
     }
     return out;
 }
@@ -476,7 +477,7 @@ Vector3 RorSolver::get_node_position(int node) const {
     if (node < 0 || node >= static_cast<int>(m_nodes.size())) {
         return Vector3();
     }
-    return m_nodes[node].position;
+    return m_frame.to_world(m_nodes[node].position);
 }
 
 Vector3 RorSolver::get_node_velocity(int node) const {
@@ -523,7 +524,7 @@ float RorSolver::total_energy() const {
         }
         const float speed = static_cast<float>(node.velocity.length());
         energy += 0.5f * node.mass * speed * speed;
-        energy += -node.mass * static_cast<float>(m_gravity.dot(node.position));
+        energy += -node.mass * static_cast<float>(m_gravity.dot(m_frame.to_world(node.position)));
     }
     for (const RorBeam &beam : m_beams) {
         // Measured the way the force law measures it, with upstream's approximate reciprocal

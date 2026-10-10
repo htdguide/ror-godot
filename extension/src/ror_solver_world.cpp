@@ -30,7 +30,7 @@ int RorSolver::ground_model_count() const {
 }
 int RorSolver::surface_at(const Vector3 &position) const {
     sync();
-    return m_heightfield.surface_at(position);
+    return m_heightfield.surface_at(m_frame.to_local(position));
 }
 
 void RorSolver::set_ground_fluid(int index, float solid_ground_level, float fluid_density,
@@ -86,7 +86,7 @@ Dictionary RorSolver::obstacle_contact(const Vector3 &position) {
     float penetration = 0.0f;
     Vector3 normal;
     int surface = 0;
-    const bool hit = m_obstacles.contact(position, penetration, normal, surface);
+    const bool hit = m_obstacles.contact(m_frame.to_local(position), penetration, normal, surface);
     out["hit"] = hit;
     out["penetration"] = penetration;
     out["normal"] = normal;
@@ -109,7 +109,7 @@ float RorSolver::ground_height_at(const Vector3 &position) const {
     if (!m_heightfield.enabled()) {
         return m_ground_height;
     }
-    return m_heightfield.height_at(position);
+    return m_heightfield.height_at(m_frame.to_local(position));
 }
 
 Vector3 RorSolver::ground_normal_at(const Vector3 &position) const {
@@ -117,7 +117,7 @@ Vector3 RorSolver::ground_normal_at(const Vector3 &position) const {
     if (!m_heightfield.enabled()) {
         return Vector3(0.0f, 1.0f, 0.0f);
     }
-    return m_heightfield.normal_at(position);
+    return m_heightfield.normal_at(m_frame.to_local(position));
 }
 
 Vector3 RorSolver::ground_contact_probe(const Vector3 &velocity, const Vector3 &forces, float mass,
@@ -131,6 +131,98 @@ Vector3 RorSolver::ground_contact_probe(const Vector3 &velocity, const Vector3 &
     node.friction_coef = friction_coef;
     // Model 0: the parity comparison is against upstream's default surface.
     return ground_contact_force(node, normal, penetration, dt, m_ground_models[0]);
+}
+
+// Moves the frame to the whole step nearest the rig once the rig's first node is more than a step
+// from it, and tells the static world where it now is. Once per call to `step`, not per substep:
+// a rig moves centimetres in a call. The shift is a whole number of steps and the coordinates it
+// is taken from are under two steps, so every node lands on the same point it was at, exactly.
+void RorSolver::follow_frame() {
+    if (m_nodes.empty() || !m_frame_follows) {
+        return;
+    }
+    const Vector3 lead = m_nodes.front().position;
+    const double shift_x = std::abs(lead.x) > RorFrame::STEP_M ? RorFrame::snap(lead.x) : 0.0;
+    const double shift_z = std::abs(lead.z) > RorFrame::STEP_M ? RorFrame::snap(lead.z) : 0.0;
+    if (shift_x == 0.0 && shift_z == 0.0) {
+        return;
+    }
+    shift_frame(shift_x, shift_z);
+    ++m_frame_moves;
+}
+
+Vector2i RorSolver::get_beam_nodes(int beam) const {
+    sync();
+    if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
+        return Vector2i(-1, -1);
+    }
+    return Vector2i(m_beams[static_cast<size_t>(beam)].a, m_beams[static_cast<size_t>(beam)].b);
+}
+
+float RorSolver::get_beam_damping(int beam) const {
+    sync();
+    if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
+        return 0.0f;
+    }
+    return m_beams[static_cast<size_t>(beam)].damping;
+}
+
+void RorSolver::set_beam_damping(int beam, float damping) {
+    sync();
+    if (beam >= 0 && beam < static_cast<int>(m_beams.size())) {
+        m_beams[static_cast<size_t>(beam)].damping = damping;
+    }
+}
+
+// Moves the frame by a whole number of steps, every node by the opposite, and tells the static
+// world where the frame now is.
+void RorSolver::shift_frame(double shift_x, double shift_z) {
+    for (RorNode &node : m_nodes) {
+        node.position.x = static_cast<float>(static_cast<double>(node.position.x) - shift_x);
+        node.position.z = static_cast<float>(static_cast<double>(node.position.z) - shift_z);
+    }
+    m_frame.x += shift_x;
+    m_frame.z += shift_z;
+    m_heightfield.set_frame(m_frame);
+    m_obstacles.set_frame(m_frame);
+    m_triangles.set_frame(m_frame);
+}
+
+void RorSolver::set_frame_origin(double x, double z) {
+    sync();
+    if (!m_frame_follows) {
+        return;
+    }
+    const double shift_x = RorFrame::snap(x) - m_frame.x;
+    const double shift_z = RorFrame::snap(z) - m_frame.z;
+    shift_frame(shift_x, shift_z);
+}
+
+double RorSolver::frame_origin_x() const {
+    sync();
+    return m_frame.x;
+}
+
+double RorSolver::frame_origin_z() const {
+    sync();
+    return m_frame.z;
+}
+
+void RorSolver::set_node_local_position(int node, const Vector3 &local) {
+    sync();
+    if (node >= 0 && node < static_cast<int>(m_nodes.size())) {
+        m_nodes[static_cast<size_t>(node)].position = local;
+    }
+}
+
+void RorSolver::set_frame_follows(bool follows) {
+    sync();
+    m_frame_follows = follows;
+}
+
+int64_t RorSolver::frame_moves() const {
+    sync();
+    return m_frame_moves;
 }
 
 } // namespace rorgd
