@@ -713,12 +713,17 @@ HLA time management, and Time Warp in parallel discrete event simulation (Jeffer
 
 Two conditions, and the plan is wrong without them:
 
-1. **A hard node-velocity clamp has to exist and the bound must be derived from it.** There is none
-   today. A bad collision launches nodes far above any vehicle's top speed — `drive_route.gd` uses
-   60 m/s as an *explosion* threshold, so nodes do exceed it. Without a clamp the guarantee fails
-   exactly when physics misbehaves, and a missed collision from a violated bound is not
-   reproducible. **This is the first prerequisite of everything in this section**, and it is a small
-   change with a gate attached.
+1. **A hard node-velocity clamp has to exist and the bound must be derived from it.** A bad
+   collision launches nodes far above any vehicle's top speed — `drive_route.gd` uses 60 m/s as an
+   *explosion* threshold, so nodes do exceed it. Without a clamp the guarantee fails exactly when
+   physics misbehaves, and a missed collision from a violated bound is not reproducible. **Built
+   2026-10-10**: `RorSolver::set_speed_limit`, default 277.8 m/s, cuts a node's velocity between
+   the velocity and position updates of `integrate`, so no node travels more than `limit * dt` in
+   a substep; `speed_limit_hits` counts the cuts. Upstream has no such clamp, so this is a
+   divergence, and `no_node_outruns_the_speed_limit` holds both halves of why it is a harmless one:
+   nodes thrown at 2222 m/s travel at most 0.13889 m a substep against 0.13895 allowed (the same
+   throw unlimited travels 2.53 m), and the hero's full-throttle crash into a wall — fastest node
+   61.8 m/s — is cut zero times, so a normal run is the same run to the bit.
 2. **Per-object-class v_max, not a world constant.** A parked truck is 0 until something hits it; a
    jet is 277.8. One global constant prices every pair at the jet rate and throws away most of the
    win.
@@ -806,7 +811,9 @@ actors instead of copied per solver. Most of what makes a persistent world hard 
 
 ### Order of work, and the measurement that decides it
 
-1. **A node-velocity clamp, gated.** Prerequisite for the causality bound to be a theorem.
+1. **A node-velocity clamp, gated.** Prerequisite for the causality bound to be a theorem. Done
+   2026-10-10 (`no_node_outruns_the_speed_limit`); the limit is per solver, so per actor, and
+   every actor still takes the 1000 km/h default until object classes exist.
 2. **Measure before designing further.** Two gates that do not exist and are cheap: the hero truck
    settled at 50 m and at 3915 m from the origin, same probe — does the tyre ring change? And the
    same rig at 1 km, 100 km and 10 000 km — what breaks first, beams, the ground query, vertex
@@ -965,7 +972,7 @@ local milestone, then the two networked ones.
 | C3 | Airplanes and boats | two further physics subsystems: aerofoils, turbojets, turboprops, screwprops, wings, autopilot, buoyancy |
 | C4 | The online repository (§0.9) | second to last. Networked, and the only milestone that writes to a service other people depend on. |
 | C5 | Multiplayer (§0.10) | last. **Client-authoritative state replication, this project's own wire, 64 players. RoRnet retired 2026-10-01**, and §0.10 records the oracle that retirement costs and the four things that replace it. |
-| S1-S7 | Scale (§0.12) | **not scheduled.** A node-velocity clamp, then the two measurements that decide whether any of the rest is urgent, then per-actor frames, islands, certificates, the `precision=double` build, and the seam. §0.12 has the order and the reason step 2 comes before steps 3 to 7. |
+| S1-S7 | Scale (§0.12) | **not scheduled.** A node-velocity clamp (done 2026-10-10), then the two measurements that decide whether any of the rest is urgent, then per-actor frames, islands, certificates, the `precision=double` build, and the seam. §0.12 has the order and the reason step 2 comes before steps 3 to 7. |
 
 Not yet placed in a milestone, and each needs one before it is forgotten: input remapping and force
 feedback, settings persistence, skins and dashboards, content management at archive scale, character

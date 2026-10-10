@@ -53,6 +53,16 @@ public:
     int add_beam(int node_a, int node_b, float rest_length, float spring, float damping);
 
     void set_gravity(const godot::Vector3 &gravity);
+    // A ceiling on every node's speed, in m/s, applied as the velocity is integrated. Upstream
+    // has none; this project needs one because the causality bound of PLAN §0.12 is derived from
+    // it, and a bound that a bad collision can exceed is not a bound. Defaults to 1000 km/h.
+    // Each solver is one actor, so this is the per-actor v_max that section asks for.
+    void set_speed_limit(float metres_per_second);
+    float speed_limit() const;
+    // How many times a node's speed has been cut to the limit since the solver was built. Zero
+    // on any run the limit did not touch, which is how a gate tells a clamp that changed nothing
+    // from one that rewrote the run.
+    int64_t speed_limit_hits() const;
     // A flat hard ground at `height`. Upstream's contact law, not a penalty spring: see
     // ror_ground.h for why that distinction decides whether a rig is stable.
     void set_ground(float height, bool enabled);
@@ -269,6 +279,10 @@ private:
     // call's travel at any speed the solver is stable at, plus a truck's length.
     static constexpr float OBSTACLE_MARGIN_M = 8.0f;
     godot::Vector3 m_gravity = godot::Vector3(0.0f, -9.81f, 0.0f);
+    // PLAN §0.12's v_max: 1000 km/h.
+    static constexpr float DEFAULT_SPEED_LIMIT = 1000.0f / 3.6f;
+    float m_speed_limit = DEFAULT_SPEED_LIMIT;
+    int64_t m_speed_limit_hits = 0;
     float m_ground_height = 0.0f;
     bool m_ground_enabled = false;
     // Upstream's DEFAULT_DRAG.

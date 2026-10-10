@@ -228,6 +228,9 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("add_beam", "node_a", "node_b", "rest_length", "spring", "damping"),
                          &RorSolver::add_beam);
     ClassDB::bind_method(D_METHOD("set_gravity", "gravity"), &RorSolver::set_gravity);
+    ClassDB::bind_method(D_METHOD("set_speed_limit", "metres_per_second"), &RorSolver::set_speed_limit);
+    ClassDB::bind_method(D_METHOD("speed_limit"), &RorSolver::speed_limit);
+    ClassDB::bind_method(D_METHOD("speed_limit_hits"), &RorSolver::speed_limit_hits);
     ClassDB::bind_method(D_METHOD("set_ground", "height", "enabled"), &RorSolver::set_ground);
     ClassDB::bind_method(D_METHOD("set_ground_friction", "adhesion_velocity", "static_friction",
                                   "sliding_friction", "hydrodynamic_friction", "stribeck_velocity", "strength"),

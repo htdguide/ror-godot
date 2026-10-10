@@ -57,6 +57,21 @@ void RorSolver::set_gravity(const Vector3 &gravity) {
     m_gravity = gravity;
 }
 
+void RorSolver::set_speed_limit(float metres_per_second) {
+    sync();
+    m_speed_limit = metres_per_second;
+}
+
+float RorSolver::speed_limit() const {
+    sync();
+    return m_speed_limit;
+}
+
+int64_t RorSolver::speed_limit_hits() const {
+    sync();
+    return m_speed_limit_hits;
+}
+
 void RorSolver::set_ground(float height, bool enabled) {
     sync();
     m_ground_height = height;
@@ -202,10 +217,22 @@ void RorSolver::step_now(float dt, int substeps) {
 // Velocity from the force accumulated last step, then position from the new velocity,
 // then reset the accumulator to gravity. Upstream's order, which is what makes the
 // integrator symplectic and keeps a rig from gaining energy at rest.
+//
+// The speed limit sits between the two, so no node moves further than `limit * dt` in one
+// substep — the property PLAN §0.12's causality bound is built on. The cut leaves a hair of
+// margin under the limit, because scaling a vector by `limit / length` in floats can land an ulp
+// over it, and a bound that is exceeded by an ulp is not a bound.
 void RorSolver::integrate(float dt) {
+    constexpr float CUT_MARGIN = 1.0f - 1.0e-6f;
+    const float limit_squared = m_speed_limit * m_speed_limit;
     for (RorNode &node : m_nodes) {
         if (!node.immovable) {
             node.velocity += node.forces / node.mass * dt;
+            const float speed_squared = static_cast<float>(node.velocity.length_squared());
+            if (speed_squared > limit_squared) {
+                node.velocity *= m_speed_limit / std::sqrt(speed_squared) * CUT_MARGIN;
+                ++m_speed_limit_hits;
+            }
             node.position += node.velocity * dt;
         }
         node.forces = m_gravity * node.mass;

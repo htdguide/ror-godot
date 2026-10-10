@@ -27,11 +27,12 @@ dropped in a content folder unpacked on their own. Trust the commit log over thi
 `tools/gate.sh --gate a,b,c` is sugar for `gate run a b c`; `--cmd "<line>"` runs any console
 command from a shell.
 
-**Two sections were decided on 2026-10-01 and nothing in them is built.** §0.10: client-
+**Two sections were decided on 2026-10-01 and almost nothing in them is built.** §0.10: client-
 authoritative replication on this project's own wire at 64 players; RoRnet compatibility retired.
 §0.12: the scale design (per-actor frames, islands, sleeping, a causality bound from a 1000 km/h
-v_max); its first prerequisite, a hard node-velocity clamp, does not exist. Read §0.12's
-order-of-work first — step 2 is two cheap measurements that decide whether any of it is urgent.
+v_max); its first prerequisite, a hard node-velocity clamp, is in (`RorSolver::set_speed_limit`,
+`no_node_outruns_the_speed_limit`, 2026-10-10). Read §0.12's order-of-work next — step 2 is two
+cheap measurements that decide whether any of the rest is urgent.
 
 **The console.** `tools/play.sh` and `--console` open it; ` or F1 drops it down over whatever is
 running, without pausing it. `help` lists the twelve commands, Tab completes and cycles, Up
@@ -148,11 +149,9 @@ has just stated.
 
 ## The suite is green
 
-162 gates, all green at `d05e809`. The last `--all --every` (156) and `--order-check` (153 twice,
-worst drift 2.2e-7) were on 2026-10-09 before the menu, grass and content work; since then only
-`--all`, and on 2026-10-10 the machine's memory pressure (two VMs swapping) stopped three runs
-early, so the tail ran as `--cmd "gate run …"` batches. **Run `--all --every` and `--order-check`
-on a quiet machine before the next change to anything that renders or steps the solver.**
+163 gates. At the speed-limit commit (2026-10-10, two VMs idle) `--all --every` is 163 of 163 and
+`--order-check` 163 twice with identical verdicts, worst drift 8.8e-8. **Run both on a quiet
+machine before the next change to anything that renders or steps the solver.**
 
 **The mod-library sweep, 2026-10-04 to 2026-10-08.** Twelve downloaded packs and the shipped
 Agora and DAF make a library of 69 vehicles, and nearly every loader convention calibrated on the
