@@ -53,13 +53,14 @@ public:
              float max_contraction, float max_extension, bool force_restricted, bool auto_center,
              bool one_press, bool one_press_center, float engine_coupling, bool needs_engine);
     void set_key(int key, float value);
-    // Upstream's inertia models, by name, and a key's inertia from them: `ActorSpawner::
-    // _ProcessKeyInertia` decides which delays and names a key gets, and a name not among the
-    // models leaves that curve as it was.
-    void add_inertia_model(const std::string &name, const std::vector<float> &x, const std::vector<float> &y);
-    void set_key_inertia(int key, float start_delay, float stop_delay, const std::string &start,
-                         const std::string &stop);
+    // A key's inertia: `ActorSpawner::_ProcessKeyInertia` decides which delays and curves a key
+    // gets, and a null curve leaves that one as it was.
+    void set_key_inertia(int key, float start_delay, float stop_delay, const RorSpline *start,
+                         const RorSpline *stop);
     bool key_has_inertia(int key) const;
+    // Upstream's `SyncReset`: every key let go and every ram's one-press state cleared. Key
+    // inertia is not reset there, so it is not here.
+    void reset();
     bool empty() const { return m_count == 0; }
     int count() const { return m_count; }
 
@@ -75,7 +76,6 @@ public:
 private:
     std::array<RorCommandKey, MAX_COMMAND_KEYS + 1> m_keys{};
     std::vector<RorCommandState> m_states;
-    RorInertiaModels m_models;
     int m_count = 0;
 };
 

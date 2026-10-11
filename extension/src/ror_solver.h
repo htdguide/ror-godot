@@ -172,6 +172,9 @@ public:
     void set_command_inertia(int key, float start_delay, float stop_delay, const godot::String &start,
                              const godot::String &stop);
     bool command_key_has_inertia(int key) const;
+    void set_hydro_inertia(int hydro, float start_delay, float stop_delay, const godot::String &start,
+                           const godot::String &stop);
+    bool hydro_has_inertia(int hydro) const;
     // A generated tyre node, which never collides with its own actor.
     void set_node_tyre(int node);
     // Upstream's self-collisions, on unless `sim_no_self_collisions`, and on here since the owner
@@ -250,6 +253,8 @@ public:
     // (-1, -1) for none.
     godot::Vector2i wheel_differential_wheels(int index);
     godot::Vector2i axle_differential_axles(int index);
+    // How far an axle's differential has wound its two wheels against each other, metres of tread.
+    float wheel_differential_wind(int index);
 
     // --- Drivetrain -------------------------------------------------------------
     void configure_engine(float min_rpm, float max_rpm, float torque, float diff_ratio, float reverse_gear,
@@ -389,6 +394,9 @@ private:
     void substep(float dt, bool first);
     RorCollCabs m_collcabs;
     RorCommands m_commands;
+    // Upstream's `CmdKeyInertiaConfig`, shared by command keys and hydros.
+    RorInertiaModels m_inertia_models;
+    const RorSpline *inertia_model(const godot::String &name) const;
     bool m_self_collision = true;
     int64_t m_self_contacts = 0;
     void integrate(float dt);

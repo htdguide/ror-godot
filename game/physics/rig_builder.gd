@@ -77,6 +77,9 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
     _add_collision_cabs(solver, truck)
 
     _add_bounds(solver, truck)
+    # Upstream's named inertia curves, which command keys and hydros may ask for.
+    if not truck.commands.is_empty() or not truck.hydros.is_empty():
+        InertiaModels.hand_to(solver)
     _add_commands(solver, truck)
     _add_wheels(solver, truck)
     _add_steering(solver, truck)
@@ -241,7 +244,13 @@ static func _add_wheels(solver: RefCounted, truck: TruckParser) -> void:
 
 static func _add_steering(solver: RefCounted, truck: TruckParser) -> void:
     for hydro: Dictionary in truck.hydros:
+        var before: int = solver.hydro_count()
         solver.add_hydro(hydro["beam"] as int, hydro["factor"] as float)
+        # Upstream's `ProcessHydro` gives each hydro its own inertia, by the commands' rule.
+        var inertia: Array = CommandRows.key_inertia(hydro)
+        if not inertia.is_empty() and solver.hydro_count() > before:
+            solver.set_hydro_inertia(solver.hydro_count() - 1, inertia[0] as float, inertia[1] as float,
+                    inertia[2] as String, inertia[3] as String)
 
 
 static func _configure_engine(solver: RefCounted, truck: TruckParser) -> void:
@@ -310,8 +319,6 @@ static func _add_collision_cabs(solver: RefCounted, truck: TruckParser) -> void:
 ## The key-driven rams: upstream's `commands`/`commands2`, each row's beam made a ram. The hero's
 ## doors are four of them, on keys 1 to 4. See `CommandRows` and ror_commands.h.
 static func _add_commands(solver: RefCounted, truck: TruckParser) -> void:
-    if not truck.commands.is_empty():
-        InertiaModels.hand_to(solver)
     for row: Dictionary in truck.commands:
         solver.add_command(
             row["beam"] as int, row["contract_key"] as int, row["extend_key"] as int,

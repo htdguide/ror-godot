@@ -45,25 +45,21 @@ void RorCommands::set_key(int key, float value) {
     }
 }
 
-void RorCommands::add_inertia_model(const std::string &name, const std::vector<float> &x,
-                                    const std::vector<float> &y) {
-    RorSpline spline;
-    for (size_t i = 0; i < std::min(x.size(), y.size()); ++i) {
-        spline.add_point(x[i], y[i]);
+void RorCommands::set_key_inertia(int key, float start_delay, float stop_delay, const RorSpline *start,
+                                  const RorSpline *stop) {
+    if (key >= 1 && key <= MAX_COMMAND_KEYS) {
+        m_keys[static_cast<size_t>(key)].inertia.configure(start_delay, stop_delay, start, stop);
     }
-    m_models[name] = spline;
 }
 
-void RorCommands::set_key_inertia(int key, float start_delay, float stop_delay, const std::string &start,
-                                  const std::string &stop) {
-    if (key < 1 || key > MAX_COMMAND_KEYS) {
-        return;
+void RorCommands::reset() {
+    for (RorCommandKey &key : m_keys) {
+        key.player_input = 0.0f;
+        key.value = 0.0f;
     }
-    auto find = [this](const std::string &name) -> const RorSpline * {
-        const auto it = m_models.find(name);
-        return it == m_models.end() ? nullptr : &it->second;
-    };
-    m_keys[static_cast<size_t>(key)].inertia.configure(start_delay, stop_delay, find(start), find(stop));
+    for (RorCommandState &state : m_states) {
+        state.auto_moving_mode = 0;
+    }
 }
 
 bool RorCommands::key_has_inertia(int key) const {

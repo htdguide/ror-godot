@@ -51,6 +51,15 @@ public:
         m_prepared = true;
         m_axle_diffs.clear();
     }
+    // Upstream's `SyncReset`: no differential wound up.
+    void reset_rotation() {
+        for (RorDifferential &d : m_wheel_diffs) {
+            d.delta_rotation = 0.0f;
+        }
+        for (RorDifferential &d : m_axle_diffs) {
+            d.delta_rotation = 0.0f;
+        }
+    }
     void toggle_wheel_diffs();
     void toggle_axle_diffs();
     int wheel_diff_count() const { return static_cast<int>(m_wheel_diffs.size()); }

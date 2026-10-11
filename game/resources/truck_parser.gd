@@ -388,7 +388,7 @@ func _parse_joint(line: String) -> void:
         errors.append("%s %s: %s" % [_section, row["error"], line])
         return
     if _section == "hydros" and (row["factor"] as float) != 0.0:
-        hydros.append({"beam": beams.size() / 2, "factor": row["factor"] as float})
+        hydros.append(CommandRows.hydro(fields, beams.size() / 2, row["factor"] as float, _inertia))
     CommandRows.collect(_section, fields, beams.size() / 2, commands, _inertia)
     beam_table.record(row)
 

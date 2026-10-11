@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ror_inertia.h"
 #include "ror_node.h"
 
 namespace rorgd {
@@ -30,11 +31,18 @@ public:
     float state() const { return m_state; }
 
     void update(float dt, float road_speed, BeamArray &beams);
+    // Upstream's `hb_inertia`: a hydro's state follows the steering through its own inertia.
+    void set_hydro_inertia(int hydro, float start_delay, float stop_delay, const RorSpline *start,
+                           const RorSpline *stop);
+    bool hydro_has_inertia(int hydro) const;
+    // Upstream's `SyncReset`: the steering straight and each hydro's inertia at rest.
+    void reset();
 
 private:
     struct Hydro {
         int beam = 0;
         float factor = 0.0f;
+        RorKeyInertia inertia;
     };
 
     std::vector<Hydro> m_hydros;

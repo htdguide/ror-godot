@@ -21,6 +21,17 @@ const NO_INERTIA: Dictionary = {"start_delay": 0.0, "stop_delay": 0.0, "start_fu
 
 ## Appends the row's command to `out` when `section` is a command section. `beam` is the index
 ## the row's beam is about to take.
+## A `hydros` row as the steering takes it: {beam, factor, inertia, inertia_defaults}. Upstream's
+## `ParseHydros`: `n1, n2, factor, options, start_delay, stop_delay, start_function, stop_function`.
+static func hydro(fields: PackedStringArray, beam: int, factor: float, defaults: Dictionary) -> Dictionary:
+    var inertia: Dictionary = NO_INERTIA.duplicate()
+    var keys: Array[String] = ["start_delay", "stop_delay", "start_function", "stop_function"]
+    for i: int in 4:
+        if fields.size() > 4 + i:
+            inertia[keys[i]] = fields[4 + i].to_float() if i < 2 else fields[4 + i]
+    return {"beam": beam, "factor": factor, "inertia": inertia, "inertia_defaults": defaults}
+
+
 ## `defaults` is the `set_inertia_defaults` in force, as `inertia_defaults` reads it.
 static func collect(section: String, fields: PackedStringArray, beam: int, out: Array[Dictionary],
         defaults: Dictionary = NO_INERTIA) -> void:

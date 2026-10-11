@@ -37,12 +37,31 @@ void RorSteering::update(float dt, float road_speed, BeamArray &beams) {
         }
     }
     const float state = std::fmax(-1.0f, std::fmin(1.0f, m_state));
-    for (const Hydro &hydro : m_hydros) {
+    for (Hydro &hydro : m_hydros) {
         if (hydro.beam < 0 || hydro.beam >= static_cast<int>(beams.size())) {
             continue;
         }
         RorBeam &beam = beams[static_cast<size_t>(hydro.beam)];
-        beam.rest_length = beam.reference_length * (1.0f - state * hydro.factor);
+        const float own = hydro.inertia.calc(state, dt);
+        beam.rest_length = beam.reference_length * (1.0f - own * hydro.factor);
+    }
+}
+
+void RorSteering::set_hydro_inertia(int hydro, float start_delay, float stop_delay, const RorSpline *start,
+                                    const RorSpline *stop) {
+    if (hydro >= 0 && hydro < count()) {
+        m_hydros[static_cast<size_t>(hydro)].inertia.configure(start_delay, stop_delay, start, stop);
+    }
+}
+
+bool RorSteering::hydro_has_inertia(int hydro) const {
+    return hydro >= 0 && hydro < count() && m_hydros[static_cast<size_t>(hydro)].inertia.active();
+}
+
+void RorSteering::reset() {
+    m_state = 0.0f;
+    for (Hydro &hydro : m_hydros) {
+        hydro.inertia.reset();
     }
 }
 

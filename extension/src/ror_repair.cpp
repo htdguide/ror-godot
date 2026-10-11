@@ -40,6 +40,11 @@ void RorSolver::snapshot_undamaged() {
 // A no-op when there is no snapshot, so a rig built before this existed behaves as it did rather
 // than being silently half-repaired.
 void RorSolver::repair() {
+    // `place` is every spawn, respawn and recovery, which is where upstream's `SyncReset` clears
+    // the controls: steering straight, hydro inertia at rest, keys let go, no differential wound.
+    m_steering.reset();
+    m_commands.reset();
+    m_wheels.differentials().reset_rotation();
     if (m_undamaged_beams.size() != m_beams.size()) {
         return;
     }

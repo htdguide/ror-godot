@@ -196,20 +196,38 @@ void RorSolver::set_command_key(int key, float value) {
 
 void RorSolver::add_inertia_model(const String &name, const PackedFloat32Array &x, const PackedFloat32Array &y) {
     sync();
-    std::vector<float> xs(x.ptr(), x.ptr() + x.size());
-    std::vector<float> ys(y.ptr(), y.ptr() + y.size());
-    m_commands.add_inertia_model(name.utf8().get_data(), xs, ys);
+    RorSpline spline;
+    for (int64_t i = 0; i < std::min(x.size(), y.size()); ++i) {
+        spline.add_point(x[i], y[i]);
+    }
+    m_inertia_models[name.utf8().get_data()] = spline;
+}
+
+const RorSpline *RorSolver::inertia_model(const String &name) const {
+    const auto it = m_inertia_models.find(name.utf8().get_data());
+    return it == m_inertia_models.end() ? nullptr : &it->second;
 }
 
 void RorSolver::set_command_inertia(int key, float start_delay, float stop_delay, const String &start,
                                     const String &stop) {
     sync();
-    m_commands.set_key_inertia(key, start_delay, stop_delay, start.utf8().get_data(), stop.utf8().get_data());
+    m_commands.set_key_inertia(key, start_delay, stop_delay, inertia_model(start), inertia_model(stop));
 }
 
 bool RorSolver::command_key_has_inertia(int key) const {
     sync();
     return m_commands.key_has_inertia(key);
+}
+
+void RorSolver::set_hydro_inertia(int hydro, float start_delay, float stop_delay, const String &start,
+                                  const String &stop) {
+    sync();
+    m_steering.set_hydro_inertia(hydro, start_delay, stop_delay, inertia_model(start), inertia_model(stop));
+}
+
+bool RorSolver::hydro_has_inertia(int hydro) const {
+    sync();
+    return m_steering.hydro_has_inertia(hydro);
 }
 
 void RorSolver::set_node_tyre(int node) {

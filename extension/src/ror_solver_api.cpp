@@ -145,6 +145,12 @@ Vector2i RorSolver::axle_differential_axles(int index) {
     return diff == nullptr ? Vector2i(-1, -1) : Vector2i(diff->a, diff->b);
 }
 
+float RorSolver::wheel_differential_wind(int index) {
+    sync();
+    const RorDifferential *diff = m_wheels.differentials().wheel_diff(index);
+    return diff == nullptr ? 0.0f : diff->delta_rotation;
+}
+
 int RorSolver::wheel_differential_count() {
     sync();
     m_wheels.prepare_differentials();
@@ -324,6 +330,9 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_command_inertia", "key", "start_delay", "stop_delay", "start", "stop"),
                          &RorSolver::set_command_inertia);
     ClassDB::bind_method(D_METHOD("command_key_has_inertia", "key"), &RorSolver::command_key_has_inertia);
+    ClassDB::bind_method(D_METHOD("set_hydro_inertia", "hydro", "start_delay", "stop_delay", "start", "stop"),
+                         &RorSolver::set_hydro_inertia);
+    ClassDB::bind_method(D_METHOD("hydro_has_inertia", "hydro"), &RorSolver::hydro_has_inertia);
     ClassDB::bind_method(D_METHOD("set_self_collision", "enabled"), &RorSolver::set_self_collision);
     ClassDB::bind_method(D_METHOD("self_contact_count"), &RorSolver::self_contact_count);
     ClassDB::bind_method(D_METHOD("set_node_ground_contact", "node", "touches"),
@@ -418,6 +427,7 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("clear_axle_differentials"), &RorSolver::clear_axle_differentials);
     ClassDB::bind_method(D_METHOD("wheel_differential_wheels", "index"), &RorSolver::wheel_differential_wheels);
     ClassDB::bind_method(D_METHOD("axle_differential_axles", "index"), &RorSolver::axle_differential_axles);
+    ClassDB::bind_method(D_METHOD("wheel_differential_wind", "index"), &RorSolver::wheel_differential_wind);
     ClassDB::bind_method(D_METHOD("wheel_differential_count"), &RorSolver::wheel_differential_count);
     ClassDB::bind_method(D_METHOD("axle_differential_count"), &RorSolver::axle_differential_count);
     ClassDB::bind_method(D_METHOD("wheel_differential_type", "index"), &RorSolver::wheel_differential_type);
