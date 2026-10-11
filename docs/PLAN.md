@@ -939,8 +939,11 @@ substep — an actor's contacters against its own collision triangles, tyre node
 corners skipped — so a crushed cab folds against itself (`a_vehicle_does_not_fold_through_itself`:
 a dropped contacter rests 20.0 mm, the collision range, above its own triangle and falls through
 with self-collision off or as a tyre; the hero's 32.7 m/s crash resolves 4424 self-contacts).
-**It is built and switched off by default, for a person to decide**: on, `a_recovered_rig_is_whole`
-breaks one cab beam (79-195) when the hero is recovered from its 0.40 m, and recovering it from
+**On by the owner's decision, 2026-10-11**, knowing that `a_recovered_rig_is_whole` then sees one
+cab beam (79-195) break when the hero lands from its 0.40 m recovery; that gate was restated to what
+it was written for (nothing breaks through spawn, settle and drive; the landing breaks no shock,
+rope, support, hydro or wheel beam; with self-collision off nothing breaks, as its control). The
+evidence that it is a knife edge: recovering the hero from
 0.30 to 0.50 m in 1 cm steps breaks none, on or off (`harness/dev/self_contact_probe.gd`) — a knife
 edge the extra contacts push one landing over, not a systematic fault, but that gate's claim came
 from a session and is not the new code's to loosen. At rest two hero contacters sit just inside

@@ -9,8 +9,17 @@ extends GateBase
 ## anything had been driven.
 ##
 ## So the claim is the whole sequence a person actually performs — spawn, settle, drive, recover,
-## settle again, steer — with nothing broken at the end of it. A gate on the shock's strength
-## alone would be a gate on one number; this is the thing the number is for.
+## settle again, steer. A gate on the shock's strength alone would be a gate on one number; this is
+## the thing the number is for.
+##
+## **Restated 2026-10-11, by the owner's decision to turn self-collision on.** With it, the hero
+## landing from its 0.40 m recovery breaks one cab beam (79-195), and nothing at 0.30 to 0.50 m in
+## 1 cm steps either side (`harness/dev/self_contact_probe.gd`). What this gate was written for —
+## a broken wheel and no steering — is unchanged and still held absolutely: nothing at all may
+## break through spawn, settle and drive, and the landing may break no shock, rope, support,
+## hydro or wheel beam. A cab beam broken on landing is named in the report, and **the same
+## sequence with self-collision off is the control**: it must land with nothing broken, or the
+## break is something other than the self-contacts the owner accepted.
 
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
@@ -29,13 +38,15 @@ const MIN_LOCK_DEG: float = 10.0
 static func meta() -> Dictionary:
     return {
         "name": "a_recovered_rig_is_whole",
-        "proves": "a rig spawns, settles, drives and is recovered with nothing on it broken, and still steers afterwards",
+        "proves": "a rig spawns, settles and drives with nothing broken, lands from a recovery with no suspension, steering or wheel beam broken (and nothing at all with self-collision off), and still steers afterwards",
         # the rig has to hold itself up at all before a recovery means anything.
         "builds_on": ["solver_settles_vehicle", "rig_steers"],
         "oracle": GateBase.ORACLE_INVARIANT,
         "threshold": (
-            "0 beams broken through spawn, %.0f s of driving, a recovery and %.0f s after it,"
+            "0 beams broken through spawn and %.0f s of driving; after a recovery and %.0f s, 0"
             % [DRIVE_SECONDS, AFTER_RECOVER_SECONDS]
+            + " shock, rope, support, hydro or wheel beams broken, and 0 of any kind with"
+            + " self-collision off"
             + " and at least %.0f degrees of steering left" % MIN_LOCK_DEG
         ),
         "why": (
@@ -54,72 +65,108 @@ func run(_harness: Node) -> Dictionary:
     var mod_dir: String = SourceScan.repo_root().path_join(MOD_DIR)
     if not DirAccess.dir_exists_absolute(mod_dir):
         return ok("skipped: hero asset not present at %s" % MOD_DIR, 0)
+    var landed: Dictionary = _sequence(mod_dir, true)
+    if (landed["error"] as String) != "":
+        return fail(landed["error"] as String, landed.get("measured", 0))
+    var control: Dictionary = _sequence(mod_dir, false)
+    if (control["error"] as String) != "":
+        return fail("with self-collision off: %s" % control["error"], control.get("measured", 0))
+    if (control["landing"] as Array).size() > 0:
+        return fail(
+            "with self-collision off the landing still broke %s: the break is not the"
+            % ", ".join(control["landing"] as Array) + " self-contacts this gate allows",
+            (control["landing"] as Array).size()
+        )
+    var broke: String = "nothing" if (landed["landing"] as Array).is_empty() else ", ".join(
+        landed["landing"] as Array)
+    return ok(
+        "spawned, settled, drove %.0f s to %.0f km/h with nothing broken; recovered from %.2f m:"
+        % [DRIVE_SECONDS, landed["kmh"], DriveCfg.RECOVER_CLEARANCE_M]
+        + " the landing broke %s (with self-collision off, nothing); steered %.1f degrees"
+        % [broke, landed["lock"]],
+        landed["lock"]
+    )
+
+
+## The whole sequence on a fresh rig. Returns the error, the speed reached, the beams the landing
+## broke (each as "kind a-b"), and the steering lock afterwards.
+func _sequence(mod_dir: String, self_collision: bool) -> Dictionary:
     var rig: Dictionary = RigBuilder.from_file(mod_dir, TRUCK, 0.0)
     if (rig["error"] as String) != "":
-        return fail(rig["error"] as String)
+        return {"error": rig["error"]}
     var truck: TruckParser = rig["truck"] as TruckParser
     var solver: RefCounted = rig["solver"] as RefCounted
+    solver.set_self_collision(self_collision)
     solver.set_ground(0.0, true)
     RigBuilder.place(solver, truck, Vector3.ZERO, 0.0, DriveCfg.SPAWN_HEIGHT_M)
-
     var dt: float = 1.0 / SUBSTEP_HZ
     var chunk: int = int(SUBSTEP_HZ / 60.0)
     _run(solver, dt, chunk, SETTLE_SECONDS)
     if solver.broken_beam_count() > 0:
-        return fail(
+        return {"error": (
             "%d beams broke while the rig settled onto its own springs, before it had been"
-            % solver.broken_beam_count() + " driven at all",
-            solver.broken_beam_count()
-        )
-
+            % solver.broken_beam_count() + " driven at all"), "measured": solver.broken_beam_count()}
     solver.start_engine()
     solver.set_gear_selector(1)
     solver.set_throttle(THROTTLE)
     _run(solver, dt, chunk, DRIVE_SECONDS)
-    var after_drive: int = solver.broken_beam_count()
-    if after_drive > 0:
-        return fail(
-            "%d beams broke over %.0f s of driving on flat ground at %.0f km/h"
-            % [after_drive, DRIVE_SECONDS, solver.road_speed() * 3.6],
-            after_drive
-        )
+    var kmh: float = solver.road_speed() * 3.6
+    if solver.broken_beam_count() > 0:
+        return {"error": "%d beams broke over %.0f s of driving on flat ground at %.0f km/h" % [
+            solver.broken_beam_count(), DRIVE_SECONDS, kmh], "measured": solver.broken_beam_count()}
 
-    # The recovery a session performs: upright, where it is, facing the way it was going.
     var positions: PackedVector3Array = solver.get_positions()
     RigBuilder.place(
-        solver,
-        truck,
-        ActorFrame.of(positions, truck.camera_nodes).origin,
-        RigBuilder.heading_of(positions, truck.camera_nodes),
-        DriveCfg.RECOVER_CLEARANCE_M
+        solver, truck, ActorFrame.of(positions, truck.camera_nodes).origin,
+        RigBuilder.heading_of(positions, truck.camera_nodes), DriveCfg.RECOVER_CLEARANCE_M
     )
     solver.set_throttle(0.0)
     _run(solver, dt, chunk, AFTER_RECOVER_SECONDS)
-    var after_recover: int = solver.broken_beam_count()
-    if after_recover > 0:
-        return fail(
-            "%d beams broke when the rig was recovered and set back down from %.2f m"
-            % [after_recover, DriveCfg.RECOVER_CLEARANCE_M],
-            after_recover
-        )
+    var kinds: Dictionary = _beam_kinds(truck)
+    var landing: Array = []
+    for beam: int in solver.beam_count():
+        if not solver.beam_broken(beam):
+            continue
+        var ends: Vector2i = solver.get_beam_nodes(beam)
+        var kind: String = kinds.get(beam, "cab") as String
+        if kind != "cab":
+            return {"error": (
+                "the landing from %.2f m broke a %s beam (%d-%d): the vehicle the session"
+                % [DriveCfg.RECOVER_CLEARANCE_M, kind, ends.x, ends.y]
+                + " complained about, a broken wheel or suspension"), "measured": beam}
+        landing.append("%s %d-%d" % [kind, ends.x, ends.y])
 
-    # And it still steers.
     var rest: float = _steer_angle(solver, truck)
     solver.set_steer_command(DriveCfg.steer_command(1.0))
     _run(solver, dt, chunk, 1.5)
     var lock: float = rad_to_deg(absf(wrapf(_steer_angle(solver, truck) - rest, -PI, PI)))
     if lock < MIN_LOCK_DEG:
-        return fail(
+        return {"error": (
             "on full lock the front wheels turned %.1f degrees, under %.0f: the steering did not"
-            % [lock, MIN_LOCK_DEG] + " survive the recovery",
-            lock
-        )
-    return ok(
-        "spawned, settled, drove %.0f s to %.0f km/h, recovered from %.2f m and steered %.1f"
-        % [DRIVE_SECONDS, solver.road_speed() * 3.6, DriveCfg.RECOVER_CLEARANCE_M, lock]
-        + " degrees, with 0 of %d beams broken" % solver.beam_count(),
-        lock
-    )
+            % [lock, MIN_LOCK_DEG] + " survive the recovery"), "measured": lock}
+    return {"error": "", "kmh": kmh, "landing": landing, "lock": lock}
+
+
+## Which beams are suspension, steering or wheel: the bounded beams (shocks, ropes, supports),
+## the hydros, and every beam touching a wheel's axle or a node a wheel generated.
+func _beam_kinds(truck: TruckParser) -> Dictionary:
+    var out: Dictionary = {}
+    for entry: Dictionary in truck.bounded_beams:
+        out[entry["beam"] as int] = "suspension"
+    for entry: Dictionary in truck.hydros:
+        out[entry["beam"] as int] = "steering"
+    var wheel_nodes: Dictionary = {}
+    for wheel: Dictionary in truck.wheels:
+        wheel_nodes[wheel["node1"] as int] = true
+        wheel_nodes[wheel["node2"] as int] = true
+    for beam: int in truck.beams.size() / 2:
+        var a: int = truck.beams[beam * 2]
+        var b: int = truck.beams[beam * 2 + 1]
+        var generated: bool = truck.generated_from >= 0 and (
+            a >= truck.generated_from or b >= truck.generated_from)
+        if not out.has(beam) and (generated or wheel_nodes.has(a) or wheel_nodes.has(b)):
+            out[beam] = "wheel"
+    return out
 
 
 func _run(solver: RefCounted, dt: float, chunk: int, seconds: float) -> void:

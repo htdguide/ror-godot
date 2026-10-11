@@ -13,10 +13,8 @@ extends GateBase
 ## self-collision off the node falls through, and marked as a tyre node it falls through. Then the
 ## hero is driven into a wall, to show that a real rig exercises it, and the count is reported.
 ##
-## **Self-collision is off by default** and this gate switches it on for its own runs. On, the
-## hero recovered from 0.40 m broke one cab beam in `a_recovered_rig_is_whole`, where 0.30 to 0.50 m
-## in 1 cm steps broke none either way (`harness/dev/self_contact_probe.gd`): a knife edge, not a
-## systematic fault, but that gate's claim came from a person and is not this one's to loosen.
+## Self-collision is on by default, the owner's decision (2026-10-11); this gate sets it explicitly
+## so its claims do not depend on the default. See PLAN §0.12 for the recovery beam it costs.
 
 const SUBSTEP_HZ: float = 2000.0
 const DROP_M: float = 0.5

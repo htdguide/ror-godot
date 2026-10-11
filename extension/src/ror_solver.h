@@ -158,9 +158,9 @@ public:
     void set_node_contact_role(int node, bool contacter, bool rim);
     // A generated tyre node, which never collides with its own actor.
     void set_node_tyre(int node);
-    // Upstream's self-collisions, on in upstream unless `sim_no_self_collisions`. **Off here by
-    // default until a person decides**: on, the hero recovered from 0.40 m breaks one cab beam
-    // (79-195) where 0.30-0.50 m in 1 cm steps break none — see PLAN §0.12, splitscreen.
+    // Upstream's self-collisions, on unless `sim_no_self_collisions`, and on here since the owner
+    // decided so (2026-10-11) knowing that the hero recovered from 0.40 m then breaks one cab beam.
+    // Off is a gate's control.
     void set_self_collision(bool enabled);
     // How many self-contacts have been resolved since the solver was built.
     int64_t self_contact_count() const;
@@ -356,7 +356,7 @@ private:
     void begin_steps();
     void substep(float dt, bool first);
     RorCollCabs m_collcabs;
-    bool m_self_collision = false;
+    bool m_self_collision = true;
     int64_t m_self_contacts = 0;
     void integrate(float dt);
     void apply_air_drag();
