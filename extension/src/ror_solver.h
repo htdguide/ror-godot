@@ -166,6 +166,12 @@ public:
     int command_count() const;
     // A command key held (1) or let go (0), as a player's input.
     void set_command_key(int key, float value);
+    // Upstream's named inertia curves (`inertia_models.cfg`), and one key's inertia from them.
+    void add_inertia_model(const godot::String &name, const godot::PackedFloat32Array &x,
+                           const godot::PackedFloat32Array &y);
+    void set_command_inertia(int key, float start_delay, float stop_delay, const godot::String &start,
+                             const godot::String &stop);
+    bool command_key_has_inertia(int key) const;
     // A generated tyre node, which never collides with its own actor.
     void set_node_tyre(int node);
     // Upstream's self-collisions, on unless `sim_no_self_collisions`, and on here since the owner

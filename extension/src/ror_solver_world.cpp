@@ -194,6 +194,24 @@ void RorSolver::set_command_key(int key, float value) {
     m_commands.set_key(key, value);
 }
 
+void RorSolver::add_inertia_model(const String &name, const PackedFloat32Array &x, const PackedFloat32Array &y) {
+    sync();
+    std::vector<float> xs(x.ptr(), x.ptr() + x.size());
+    std::vector<float> ys(y.ptr(), y.ptr() + y.size());
+    m_commands.add_inertia_model(name.utf8().get_data(), xs, ys);
+}
+
+void RorSolver::set_command_inertia(int key, float start_delay, float stop_delay, const String &start,
+                                    const String &stop) {
+    sync();
+    m_commands.set_key_inertia(key, start_delay, stop_delay, start.utf8().get_data(), stop.utf8().get_data());
+}
+
+bool RorSolver::command_key_has_inertia(int key) const {
+    sync();
+    return m_commands.key_has_inertia(key);
+}
+
 void RorSolver::set_node_tyre(int node) {
     sync();
     m_collcabs.set_tyre(node, m_nodes.size());

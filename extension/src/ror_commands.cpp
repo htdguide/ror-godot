@@ -45,6 +45,31 @@ void RorCommands::set_key(int key, float value) {
     }
 }
 
+void RorCommands::add_inertia_model(const std::string &name, const std::vector<float> &x,
+                                    const std::vector<float> &y) {
+    RorSpline spline;
+    for (size_t i = 0; i < std::min(x.size(), y.size()); ++i) {
+        spline.add_point(x[i], y[i]);
+    }
+    m_models[name] = spline;
+}
+
+void RorCommands::set_key_inertia(int key, float start_delay, float stop_delay, const std::string &start,
+                                  const std::string &stop) {
+    if (key < 1 || key > MAX_COMMAND_KEYS) {
+        return;
+    }
+    auto find = [this](const std::string &name) -> const RorSpline * {
+        const auto it = m_models.find(name);
+        return it == m_models.end() ? nullptr : &it->second;
+    };
+    m_keys[static_cast<size_t>(key)].inertia.configure(start_delay, stop_delay, find(start), find(stop));
+}
+
+bool RorCommands::key_has_inertia(int key) const {
+    return key >= 1 && key <= MAX_COMMAND_KEYS && m_keys[static_cast<size_t>(key)].inertia.active();
+}
+
 RorCommands::Power RorCommands::update(BeamArray &beams, float dt, bool engine_running,
                                        bool hydraulics_ready, float crank_factor) {
     Power power;
@@ -136,7 +161,9 @@ RorCommands::Power RorCommands::update(BeamArray &beams, float dt, bool engine_r
                     state.auto_moving_mode = 0;
                 }
             }
-            // Key inertia is not read, so the input acts at once.
+            // Upstream runs the key's inertia once per ram on the key, so a key driving two rams
+            // ramps twice as fast; kept, because it is what the vehicles were tuned against.
+            v = key.inertia.calc(v, dt);
             if (dir * state.auto_moving_mode > 0) {
                 v = 1.0f;
             }

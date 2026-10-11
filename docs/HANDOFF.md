@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-174 gates; `--all --every` 174 of 174 at the parallel islands commit (2026-10-11). `--order-check` has one
+175 gates; `--all --every` 175 of 175 at the key inertia commit (2026-10-11). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 
@@ -298,7 +298,7 @@ What M1 still owes is human: 5 below.
   No transfer case yet; the four laws have no bit-parity case in `tools/parity` yet.
 - `commands`/`commands2` are rams now (`ror_commands.cpp`, upstream's `CalcCommands` with priming):
   keys 1-0 in the solo window, the hero's doors on 1-4 (`a_ram_moves_by_its_rate_and_stops_at_its_bounds`).
-  Key inertia and the `r` rope option are not read.
+  Key inertia ported (`a_command_key_ramps_by_…`); not yet hydro inertia, its respawn reset, `r` ropes.
 - Traction control and ABS are not implemented; neither is declared by the hero rig.
 - A vehicle that declares no `materialflarebindings` has no lit lamp glass, which is upstream's
   behaviour too — the hero truck declares none, so its lamps are the sprite and the beam and its

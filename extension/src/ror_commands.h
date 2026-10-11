@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ror_inertia.h"
 #include "ror_node.h"
 
 #include <array>
@@ -39,6 +40,7 @@ struct RorCommandKey {
     std::vector<RorCommandBeam> beams;
     float player_input = 0.0f;
     float value = 0.0f;
+    RorKeyInertia inertia;
 };
 
 // The key-driven rams of one actor: upstream's `Actor::CalcCommands`, beams only (rotators are not
@@ -51,6 +53,13 @@ public:
              float max_contraction, float max_extension, bool force_restricted, bool auto_center,
              bool one_press, bool one_press_center, float engine_coupling, bool needs_engine);
     void set_key(int key, float value);
+    // Upstream's inertia models, by name, and a key's inertia from them: `ActorSpawner::
+    // _ProcessKeyInertia` decides which delays and names a key gets, and a name not among the
+    // models leaves that curve as it was.
+    void add_inertia_model(const std::string &name, const std::vector<float> &x, const std::vector<float> &y);
+    void set_key_inertia(int key, float start_delay, float stop_delay, const std::string &start,
+                         const std::string &stop);
+    bool key_has_inertia(int key) const;
     bool empty() const { return m_count == 0; }
     int count() const { return m_count; }
 
@@ -66,6 +75,7 @@ public:
 private:
     std::array<RorCommandKey, MAX_COMMAND_KEYS + 1> m_keys{};
     std::vector<RorCommandState> m_states;
+    RorInertiaModels m_models;
     int m_count = 0;
 };
 

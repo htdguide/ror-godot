@@ -310,6 +310,8 @@ static func _add_collision_cabs(solver: RefCounted, truck: TruckParser) -> void:
 ## The key-driven rams: upstream's `commands`/`commands2`, each row's beam made a ram. The hero's
 ## doors are four of them, on keys 1 to 4. See `CommandRows` and ror_commands.h.
 static func _add_commands(solver: RefCounted, truck: TruckParser) -> void:
+    if not truck.commands.is_empty():
+        InertiaModels.hand_to(solver)
     for row: Dictionary in truck.commands:
         solver.add_command(
             row["beam"] as int, row["contract_key"] as int, row["extend_key"] as int,
@@ -319,6 +321,12 @@ static func _add_commands(solver: RefCounted, truck: TruckParser) -> void:
             row["one_press_center"] as bool, row["affect_engine"] as float,
             row["needs_engine"] as bool
         )
+        # Both keys of the row take its inertia, as upstream's `_ProcessKeyInertia` gives them.
+        var inertia: Array = CommandRows.key_inertia(row)
+        if not inertia.is_empty():
+            for key: String in ["contract_key", "extend_key"]:
+                solver.set_command_inertia(row[key] as int, inertia[0] as float, inertia[1] as float,
+                        inertia[2] as String, inertia[3] as String)
 
 
 ## Upstream's `ProcessAxle` and `ProcessInterAxle`. An axle finds each wheel by its two axle nodes,

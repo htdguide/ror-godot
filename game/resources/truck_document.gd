@@ -96,6 +96,7 @@ func read(text: String) -> void:
     # yield stress below upstream's 400 kN floor — see `BeamDefaults.CREAK`.
     var advanced: bool = false
     var node_defaults: NodeRows.Defaults = NodeRows.Defaults.new()
+    var inertia: Dictionary = CommandRows.NO_INERTIA
     var started: bool = false
     for raw: String in text.split("\n"):
         var line: String = TruckLexer.strip(raw)
@@ -114,7 +115,7 @@ func read(text: String) -> void:
         if directive == "":
             if TruckLexer.is_section_header(line, section):
                 section = line.to_lower()
-                _append(section, line, true, beams, node_defaults)
+                _append(section, line, true, beams, node_defaults, inertia)
                 continue
             if TruckLexer.is_metadata(line):
                 continue
@@ -133,10 +134,12 @@ func read(text: String) -> void:
                 beams.read_scale(arguments)
             elif directive == "set_node_defaults":
                 node_defaults = NodeRows.parse_defaults(arguments, node_defaults)
+            elif directive == "set_inertia_defaults":
+                inertia = CommandRows.inertia_defaults(arguments, inertia)
             # Every other directive is recognised so that it is not mistaken for data. Acting
             # on them is a separate job; being silently parsed as geometry is the bug.
             continue
-        _append(section, line, false, beams, node_defaults)
+        _append(section, line, false, beams, node_defaults, inertia)
 
 
 ## The rows in the order upstream spawns them, with the file's order kept inside each section.
@@ -159,7 +162,7 @@ func order_of(section: String) -> int:
 
 func _append(
     section: String, line: String, header: bool, beams: BeamDefaults,
-    node_defaults: NodeRows.Defaults
+    node_defaults: NodeRows.Defaults, inertia: Dictionary
 ) -> void:
     rows.append({
         "section": section,
@@ -169,4 +172,5 @@ func _append(
         "at": rows.size(),
         "beams": beams,
         "nodes": node_defaults,
+        "inertia": inertia,
     })

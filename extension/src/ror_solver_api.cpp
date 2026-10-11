@@ -320,6 +320,10 @@ void RorSolver::_bind_methods() {
                          &RorSolver::add_command);
     ClassDB::bind_method(D_METHOD("command_count"), &RorSolver::command_count);
     ClassDB::bind_method(D_METHOD("set_command_key", "key", "value"), &RorSolver::set_command_key);
+    ClassDB::bind_method(D_METHOD("add_inertia_model", "name", "x", "y"), &RorSolver::add_inertia_model);
+    ClassDB::bind_method(D_METHOD("set_command_inertia", "key", "start_delay", "stop_delay", "start", "stop"),
+                         &RorSolver::set_command_inertia);
+    ClassDB::bind_method(D_METHOD("command_key_has_inertia", "key"), &RorSolver::command_key_has_inertia);
     ClassDB::bind_method(D_METHOD("set_self_collision", "enabled"), &RorSolver::set_self_collision);
     ClassDB::bind_method(D_METHOD("self_contact_count"), &RorSolver::self_contact_count);
     ClassDB::bind_method(D_METHOD("set_node_ground_contact", "node", "touches"),

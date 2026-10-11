@@ -15,11 +15,15 @@ extends RefCounted
 ## by the engine's crank factor when it draws on the engine (`affect_engine` > 0, the default).
 
 const SECTIONS: PackedStringArray = ["commands", "commands2"]
+## Upstream's `Inertia` before any `set_inertia_defaults`: no delay, no curves.
+const NO_INERTIA: Dictionary = {"start_delay": 0.0, "stop_delay": 0.0, "start_function": "", "stop_function": ""}
 
 
 ## Appends the row's command to `out` when `section` is a command section. `beam` is the index
 ## the row's beam is about to take.
-static func collect(section: String, fields: PackedStringArray, beam: int, out: Array[Dictionary]) -> void:
+## `defaults` is the `set_inertia_defaults` in force, as `inertia_defaults` reads it.
+static func collect(section: String, fields: PackedStringArray, beam: int, out: Array[Dictionary],
+        defaults: Dictionary = NO_INERTIA) -> void:
     if not SECTIONS.has(section):
         return
     var two: bool = section == "commands2"
@@ -46,6 +50,8 @@ static func collect(section: String, fields: PackedStringArray, beam: int, out: 
         "description": "",
         "affect_engine": 1.0,
         "needs_engine": true,
+        "inertia": NO_INERTIA.duplicate(),
+        "inertia_defaults": defaults,
     }
     at += 4
     if fields.size() > at:
@@ -54,7 +60,12 @@ static func collect(section: String, fields: PackedStringArray, beam: int, out: 
     if fields.size() > at:
         row["description"] = fields[at]
         at += 1
-    # Four inertia fields, which shape how a key's input ramps; not modelled, so a key acts at once.
+    # Upstream's `ParseOptionalInertia`: start and stop delay factors, then start and stop curves.
+    var inertia: Dictionary = row["inertia"] as Dictionary
+    var keys: Array[String] = ["start_delay", "stop_delay", "start_function", "stop_function"]
+    for i: int in 4:
+        if fields.size() > at + i:
+            inertia[keys[i]] = fields[at + i].to_float() if i < 2 else fields[at + i]
     at += 4
     if fields.size() > at:
         row["affect_engine"] = fields[at].to_float()
@@ -93,3 +104,41 @@ static func _truth(field: String) -> bool:
         if value.begins_with(prefix):
             return true
     return false
+
+
+## Upstream's `ParseDirectiveSetInertiaDefaults`: `start, stop, start_function, stop_function`, the
+## curves kept from the defaults before when not given; a negative delay restores no inertia.
+static func inertia_defaults(arguments: PackedStringArray, before: Dictionary) -> Dictionary:
+    if arguments.is_empty():
+        return before
+    var start: float = arguments[0].to_float()
+    var stop: float = arguments[1].to_float() if arguments.size() > 1 else 0.0
+    if start < 0.0 or stop < 0.0:
+        return NO_INERTIA
+    var out: Dictionary = before.duplicate()
+    out["start_delay"] = start
+    out["stop_delay"] = stop
+    if arguments.size() > 2:
+        out["start_function"] = arguments[2]
+    if arguments.size() > 3:
+        out["stop_function"] = arguments[3]
+    return out
+
+
+## Upstream's `ActorSpawner::_ProcessKeyInertia`: the row's own inertia when both its delays are
+## set, else the defaults when either of theirs is positive, else nothing. "/" and "-" are a row's
+## placeholders for no curve. Returns [start_delay, stop_delay, start_function, stop_function], or
+## an empty array for leaving the key as it is.
+static func key_inertia(row: Dictionary) -> Array:
+    var own: Dictionary = row["inertia"] as Dictionary
+    var defaults: Dictionary = row["inertia_defaults"] as Dictionary
+    if float(own["start_delay"]) != 0.0 and float(own["stop_delay"]) != 0.0:
+        return [own["start_delay"], own["stop_delay"], _curve(own["start_function"]), _curve(own["stop_function"])]
+    if float(defaults["start_delay"]) > 0.0 or float(defaults["stop_delay"]) > 0.0:
+        return [defaults["start_delay"], defaults["stop_delay"], defaults["start_function"], defaults["stop_function"]]
+    return []
+
+
+static func _curve(name: Variant) -> String:
+    var text: String = str(name)
+    return "" if text == "/" or text == "-" else text

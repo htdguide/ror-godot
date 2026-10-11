@@ -1860,8 +1860,8 @@ milestone the `mod_corpus` gate from M1 acceptance 5 belongs to, and it is where
 asserting "loads or fails cleanly" and starts asserting fidelity per section.
 
 Scope, vehicles:
-- **Every section a ground rig uses.** The named gaps today: command key inertia and the `r` rope
-  option (the rams themselves move since 2026-10-11, keys 1-0), the transfer case (differentials
+- **Every section a ground rig uses.** The named gaps today: hydro inertia and the `r` rope option
+  (rams move and command keys ramp by their inertia since 2026-10-11), the transfer case (differentials
   are in since 2026-10-11),
   `fusedrag` given per-node drag instead of a fuselage vector, traction control and ABS absent,
   flares placed but not animated.

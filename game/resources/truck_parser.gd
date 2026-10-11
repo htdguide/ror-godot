@@ -131,6 +131,7 @@ var node_defaults: NodeRows.Defaults = NodeRows.Defaults.new()
 ## flexbody wheel builds its tread at these rather than at the tyre's — tread is carcass.
 var beam_defaults: BeamDefaults = BeamDefaults.new()
 var _section: String = ""
+var _inertia: Dictionary = CommandRows.NO_INERTIA
 
 
 func parse_file(path: String) -> String:
@@ -168,6 +169,7 @@ func parse_text(text: String) -> String:
             continue
         beam_defaults = row["beams"] as BeamDefaults
         node_defaults = row["nodes"] as NodeRows.Defaults
+        _inertia = row.get("inertia", CommandRows.NO_INERTIA) as Dictionary
         _parse_row(row["line"] as String)
     if not generated:
         _generate_wheels()
@@ -387,7 +389,7 @@ func _parse_joint(line: String) -> void:
         return
     if _section == "hydros" and (row["factor"] as float) != 0.0:
         hydros.append({"beam": beams.size() / 2, "factor": row["factor"] as float})
-    CommandRows.collect(_section, fields, beams.size() / 2, commands)
+    CommandRows.collect(_section, fields, beams.size() / 2, commands, _inertia)
     beam_table.record(row)
 
 
