@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-182 gates; `--all --every` 182 of 182 at the yield-table commit (2026-10-12). `--order-check` has one
+183 gates; `--all --every` 183 of 183 at the differential parity commit (2026-10-12). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 
@@ -295,7 +295,7 @@ What M1 still owes is human: 5 below.
   gates `a_vehicle_collides_with_…`, `a_node_marked_c_…`, `a_vehicle_does_not_fold_…`).
 - Differentials are upstream's (`ror_differentials.cpp`): `axles`/`interaxles` rows, the automatic
   viscous ones of a rig naming none, V/J switch them (`a_differential_shares_torque_by_its_kind`).
-  `transfercase` too, T/Y for 4WD and range (`a_transfer_case_drives_…`); no parity case for the laws.
+  `transfercase` too, T/Y for 4WD and range; the laws hold to upstream's (`differential_laws_…`).
 - `commands`/`commands2` are rams now (`ror_commands.cpp`, upstream's `CalcCommands` with priming):
   keys 1-0 in the solo window, the hero's doors on 1-4 (`a_ram_moves_by_its_rate_and_stops_at_its_bounds`).
   Key and hydro inertia and the respawn reset are upstream's (`a_hydro_follows_…`); `r` rams are ropes.
@@ -308,9 +308,9 @@ What M1 still owes is human: 5 below.
 ## Checking against Rigs of Rods itself
 
 `tools/build_parity.sh` extracts functions from the pinned upstream submodule, compiles them on their
-own against a shim in `tools/parity/shim/`, and `upstream_contact_parity` and `shocks2_and_shocks3_…`
-compare them with ours case by case. Nothing is copied into the tree; a rename upstream fails extraction rather than comparing
-against a stale copy.
+own against a shim in `tools/parity/shim/`; the contact, shock and differential parity gates compare
+them with ours case by case, both built with `-ffp-contract=off` (no fused multiply-adds). Nothing is
+copied into the tree; a rename upstream fails extraction rather than comparing against a stale copy.
 
 **Upstream's physics is not exact arithmetic and must not be implemented as though it were.**
 `approx_exp` is three integer operations on a float's bit pattern; `fast_invSqrt` is the Quake

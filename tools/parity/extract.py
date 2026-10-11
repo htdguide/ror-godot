@@ -29,6 +29,10 @@ WANTED = [
         "main/physics/Actor.cpp",
         "void Actor::CalcShocks3(int i, Real difftoBeamL, Real &k, Real& d, Real v)",
     ),
+    ("main/physics/Differentials.cpp", "void Differential::CalcSeparateDiff(DifferentialData& diff_data)"),
+    ("main/physics/Differentials.cpp", "void Differential::CalcOpenDiff(DifferentialData& diff_data)"),
+    ("main/physics/Differentials.cpp", "void Differential::CalcViscousDiff(DifferentialData& diff_data)"),
+    ("main/physics/Differentials.cpp", "void Differential::CalcLockedDiff(DifferentialData& diff_data)"),
 ]
 
 PROLOGUE = """// GENERATED — do not edit. Produced by tools/parity/extract.py from the pinned
@@ -38,6 +42,7 @@ PROLOGUE = """// GENERATED — do not edit. Produced by tools/parity/extract.py 
 
 #include "rig_types.h"
 #include "actor_shocks.h"
+#include "differentials.h"
 #include "ApproxMath.h"
 
 #include <algorithm>

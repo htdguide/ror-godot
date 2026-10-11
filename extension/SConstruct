@@ -15,6 +15,11 @@ env = SConscript("../vendor/godot-cpp/SConstruct")
 # stale-root trap is recorded for `res://` in docs/guides/hard-won-facts.md.
 
 env.Append(CPPPATH=["src/"])
+# No fused multiply-adds. Clang fuses `a * b + c` on arm64 by default, which rounds once where
+# upstream's x86-64 builds (no FMA in the baseline ISA) round twice; with cancellation, as in a
+# locked differential's torsion, that is a 2e-6 difference from upstream's own arithmetic. The
+# parity oracle is built the same way (`tools/build_parity.sh`).
+env.Append(CCFLAGS=["-ffp-contract=off"])
 sources = Glob("src/*.cpp")
 
 library = env.SharedLibrary(

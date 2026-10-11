@@ -15,9 +15,15 @@
 // with the row's rates in its order: shocks2 springin dampin sprogin dprogin springout dampout
 // sprogout dprogout; shocks3 springin dampin dslowin splitin dfastin springout dampout dslowout
 // splitout dfastout.
+//
+// A line starting `diff` runs one of `Differential`'s four laws:
+//
+//   in:  diff <s|o|v|l> speed0 speed1 in_torque dt delta_rotation
+//   out: out_torque0 out_torque1 delta_rotation
 
 #include "rig_types.h"
 #include "actor_shocks.h"
+#include "differentials.h"
 
 #include <sstream>
 #include <vector>
@@ -70,10 +76,36 @@ static bool run_shock(const std::string &line) {
     return true;
 }
 
+// One differential case; false if the line is malformed.
+static bool run_diff(const std::string &line) {
+    char type = 0;
+    RoR::DifferentialData data{};
+    if (std::sscanf(line.c_str(), "diff %c %f %f %f %f %f", &type, &data.speed[0], &data.speed[1], &data.in_torque,
+                    &data.dt, &data.delta_rotation) != 6) {
+        return false;
+    }
+    switch (type) {
+    case 's': RoR::Differential::CalcSeparateDiff(data); break;
+    case 'o': RoR::Differential::CalcOpenDiff(data); break;
+    case 'v': RoR::Differential::CalcViscousDiff(data); break;
+    case 'l': RoR::Differential::CalcLockedDiff(data); break;
+    default: return false;
+    }
+    std::printf("%.9g %.9g %.9g\n", data.out_torque[0], data.out_torque[1], data.delta_rotation);
+    return true;
+}
+
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("diff", 0) == 0) {
+            if (!run_diff(line)) {
+                std::fprintf(stderr, "oracle: malformed diff case: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("shock", 0) == 0) {

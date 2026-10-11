@@ -232,6 +232,21 @@ int RorSolver::driven_wheel_count() {
     return m_wheels.driven_count();
 }
 
+PackedFloat32Array RorSolver::differential_probe(const String &type, float speed_a, float speed_b, float in_torque,
+                                                float dt, float wind) const {
+    RorDifferential diff;
+    diff.types = RorDifferentials::parse_types(type.utf8().get_data());
+    diff.delta_rotation = wind;
+    float out_a = 0.0f;
+    float out_b = 0.0f;
+    diff.split(speed_a, speed_b, in_torque, dt, out_a, out_b);
+    PackedFloat32Array out;
+    out.push_back(out_a);
+    out.push_back(out_b);
+    out.push_back(diff.delta_rotation);
+    return out;
+}
+
 int RorSolver::wheel_differential_count() {
     sync();
     m_wheels.prepare_differentials();
@@ -513,6 +528,8 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("wheel_differential_wheels", "index"), &RorSolver::wheel_differential_wheels);
     ClassDB::bind_method(D_METHOD("axle_differential_axles", "index"), &RorSolver::axle_differential_axles);
     ClassDB::bind_method(D_METHOD("wheel_differential_wind", "index"), &RorSolver::wheel_differential_wind);
+    ClassDB::bind_method(D_METHOD("differential_probe", "type", "speed_a", "speed_b", "in_torque", "dt", "wind"),
+                         &RorSolver::differential_probe);
     ClassDB::bind_method(D_METHOD("wheel_differential_count"), &RorSolver::wheel_differential_count);
     ClassDB::bind_method(D_METHOD("set_transfer_case", "axle_1", "axle_2", "has_2wd", "has_2wd_lo", "ratios"),
                          &RorSolver::set_transfer_case);

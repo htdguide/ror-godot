@@ -268,6 +268,10 @@ public:
     godot::Vector2i axle_differential_axles(int index);
     // How far an axle's differential has wound its two wheels against each other, metres of tread.
     float wheel_differential_wind(int index);
+    // Runs one differential law (`type` s, o, v or l) on the given speeds, torque and wind, and
+    // returns [out_a, out_b, wind after], for comparison against upstream's laws case by case.
+    godot::PackedFloat32Array differential_probe(const godot::String &type, float speed_a, float speed_b,
+                                                 float in_torque, float dt, float wind) const;
     // Upstream's transfer case, axles counted from 0 in file order and `axle_2` -1 for none;
     // `ratios` start with 1, as upstream's parser starts them. False if upstream would skip it.
     bool set_transfer_case(int axle_1, int axle_2, bool has_2wd, bool has_2wd_lo,
