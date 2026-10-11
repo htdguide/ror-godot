@@ -240,6 +240,10 @@ public:
     int axle_differential_count();
     godot::String wheel_differential_type(int index);
     godot::String axle_differential_type(int index);
+    // The two wheels an axle's differential joins, or the two axles one between axles joins;
+    // (-1, -1) for none.
+    godot::Vector2i wheel_differential_wheels(int index);
+    godot::Vector2i axle_differential_axles(int index);
 
     // --- Drivetrain -------------------------------------------------------------
     void configure_engine(float min_rpm, float max_rpm, float torque, float diff_ratio, float reverse_gear,

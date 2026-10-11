@@ -58,6 +58,13 @@ public:
     // The active type of a differential, as upstream's letter, or 0 for none.
     char wheel_diff_type(int index) const;
     char axle_diff_type(int index) const;
+    // What a differential joins: two wheels for an axle's, two axles for one between axles.
+    const RorDifferential *wheel_diff(int index) const {
+        return index >= 0 && index < wheel_diff_count() ? &m_wheel_diffs[static_cast<size_t>(index)] : nullptr;
+    }
+    const RorDifferential *axle_diff(int index) const {
+        return index >= 0 && index < axle_diff_count() ? &m_axle_diffs[static_cast<size_t>(index)] : nullptr;
+    }
 
     static std::vector<DiffType> parse_types(const char *letters);
 

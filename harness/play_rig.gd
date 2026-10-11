@@ -56,6 +56,8 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
     _map.name = Harness.args.get_string("terrain-dir", BuildProfile.default_map())
     DisplayServer.window_set_title("ror-godot [%s]" % BuildProfile.label())
     _hud = PlayHud.build(self)
+    DiffPanel.attach(_hud, func() -> RefCounted:
+        return _drive.solver if _drive != null and _split == null else null)
     if not vehicle.is_empty():
         # `--vehicle <dir>:<file>` is how a session names one; the library keys on the basename.
         _vehicle_name = Harness.args.get_string("vehicle", "").get_slice(":", 1).get_basename()

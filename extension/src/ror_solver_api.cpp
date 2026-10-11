@@ -131,6 +131,20 @@ void RorSolver::clear_axle_differentials() {
     m_wheels.differentials().clear_axle_diffs();
 }
 
+Vector2i RorSolver::wheel_differential_wheels(int index) {
+    sync();
+    m_wheels.prepare_differentials();
+    const RorDifferential *diff = m_wheels.differentials().wheel_diff(index);
+    return diff == nullptr ? Vector2i(-1, -1) : Vector2i(diff->a, diff->b);
+}
+
+Vector2i RorSolver::axle_differential_axles(int index) {
+    sync();
+    m_wheels.prepare_differentials();
+    const RorDifferential *diff = m_wheels.differentials().axle_diff(index);
+    return diff == nullptr ? Vector2i(-1, -1) : Vector2i(diff->a, diff->b);
+}
+
 int RorSolver::wheel_differential_count() {
     sync();
     m_wheels.prepare_differentials();
@@ -398,6 +412,8 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("toggle_wheel_differentials"), &RorSolver::toggle_wheel_differentials);
     ClassDB::bind_method(D_METHOD("toggle_axle_differentials"), &RorSolver::toggle_axle_differentials);
     ClassDB::bind_method(D_METHOD("clear_axle_differentials"), &RorSolver::clear_axle_differentials);
+    ClassDB::bind_method(D_METHOD("wheel_differential_wheels", "index"), &RorSolver::wheel_differential_wheels);
+    ClassDB::bind_method(D_METHOD("axle_differential_axles", "index"), &RorSolver::axle_differential_axles);
     ClassDB::bind_method(D_METHOD("wheel_differential_count"), &RorSolver::wheel_differential_count);
     ClassDB::bind_method(D_METHOD("axle_differential_count"), &RorSolver::axle_differential_count);
     ClassDB::bind_method(D_METHOD("wheel_differential_type", "index"), &RorSolver::wheel_differential_type);
