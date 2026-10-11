@@ -29,6 +29,8 @@ WANTED = [
         "main/physics/Actor.cpp",
         "void Actor::CalcShocks3(int i, Real difftoBeamL, Real &k, Real& d, Real v)",
     ),
+    ("main/physics/ActorForcesEuler.cpp", "void Actor::CalcBeams(bool trigger_hooks)"),
+    ("main/physics/Actor.cpp", "int Actor::GetNumActiveConnectedBeams(int nodeid)"),
     ("main/physics/Differentials.cpp", "void Differential::CalcSeparateDiff(DifferentialData& diff_data)"),
     ("main/physics/Differentials.cpp", "void Differential::CalcOpenDiff(DifferentialData& diff_data)"),
     ("main/physics/Differentials.cpp", "void Differential::CalcViscousDiff(DifferentialData& diff_data)"),

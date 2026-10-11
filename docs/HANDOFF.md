@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-184 gates; `--all --every` 184 of 184 at the tyre support commit (2026-10-12). `--order-check` has one
+185 gates; `--all --every` 185 of 185 at the beam pass parity commit (2026-10-12). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 
@@ -308,7 +308,7 @@ What M1 still owes is human: 5 below.
 ## Checking against Rigs of Rods itself
 
 `tools/build_parity.sh` extracts functions from the pinned upstream submodule, compiles them on their
-own against a shim in `tools/parity/shim/`; the contact, shock and differential parity gates compare
+own against a shim in `tools/parity/shim/`; the contact, shock, differential and beam pass gates compare
 them with ours case by case, both built with `-ffp-contract=off` (no fused multiply-adds). Nothing is
 copied into the tree; a rename upstream fails extraction rather than comparing against a stale copy.
 

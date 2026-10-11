@@ -237,6 +237,9 @@ public:
     float get_beam_length(int beam) const;
     // The force along the beam last substep, signed as upstream's `beam.stress`: negative pulls.
     float get_beam_stress(int beam) const;
+    // Runs the beam pass alone `passes` times, forces cleared before each and nothing integrated,
+    // and returns every node's force: upstream's `CalcBeams`, for comparison case by case.
+    godot::PackedVector3Array beam_pass_probe(int passes);
 
     // --- Wheels -----------------------------------------------------------------
     // `first_tread` and `tread_count` name the generated tread nodes, which alternate

@@ -316,8 +316,9 @@ void RorSolver::accumulate_beam_forces() {
         float damping = beam.damping;
         apply_bound_law(beam, extension, closing_speed, spring, damping);
         float stress = -spring * extension - damping * closing_speed;
-        stress = apply_beam_deformation(beam, extension, spring, stress, m_nodes);
+        // Kept before deformation softens it, as upstream keeps `beam.stress`.
         beam.stress = stress;
+        stress = apply_beam_deformation(beam, extension, spring, stress, m_nodes);
         if (beam.broken) {
             continue;
         }

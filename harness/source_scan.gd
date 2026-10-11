@@ -6,8 +6,10 @@ extends RefCounted
 ## our source only: third-party code under addons/ and vendor/ is not ours to lint, and
 ## linting it would produce failures nobody is allowed to fix.
 
+## `build` is generated output, never source: the parity oracle writes upstream's functions there,
+## extracted from `vendor/`, and they are upstream's size, not ours.
 const SKIP_DIRS: Array[String] = [
-    ".godot", "addons", "vendor", ".git", "artifacts", "history", "assets", "bin",
+    ".godot", "addons", "vendor", ".git", "artifacts", "history", "assets", "bin", "build",
 ]
 
 

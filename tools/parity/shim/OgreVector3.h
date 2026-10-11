@@ -44,6 +44,8 @@ struct Vector3 {
     Vector3 operator*(float s) const { return Vector3(x * s, y * s, z * s); }
     Vector3 operator-() const { return Vector3(-x, -y, -z); }
     Vector3 &operator+=(const Vector3 &o) { x += o.x; y += o.y; z += o.z; return *this; }
+    Vector3 &operator-=(const Vector3 &o) { x -= o.x; y -= o.y; z -= o.z; return *this; }
+    Vector3 &operator*=(float s) { x *= s; y *= s; z *= s; return *this; }
 };
 
 inline Vector3 operator*(float s, const Vector3 &v) { return v * s; }

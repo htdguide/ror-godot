@@ -16,6 +16,15 @@
 // sprogout dprogout; shocks3 springin dampin dslowin splitin dfastin springout dampout dslowout
 // splitout dfastout.
 //
+// A line starting `beams` runs `Actor::CalcBeams` on the rig that follows, `passes` times with
+// the forces cleared before each and the nodes left where they are:
+//
+//   in:  beams passes node_count beam_count
+//        node x y z vx vy vz cab                                  (node_count lines)
+//        beam p1 p2 L k d bounded bm_type shortbound longbound sbd_spring sbd_damp deform
+//             strength plastic_coef                               (beam_count lines)
+//   out: one line per node: fx fy fz; then one per beam: L stress strength broken
+//
 // A line starting `diff` runs one of `Differential`'s four laws:
 //
 //   in:  diff <s|o|v|l> speed0 speed1 in_torque dt delta_rotation
@@ -95,10 +104,81 @@ static bool run_diff(const std::string &line) {
     return true;
 }
 
+// One rig of beams; false if the block is malformed.
+static bool run_beams(const std::string &header) {
+    int passes = 0, node_count = 0, beam_count = 0;
+    if (std::sscanf(header.c_str(), "beams %d %d %d", &passes, &node_count, &beam_count) != 3) {
+        return false;
+    }
+    std::vector<node_t> nodes(static_cast<size_t>(node_count));
+    std::vector<shock_t> shocks(static_cast<size_t>(beam_count));
+    RoR::Actor actor;
+    actor.beams.resize(static_cast<size_t>(beam_count));
+    actor.ar_node_to_beam_connections.resize(static_cast<size_t>(node_count));
+    std::string line;
+    for (int i = 0; i < node_count; ++i) {
+        int cab = 0;
+        node_t &n = nodes[static_cast<size_t>(i)];
+        if (!std::getline(std::cin, line) ||
+            std::sscanf(line.c_str(), "node %f %f %f %f %f %f %d", &n.RelPosition.x, &n.RelPosition.y,
+                        &n.RelPosition.z, &n.Velocity.x, &n.Velocity.y, &n.Velocity.z, &cab) != 7) {
+            return false;
+        }
+        n.nd_cab_node = cab != 0;
+        n.pos = i;
+    }
+    for (int i = 0; i < beam_count; ++i) {
+        int p1 = 0, p2 = 0, bounded = 0, type = 0;
+        float deform = 0;
+        beam_t &b = actor.beams[static_cast<size_t>(i)];
+        shock_t &shock = shocks[static_cast<size_t>(i)];
+        if (!std::getline(std::cin, line) ||
+            std::sscanf(line.c_str(), "beam %d %d %f %f %f %d %d %f %f %f %f %f %f %f", &p1, &p2, &b.L, &b.k, &b.d,
+                        &bounded, &type, &b.shortbound, &b.longbound, &shock.sbd_spring, &shock.sbd_damp, &deform,
+                        &b.strength, &b.plastic_coef) != 14) {
+            return false;
+        }
+        b.p1 = &nodes[static_cast<size_t>(p1)];
+        b.p2 = &nodes[static_cast<size_t>(p2)];
+        b.bounded = static_cast<SpecialBeam>(bounded);
+        b.bm_type = static_cast<BeamType>(type);
+        // As upstream's spawner sets them (`SetBeamDeformationThreshold`).
+        b.maxposstress = deform;
+        b.maxnegstress = -deform;
+        b.minmaxposnegstress = deform;
+        b.shock = &shock;
+        actor.ar_node_to_beam_connections[static_cast<size_t>(p1)].push_back(i);
+        actor.ar_node_to_beam_connections[static_cast<size_t>(p2)].push_back(i);
+    }
+    actor.ar_beams = actor.beams.data();
+    actor.ar_num_beams = beam_count;
+    actor.ar_nodes = nodes.data();
+    for (int pass = 0; pass < passes; ++pass) {
+        for (node_t &n : nodes) {
+            n.Forces = Ogre::Vector3(0.0f, 0.0f, 0.0f);
+        }
+        actor.CalcBeams(false);
+    }
+    for (const node_t &n : nodes) {
+        std::printf("%.9g %.9g %.9g\n", n.Forces.x, n.Forces.y, n.Forces.z);
+    }
+    for (const beam_t &b : actor.beams) {
+        std::printf("%.9g %.9g %.9g %d\n", b.L, b.stress, b.strength, b.bm_broken ? 1 : 0);
+    }
+    return true;
+}
+
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("beams", 0) == 0) {
+            if (!run_beams(line)) {
+                std::fprintf(stderr, "oracle: malformed beams block: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("diff", 0) == 0) {

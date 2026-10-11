@@ -17,6 +17,11 @@ struct node_t {
     float nd_avg_collision_slip = 0.0f;
     Ogre::Vector3 nd_last_collision_slip;
     Ogre::Vector3 nd_last_collision_force;
+    // What `Actor::CalcBeams` reads.
+    Ogre::Vector3 RelPosition;
+    Ogre::Vector3 Velocity;
+    bool nd_cab_node = false;
+    int pos = 0;
 };
 
 // Upstream's ground_model_t, reduced to the fields the contact law reads. The defaults are

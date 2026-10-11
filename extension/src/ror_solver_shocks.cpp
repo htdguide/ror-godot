@@ -121,6 +121,21 @@ float RorSolver::get_beam_stress(int beam) const {
     return m_beams[static_cast<size_t>(beam)].stress;
 }
 
+PackedVector3Array RorSolver::beam_pass_probe(int passes) {
+    sync();
+    for (int pass = 0; pass < passes; ++pass) {
+        for (RorNode &node : m_nodes) {
+            node.forces = Vector3();
+        }
+        accumulate_beam_forces();
+    }
+    PackedVector3Array out;
+    for (const RorNode &node : m_nodes) {
+        out.push_back(node.forces);
+    }
+    return out;
+}
+
 Vector2 RorSolver::shock_law_probe(int kind, const PackedFloat32Array &rates, bool soft_bump,
                                    const PackedFloat32Array &beam, float extension, float v) const {
     const BeamBound bound = static_cast<BeamBound>(kind);

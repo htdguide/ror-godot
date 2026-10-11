@@ -1862,6 +1862,7 @@ asserting "loads or fails cleanly" and starts asserting fidelity per section.
 Scope, vehicles:
 - **Every section a ground rig uses.** The named gaps today (rams move, ramp by
   their inertia and honour `r` ropes; differentials and the transfer case are in, 2026-10-11/12):
+  detacher groups (`detacher_group`, `wheeldetachers`: a broken beam taking its group with it),
   `fusedrag` given per-node drag instead of a fuselage vector, traction control and ABS absent,
   flares placed but not animated.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
