@@ -10,6 +10,8 @@ extends Node
 ## the tree under GPL and therefore present on any clone.
 
 const HUD_REFRESH_FRAMES: int = 10
+## With `--frame-log`, how many frames go into each printed line of frame times.
+const FRAME_LOG_FRAMES: int = 300
 
 var _camera: Camera3D
 var _world: Node3D
@@ -35,6 +37,9 @@ var _main_menu: MainMenu = null
 var _solid: PlaySolid = PlaySolid.new()
 ## A second driver and a split picture, with `--split`. See `PlaySplit`.
 var _split: PlaySplit = null
+## Frame times since the last `--frame-log` line, in milliseconds.
+var _frame_ms: PackedFloat32Array = PackedFloat32Array()
+var _frame_clock: int = 0
 
 
 ## `vehicle` is a VehicleBuilder result, or empty when no vehicle was loaded. With one, the
@@ -125,9 +130,12 @@ func _process(delta: float) -> void:
     if _split != null:
         _split.finish(delta, _frames % HUD_REFRESH_FRAMES == 0)
     _frames += 1
+    if Harness.args.has_flag("frame-log"):
+        _log_frame()
     if _hud.visible and _frames % HUD_REFRESH_FRAMES == 0:
         _hud.text = PlayHud.text(
-            get_viewport(), _weather.current(), PlayHud.footer(_drive if _split == null else null)
+            get_viewport() if _split == null else _split.left_view(), _weather.current(),
+            PlayHud.footer(_drive if _split == null else null)
         )
 
 
@@ -358,3 +366,25 @@ func _apply_graphics() -> void:
     _graphics.apply(get_viewport(), _world, _map.vegetation)
     if _split != null:
         _split.copy_graphics(get_viewport())
+
+
+## One line every `FRAME_LOG_FRAMES` frames with `--frame-log`: the median and worst frame, the
+## 3D resolution drawn and the solver's share. A session on a machine nobody here can watch — a
+## Windows PC reporting "fullscreen is slow" — can paste the lines instead of describing them.
+func _log_frame() -> void:
+    # The wall clock, not `delta`: Godot smooths `delta` towards whole display intervals, and a log
+    # read off it showed a split window at a steady 10.0 ms with VSync off.
+    var now: int = Time.get_ticks_usec()
+    if _frame_clock > 0:
+        _frame_ms.append(float(now - _frame_clock) / 1000.0)
+    _frame_clock = now
+    if _frame_ms.size() < FRAME_LOG_FRAMES:
+        return
+    _frame_ms.sort()
+    var viewport: Viewport = get_viewport()
+    var rows: float = viewport.get_visible_rect().size.y * viewport.scaling_3d_scale
+    print("PLAY  frames: median %.1f ms, worst %.1f ms over %d; 3D drawn at %d rows%s; solver %.2f ms" % [
+        _frame_ms[_frame_ms.size() / 2], _frame_ms[_frame_ms.size() - 1], _frame_ms.size(),
+        int(rows), " x2 (split)" if _split != null else "",
+        float(_drive.solver_usec) / 1000.0 if _drive != null else 0.0])
+    _frame_ms.clear()

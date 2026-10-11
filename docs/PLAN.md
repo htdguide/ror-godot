@@ -943,6 +943,19 @@ did not: a window taken fullscreen by its title bar kept the scale of the size i
 first wants `the_frame_costs_what_each_feature_costs` run with a split window before anything is
 changed.
 
+**Measured and fixed the same day.** `--frame-log` prints the median and worst wall-clock frame
+every 300 frames (Godot's `delta` is smoothed towards display intervals and read a split window as
+a steady 10.0 ms). On La Paz at 1118 rows, VSync off: one view 13.1 ms, split 25.8 — twice, for the
+same pixel count. Script work was 1.5 and 2.7 ms; trials in the window (SSAO off -2.8, sun shadows
+off -3.5, 2 cascades 0, sky radiance incremental -1.1, glow -0.5, LOD x4 0, halves at 0.75 scale
+-3.5) each moved little, and a quarter-size window kept the ratio, so the cost was per view. **It
+was a third view**: the root viewport went on drawing the world under the two halves although its
+camera was switched off. `disable_3d` on the root: **split 15.4 ms against one view 13.0**.
+`the_split_frame_costs_what_each_half_costs` tables what the halves cost (a gate container's
+viewport does stop drawing with its camera off, so that fault is the window's alone). What is left
+of the gap is per-view work — the shadow cascades, SSAO and the sky are drawn per half — and a
+person can buy it back with Resolution.
+
 ### 0.13 Seeing a long way: the whole map, whatever size it is
 
 **Asked for 2026-10-02, and clarified the same day:** see the far parts of the map — mountains,

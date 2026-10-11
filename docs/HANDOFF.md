@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-166 gates; `--all --every` 166 of 166 at the collision commit (2026-10-11). `--order-check` has one
+167 gates; `--all --every` 167 of 167 at the split-performance commit (2026-10-11). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 

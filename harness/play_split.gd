@@ -65,9 +65,7 @@ func setup(world: Node3D, camera: Camera3D, driver: PlayDrive, vehicle_spec: Str
 func place_second() -> void:
     if first == null or second == null:
         return
-    var right: Vector3 = Basis(Vector3.UP, first.spawn_heading) * Vector3.RIGHT
-    second.spawn = first.spawn + right * SIDE_BY_SIDE_M
-    second.spawn_heading = first.spawn_heading
+    _spawn_beside_first()
     second.respawn()
 
 
@@ -76,9 +74,7 @@ func place_second() -> void:
 func hand_terrain(wanted: RorTerrain, data: Object) -> void:
     if second == null:
         return
-    var right: Vector3 = Basis(Vector3.UP, first.spawn_heading) * Vector3.RIGHT
-    second.spawn = first.spawn + right * SIDE_BY_SIDE_M
-    second.spawn_heading = first.spawn_heading
+    _spawn_beside_first()
     second.solver.set_gravity(Vector3(0.0, wanted.gravity(), 0.0))
     # Taking the terrain puts the rig down at its spawn, which is why the spawn is set first.
     var error: String = second.use_terrain(data)
@@ -86,6 +82,17 @@ func hand_terrain(wanted: RorTerrain, data: Object) -> void:
         printerr("PLAY  the second solver could not take the terrain: " + error)
         return
     RorObjectCollision.apply(wanted, second.solver)
+
+
+## The second vehicle's spawn: beside the first along the first's own sideways axis, read off its
+## pose. The spawn heading alone was not enough: a map's start states a position, the heading
+## stays zero, and on La Paz "to the right of heading zero" put the second truck behind the first.
+func _spawn_beside_first() -> void:
+    var side: Vector3 = Vector3(first.frame.basis.x.x, 0.0, first.frame.basis.x.z)
+    if side.length() < 0.1:
+        side = Basis(Vector3.UP, first.spawn_heading) * Vector3.RIGHT
+    second.spawn = first.spawn + side.normalized() * SIDE_BY_SIDE_M
+    second.spawn_heading = first.spawn_heading
 
 
 ## The first vehicle changed (the menu swapped it): the new one drives the left half.
@@ -112,9 +119,18 @@ func finish(delta: float, refresh_hud: bool) -> void:
     var half_width: float = get_viewport().get_visible_rect().size.x * 0.5
     for half: int in _views.size():
         _views[half].follow(drivers[half], delta)
-        _labels[half].position.x = HUD_MARGIN_PX + half_width * half
+        # At the foot of each half: the session's own readout owns the top-left corner.
+        _labels[half].position = Vector2(
+            HUD_MARGIN_PX + half_width * half,
+            get_viewport().get_visible_rect().size.y - _labels[half].size.y - HUD_MARGIN_PX
+        )
         if refresh_hud and drivers[half] != null:
             _labels[half].text = drivers[half].hud_line()
+
+
+## The left half's viewport, for a readout of draw calls: the root viewport draws no 3D in a split.
+func left_view() -> Viewport:
+    return _ports[0] if not _ports.is_empty() else get_viewport()
 
 
 ## A key goes to whichever driver owns it. Returns whether one did.
@@ -180,6 +196,11 @@ func _build_halves(camera: Camera3D) -> void:
         _views.append(view)
         _labels.append(label)
     camera.current = false
+    # **And the root viewport stops drawing 3D at all.** Switching its camera off was supposed to
+    # be enough and was not: it went on rendering the world a third time under the two halves.
+    # Measured on La Paz at 1118 rows, split went from 26.1 ms a frame to 15.6, against 13.1 for
+    # one view. The world itself lives on — the halves hold it — and the root keeps the 2D on top.
+    camera.get_viewport().disable_3d = true
     copy_graphics(camera.get_viewport())
 
 
