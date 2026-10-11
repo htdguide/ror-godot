@@ -51,18 +51,23 @@ void RorCollCabs::prepare(const NodeArray &nodes, const BeamArray &beams) {
     }
     // `UpdateCollcabContacterNodes`: a node is contactable when the file names it a contacter,
     // when it is on a collision triangle or a rim, and every node is when the actor has no
-    // triangles at all. (Upstream also excludes nodes with option `c`, no ground contact; that
-    // option is not read yet.)
-    contactable.assign(nodes.size(), count() == 0 ? 1 : 0);
+    // triangles at all — and never a node with option `c`, no ground contact, unless it is a
+    // contacter.
+    contactable.assign(nodes.size(), 0);
     rim.resize(nodes.size(), 0);
     contacter.resize(nodes.size(), 0);
+    std::vector<uint8_t> on_triangle(nodes.size(), 0);
     for (int node : triangles) {
         if (node >= 0 && static_cast<size_t>(node) < nodes.size()) {
-            contactable[static_cast<size_t>(node)] = 1;
+            on_triangle[static_cast<size_t>(node)] = 1;
         }
     }
+    // A contacter always; otherwise only a node that touches ground, and then if it is on a
+    // collision triangle or a rim, or the actor has no triangles at all.
     for (size_t i = 0; i < nodes.size(); ++i) {
-        if (rim[i] || contacter[i]) {
+        if (contacter[i]) {
+            contactable[i] = 1;
+        } else if (!nodes[i].no_ground_contact && (on_triangle[i] || rim[i] || count() == 0)) {
             contactable[i] = 1;
         }
     }

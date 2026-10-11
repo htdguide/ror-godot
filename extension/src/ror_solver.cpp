@@ -438,7 +438,7 @@ void RorSolver::apply_ground_contact(float dt) {
     const bool sloped = m_heightfield.enabled();
     const Vector3 flat_normal(0.0f, 1.0f, 0.0f);
     for (RorNode &node : m_nodes) {
-        if (node.immovable) {
+        if (node.immovable || node.no_ground_contact) {
             continue;
         }
         const float ground = sloped ? m_heightfield.height_at(node.position) : m_ground_height;

@@ -239,6 +239,8 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_node_contact_role", "node", "contacter", "rim"),
                          &RorSolver::set_node_contact_role);
     ClassDB::bind_method(D_METHOD("contactable_count"), &RorSolver::contactable_count);
+    ClassDB::bind_method(D_METHOD("set_node_ground_contact", "node", "touches"),
+                         &RorSolver::set_node_ground_contact);
     ClassDB::bind_method(D_METHOD("set_collision_range", "metres"), &RorSolver::set_collision_range);
     ClassDB::bind_method(D_METHOD("get_beam_damping", "beam"), &RorSolver::get_beam_damping);
     ClassDB::bind_method(D_METHOD("set_beam_damping", "beam", "damping"), &RorSolver::set_beam_damping);

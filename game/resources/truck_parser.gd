@@ -110,6 +110,9 @@ var slide_nodes: Array[Dictionary] = []
 ## both collide with other vehicles' cabs. See `RigBuilder._add_collision_cabs`.
 var contacters: PackedInt32Array = PackedInt32Array()
 var rim_nodes: PackedInt32Array = PackedInt32Array()
+## Nodes with upstream's option `c` (no ground contact), and every cinecam node, which upstream
+## makes so whatever the file says.
+var no_ground_contact: PackedInt32Array = PackedInt32Array()
 var sections_seen: Dictionary = {}
 var sections_parsed: Dictionary = {}
 var errors: PackedStringArray = PackedStringArray()
@@ -293,6 +296,8 @@ func _parse_node(line: String) -> void:
         return
     if bool(row["loaded"]) and not bool(row["has_mass"]):
         cargo_share_nodes.append(nodes.size())
+    if bool(row["no_ground_contact"]):
+        no_ground_contact.append(nodes.size())
     _register(row["id"] as String)
     node_ids.append(row["id"] as String)
     nodes.append(row["position"] as Vector3)

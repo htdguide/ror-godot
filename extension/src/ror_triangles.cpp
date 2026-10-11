@@ -103,7 +103,7 @@ void apply_triangle_forces(NodeArray &nodes, const RorTriangleSet &triangles,
         return;
     }
     for (RorNode &node : nodes) {
-        if (node.immovable) {
+        if (node.immovable || node.no_ground_contact) {
             continue;
         }
         float penetration = 0.0f;

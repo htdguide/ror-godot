@@ -153,9 +153,15 @@ static func place(
     # "after pressing R car is resetting but it is broken, doors and wheels fall of".
     solver.repair()
     var upright: Basis = Basis(Vector3.UP, heading)
+    # The rig's lowest node that touches ground: upstream leaves `c` nodes out of a spawn's height,
+    # and one hanging below the rest would otherwise hold the whole vehicle up off the ground.
     var lowest: float = INF
-    for node: Vector3 in truck.nodes:
-        lowest = minf(lowest, (upright * node).y)
+    for index: int in truck.nodes.size():
+        if truck.no_ground_contact.has(index):
+            continue
+        lowest = minf(lowest, (upright * truck.nodes[index]).y)
+    if lowest == INF:
+        lowest = 0.0
     # **The ground is the higher of the heightfield and whatever the caller says it stands on.**
     # This used to be the heightfield alone, so `origin.y` was read for x and z and thrown away
     # for height — which was harmless while a terrain's objects were barely solid, and is not
@@ -284,3 +290,5 @@ static func _add_collision_cabs(solver: RefCounted, truck: TruckParser) -> void:
         solver.set_node_contact_role(node, true, false)
     for node: int in truck.rim_nodes:
         solver.set_node_contact_role(node, false, true)
+    for node: int in truck.no_ground_contact:
+        solver.set_node_ground_contact(node, false)

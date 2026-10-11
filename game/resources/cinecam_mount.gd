@@ -22,6 +22,8 @@ extends RefCounted
 ## Adds the node and its beams to `truck`. `row` is `CameraRows.read_cinecam`'s.
 static func build(truck: TruckParser, row: Dictionary) -> void:
     var at: int = truck.nodes.size()
+    # Upstream hard-codes a cinecam node as touching no ground (`ProcessCinecam`).
+    truck.no_ground_contact.append(truck.nodes.size())
     truck.register_generated("@cinecam%d" % truck.cinecams.size())
     truck.nodes.append(row["position"] as Vector3)
     # **Its own weight, not a share of the rig's.** The spawner leaves this node out of its mass

@@ -156,6 +156,8 @@ public:
     // Which of a node's contact roles the file gives it: a `contacters` row, or a flexbody
     // wheel's rim. Either makes it hit other vehicles' collision triangles.
     void set_node_contact_role(int node, bool contacter, bool rim);
+    // Upstream's node option `c`: false lets the node pass through the ground and the scenery.
+    void set_node_ground_contact(int node, bool touches);
     // How many nodes other vehicles' triangles can hit, by upstream's rule.
     int contactable_count();
     // Upstream's `set_collision_range`; 0.02 m unless a file says otherwise.

@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-168 gates; `--all --every` 168 of 168 at the contacters commit (2026-10-11). `--order-check` has one
+169 gates; `--all --every` 169 of 169 at the no-ground-contact commit (2026-10-11). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 
@@ -291,8 +291,8 @@ What M1 still owes is human: 5 below.
 
 - The hero truck declares a `fusedrag` section. Upstream gives such a rig a single fuselage drag
   vector instead of the per-node drag it currently gets.
-- Node option `c` (no ground contact) is unread; `contacters` and flexbody rims are read and hit
-  other vehicles (`a_vehicle_collides_with_the_nodes_its_file_names`).
+- `contacters`, flexbody rims and node option `c` (no ground contact, also every cinecam) are read
+  (`a_vehicle_collides_with_the_nodes_its_file_names`, `a_node_marked_c_touches_no_ground`).
 - Differentials are not modelled. The hero rig's are all split, and a split differential chain
   reduces to the division `ror_wheels` already does, so this is invisible on this rig and wrong on
   one with locked or open diffs.

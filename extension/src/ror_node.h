@@ -32,6 +32,9 @@ struct RorNode {
     // than a beam that should have snapped.
     bool cab_node = false;
     int active_beams = 0;
+    // Upstream's `nd_no_ground_contact`, node option `c` and every cinecam node: the node passes
+    // through the ground and the scenery and other vehicles' triangles do not test it.
+    bool no_ground_contact = false;
 };
 
 // How a beam behaves outside the travel it was given. Upstream's `bounded` field.

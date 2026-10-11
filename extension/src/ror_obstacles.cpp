@@ -166,7 +166,8 @@ void apply_obstacle_forces(NodeArray &nodes, const RorObstacles &obstacles,
         return;
     }
     for (RorNode &node : nodes) {
-        if (node.immovable) {
+        // Upstream's `CalcNodes` skips both terrain and scenery for a node marked `c`.
+        if (node.immovable || node.no_ground_contact) {
             continue;
         }
         float penetration = 0.0f;

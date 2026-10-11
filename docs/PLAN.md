@@ -930,9 +930,12 @@ triangle corner's share of the force (the third law broken once) drifts 1.2% and
 Contactable nodes are upstream's rule from the file since the same day — `contacters` rows (now
 parsed), collision-triangle nodes and `flexbodywheels` rims: the hero has 196 (7 contacters on no
 triangle), the Mazda 626 286 (96 rims), held by `a_vehicle_collides_with_the_nodes_its_file_names`
-against the rule applied to the parsed file, with and without the contacters and rims. Not yet:
-lockstep islands on workers (serial today; separate actors already run on two cores), node option
-`c` (no ground contact, which the rule also reads), intra-actor collision, sleeping.
+against the rule applied to the parsed file, with and without the contacters and rims. Node option
+`c` (no ground contact) is read too, from the row or `set_node_defaults`, and every cinecam node
+gets it as upstream's does: such a node skips the ground, boxes and triangles, leaves the spawn's
+height alone and is not contactable (`a_node_marked_c_touches_no_ground`; 15 library vehicles mark
+nodes `c`). Not yet: lockstep islands on workers (serial today; separate actors already run on two
+cores), intra-actor collision, sleeping.
 `meshwheels2` tyres are not contactable upstream either, so the hero's wheels pass into the other
 truck until the bodies meet.
 
@@ -1842,8 +1845,7 @@ milestone the `mod_corpus` gate from M1 acceptance 5 belongs to, and it is where
 asserting "loads or fails cleanly" and starts asserting fidelity per section.
 
 Scope, vehicles:
-- **Every section a ground rig uses.** The named gaps today: node option `c` (no ground contact),
-  `commands2` not key-driven so doors do not open, differentials not modelled,
+- **Every section a ground rig uses.** The named gaps today: `commands2` not key-driven so doors do not open, differentials not modelled,
   `fusedrag` given per-node drag instead of a fuselage vector, traction control and ABS absent,
   flares placed but not animated.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.

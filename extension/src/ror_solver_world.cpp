@@ -171,6 +171,14 @@ void RorSolver::set_node_contact_role(int node, bool contacter, bool rim) {
     m_collcabs.set_roles(node, m_nodes.size(), contacter, rim);
 }
 
+void RorSolver::set_node_ground_contact(int node, bool touches) {
+    sync();
+    if (node >= 0 && node < static_cast<int>(m_nodes.size())) {
+        m_nodes[static_cast<size_t>(node)].no_ground_contact = !touches;
+        m_collcabs.prepared_nodes = 0;
+    }
+}
+
 int RorSolver::contactable_count() {
     sync();
     m_collcabs.prepare(m_nodes, m_beams);

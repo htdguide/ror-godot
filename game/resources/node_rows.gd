@@ -26,11 +26,14 @@ class Defaults:
     ## distribution rather than from the directive.
     var load_weight: float = -1.0
     var friction: float = FRICTION_DEFAULT
+    ## The option letters every node after the directive takes as well as its own.
+    var options: String = ""
 
     func duplicate_defaults() -> Defaults:
         var copy: Defaults = Defaults.new()
         copy.load_weight = load_weight
         copy.friction = friction
+        copy.options = options
         return copy
 
 
@@ -42,6 +45,8 @@ static func parse_defaults(fields: PackedStringArray, current: Defaults) -> Defa
         out.load_weight = fields[0].to_float()
     if fields.size() >= 2 and fields[1].to_float() >= 0.0:
         out.friction = fields[1].to_float()
+    if fields.size() >= 5:
+        out.options = _letters_of(fields[4])
     return out
 
 
@@ -59,10 +64,15 @@ static func row(fields: PackedStringArray, defaults: Defaults) -> Dictionary:
         "mass": defaults.load_weight,
         "has_mass": defaults.load_weight >= 0.0,
         "loaded": defaults.load_weight >= 0.0,
+        # Upstream's `c`, NO_GROUND_CONTACT: the node passes through the ground and the scenery,
+        # and other vehicles' triangles do not test it. From the row or from `set_node_defaults`.
+        "no_ground_contact": defaults.options.contains("c"),
     }
     if fields.size() < 5:
         return out
     var options: String = _letters_of(fields[4])
+    if options.contains("c"):
+        out["no_ground_contact"] = true
     if not options.contains("l"):
         return out
     out["loaded"] = true
