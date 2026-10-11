@@ -198,6 +198,9 @@ static func _generate_flexbody(truck: TruckParser, wheel: Dictionary) -> void:
         ray = ray.rotated(axis, step)
         rim_inner.append(_add_node(truck, origin_b + ray, node_mass, friction))
         ray = ray.rotated(axis, step)
+    # Upstream's `nd_rim_node`: a flexbody wheel's rim collides with other vehicles' cabs.
+    truck.rim_nodes.append_array(rim_outer)
+    truck.rim_nodes.append_array(rim_inner)
 
     # The tyre ring starts half a ray round from the rim ring: upstream turns its ray vector once
     # before the loop, which is what interleaves the two rings instead of stacking them.

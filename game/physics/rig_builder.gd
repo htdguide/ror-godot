@@ -280,3 +280,7 @@ static func _add_collision_cabs(solver: RefCounted, truck: TruckParser) -> void:
             solver.add_collision_cab(
                 triangles[index * 3], triangles[index * 3 + 1], triangles[index * 3 + 2]
             )
+    for node: int in truck.contacters:
+        solver.set_node_contact_role(node, true, false)
+    for node: int in truck.rim_nodes:
+        solver.set_node_contact_role(node, false, true)

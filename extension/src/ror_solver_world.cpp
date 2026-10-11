@@ -166,6 +166,17 @@ int RorSolver::collision_cab_count() const {
     return static_cast<int>(m_collcabs.count());
 }
 
+void RorSolver::set_node_contact_role(int node, bool contacter, bool rim) {
+    sync();
+    m_collcabs.set_roles(node, m_nodes.size(), contacter, rim);
+}
+
+int RorSolver::contactable_count() {
+    sync();
+    m_collcabs.prepare(m_nodes, m_beams);
+    return static_cast<int>(m_collcabs.contactable_count());
+}
+
 void RorSolver::set_collision_range(float metres) {
     sync();
     m_collcabs.range = metres;

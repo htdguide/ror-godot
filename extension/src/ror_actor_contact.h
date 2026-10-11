@@ -28,6 +28,8 @@ struct RorCollCabs {
     // Per node: may this node hit another actor's triangles. Upstream's `nd_contactable`: every
     // node of a collision triangle, every rim node, and every node of an actor with no triangles.
     std::vector<uint8_t> contactable;
+    // Per node, as the file says: a `contacters` row, or a rim node of a flexbody wheel.
+    std::vector<uint8_t> contacter;
     std::vector<uint8_t> rim;
     // Per node: the nodes a beam joins it to, for the back-face vote.
     std::vector<std::vector<int>> neighbours;
@@ -35,6 +37,8 @@ struct RorCollCabs {
     size_t prepared_beams = 0;
 
     void add(int no, int na, int nb);
+    void set_roles(int node, size_t node_count, bool is_contacter, bool is_rim);
+    size_t contactable_count() const;
     // Rebuilds `contactable` and `neighbours` if the rig has grown since they were built.
     void prepare(const NodeArray &nodes, const BeamArray &beams);
     size_t count() const { return triangles.size() / 3; }

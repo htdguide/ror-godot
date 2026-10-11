@@ -691,8 +691,7 @@ Without this the beams become exact while `RorHeightfield::height_at` keeps doin
 world magnitude.
 
 **Actor-to-actor contact** converts one actor into the other's frame for that contact only: bounded
-error, no shared state, no merge event. Free today, because actors do not collide with each other
-yet — `contacters` is unparsed.
+error, no shared state, no merge event. Built 2026-10-11 in `RorWorld`; see "Splitscreen" below.
 
 ### The causality bound
 
@@ -928,10 +927,14 @@ overload). `two_vehicles_collide`: 200 m apart two islands and 6 m one; 90 frame
 without contact bit-equal to stepping alone; a truck thrown at a floating one at 8 m/s hands over
 69.1% of its momentum with the total conserved to 0.000%, and none without the world; dropping one
 triangle corner's share of the force (the third law broken once) drifts 1.2% and fails it.
-Not yet: lockstep islands on workers (serial today; separate actors already run on two cores),
-contacters and rim nodes (`contacters` unparsed; `meshwheels2` tyres are not contactable upstream
-either, so a wheel passes into the other truck until the bodies meet), intra-actor collision,
-sleeping.
+Contactable nodes are upstream's rule from the file since the same day — `contacters` rows (now
+parsed), collision-triangle nodes and `flexbodywheels` rims: the hero has 196 (7 contacters on no
+triangle), the Mazda 626 286 (96 rims), held by `a_vehicle_collides_with_the_nodes_its_file_names`
+against the rule applied to the parsed file, with and without the contacters and rims. Not yet:
+lockstep islands on workers (serial today; separate actors already run on two cores), node option
+`c` (no ground contact, which the rule also reads), intra-actor collision, sleeping.
+`meshwheels2` tyres are not contactable upstream either, so the hero's wheels pass into the other
+truck until the bodies meet.
 
 **Splitscreen is slow, and fullscreen slower — said from a session, 2026-10-11, not yet
 measured.** Suspects in order: the scene is drawn twice (two `SubViewport`s, each with its own
@@ -1839,8 +1842,8 @@ milestone the `mod_corpus` gate from M1 acceptance 5 belongs to, and it is where
 asserting "loads or fails cleanly" and starts asserting fidelity per section.
 
 Scope, vehicles:
-- **Every section a ground rig uses.** The named gaps today: `contacters` (79 rows unparsed on the
-  hero truck), `commands2` not key-driven so doors do not open, differentials not modelled,
+- **Every section a ground rig uses.** The named gaps today: node option `c` (no ground contact),
+  `commands2` not key-driven so doors do not open, differentials not modelled,
   `fusedrag` given per-node drag instead of a fuselage vector, traction control and ABS absent,
   flares placed but not animated.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.

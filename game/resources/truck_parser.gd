@@ -106,6 +106,10 @@ var ties: Array[Dictionary] = []
 ## Every `slidenodes` row: a node that runs along a rail instead of being pinned to one place.
 ## Eight vehicles here declare them and all eight are strut cars. See `SlideNodeRows`.
 var slide_nodes: Array[Dictionary] = []
+## Upstream's `nd_contacter` nodes (`contacters`), and the rim nodes a `flexbodywheels` row makes:
+## both collide with other vehicles' cabs. See `RigBuilder._add_collision_cabs`.
+var contacters: PackedInt32Array = PackedInt32Array()
+var rim_nodes: PackedInt32Array = PackedInt32Array()
 var sections_seen: Dictionary = {}
 var sections_parsed: Dictionary = {}
 var errors: PackedStringArray = PackedStringArray()
@@ -259,6 +263,8 @@ func _parse_row(line: String) -> void:
             _parse_cinecam(line)
         "axles", "interaxles":
             has_axles = true
+        "contacters":
+            _note(_section, NodeRows.contacter(TruckLexer.fields(line), node_id_to_index, contacters), line)
         "flares", "flares2":
             BodyRows.flare(line, node_id_to_index, flares, errors, _section)
         "materialflarebindings":
@@ -371,7 +377,8 @@ func _parse_joint(line: String) -> void:
         return
     var fields: PackedStringArray = TruckLexer.fields(line)
     var row: Dictionary = BeamRows.joint(
-        _section, fields, node_id_to_index, beam_defaults, _joint_length(fields)
+        _section, fields, node_id_to_index, beam_defaults,
+        BeamRows.joint_length(fields, node_id_to_index, nodes)
     )
     if (row["error"] as String) != "":
         errors.append("%s %s: %s" % [_section, row["error"], line])
@@ -379,18 +386,6 @@ func _parse_joint(line: String) -> void:
     if _section == "hydros" and (row["factor"] as float) != 0.0:
         hydros.append({"beam": beams.size() / 2, "factor": row["factor"] as float})
     beam_table.record(row)
-
-
-## The rest length of the beam a row declares, for the rows that state their travel in metres
-## rather than as a fraction of it.
-func _joint_length(fields: PackedStringArray) -> float:
-    if fields.size() < 2:
-        return 0.0
-    var a: int = int(node_id_to_index.get(fields[0], -1))
-    var b: int = int(node_id_to_index.get(fields[1], -1))
-    if a < 0 or b < 0:
-        return 0.0
-    return nodes[a].distance_to(nodes[b])
 
 
 ## Records a row reader's error against the line it came from, or does nothing.

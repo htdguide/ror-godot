@@ -284,3 +284,17 @@ static func _read_shock_travel(
     row["long_bound"] = maxf(long_bound, 0.0)
     if fields.size() > bound_at + 2:
         row["precompression"] = maxf(fields[bound_at + 2].to_float(), 0.0)
+
+
+## The rest length of the beam a row declares, for the rows that state their travel in metres
+## rather than as a fraction of it.
+static func joint_length(
+    fields: PackedStringArray, id_to_index: Dictionary, nodes: PackedVector3Array
+) -> float:
+    if fields.size() < 2:
+        return 0.0
+    var a: int = int(id_to_index.get(fields[0], -1))
+    var b: int = int(id_to_index.get(fields[1], -1))
+    if a < 0 or b < 0:
+        return 0.0
+    return nodes[a].distance_to(nodes[b])

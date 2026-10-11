@@ -93,3 +93,15 @@ static func _digits_of(field: String) -> String:
         if character.is_valid_int() or character == "." or character == "-":
             out += character
     return out
+
+
+## A `contacters` row: one node, which upstream marks `nd_contacter` and lets hit other actors'
+## collision triangles. Returns "" or what was wrong with the row.
+static func contacter(fields: PackedStringArray, id_to_index: Dictionary, out: PackedInt32Array) -> String:
+    if fields.is_empty():
+        return "row names no node"
+    var node: int = int(id_to_index.get(fields[0], -1))
+    if node < 0:
+        return "row references an unknown node"
+    out.append(node)
+    return ""

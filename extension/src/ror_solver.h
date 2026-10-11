@@ -153,6 +153,11 @@ public:
     // or u (or their buoyant twins). Node order is the file's. See ror_actor_contact.h.
     void add_collision_cab(int node_o, int node_a, int node_b);
     int collision_cab_count() const;
+    // Which of a node's contact roles the file gives it: a `contacters` row, or a flexbody
+    // wheel's rim. Either makes it hit other vehicles' collision triangles.
+    void set_node_contact_role(int node, bool contacter, bool rim);
+    // How many nodes other vehicles' triangles can hit, by upstream's rule.
+    int contactable_count();
     // Upstream's `set_collision_range`; 0.02 m unless a file says otherwise.
     void set_collision_range(float metres);
     // A beam's two nodes and its damping, read and set: for probes that change one family of

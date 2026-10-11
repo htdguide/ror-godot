@@ -30,21 +30,39 @@ void RorCollCabs::add(int no, int na, int nb) {
     prepared_nodes = 0;
 }
 
+void RorCollCabs::set_roles(int node, size_t node_count, bool is_contacter, bool is_rim) {
+    if (node < 0 || static_cast<size_t>(node) >= node_count) {
+        return;
+    }
+    contacter.resize(node_count, 0);
+    rim.resize(node_count, 0);
+    contacter[static_cast<size_t>(node)] |= is_contacter ? 1 : 0;
+    rim[static_cast<size_t>(node)] |= is_rim ? 1 : 0;
+    prepared_nodes = 0;
+}
+
+size_t RorCollCabs::contactable_count() const {
+    return static_cast<size_t>(std::count(contactable.begin(), contactable.end(), 1));
+}
+
 void RorCollCabs::prepare(const NodeArray &nodes, const BeamArray &beams) {
     if (prepared_nodes == nodes.size() && prepared_beams == beams.size()) {
         return;
     }
-    // `UpdateCollcabContacterNodes`: a node is contactable when it is on a collision triangle or
-    // a rim, and every node is when the actor has no triangles at all.
+    // `UpdateCollcabContacterNodes`: a node is contactable when the file names it a contacter,
+    // when it is on a collision triangle or a rim, and every node is when the actor has no
+    // triangles at all. (Upstream also excludes nodes with option `c`, no ground contact; that
+    // option is not read yet.)
     contactable.assign(nodes.size(), count() == 0 ? 1 : 0);
     rim.resize(nodes.size(), 0);
+    contacter.resize(nodes.size(), 0);
     for (int node : triangles) {
         if (node >= 0 && static_cast<size_t>(node) < nodes.size()) {
             contactable[static_cast<size_t>(node)] = 1;
         }
     }
     for (size_t i = 0; i < nodes.size(); ++i) {
-        if (rim[i]) {
+        if (rim[i] || contacter[i]) {
             contactable[i] = 1;
         }
     }
