@@ -67,7 +67,10 @@ static func add_tyre(
 
 
 ## A beam that is a plain spring until it is compressed past `short_bound`, then ramps towards
-## the structural rates. Upstream's SHOCK1.
+## the structural rates. Upstream's SHOCK1, and as for every SHOCK1 that is not a `shocks` row
+## (`CalcBeams` reads `sbd_spring` only for `BEAM_HYDRO`), the rates it ramps to are upstream's
+## `DEFAULT_SPRING` and `DEFAULT_DAMP`, not the tyre's own: ramping to the tyre's rate, as this
+## did until 2026-10-12, never stiffened at all and let a squashed tread reach the rim.
 static func add_support(
     truck: TruckParser, a: int, b: int, spring: float, damp: float, short_bound: float,
     stress: Dictionary
@@ -77,8 +80,8 @@ static func add_support(
         "bound": BeamRows.BOUND_SHOCK,
         "short_bound": short_bound,
         "long_bound": 0.0,
-        "bound_spring": spring,
-        "bound_damp": damp,
+        "bound_spring": BeamDefaults.DEFAULT_SPRING,
+        "bound_damp": BeamDefaults.DEFAULT_DAMP,
         "precompression": 1.0,
     })
     add(truck, a, b, spring, damp, stress)
