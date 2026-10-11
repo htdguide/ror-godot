@@ -45,6 +45,7 @@ void RorSolver::repair() {
     m_steering.reset();
     m_commands.reset();
     m_wheels.differentials().reset_rotation();
+    m_wheels.reattach_all();
     if (m_undamaged_beams.size() != m_beams.size()) {
         return;
     }

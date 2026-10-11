@@ -10,8 +10,9 @@ extends GateBase
 ## the cab rule that refuses to break the last beams of a collision-triangle node. Each rig is run
 ## several passes without moving, so deformation and softening compound as they do over substeps.
 ##
-## Not covered, because not modelled here: detacher groups (`detacher_group`, wheel detachers),
-## buoyant hulls sinking when a beam breaks, triggers. Every case has them off.
+## Half the rigs put their beams in detacher groups, positive and negative, so one break takes
+## others with it. Not covered, because not modelled here: buoyant hulls sinking when a beam breaks,
+## and triggers. Wheel detachers are held by `a_detacher_group_takes_its_wheel_off`.
 
 const ORACLE: String = "build/parity/upstream_oracle"
 const TOLERANCE_RELATIVE: float = 1e-6
@@ -52,10 +53,10 @@ func run(_harness: Node) -> Dictionary:
             var v: Vector3 = node["velocity"]
             lines.append("node %s %s %s %s %s %s %d" % [_n(p.x), _n(p.y), _n(p.z), _n(v.x), _n(v.y), _n(v.z), 1 if node["cab"] else 0])
         for beam: Dictionary in rig["beams"] as Array:
-            lines.append("beam %d %d %s %s %s %d %d %s %s %s %s %s %s %s" % [beam["a"], beam["b"], _n(beam["rest"]),
+            lines.append("beam %d %d %s %s %s %d %d %s %s %s %s %s %s %s %d" % [beam["a"], beam["b"], _n(beam["rest"]),
                     _n(beam["k"]), _n(beam["d"]), UPSTREAM_BOUND[beam["kind"]], 1 if beam["hydro"] else 0,
                     _n(beam["short"]), _n(beam["long"]), _n(beam["sbd_k"]), _n(beam["sbd_d"]), _n(beam["deform"]),
-                    _n(beam["strength"]), _n(beam["plastic"])])
+                    _n(beam["strength"]), _n(beam["plastic"]), beam["group"]])
     var path: String = root.path_join("build/parity/beam_cases.txt")
     var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
     file.store_string("\n".join(lines) + "\n")
@@ -116,6 +117,7 @@ func _ours(rig: Dictionary) -> Dictionary:
     for beam: Dictionary in rig["beams"] as Array:
         var b: int = solver.add_beam(beam["a"], beam["b"], beam["rest"], beam["k"], beam["d"])
         solver.set_beam_limits(b, beam["deform"], beam["strength"], beam["plastic"], not beam["hydro"])
+        solver.set_beam_detacher_group(b, beam["group"])
         if (beam["kind"] as int) != 0:
             # What a SHOCK1 bumps into: its shock's rates for a `shocks` row (`BEAM_HYDRO`), else
             # upstream's defaults; the builder makes that choice (`a_squashed_tyre_…`).
@@ -161,6 +163,8 @@ func _rigs() -> Array[Dictionary]:
                 "sbd_k": rng.randf_range(1e5, 9e6), "sbd_d": rng.randf_range(100.0, 2e4),
                 "deform": rng.randf_range(1e3, 1e6), "strength": rng.randf_range(1e3, 3e6),
                 "plastic": rng.randf_range(0.0, 0.5) if rng.randf() < 0.5 else 0.0,
+                # Half the rigs group their beams, positive and negative, so a break takes others.
+                "group": [0, 1, -1, 2, -2][rng.randi_range(0, 4)] if r % 2 == 1 else 0,
             })
         rigs.append({"nodes": nodes, "beams": beams, "passes": [1, 3, 20][r % 3]})
     return rigs

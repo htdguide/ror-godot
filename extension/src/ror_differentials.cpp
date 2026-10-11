@@ -187,7 +187,53 @@ void RorDifferentials::split_axles(RorDifferential &diff, std::vector<RorWheel> 
     w2a.torque = w2b.torque = out_2 * 0.5f;
 }
 
+void RorDifferentials::copy_detached_speeds(std::vector<RorWheel> &wheels) {
+    const int count = static_cast<int>(wheels.size());
+    auto valid = [count](const RorDifferential &d) { return d.a >= 0 && d.b >= 0 && d.a < count && d.b < count; };
+    auto copy_axle = [&](const RorDifferential &between) {
+        const RorDifferential &one = m_wheel_diffs[static_cast<size_t>(between.a)];
+        const RorDifferential &two = m_wheel_diffs[static_cast<size_t>(between.b)];
+        if (!valid(one) || !valid(two)) {
+            return;
+        }
+        RorWheel &w1a = wheels[static_cast<size_t>(one.a)];
+        RorWheel &w1b = wheels[static_cast<size_t>(one.b)];
+        RorWheel &w2a = wheels[static_cast<size_t>(two.a)];
+        RorWheel &w2b = wheels[static_cast<size_t>(two.b)];
+        if (w1a.detached && w1b.detached) {
+            w1a.speed = w2a.speed;
+            w1b.speed = w2b.speed;
+        }
+        if (w2a.detached && w2b.detached) {
+            w2a.speed = w1a.speed;
+            w2b.speed = w1b.speed;
+        }
+    };
+    // Upstream's `CalcDifferentials`, "Handle detached wheels": a whole axle gone reads the speeds
+    // of the axle it is joined to, and a lone wheel gone reads its partner's.
+    for (const RorDifferential &diff : m_axle_diffs) {
+        copy_axle(diff);
+    }
+    if (m_has_transfer_case && m_transfer_case.four_wd && m_transfer_case.ax_2 >= 0) {
+        copy_axle(m_transfer_case.diff);
+    }
+    for (const RorDifferential &diff : m_wheel_diffs) {
+        if (!valid(diff)) {
+            continue;
+        }
+        RorWheel &a = wheels[static_cast<size_t>(diff.a)];
+        RorWheel &b = wheels[static_cast<size_t>(diff.b)];
+        if (a.detached) {
+            a.speed = b.speed;
+        }
+        if (b.detached) {
+            b.speed = a.speed;
+        }
+    }
+}
+
 void RorDifferentials::distribute(std::vector<RorWheel> &wheels, float dt) {
+    copy_detached_speeds(wheels);
     for (RorDifferential &diff : m_axle_diffs) {
         split_axles(diff, wheels, dt);
     }

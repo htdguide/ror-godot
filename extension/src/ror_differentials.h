@@ -90,6 +90,7 @@ public:
     static std::vector<DiffType> parse_types(const char *letters);
 
 private:
+    void copy_detached_speeds(std::vector<RorWheel> &wheels);
     // One differential between axles: the four wheels' torque shared between the two axles.
     void split_axles(RorDifferential &diff, std::vector<RorWheel> &wheels, float dt);
 

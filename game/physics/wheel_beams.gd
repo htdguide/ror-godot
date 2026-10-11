@@ -37,6 +37,7 @@ static func add(
         "bound_damp": damp,
         "precompression": 1.0,
         "virtual": is_virtual,
+        "detacher_group": 0,
     })
 
 

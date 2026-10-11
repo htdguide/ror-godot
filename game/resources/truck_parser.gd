@@ -172,6 +172,7 @@ func parse_text(text: String) -> String:
         beam_defaults = row["beams"] as BeamDefaults
         node_defaults = row["nodes"] as NodeRows.Defaults
         _inertia = row.get("inertia", CommandRows.NO_INERTIA) as Dictionary
+        beam_table.detacher_group = int(row.get("detacher", 0))
         _parse_row(row["line"] as String)
     if not generated:
         _generate_wheels()
@@ -265,7 +266,7 @@ func _parse_row(line: String) -> void:
         # Five sections, five field orders, and two of them generate twice as many nodes as the
         # other three. `WheelRows` holds the layouts; this only has to name the section, because
         # which section a row came from is part of reading it.
-        "wheels", "wheels2", "meshwheels", "meshwheels2", "flexbodywheels":
+        "wheels", "wheels2", "meshwheels", "meshwheels2", "flexbodywheels", "wheeldetachers":
             _note(_section, WheelRig.read_row(self, _section, line), line)
         "cameras":
             _cameras.read_cameras(TruckLexer.fields(line))

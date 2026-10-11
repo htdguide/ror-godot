@@ -33,6 +33,14 @@ var virtual_beam: PackedByteArray = PackedByteArray()
 ## precompression}. Without these a shock is a soft spring with no bump stop, so a suspension
 ## travels through its own limits and a door damper never resists.
 var bounded: Array[Dictionary] = []
+## Each beam's detacher group (`detacher_group` in force where its row stands; 0 for none): when a
+## beam of a positive group breaks, every beam of that group or its negative breaks with it, and
+## the wheels `wheel_detachers` names for the group come off. {wheel, group} per `wheeldetachers` row.
+var detacher: PackedInt32Array = PackedInt32Array()
+var wheel_detachers: Array[Dictionary] = []
+## The group in force for the row being read; a beam the file only implies (a wheel's, a
+## cinecam's) states 0 itself, as upstream gives those `DEFAULT_DETACHER_GROUP`.
+var detacher_group: int = 0
 
 
 ## Appends a beam row, and remembers what it does outside its travel when it is not a plain
@@ -61,6 +69,7 @@ func record(row: Dictionary) -> void:
     plastic.append(float(row.get("plastic_coef", BeamDefaults.DEFAULT_PLASTIC_COEF)))
     deformable.append(1 if bool(row.get("deformable", true)) else 0)
     virtual_beam.append(1 if bool(row.get("virtual", false)) else 0)
+    detacher.append(int(row.get("detacher_group", detacher_group)))
 
 
 func count() -> int:

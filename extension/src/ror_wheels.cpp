@@ -62,7 +62,7 @@ void RorWheelSet::apply(NodeArray &nodes, float clutch_torque, float dt) {
         }
     }
     for (RorWheel &wheel : m_wheels) {
-        wheel.torque = wheel.drive == WheelDrive::NONE ? 0.0f : drive_torque;
+        wheel.torque = wheel.drive == WheelDrive::NONE || wheel.detached ? 0.0f : drive_torque;
     }
     m_diffs.prepare(m_wheels);
     m_diffs.distribute(m_wheels, dt);
@@ -70,7 +70,7 @@ void RorWheelSet::apply(NodeArray &nodes, float clutch_torque, float dt) {
     m_driven_spin = 0.0f;
     m_driven_speed = 0.0f;
     for (RorWheel &wheel : m_wheels) {
-        if (wheel.tread_count <= 0 || wheel.radius <= 0.0f) {
+        if (wheel.tread_count <= 0 || wheel.radius <= 0.0f || wheel.detached) {
             continue;
         }
 

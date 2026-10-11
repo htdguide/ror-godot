@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-185 gates; `--all --every` 185 of 185 at the beam pass parity commit (2026-10-12). `--order-check` has one
+186 gates; `--all --every` 186 of 186 at the detacher group commit (2026-10-12). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 
@@ -295,7 +295,7 @@ What M1 still owes is human: 5 below.
   gates `a_vehicle_collides_with_…`, `a_node_marked_c_…`, `a_vehicle_does_not_fold_…`).
 - Differentials are upstream's (`ror_differentials.cpp`): `axles`/`interaxles` rows, the automatic
   viscous ones of a rig naming none, V/J switch them (`a_differential_shares_torque_by_its_kind`).
-  `transfercase` too, T/Y for 4WD and range; the laws hold to upstream's (`differential_laws_…`).
+  `transfercase` (T/Y), detacher groups and `wheeldetachers` too; laws held to upstream's code.
 - `commands`/`commands2` are rams now (`ror_commands.cpp`, upstream's `CalcCommands` with priming):
   keys 1-0 in the solo window, the hero's doors on 1-4 (`a_ram_moves_by_its_rate_and_stops_at_its_bounds`).
   Key and hydro inertia and the respawn reset are upstream's (`a_hydro_follows_…`); `r` rams are ropes.

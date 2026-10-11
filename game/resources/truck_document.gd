@@ -97,6 +97,7 @@ func read(text: String) -> void:
     var advanced: bool = false
     var node_defaults: NodeRows.Defaults = NodeRows.Defaults.new()
     var inertia: Dictionary = CommandRows.NO_INERTIA
+    var detacher: int = 0
     var started: bool = false
     for raw: String in text.split("\n"):
         var line: String = TruckLexer.strip(raw)
@@ -115,7 +116,7 @@ func read(text: String) -> void:
         if directive == "":
             if TruckLexer.is_section_header(line, section):
                 section = line.to_lower()
-                _append(section, line, true, beams, node_defaults, inertia)
+                _append(section, line, true, beams, node_defaults, inertia, detacher)
                 continue
             if TruckLexer.is_metadata(line):
                 continue
@@ -136,10 +137,13 @@ func read(text: String) -> void:
                 node_defaults = NodeRows.parse_defaults(arguments, node_defaults)
             elif directive == "set_inertia_defaults":
                 inertia = CommandRows.inertia_defaults(arguments, inertia)
+            elif directive == "detacher_group":
+                # Upstream's `ParseDirectiveDetacherGroup`: a number, or `end` for none (0).
+                detacher = 0 if arguments.is_empty() or arguments[0].strip_edges() == "end" else arguments[0].to_int()
             # Every other directive is recognised so that it is not mistaken for data. Acting
             # on them is a separate job; being silently parsed as geometry is the bug.
             continue
-        _append(section, line, false, beams, node_defaults, inertia)
+        _append(section, line, false, beams, node_defaults, inertia, detacher)
 
 
 ## The rows in the order upstream spawns them, with the file's order kept inside each section.
@@ -162,7 +166,7 @@ func order_of(section: String) -> int:
 
 func _append(
     section: String, line: String, header: bool, beams: BeamDefaults,
-    node_defaults: NodeRows.Defaults, inertia: Dictionary
+    node_defaults: NodeRows.Defaults, inertia: Dictionary, detacher: int
 ) -> void:
     rows.append({
         "section": section,
@@ -173,4 +177,5 @@ func _append(
         "beams": beams,
         "nodes": node_defaults,
         "inertia": inertia,
+        "detacher": detacher,
     })

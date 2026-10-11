@@ -77,6 +77,9 @@ struct RorBeam {
     float long_bound = 0.0f;
     // Index of a `shocks2` or `shocks3` beam's own rates in the solver's shock list, or -1.
     int shock = -1;
+    // Upstream's `detacher_group`: a beam of a positive group breaking by strength breaks every
+    // beam of that group or its negative. 0 for none.
+    int detacher_group = 0;
     // The rates a shock ramps towards once it is past a bound: the rig's own structural
     // defaults where the shock was declared, not the shock's soft rates.
     float bound_spring = 0.0f;

@@ -60,6 +60,8 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
                 truck.beam_plastic[beam],
                 beam >= truck.beam_deformable.size() or truck.beam_deformable[beam] != 0
             )
+        if beam < truck.beam_table.detacher.size() and truck.beam_table.detacher[beam] != 0:
+            solver.set_beam_detacher_group(beam, truck.beam_table.detacher[beam])
 
     # A strut's hub runs along a rail rather than sitting on a point. Handed over after the beams
     # because the rail is made of nodes the beams have already placed. See `SlideNodeRows`.
@@ -82,6 +84,8 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
         InertiaModels.hand_to(solver)
     _add_commands(solver, truck)
     _add_wheels(solver, truck)
+    for detacher: Dictionary in truck.beam_table.wheel_detachers:
+        solver.add_wheel_detacher(detacher["wheel"] as int, detacher["group"] as int)
     _add_steering(solver, truck)
     _configure_engine(solver, truck)
     solver.set_gravity(GRAVITY)

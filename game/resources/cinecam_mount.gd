@@ -58,4 +58,6 @@ static func _beam(
         "bound_spring": row["spring"] as float,
         "bound_damp": row["damp"] as float,
         "precompression": 1.0,
+        # Upstream's `ProcessCinecam` gives these `DEFAULT_DETACHER_GROUP`.
+        "detacher_group": 0,
     }

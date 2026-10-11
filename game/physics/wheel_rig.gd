@@ -33,6 +33,14 @@ const RIM_DAMP_FALLBACK: float = 150.0
 ## tread is generated once every row is read. The hero truck states `set_node_defaults -1, 1.06`
 ## above its front pair and `-1, 1.12` above its rear, and those are the grip its tyres have.
 static func read_row(truck: TruckParser, section: String, line: String) -> String:
+    if section == "wheeldetachers":
+        # Upstream's `ParseWheelDetachers`: "wheel_id, detacher_group", the wheel counted from 0
+        # in the order the wheels spawn.
+        var fields: PackedStringArray = TruckLexer.fields(line)
+        if fields.size() < 2:
+            return "row has %d fields, expected 2" % fields.size()
+        truck.beam_table.wheel_detachers.append({"wheel": fields[0].to_int(), "group": fields[1].to_int()})
+        return ""
     var row: Dictionary = WheelRows.row(section, TruckLexer.fields(line), truck.node_id_to_index)
     if (row["error"] as String) != "":
         return row["error"] as String

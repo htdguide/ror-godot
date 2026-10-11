@@ -320,6 +320,9 @@ void RorSolver::accumulate_beam_forces() {
         beam.stress = stress;
         stress = apply_beam_deformation(beam, extension, spring, stress, m_nodes);
         if (beam.broken) {
+            if (beam.detacher_group > 0) {
+                detach_group(beam.detacher_group);
+            }
             continue;
         }
         const Vector3 force = separation * (stress * inverted_length);

@@ -235,6 +235,11 @@ public:
     // square root, not exactly. Exposed so a check of the force law can be made at the
     // extension the law was actually applied to, rather than at the one the caller intended.
     float get_beam_length(int beam) const;
+    // Upstream's detacher groups: the group a beam belongs to (0 none; see `RorBeam`), and a wheel
+    // that comes off when a beam of `group` breaks (`wheeldetachers`).
+    void set_beam_detacher_group(int beam, int group);
+    void add_wheel_detacher(int wheel, int group);
+    bool wheel_detached(int wheel) const;
     // The force along the beam last substep, signed as upstream's `beam.stress`: negative pulls.
     float get_beam_stress(int beam) const;
     // Runs the beam pass alone `passes` times, forces cleared before each and nothing integrated,
@@ -441,6 +446,10 @@ private:
     void apply_bound_law(const RorBeam &beam, float extension, float closing_speed, float &spring,
                          float &damping) const;
     std::vector<RorShock> m_shocks;
+    // {wheel, group} per `wheeldetachers` row.
+    std::vector<std::pair<int, int>> m_wheel_detachers;
+    // A beam of `group` broke by strength: the rest of the group goes, and its wheels come off.
+    void detach_group(int group);
     void accumulate_beam_forces();
     void apply_ground_contact(float dt);
     void apply_obstacle_contact(float dt);

@@ -53,6 +53,9 @@ struct RorWheel {
     float last_retorque = 0.0f;
     // Accumulated rotation in radians, for turning the rim mesh.
     float rotation = 0.0f;
+    // Upstream's `wh_is_detached`: taken off by a detacher group. It is handed no drive torque,
+    // pushes nothing, and its speed is no longer measured; the differentials read its partner's.
+    bool detached = false;
 };
 
 // The wheel set of one rig.
@@ -76,6 +79,17 @@ public:
     bool set_transfer_case(const RorTransferCase &transfer_case);
     // Upstream's `toggleTransferCaseMode` on the wheels: the second axle driven or not.
     void set_axle_driven(int axle, bool driven);
+    void detach(int wheel) {
+        if (wheel >= 0 && wheel < count()) {
+            m_wheels[static_cast<size_t>(wheel)].detached = true;
+        }
+    }
+    // Upstream's `SyncReset`: every wheel back on.
+    void reattach_all() {
+        for (RorWheel &wheel : m_wheels) {
+            wheel.detached = false;
+        }
+    }
 
     // Driver input, 0..1 each.
     void set_brake(float brake) { m_brake = brake; }

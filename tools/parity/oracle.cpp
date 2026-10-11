@@ -22,7 +22,7 @@
 //   in:  beams passes node_count beam_count
 //        node x y z vx vy vz cab                                  (node_count lines)
 //        beam p1 p2 L k d bounded bm_type shortbound longbound sbd_spring sbd_damp deform
-//             strength plastic_coef                               (beam_count lines)
+//             strength plastic_coef detacher_group                (beam_count lines)
 //   out: one line per node: fx fy fz; then one per beam: L stress strength broken
 //
 // A line starting `diff` runs one of `Differential`'s four laws:
@@ -133,9 +133,9 @@ static bool run_beams(const std::string &header) {
         beam_t &b = actor.beams[static_cast<size_t>(i)];
         shock_t &shock = shocks[static_cast<size_t>(i)];
         if (!std::getline(std::cin, line) ||
-            std::sscanf(line.c_str(), "beam %d %d %f %f %f %d %d %f %f %f %f %f %f %f", &p1, &p2, &b.L, &b.k, &b.d,
+            std::sscanf(line.c_str(), "beam %d %d %f %f %f %d %d %f %f %f %f %f %f %f %d", &p1, &p2, &b.L, &b.k, &b.d,
                         &bounded, &type, &b.shortbound, &b.longbound, &shock.sbd_spring, &shock.sbd_damp, &deform,
-                        &b.strength, &b.plastic_coef) != 14) {
+                        &b.strength, &b.plastic_coef, &b.detacher_group) != 15) {
             return false;
         }
         b.p1 = &nodes[static_cast<size_t>(p1)];
