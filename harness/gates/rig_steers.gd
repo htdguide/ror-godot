@@ -27,6 +27,12 @@ extends GateBase
 ## world. Measured against the world, a rig in a turn shows its whole body's yaw on both
 ## axles at once: the first version of this gate reported a 64 degree steering lock for what
 ## the path says was 30.
+##
+## The rig is measured with its axles free of each other. Upstream locks the hero's two axles
+## together because it names `axles`, and in a turn this tight the front axle has to roll about
+## 15% further than the rear: the lock scrubs the tyres and widens the circle (27% off Ackermann
+## became 36%). That is the driveline, not the steering, so it is removed here by the owner's
+## decision and proved on its own in `a_differential_shares_torque_by_its_kind`.
 
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
@@ -173,6 +179,7 @@ func _run_turn(mod_dir: String, command: float) -> Dictionary:
     if truck.wheels.size() < 4:
         return {"error": "%s has %d wheels, expected 4" % [TRUCK, truck.wheels.size()]}
     solver.set_ground(0.0, true)
+    solver.clear_axle_differentials()
 
     var dt: float = 1.0 / SUBSTEP_HZ
     var chunk: int = int(SUBSTEP_HZ / 60.0)

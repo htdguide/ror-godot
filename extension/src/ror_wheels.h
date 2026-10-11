@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ror_differentials.h"
 #include "ror_node.h"
 
 #include <godot_cpp/variant/vector3.hpp>
@@ -67,6 +68,9 @@ public:
     // pulls and it has to be carried rather than assumed.
     void set_has_axles(bool has_axles) { m_has_axles = has_axles; }
     void set_brake_forces(float foot, float handbrake);
+    RorDifferentials &differentials() { return m_diffs; }
+    const RorDifferentials &differentials() const { return m_diffs; }
+    void prepare_differentials() { m_diffs.prepare(m_wheels); }
 
     // Driver input, 0..1 each.
     void set_brake(float brake) { m_brake = brake; }
@@ -86,6 +90,7 @@ private:
     std::vector<RorWheel> m_wheels;
     int m_driven_count = 0;
     bool m_has_axles = false;
+    RorDifferentials m_diffs;
     float m_brake_force = 0.0f;
     float m_handbrake_force = 0.0f;
     float m_brake = 0.0f;

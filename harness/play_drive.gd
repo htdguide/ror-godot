@@ -234,6 +234,8 @@ func on_key(keycode: Key) -> bool:
             print("DRIVE  indicators off")
         "recover":
             _recover()
+        "wheel_diffs", "axle_diffs":
+            print("DRIVE  %s" % AxleRows.toggle(solver, DriveKeys.action_of(keys, keycode) == "axle_diffs"))
         _:
             return false
     return true

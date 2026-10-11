@@ -98,6 +98,65 @@ float RorSolver::get_wheel_torque(int wheel) const {
     return m_wheels.at(wheel).last_torque;
 }
 
+int RorSolver::add_axle(int wheel_a, int wheel_b, const String &types) {
+    sync();
+    if (wheel_a < 0 || wheel_b < 0 || wheel_a >= m_wheels.count() || wheel_b >= m_wheels.count()) {
+        return -1;
+    }
+    return m_wheels.differentials().add_axle(wheel_a, wheel_b,
+                                             RorDifferentials::parse_types(types.utf8().get_data()));
+}
+
+int RorSolver::add_interaxle(int axle_a, int axle_b, const String &types) {
+    sync();
+    return m_wheels.differentials().add_interaxle(axle_a, axle_b,
+                                                  RorDifferentials::parse_types(types.utf8().get_data()));
+}
+
+void RorSolver::toggle_wheel_differentials() {
+    sync();
+    m_wheels.prepare_differentials();
+    m_wheels.differentials().toggle_wheel_diffs();
+}
+
+void RorSolver::toggle_axle_differentials() {
+    sync();
+    m_wheels.prepare_differentials();
+    m_wheels.differentials().toggle_axle_diffs();
+}
+
+void RorSolver::clear_axle_differentials() {
+    sync();
+    m_wheels.prepare_differentials();
+    m_wheels.differentials().clear_axle_diffs();
+}
+
+int RorSolver::wheel_differential_count() {
+    sync();
+    m_wheels.prepare_differentials();
+    return m_wheels.differentials().wheel_diff_count();
+}
+
+int RorSolver::axle_differential_count() {
+    sync();
+    m_wheels.prepare_differentials();
+    return m_wheels.differentials().axle_diff_count();
+}
+
+String RorSolver::wheel_differential_type(int index) {
+    sync();
+    m_wheels.prepare_differentials();
+    const char type = m_wheels.differentials().wheel_diff_type(index);
+    return type == 0 ? String() : String::chr(type);
+}
+
+String RorSolver::axle_differential_type(int index) {
+    sync();
+    m_wheels.prepare_differentials();
+    const char type = m_wheels.differentials().axle_diff_type(index);
+    return type == 0 ? String() : String::chr(type);
+}
+
 // --- Drivetrain -----------------------------------------------------------------
 
 void RorSolver::configure_engine(float min_rpm, float max_rpm, float torque, float diff_ratio, float reverse_gear,
@@ -334,6 +393,15 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_wheel_speed", "wheel"), &RorSolver::get_wheel_speed);
     ClassDB::bind_method(D_METHOD("get_wheel_rotation", "wheel"), &RorSolver::get_wheel_rotation);
     ClassDB::bind_method(D_METHOD("get_wheel_torque", "wheel"), &RorSolver::get_wheel_torque);
+    ClassDB::bind_method(D_METHOD("add_axle", "wheel_a", "wheel_b", "types"), &RorSolver::add_axle);
+    ClassDB::bind_method(D_METHOD("add_interaxle", "axle_a", "axle_b", "types"), &RorSolver::add_interaxle);
+    ClassDB::bind_method(D_METHOD("toggle_wheel_differentials"), &RorSolver::toggle_wheel_differentials);
+    ClassDB::bind_method(D_METHOD("toggle_axle_differentials"), &RorSolver::toggle_axle_differentials);
+    ClassDB::bind_method(D_METHOD("clear_axle_differentials"), &RorSolver::clear_axle_differentials);
+    ClassDB::bind_method(D_METHOD("wheel_differential_count"), &RorSolver::wheel_differential_count);
+    ClassDB::bind_method(D_METHOD("axle_differential_count"), &RorSolver::axle_differential_count);
+    ClassDB::bind_method(D_METHOD("wheel_differential_type", "index"), &RorSolver::wheel_differential_type);
+    ClassDB::bind_method(D_METHOD("axle_differential_type", "index"), &RorSolver::axle_differential_type);
 
     ClassDB::bind_method(D_METHOD("configure_engine", "min_rpm", "max_rpm", "torque", "diff_ratio",
                                   "reverse_gear", "neutral_gear", "forward_gears"),

@@ -213,10 +213,12 @@ static func _add_bounds(solver: RefCounted, truck: TruckParser) -> void:
 
 
 static func _add_wheels(solver: RefCounted, truck: TruckParser) -> void:
+    # Each built wheel's axle nodes, by the solver's index for it, for the axles to find it by.
+    var axle_nodes: Array[Vector2i] = []
     for wheel: Dictionary in truck.wheels:
         if (wheel["tread_count"] as int) <= 0:
             continue
-        solver.add_wheel(
+        var index: int = solver.add_wheel(
             wheel["node1"] as int,
             wheel["node2"] as int,
             wheel["first_tread"] as int,
@@ -226,7 +228,11 @@ static func _add_wheels(solver: RefCounted, truck: TruckParser) -> void:
             wheel["propulsed"] as int,
             wheel["braked"] as int
         )
+        if index >= 0:
+            axle_nodes.resize(index + 1)
+            axle_nodes[index] = Vector2i(wheel["node1"] as int, wheel["node2"] as int)
     solver.set_has_axles(truck.has_axles)
+    _add_differentials(solver, truck, axle_nodes)
     solver.set_brake_forces(
         truck.drivetrain["brake_force"] as float,
         truck.drivetrain["parking_brake_force"] as float
@@ -313,3 +319,24 @@ static func _add_commands(solver: RefCounted, truck: TruckParser) -> void:
             row["one_press_center"] as bool, row["affect_engine"] as float,
             row["needs_engine"] as bool
         )
+
+
+## Upstream's `ProcessAxle` and `ProcessInterAxle`. An axle finds each wheel by its two axle nodes,
+## in either order; one whose wheel is not found is left out, where upstream would keep it pointing
+## at wheel 0, and every interaxle after it then counts axles as upstream does not.
+static func _add_differentials(solver: RefCounted, truck: TruckParser, axle_nodes: Array[Vector2i]) -> void:
+    for row: Dictionary in truck.axles:
+        var nodes: Array = row["nodes"] as Array
+        var first: int = _wheel_on(axle_nodes, nodes[0] as int, nodes[1] as int)
+        var second: int = _wheel_on(axle_nodes, nodes[2] as int, nodes[3] as int)
+        if first >= 0 and second >= 0:
+            solver.add_axle(first, second, row["types"] as String)
+    for row: Dictionary in truck.interaxles:
+        solver.add_interaxle(row["a"] as int, row["b"] as int, row["types"] as String)
+
+
+static func _wheel_on(axle_nodes: Array[Vector2i], a: int, b: int) -> int:
+    for i: int in axle_nodes.size():
+        if axle_nodes[i] == Vector2i(a, b) or axle_nodes[i] == Vector2i(b, a):
+            return i
+    return -1

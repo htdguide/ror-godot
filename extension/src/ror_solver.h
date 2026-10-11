@@ -228,6 +228,18 @@ public:
     float get_wheel_speed(int wheel) const;
     float get_wheel_rotation(int wheel) const;
     float get_wheel_torque(int wheel) const;
+    // Upstream's differentials. `types` are its letters (s split, o open, v viscous, l locked), the
+    // first active; `toggle` makes the next active on every differential of the kind. A rig with no
+    // `axles` gets upstream's automatic ones on its first step, or on the first count asked for.
+    int add_axle(int wheel_a, int wheel_b, const godot::String &types);
+    int add_interaxle(int axle_a, int axle_b, const godot::String &types);
+    void toggle_wheel_differentials();
+    void toggle_axle_differentials();
+    void clear_axle_differentials();
+    int wheel_differential_count();
+    int axle_differential_count();
+    godot::String wheel_differential_type(int index);
+    godot::String axle_differential_type(int index);
 
     // --- Drivetrain -------------------------------------------------------------
     void configure_engine(float min_rpm, float max_rpm, float torque, float diff_ratio, float reverse_gear,

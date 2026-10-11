@@ -25,18 +25,21 @@ void RorWheelSet::apply(NodeArray &nodes, float clutch_torque, float dt) {
     if (dt <= 0.0f || m_wheels.empty()) {
         return;
     }
-    // Upstream's differential chain, for the case a rig's differentials are split — which
-    // every axle of the hero rig is. A split differential hands each output half of what
-    // it was given, so across the axle differential and the two wheel differentials the
-    // chain returns exactly what came in and reduces to this division. Open, locked and
-    // viscous differentials do not, and they are not modelled yet.
+    // Upstream's `CalcDifferentials`: every driven wheel is handed an equal share of the clutch's
+    // torque, doubled when the rig names its axles, and the differentials then share it out by
+    // last step's wheel speeds.
     float drive_torque = 0.0f;
     if (m_driven_count > 0) {
         drive_torque = clutch_torque / static_cast<float>(m_driven_count);
-        if (m_has_axles) {
+        if (m_has_axles || m_diffs.has_axles()) {
             drive_torque *= 2.0f;
         }
     }
+    for (RorWheel &wheel : m_wheels) {
+        wheel.torque = wheel.drive == WheelDrive::NONE ? 0.0f : drive_torque;
+    }
+    m_diffs.prepare(m_wheels);
+    m_diffs.distribute(m_wheels, dt);
 
     m_driven_spin = 0.0f;
     m_driven_speed = 0.0f;
@@ -44,7 +47,6 @@ void RorWheelSet::apply(NodeArray &nodes, float clutch_torque, float dt) {
         if (wheel.tread_count <= 0 || wheel.radius <= 0.0f) {
             continue;
         }
-        wheel.torque = wheel.drive == WheelDrive::NONE ? 0.0f : drive_torque;
 
         if (wheel.brake != WheelBrake::NONE) {
             float stopping = m_brake_force * m_brake;

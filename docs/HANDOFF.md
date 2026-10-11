@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-171 gates; `--all --every` 171 of 171 at the command-rams commit (2026-10-11). `--order-check` has one
+172 gates; `--all --every` 172 of 172 at the differentials commit (2026-10-11). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 
@@ -293,9 +293,9 @@ What M1 still owes is human: 5 below.
   vector instead of the per-node drag it currently gets.
 - `contacters`, flexbody rims, node option `c` and self-collision (on, owner's call) are in (PLAN §0.12;
   gates `a_vehicle_collides_with_…`, `a_node_marked_c_…`, `a_vehicle_does_not_fold_…`).
-- Differentials are not modelled. The hero rig's are all split, and a split differential chain
-  reduces to the division `ror_wheels` already does, so this is invisible on this rig and wrong on
-  one with locked or open diffs.
+- Differentials are upstream's (`ror_differentials.cpp`): `axles`/`interaxles` rows, the automatic
+  viscous ones of a rig naming none, V/J switch them (`a_differential_shares_torque_by_its_kind`).
+  No transfer case yet; the four laws have no bit-parity case in `tools/parity` yet.
 - `commands`/`commands2` are rams now (`ror_commands.cpp`, upstream's `CalcCommands` with priming):
   keys 1-0 in the solo window, the hero's doors on 1-4 (`a_ram_moves_by_its_rate_and_stops_at_its_bounds`).
   Key inertia and the `r` rope option are not read.
