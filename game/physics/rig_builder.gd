@@ -328,6 +328,9 @@ static func _add_commands(solver: RefCounted, truck: TruckParser) -> void:
             row["one_press_center"] as bool, row["affect_engine"] as float,
             row["needs_engine"] as bool
         )
+        # Upstream's option `r`: the ram is a rope, pulling but never pushing.
+        if bool(row["rope"]):
+            solver.set_beam_bounds(row["beam"] as int, BeamRows.BOUND_ROPE, 0.0, 0.0, 0.0, 0.0, 1.0)
         # Both keys of the row take its inertia, as upstream's `_ProcessKeyInertia` gives them.
         var inertia: Array = CommandRows.key_inertia(row)
         if not inertia.is_empty():
@@ -336,9 +339,8 @@ static func _add_commands(solver: RefCounted, truck: TruckParser) -> void:
                         inertia[2] as String, inertia[3] as String)
 
 
-## Upstream's `ProcessAxle` and `ProcessInterAxle`. An axle finds each wheel by its two axle nodes,
-## in either order; one whose wheel is not found is left out, where upstream would keep it pointing
-## at wheel 0, and every interaxle after it then counts axles as upstream does not.
+## Upstream's `ProcessAxle`, `ProcessTransferCase` and `ProcessInterAxle`. An axle finds each wheel
+## by its two axle nodes, in either order.
 static func _add_differentials(solver: RefCounted, truck: TruckParser, axle_nodes: Array[Vector2i]) -> void:
     for row: Dictionary in truck.axles:
         var nodes: Array = row["nodes"] as Array
