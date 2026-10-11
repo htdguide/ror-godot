@@ -2333,6 +2333,48 @@ Tier 3 does not load and will not: custom OGRE shaders, overlays.
 Publishing these tiers early is the single cheapest thing that keeps mod authors on side, because the
 thing they fear is silent breakage, not documented breakage.
 
+### BeamNG vehicles (JBeam) — a second kind of actor, proposed 2026-10-12, not scheduled
+
+The owner's idea: load BeamNG.drive vehicle mods too, at their full fidelity, alongside Rigs of
+Rods ones, a "dumb and smart" world where the two kinds drive and collide together. RoR actors stay
+as upstream makes them; nothing of BeamNG's is added to them.
+
+Why it is plausible: both are node-and-beam soft bodies from the same lineage. A JBeam vehicle is
+nodes, beams, triangles and wheels like a `.truck`, and the world here already treats each actor
+as its own solver meeting others only through node and triangle contact (`RorWorld`, islands,
+`ror_actor_contact.cpp`). A JBeam actor can be a different solver kind in the same world with no
+change to the RoR one.
+
+What it costs, roughly in order of size:
+
+1. **Licence first; the owner decides.** BeamNG.drive is closed source. Its own vehicles and the
+   shared parts most mods build on (`vehicles/common`) are BeamNG's and cannot ship here or be
+   assumed present. A mod's own files carry its author's terms. Reading the JBeam format is
+   interoperability; using BeamNG's files from a user's install may be restricted by its EULA.
+   Settle this before writing code; it decides whether the feature exists.
+2. **JBeam parsing.** Relaxed JSON; a vehicle is a tree of parts chosen by slots, with variables
+   and per-part defaults. A parser and the slot resolver are the entry ticket.
+3. **More physics in the new solver kind.** Beam types beyond RoR's (anisotropic, bounded with
+   their own limits, pressured, L-beams), torsion bars, pressurised triangles and pressure wheels,
+   triangle aerodynamics, breakgroups and deform groups. Each one gated like the RoR laws.
+4. **The powertrain and controllers.** BeamNG builds the drivetrain as a graph of devices
+   (engine, gearbox, differentials, shafts, transfer cases) and drives almost every feature
+   (electronics, ABS/ESC, lights, gauges, "all buttons working") from vehicle-side Lua against
+   BeamNG's own API. That API would have to be reimplemented with an embedded Lua. By far the
+   largest item, and open-ended: mods call whatever the game exposes.
+5. **Visuals.** Collada `.dae` meshes skinned to nodes (flexmesh), BeamNG's material JSON mapped to
+   the PBR materials here.
+
+The oracle problem: nothing of BeamNG's can be compiled the way `tools/parity` compiles upstream,
+so "full fidelity" has no source to be checked against. The oracle would have to be BeamNG itself:
+recordings the owner makes in the game (a vehicle's settle height, braking distance, top speed,
+lap) that a gate replays. Without that, a JBeam actor is "behaves plausibly", which §0 does not
+accept as done.
+
+Suggested first step, when it is picked up: the licence decision, then a JBeam parser that loads
+one permissively licensed community vehicle's nodes and beams into the existing solver as a
+static shape, gated against the file, before any of 3-5.
+
 ---
 
 ## 6. Risks, ranked, with the earliest de-risking step
