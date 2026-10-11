@@ -903,6 +903,20 @@ everything above that does not need a network: two actors, two frames, two islan
 them, and a human able to drive one into the other. It exercises the multi-actor paths long before
 C5 and it is how a person judges whether any of this feels right.
 
+**Phase 1 built, 2026-10-11: the window.** `tools/play.sh --truck --split` opens two halves, the
+left driven on WASD and the right on the arrow keys, each with its own vehicle, solver, chase
+camera and readout (`PlaySplit`). Keys are data now (`DriveKeys`: `SOLO`, `SPLIT_LEFT`,
+`SPLIT_RIGHT`), so the help text is read off the map it describes; the old hand-written help had
+already drifted from the handling. `two_drivers_drive_their_own_vehicles` holds the maps disjoint
+from each other and from the session's keys, and drives two trucks through real key events: W
+moves its truck 23 m and the other 2 cm, Up the same the other way round; given both drivers one
+map, the gate fails. Two solvers already step on two workers, so SMP across actors is live.
+Building it found two respawn faults that a one-truck window also has: the automatic box kept the
+gear it had reached (upstream's `startEngine` resets it through `offStart`, now ported), and the
+pedal ramp kept the throttle down for a quarter second after its key was let go, so a truck
+respawned in that window set off by itself. **Phase 2 is contact between the two** — today they
+pass through each other, because each `RorSolver` knows only its own nodes — and islands follow.
+
 ### 0.13 Seeing a long way: the whole map, whatever size it is
 
 **Asked for 2026-10-02, and clarified the same day:** see the far parts of the map — mountains,

@@ -54,13 +54,7 @@ const CHASE_AIM: Vector3 = Vector3(0.0, 0.8, 0.0)
 const CHASE_SMOOTHING: float = 0.15
 
 
-## The keys the driver uses. Named so the help text and the handling cannot disagree.
-const HELP: String = (
-    "DRIVE  Up throttle, Down brake, Left/Right steer, Space handbrake\n"
-    + "DRIVE  G drive, B reverse, H neutral, I ignition, N or L lights, K main beam\n"
-    + "DRIVE  R recover upright where you are, Backspace respawn at the start\n"
-    + "DRIVE  Z/C indicators, X off, F5 chase camera, F6 free camera, F7 driver's seat"
-)
+## The keys themselves are in `DriveKeys`, and the help text is read off them.
 
 
 ## Turns "positive means left" driver intent into the command the solver takes.

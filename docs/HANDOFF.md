@@ -138,9 +138,9 @@ Sessions open at golden dusk unless `--weather` says otherwise (they opened at n
 held by `a_map_change_leaves_nothing_of_the_old_map`) and puts the opening weather back over the
 new one. `Esc` opens the settings panel — weather, gravity, sun,
 shadows, sky brightness, exposure, cloud cover and density, wind, view distance, fog, grass
-distance, lamps — with Resume and Quit in it. Controls: `G` drive, `B` reverse, `H` neutral, `I`
-ignition, `N` or `L` lights, `R` recover upright, Backspace respawn, `Z`/`C`/`X` indicators,
-`F5`/`F6`/`F7` chase, free and driver's seat. `K` is the main beam: a vehicle with no `h` lamps
+distance, lamps — with Resume and Quit in it. Controls are `DriveKeys` (printed at start):
+`G`/`B`/`H` drive/reverse/neutral, `R` respawn, Enter recover, `--split` two drivers (WASD |
+arrows, `PlaySplit`, no contact yet), `F5`/`F6`/`F7` chase, free and driver's seat. `K` is the main beam: a vehicle with no `h` lamps
 of its own — which is most of them — puts its low beams onto the main-beam pattern instead, the
 way a two-filament bulb does. `F2` cycles the weather, and `night_moon` is one of them. The settings panel's **Time of day**
 slider runs the whole 24 hours instead — `DayCycle` moves the sun along its arc, hands the night
@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-164 gates; `--all --every` 164 of 164 at the frames commit (2026-10-11). `--order-check` has one
+165 gates; `--all --every` 165 of 165 at the splitscreen commit (2026-10-11). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 

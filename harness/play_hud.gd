@@ -83,4 +83,7 @@ static func print_help(drive: PlayDrive) -> void:
         + "PLAY  P save a screenshot and a .json beside it saying where it was taken from"
     )
     if drive != null:
-        print(DriveCfg.HELP)
+        # Read off the driver's own key map, so the help cannot drift from the handling — it had:
+        # it said R recovers and Backspace respawns, a year after R was made to respawn.
+        print(DriveKeys.help(drive.keys, "DRIVE "))
+        print("DRIVE  F5 chase camera, F6 free camera, F7 driver's seat")

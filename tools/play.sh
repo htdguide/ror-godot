@@ -8,6 +8,8 @@
 #   tools/play.sh --truck --map <name>   the same vehicle on another Rigs of Rods terrain
 #                                        (tools/import_terrain.sh --list says what there is)
 #   tools/play.sh --truck --no-terrain   the same vehicle on a bare flat plane
+#   tools/play.sh --truck --split        two drivers in one window: WASD on the left, arrows on
+#                                        the right (they do not collide yet)
 #   tools/play.sh --truck --collision    what the terrain is solid as, drawn over everything: a
 #                                        box with nothing in it is geometry that is missing, and
 #                                        drawn geometry with no box is something you drive through

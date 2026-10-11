@@ -26,6 +26,9 @@ var loaded: RorTerrain = null
 var vegetation: RorVegetation = null
 ## The vehicle the map is driven with, if any; the session sets it and swaps it.
 var drive: PlayDrive = null
+## Called once the vehicle has the terrain, for a session with more than one: a splitscreen puts
+## its second vehicle down beside the first and hands it the same ground. See `PlaySplit`.
+var after_hand: Callable = Callable()
 var pending: bool = false
 var loading: bool = false
 
@@ -147,6 +150,8 @@ func _hand_to_vehicle(wanted: RorTerrain) -> void:
     var solid: int = RorObjectCollision.apply(wanted, drive.solver)
     print("PLAY  driving on %s, spawned at %v under %.2f m/s^2; %d solid scenery parts"
         % [wanted.name, drive.spawn, wanted.gravity(), solid])
+    if after_hand.is_valid():
+        after_hand.call(wanted)
 
 
 ## The weather every load ends by putting on. The main menu's third choice sets it.

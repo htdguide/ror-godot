@@ -33,6 +33,8 @@ var _graphics: GraphicsSettings = GraphicsSettings.new()
 var _main_menu: MainMenu = null
 ## What the terrain is solid as: the F8 overlay, and where a vehicle may stand.
 var _solid: PlaySolid = PlaySolid.new()
+## A second driver and a split picture, with `--split`. See `PlaySplit`.
+var _split: PlaySplit = null
 
 
 ## `vehicle` is a VehicleBuilder result, or empty when no vehicle was loaded. With one, the
@@ -59,6 +61,8 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
         else:
             _drive = drive
             _view.set_mode(PlayCamera.Mode.CHASE)
+            if Harness.args.has_flag("split"):
+                _start_split()
     _menu = _build_menu(weather)
     # And the weather moves in a window, where nothing is comparing two frames.
     var holder: WorldEnvironment = _world.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
@@ -72,17 +76,20 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
     _map.drive = _drive
     _graphics.load_from()
     _graphics.apply(get_viewport(), _world)
-    _weather.after_put = func() -> void: _graphics.apply(get_viewport(), _world, _map.vegetation)
+    if _split != null:
+        _split.copy_graphics(get_viewport())
+    _weather.after_put = func() -> void: _apply_graphics()
     # Nothing named on the command line: the game opens on its menu rather than on a world.
     if not Harness.args.values.has("vehicle") and not Harness.args.values.has("terrain-dir"):
         _map.name = ""
         _main_menu = MainMenu.new()
         add_child(_main_menu)
         _main_menu.setup(_graphics, _start_game, func() -> void: get_tree().quit(0),
-            func() -> void: _graphics.apply(get_viewport(), _world, _map.vegetation))
+            func() -> void: _apply_graphics())
         _main_menu.open()
     _map.build()
-    PlayHud.print_help(_drive)
+    # A split session printed both drivers' maps as it started; the one-driver help would be wrong.
+    PlayHud.print_help(_drive if _split == null else null)
 
 
 ## The main menu's three choices, made: the vehicle, then the map under the chosen weather.
@@ -99,6 +106,8 @@ func _process(delta: float) -> void:
     # Step posted first, vehicle posed last, same frame. See `PlayDrive.begin`.
     if _drive != null:
         _drive.begin(delta)
+    if _split != null:
+        _split.begin(delta)
     if _map.vegetation != null:
         _map.vegetation.focus_on(_camera.global_position)
     if _view.mode == PlayCamera.Mode.FREE:
@@ -106,10 +115,12 @@ func _process(delta: float) -> void:
     if _drive != null:
         _drive.finish()
         _view.follow(_drive, delta)
+    if _split != null:
+        _split.finish(delta, _frames % HUD_REFRESH_FRAMES == 0)
     _frames += 1
     if _hud.visible and _frames % HUD_REFRESH_FRAMES == 0:
         _hud.text = PlayHud.text(
-            get_viewport(), _weather.current(), PlayHud.footer(_drive)
+            get_viewport(), _weather.current(), PlayHud.footer(_drive if _split == null else null)
         )
 
 
@@ -134,7 +145,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_key(keycode: Key) -> void:
-    if _drive != null and _drive.on_key(keycode):
+    if _split != null:
+        if _split.on_key(keycode):
+            return
+    elif _drive != null and _drive.on_key(keycode):
         return
     match keycode:
         KEY_M:
@@ -289,6 +303,8 @@ func _change_vehicle(name: String) -> void:
         return
     _drive = drive
     _map.drive = drive
+    if _split != null:
+        _split.replace_first(drive)
     _drive.spawn = at
     _drive.spawn_heading = heading
     _vehicle_name = name
@@ -312,3 +328,26 @@ func _change_map(name: String) -> void:
     _map.change(name)
     if _menu != null:
         _menu.set_loaded(_map.name, _vehicle_name)
+
+
+## The second driver and the split picture. A failure is said and the session carries on alone.
+func _start_split() -> void:
+    var split: PlaySplit = PlaySplit.new()
+    split.name = "Split"
+    add_child(split)
+    var error: String = split.setup(
+        _world, _camera, _drive, Harness.args.get_string("vehicle", "")
+    )
+    if error != "":
+        printerr("PLAY  " + error)
+        split.queue_free()
+        return
+    _split = split
+    _map.after_hand = func(wanted: RorTerrain) -> void:
+        _split.hand_terrain(wanted, _map.terrain.get("data"))
+
+
+func _apply_graphics() -> void:
+    _graphics.apply(get_viewport(), _world, _map.vegetation)
+    if _split != null:
+        _split.copy_graphics(get_viewport())

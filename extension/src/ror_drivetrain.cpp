@@ -150,10 +150,24 @@ void RorDrivetrain::set_selector(int selector) {
     }
 }
 
+// Upstream's `Engine::startEngine`, which begins with `offStart`: the clutch, the gear and any
+// shift in progress go back to rest before the engine catches, and an automatic box is put in
+// first with DRIVE selected. Setting only the rpm left a respawned truck in whatever gear it had
+// reached — fourth after a three-second run — and it set off by itself from a standstill.
 void RorDrivetrain::start() {
+    m_acc = 0.0f;
+    m_clutch = 0.0f;
+    m_clutch_torque = 0.0f;
+    m_shifting = 0;
+    m_shift_val = 0;
+    m_shift_clock = 0.0f;
+    m_post_shifting = 0;
+    m_post_shift_clock = 0.0f;
     m_contact = true;
     m_running = true;
     m_rpm = m_idle_rpm;
+    m_gear = 1;
+    m_selector = 1;
 }
 
 void RorDrivetrain::stop() {

@@ -52,6 +52,9 @@ var _left_indicator: bool = false
 var _right_indicator: bool = false
 var _seconds: float = 0.0
 var _cockpit: Node3D
+## Which key does what for this driver. A one-driver window keeps `DriveKeys.SOLO`; a split
+## window hands each driver its own half of the keyboard.
+var keys: Dictionary = DriveKeys.SOLO
 
 
 ## Returns "" on success. `built` is a VehicleBuilder result.
@@ -190,44 +193,41 @@ func _snapshot() -> void:
 
 
 func on_key(keycode: Key) -> bool:
-    match keycode:
-        KEY_B:
+    match DriveKeys.action_of(keys, keycode):
+        "reverse":
             _set_selector(-1)
-        KEY_H:
+        "neutral":
             _set_selector(0)
-        KEY_G:
+        "drive":
             _set_selector(1)
-        KEY_R:
+        "respawn":
             # Back to where the map starts the vehicle, undamaged — what a person means by
-            # "reset". Recovery in place, which this used to do, is on Enter. The gears moved to
-            # make room: B backs it up, H is neutral.
+            # "reset". Recovery in place is its own key.
             _respawn()
-        KEY_I:
+        "ignition":
             if solver.engine_running():
                 solver.stop_engine()
             else:
-                solver.start_engine()
+                _start_engine()
             print("DRIVE  engine %s" % ("running" if solver.engine_running() else "off"))
-        KEY_L, KEY_N:
+        "lights":
             set_lights(not _lit)
-        KEY_K:
+        "main_beam":
             _main_beam = not _main_beam
             print("DRIVE  main beam %s" % ("on" if _main_beam else "off"))
-        KEY_Z:
+        "indicator_left":
             _left_indicator = not _left_indicator
             _right_indicator = false
             print("DRIVE  left indicator %s" % ("on" if _left_indicator else "off"))
-        KEY_C:
+        "indicator_right":
             _right_indicator = not _right_indicator
             _left_indicator = false
             print("DRIVE  right indicator %s" % ("on" if _right_indicator else "off"))
-        KEY_X:
+        "indicators_off":
             _left_indicator = false
             _right_indicator = false
             print("DRIVE  indicators off")
-        KEY_BACKSPACE:
-            _respawn()
-        KEY_ENTER:
+        "recover":
             _recover()
         _:
             return false
@@ -258,10 +258,10 @@ func hud_line() -> String:
 
 
 func _read_controls(delta: float) -> void:
-    var wants_throttle: bool = Input.is_key_pressed(KEY_UP)
+    var wants_throttle: bool = DriveKeys.held(keys, "throttle")
     if not is_nan(scripted_throttle):
         wants_throttle = scripted_throttle > 0.0
-    var wants_brake: bool = Input.is_key_pressed(KEY_DOWN)
+    var wants_brake: bool = DriveKeys.held(keys, "brake")
     _throttle = clampf(
         _throttle + (DriveCfg.THROTTLE_RATE if wants_throttle else -DriveCfg.THROTTLE_RATE) * delta,
         0.0,
@@ -271,13 +271,13 @@ func _read_controls(delta: float) -> void:
         _brake + (DriveCfg.BRAKE_RATE if wants_brake else -DriveCfg.BRAKE_RATE) * delta, 0.0, 1.0
     )
     var steer: float = 0.0
-    if Input.is_key_pressed(KEY_LEFT):
+    if DriveKeys.held(keys, "left"):
         steer += 1.0
-    if Input.is_key_pressed(KEY_RIGHT):
+    if DriveKeys.held(keys, "right"):
         steer -= 1.0
     solver.set_throttle(_throttle)
     solver.set_brake(_brake)
-    solver.set_parking_brake(Input.is_key_pressed(KEY_SPACE))
+    solver.set_parking_brake(DriveKeys.held(keys, "parking"))
     if not is_nan(scripted_steer):
         steer = scripted_steer
     solver.set_steer_command(DriveCfg.steer_command(steer))
@@ -330,7 +330,7 @@ func _recover() -> void:
         RigBuilder.heading_of(positions, truck.camera_nodes),
         DriveCfg.RECOVER_CLEARANCE_M
     )
-    solver.start_engine()
+    _start_engine()
     _snapshot()
     _apply_pose()
     print("DRIVE  recovered")
@@ -341,7 +341,7 @@ func _respawn() -> void:
     RigBuilder.place(solver, truck, spawn, spawn_heading, DriveCfg.SPAWN_HEIGHT_M)
     _lit = false
     _main_beam = false
-    solver.start_engine()
+    _start_engine()
     _snapshot()
     _apply_pose()
     print("DRIVE  respawned")
@@ -363,3 +363,14 @@ func _apply_cabin() -> void:
     Cockpit.update(
         _cockpit, float(_state.get("rpm", 0.0)), float(_state.get("road_speed", 0.0)), _lit
     )
+
+
+## Starting the engine puts an automatic box in first with DRIVE selected, as upstream's does, so
+## the selector this driver shows has to follow it. And the pedals start from rest: the throttle
+## ramps down over a quarter of a second after its key is let go, and a truck respawned inside that
+## quarter was put back at a standstill with its foot still down, and set off on its own.
+func _start_engine() -> void:
+    solver.start_engine()
+    _selector = 1
+    _throttle = 0.0
+    _brake = 0.0
