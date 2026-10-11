@@ -51,6 +51,12 @@ enum class BeamBound {
     // A support beam. Carries compression and nothing else: it holds a part up and lets it
     // be lifted away freely.
     SUPPORT = 3,
+    // `shocks2`: separate rates in and out, each made progressive towards its bound, and a hard
+    // or soft bump past it (`ror_shocks.cpp`).
+    SHOCK2 = 4,
+    // `shocks3`: separate rates in and out with two damping slopes split by speed, ramping to the
+    // structural rates past either bound (`ror_shocks.cpp`).
+    SHOCK3 = 5,
 };
 
 // A damped spring between two nodes. `rest_length` is live: steering and commands work
@@ -69,6 +75,8 @@ struct RorBeam {
     // is how far the beam may compress and `longbound` how far it may stretch.
     float short_bound = 0.0f;
     float long_bound = 0.0f;
+    // Index of a `shocks2` or `shocks3` beam's own rates in the solver's shock list, or -1.
+    int shock = -1;
     // The rates a shock ramps towards once it is past a bound: the rig's own structural
     // defaults where the shock was declared, not the shock's soft rates.
     float bound_spring = 0.0f;

@@ -314,7 +314,7 @@ void RorSolver::accumulate_beam_forces() {
                 static_cast<float>((a.velocity - b.velocity).dot(separation)) * inverted_length;
         float spring = beam.spring;
         float damping = beam.damping;
-        apply_bound_law(beam, extension, spring, damping);
+        apply_bound_law(beam, extension, closing_speed, spring, damping);
         float stress = -spring * extension - damping * closing_speed;
         stress = apply_beam_deformation(beam, extension, spring, stress, m_nodes);
         beam.stress = stress;
@@ -402,46 +402,6 @@ void RorSolver::set_node_cab(int node, bool is_cab) {
         return;
     }
     m_nodes[static_cast<size_t>(node)].cab_node = is_cab;
-}
-
-// What a beam does outside the travel it was given. Upstream's `CalcBeams` branches, and the
-// reason a rig has suspension rather than springs: a shock is soft over its own travel and
-// then hands over to the structure around it.
-void RorSolver::apply_bound_law(const RorBeam &beam, float extension, float &spring, float &damping) {
-    switch (beam.bound) {
-        case BeamBound::NORMAL:
-            return;
-        case BeamBound::SHOCK1: {
-            // How far past a bound the beam is, in metres. Not normalised, so the handover
-            // to the structural rates gets firmer the further it is pushed — which is what
-            // makes a bump stop feel like one instead of a wall.
-            float overshoot = 0.0f;
-            if (extension > beam.long_bound * beam.rest_length) {
-                overshoot = extension - beam.long_bound * beam.rest_length;
-            } else if (extension < -beam.short_bound * beam.rest_length) {
-                overshoot = -extension - beam.short_bound * beam.rest_length;
-            }
-            if (overshoot != 0.0f) {
-                spring += (beam.bound_spring - spring) * overshoot;
-                damping += (beam.bound_damp - damping) * overshoot;
-            }
-            return;
-        }
-        case BeamBound::ROPE:
-            // Slack: a rope pushes nothing.
-            if (extension < 0.0f) {
-                spring = 0.0f;
-                damping *= 0.1f;
-            }
-            return;
-        case BeamBound::SUPPORT:
-            // Lifted away: a support beam pulls nothing.
-            if (extension > 0.0f) {
-                spring = 0.0f;
-                damping *= 0.1f;
-            }
-            return;
-    }
 }
 
 // The world bounds of the rig, grown by the distance it could travel inside one call, handed to
@@ -590,7 +550,8 @@ float RorSolver::total_energy() const {
         // it is right at zero and right inside the travel, which is where a settled rig sits.
         float spring = beam.spring;
         float damping = beam.damping;
-        apply_bound_law(beam, extension, spring, damping);
+        // Potential, not force: the shocks' laws are asked about a beam at rest.
+        apply_bound_law(beam, extension, 0.0f, spring, damping);
         energy += 0.5f * spring * extension * extension;
     }
     return energy;

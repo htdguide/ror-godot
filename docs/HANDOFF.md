@@ -93,8 +93,8 @@ steering, gears, ignition, lights, respawn, chase camera and a HUD. The solver h
 a driven rig needs, each a port of upstream's own law and each in its own file: ground contact with
 static and Stribeck friction (`ror_ground`), wheel torque and braking (`ror_wheels`), engine,
 gearbox and clutch (`ror_drivetrain`), steering through hydro rest length (`ror_steering`), per-node
-air drag, travel bounds for shocks, ropes and support beams (which break past their limit), and a
-heightfield so it stands on terrain rather than a plane.
+air drag, travel bounds for shocks, ropes and support beams (which break past their limit), upstream's
+`shocks2`/`shocks3` laws (within 4e-7 of its own code), and a heightfield.
 
 **The 2 kHz gap is closed.** The rig settles at upstream's own rate and diverges at 1.5 kHz;
 `game/tools/stability_probe.gd` measures it by sweeping. Node masses did most of it (10 kHz to
@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-180 gates; `--all --every` 180 of 180 at the cab-rule commit (2026-10-12). `--order-check` has one
+181 gates; `--all --every` 181 of 181 at the shocks2/3 commit (2026-10-12). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 
@@ -307,9 +307,9 @@ What M1 still owes is human: 5 below.
 
 ## Checking against Rigs of Rods itself
 
-`tools/build_parity.sh` extracts a function from the pinned upstream submodule, compiles it on its
-own against a shim in `tools/parity/shim/`, and `upstream_contact_parity` compares it with ours case
-by case. Nothing is copied into the tree; a rename upstream fails extraction rather than comparing
+`tools/build_parity.sh` extracts functions from the pinned upstream submodule, compiles them on their
+own against a shim in `tools/parity/shim/`, and `upstream_contact_parity` and `shocks2_and_shocks3_…`
+compare them with ours case by case. Nothing is copied into the tree; a rename upstream fails extraction rather than comparing
 against a stale copy.
 
 **Upstream's physics is not exact arithmetic and must not be implemented as though it were.**

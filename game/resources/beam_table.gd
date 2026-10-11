@@ -48,6 +48,9 @@ func record(row: Dictionary) -> void:
             "bound_spring": row["bound_spring"],
             "bound_damp": row["bound_damp"],
             "precompression": row["precompression"],
+            # A `shocks2`/`shocks3` beam's own rates and its soft bump: see `BeamRows.joint`.
+            "rates": row.get("rates", PackedFloat32Array()),
+            "soft_bump": bool(row.get("soft_bump", false)),
         })
     beams.append(row["a"] as int)
     beams.append(row["b"] as int)

@@ -26,13 +26,16 @@ extends RefCounted
 ## own drive torque — the Burnside Drag reaching 88 degrees — and the two hub nodes are what
 ## rotate. The Burnside holds its suspension with eight `commands2`; the hero truck, which does
 ## not fold, has four.
-const NEVER_YIELDS: PackedStringArray = ["hydros", "commands", "commands2"]
+const NEVER_YIELDS: PackedStringArray = [
+    "hydros", "commands", "commands2", "shocks", "shocks2", "shocks3", "ropes",
+]
 
 ## Section name -> the field index its spring and damping start at, or -1 when the row
 ## carries none and the beam defaults in force apply instead.
 const SPRING_FIELD: Dictionary = {
     "shocks": 2,
     "shocks2": 2,
+    "shocks3": 2,
     "hydros": -1,
     "commands": -1,
     "commands2": -1,
@@ -61,14 +64,20 @@ const STRENGTH_SCALE: Dictionary = {
 
 ## What a section's beams do outside their travel, matching the solver's BeamBound. A shock
 ## ramps towards the structural rates past either bound; a rope carries tension only; a
-## support beam carries compression only.
+## support beam carries compression only; `shocks2` and `shocks3` have upstream's own laws.
+##
+## Until 2026-10-12 a `shocks2` beam ran the `shocks` law on its in rates alone, and a `shocks3`
+## beam was a plain beam on the defaults, with no travel and no pre-compression.
 const BOUND_NORMAL: int = 0
 const BOUND_SHOCK: int = 1
 const BOUND_ROPE: int = 2
 const BOUND_SUPPORT: int = 3
+const BOUND_SHOCK2: int = 4
+const BOUND_SHOCK3: int = 5
 const BOUND_TYPE: Dictionary = {
     "shocks": BOUND_SHOCK,
-    "shocks2": BOUND_SHOCK,
+    "shocks2": BOUND_SHOCK2,
+    "shocks3": BOUND_SHOCK3,
     "ropes": BOUND_ROPE,
     "supportbeams": BOUND_SUPPORT,
 }
@@ -259,8 +268,18 @@ static func joint(
         "bound_damp": defaults.damp_unscaled(),
         "precompression": 1.0,
     }
-    if (row["bound"] as int) == BOUND_SHOCK:
+    if SHOCK_BOUND_FIELD.has(section):
+        if fields.size() < int(SHOCK_BOUND_FIELD[section]) + 3:
+            # Upstream's `CheckNumArguments` drops a shock row short of its pre-compression.
+            return {"error": "row has %d fields, %s needs %d" % [
+                fields.size(), section, int(SHOCK_BOUND_FIELD[section]) + 3]}
         _read_shock_travel(section, fields, row, length_m)
+        if section != "shocks":
+            # Every rate between the nodes and the bounds, in the row's order.
+            var rates: PackedFloat32Array = PackedFloat32Array()
+            for i: int in range(2, int(SHOCK_BOUND_FIELD[section])):
+                rates.append(fields[i].to_float())
+            row["rates"] = rates
     return row
 
 
@@ -276,10 +295,16 @@ static func _read_shock_travel(
     var options: String = (
         fields[bound_at + 3] if fields.size() > bound_at + 3 else ""
     )
-    # The `m` option states the bounds in metres rather than as fractions of the beam.
+    # The `m` option states the bounds in metres rather than as fractions of the beam; `M`, in
+    # `shocks2` and `shocks3`, as the shortest and longest the beam may be, clamped as upstream
+    # clamps them.
     if options.contains("m") and length_m > 0.0:
         short_bound /= length_m
         long_bound /= length_m
+    if section != "shocks" and options.contains("M") and length_m > 0.0:
+        short_bound = minf((length_m - short_bound) / length_m, 1.0)
+        long_bound = maxf((long_bound - length_m) / length_m, 0.0)
+    row["soft_bump"] = section == "shocks2" and options.contains("s")
     row["short_bound"] = maxf(short_bound, 0.0)
     row["long_bound"] = maxf(long_bound, 0.0)
     if fields.size() > bound_at + 2:

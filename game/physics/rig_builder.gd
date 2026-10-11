@@ -213,6 +213,9 @@ static func _add_bounds(solver: RefCounted, truck: TruckParser) -> void:
             entry["bound_damp"] as float,
             entry["precompression"] as float
         )
+        var rates: PackedFloat32Array = entry.get("rates", PackedFloat32Array()) as PackedFloat32Array
+        if not rates.is_empty():
+            solver.set_beam_shock(entry["beam"] as int, rates, bool(entry.get("soft_bump", false)))
 
 
 static func _add_wheels(solver: RefCounted, truck: TruckParser) -> void:

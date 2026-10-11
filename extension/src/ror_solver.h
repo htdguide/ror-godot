@@ -7,6 +7,7 @@
 #include "ror_heightfield.h"
 #include "ror_obstacles.h"
 #include "ror_node.h"
+#include "ror_shocks.h"
 #include "ror_slidenode.h"
 #include "ror_step_worker.h"
 #include "ror_triangles.h"
@@ -17,6 +18,7 @@
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
+#include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
 #include <atomic>
@@ -114,6 +116,15 @@ public:
     godot::Vector3 ground_contact_probe(const godot::Vector3 &velocity, const godot::Vector3 &forces,
                                         float mass, float friction_coef, const godot::Vector3 &normal,
                                         float penetration, float dt) const;
+    // A `shocks2` (kind 4) or `shocks3` (kind 5) beam's own rates, in its row's order after the
+    // nodes: shocks2 spring_in, damp_in, sprog_in, dprog_in, spring_out, damp_out, sprog_out,
+    // dprog_out; shocks3 spring_in, damp_in, dslow_in, split_in, dfast_in, spring_out, damp_out,
+    // dslow_out, split_out, dfast_out. Call after `set_beam_bounds` gives it the kind.
+    void set_beam_shock(int beam, const godot::PackedFloat32Array &rates, bool soft_bump);
+    // Runs a `shocks2`/`shocks3` law once on a beam described by its arguments and returns the
+    // spring and damping it chooses, for comparison against upstream's own, case by case.
+    godot::Vector2 shock_law_probe(int kind, const godot::PackedFloat32Array &rates, bool soft_bump,
+                                   const godot::PackedFloat32Array &beam, float extension, float v) const;
     // The friction surface. Defaults to upstream's `concrete`.
     void set_ground_friction(float adhesion_velocity, float static_friction, float sliding_friction,
                              float hydrodynamic_friction, float stribeck_velocity, float strength);
@@ -224,6 +235,8 @@ public:
     // square root, not exactly. Exposed so a check of the force law can be made at the
     // extension the law was actually applied to, rather than at the one the caller intended.
     float get_beam_length(int beam) const;
+    // The force along the beam last substep, signed as upstream's `beam.stress`: negative pulls.
+    float get_beam_stress(int beam) const;
 
     // --- Wheels -----------------------------------------------------------------
     // `first_tread` and `tread_count` name the generated tread nodes, which alternate
@@ -417,7 +430,10 @@ private:
     int64_t m_self_contacts = 0;
     void integrate(float dt);
     void apply_air_drag();
-    static void apply_bound_law(const RorBeam &beam, float extension, float &spring, float &damping);
+    // `closing_speed` is the beam's rate of stretch, which the `shocks2`/`shocks3` laws read.
+    void apply_bound_law(const RorBeam &beam, float extension, float closing_speed, float &spring,
+                         float &damping) const;
+    std::vector<RorShock> m_shocks;
     void accumulate_beam_forces();
     void apply_ground_contact(float dt);
     void apply_obstacle_contact(float dt);

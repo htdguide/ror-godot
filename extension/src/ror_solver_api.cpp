@@ -488,6 +488,10 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_beam_bounds", "beam", "bound_type", "short_bound",
                                   "long_bound", "bound_spring", "bound_damp", "precompression"),
                          &RorSolver::set_beam_bounds);
+    ClassDB::bind_method(D_METHOD("get_beam_stress", "beam"), &RorSolver::get_beam_stress);
+    ClassDB::bind_method(D_METHOD("set_beam_shock", "beam", "rates", "soft_bump"), &RorSolver::set_beam_shock);
+    ClassDB::bind_method(D_METHOD("shock_law_probe", "kind", "rates", "soft_bump", "beam", "extension", "v"),
+                         &RorSolver::shock_law_probe);
     ClassDB::bind_method(D_METHOD("get_beam_rest_length", "beam"), &RorSolver::get_beam_rest_length);
     ClassDB::bind_method(D_METHOD("get_beam_reference_length", "beam"), &RorSolver::get_beam_reference_length);
     ClassDB::bind_method(D_METHOD("get_beam_length", "beam"), &RorSolver::get_beam_length);
