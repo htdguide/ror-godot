@@ -29,7 +29,8 @@ struct RorNode {
     bool ground_contact = false;
     // Part of a collision triangle, and how many unbroken beams still hold it. Upstream refuses
     // to break the last beams holding a cab node, because a hole in the collision mesh is worse
-    // than a beam that should have snapped.
+    // than a beam that should have snapped. Its `GetNumActiveConnectedBeams` counts only beams
+    // with no bound: a shock, rope or support beam on the node does not hold it.
     bool cab_node = false;
     int active_beams = 0;
     // Upstream's `nd_no_ground_contact`, node option `c` and every cinecam node: the node passes

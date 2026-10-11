@@ -149,7 +149,15 @@ void RorSolver::set_beam_bounds(int beam, int bound_type, float short_bound, flo
         return;
     }
     RorBeam &target = m_beams[beam];
+    // Only a beam with no bound counts towards what holds a cab node.
+    const bool counted_before = target.bound == BeamBound::NORMAL && !target.broken;
     target.bound = static_cast<BeamBound>(bound_type);
+    const bool counted_after = target.bound == BeamBound::NORMAL && !target.broken;
+    if (counted_before != counted_after) {
+        const int by = counted_after ? 1 : -1;
+        m_nodes[static_cast<size_t>(target.a)].active_beams += by;
+        m_nodes[static_cast<size_t>(target.b)].active_beams += by;
+    }
     target.short_bound = short_bound;
     target.long_bound = long_bound;
     target.bound_spring = bound_spring;
@@ -316,8 +324,7 @@ void RorSolver::accumulate_beam_forces() {
         const Vector3 force = separation * (stress * inverted_length);
         a.forces += force;
         b.forces -= force;
-        // Upstream's support beam stretched past its limit, `long_bound` lengths or 4 by default:
-        // it carries this substep's (slack) force and then is gone.
+        // Upstream's support beam past `long_bound` lengths (4 unset) breaks after this substep.
         if (beam.bound == BeamBound::SUPPORT && extension > 0.0f) {
             const float limit = beam.long_bound > 0.0f ? beam.long_bound : SUPPORT_BREAK_LIMIT;
             if (extension > beam.rest_length * limit) {

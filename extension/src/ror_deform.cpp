@@ -60,8 +60,10 @@ float apply_beam_deformation(RorBeam &beam, float extension, float spring, float
         if (!(nodes[beam.a].cab_node && nodes[beam.a].active_beams < 3)
                 && !(nodes[beam.b].cab_node && nodes[beam.b].active_beams < 3)) {
             beam.broken = true;
-            nodes[beam.a].active_beams -= 1;
-            nodes[beam.b].active_beams -= 1;
+            if (beam.bound == BeamBound::NORMAL) {
+                nodes[beam.a].active_beams -= 1;
+                nodes[beam.b].active_beams -= 1;
+            }
             return 0.0f;
         }
         // Held together, but softened: upstream halves what it can carry so the structure
