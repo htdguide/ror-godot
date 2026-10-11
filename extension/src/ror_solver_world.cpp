@@ -171,6 +171,21 @@ void RorSolver::set_node_contact_role(int node, bool contacter, bool rim) {
     m_collcabs.set_roles(node, m_nodes.size(), contacter, rim);
 }
 
+void RorSolver::set_node_tyre(int node) {
+    sync();
+    m_collcabs.set_tyre(node, m_nodes.size());
+}
+
+void RorSolver::set_self_collision(bool enabled) {
+    sync();
+    m_self_collision = enabled;
+}
+
+int64_t RorSolver::self_contact_count() const {
+    sync();
+    return m_self_contacts;
+}
+
 void RorSolver::set_node_ground_contact(int node, bool touches) {
     sync();
     if (node >= 0 && node < static_cast<int>(m_nodes.size())) {

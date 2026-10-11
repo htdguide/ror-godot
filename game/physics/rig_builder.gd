@@ -292,3 +292,9 @@ static func _add_collision_cabs(solver: RefCounted, truck: TruckParser) -> void:
         solver.set_node_contact_role(node, false, true)
     for node: int in truck.no_ground_contact:
         solver.set_node_ground_contact(node, false)
+    # Upstream's `nd_tyre_node`: every node a wheel generates except a flexbody wheel's rim, which
+    # never collides with its own vehicle. Cinecam nodes are generated too and are not tyres.
+    if truck.generated_from >= 0:
+        for node: int in range(truck.generated_from, truck.nodes.size()):
+            if not truck.rim_nodes.has(node) and not truck.no_ground_contact.has(node):
+                solver.set_node_tyre(node)

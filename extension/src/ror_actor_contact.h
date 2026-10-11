@@ -23,6 +23,8 @@ struct RorCollCabs {
     // Three nodes per triangle, in the file's order, which upstream calls `no`, `na`, `nb`.
     std::vector<int> triangles;
     std::vector<RorCollCabRate> rates;
+    // The same skip rates, kept apart for collisions with the actor's own nodes, as upstream does.
+    std::vector<RorCollCabRate> intra_rates;
     // Upstream's DEFAULT_COLLISION_RANGE: how close to a triangle's plane a node counts as in it.
     float range = 0.02f;
     // Per node: may this node hit another actor's triangles. Upstream's `nd_contactable`: every
@@ -31,6 +33,10 @@ struct RorCollCabs {
     // Per node, as the file says: a `contacters` row, or a rim node of a flexbody wheel.
     std::vector<uint8_t> contacter;
     std::vector<uint8_t> rim;
+    // Per node: a tyre node, which never collides with its own actor (upstream's `nd_tyre_node`).
+    std::vector<uint8_t> tyre;
+    // The contacters as a list, for the self-collision test, which tests nothing else.
+    std::vector<int> contacter_list;
     // Per node: the nodes a beam joins it to, for the back-face vote.
     std::vector<std::vector<int>> neighbours;
     size_t prepared_nodes = 0;
@@ -38,6 +44,7 @@ struct RorCollCabs {
 
     void add(int no, int na, int nb);
     void set_roles(int node, size_t node_count, bool is_contacter, bool is_rim);
+    void set_tyre(int node, size_t node_count);
     size_t contactable_count() const;
     // Rebuilds `contactable` and `neighbours` if the rig has grown since they were built.
     void prepare(const NodeArray &nodes, const BeamArray &beams);
@@ -52,6 +59,12 @@ struct RorCollCabs {
 int resolve_inter_actor(RorCollCabs &owner_cabs, NodeArray &owner_nodes,
                         const RorGroundModel &surface, const RorCollCabs &other_cabs,
                         NodeArray &other_nodes, const godot::Vector3 &other_to_owner, float dt);
+
+// One substep of upstream's `ResolveIntraActorCollisions`: an actor's own contacter nodes against
+// its own collision triangles, so a crushed cab cannot fold through itself. Tyre nodes and a
+// triangle's own corners are skipped; the back face is simply the far side of the plane.
+int resolve_intra_actor(RorCollCabs &cabs, NodeArray &nodes, const RorGroundModel &surface,
+                        float dt);
 
 // Upstream resets every triangle's skip rate when two actors close on each other faster than
 // 4 m/s, so a fast approach is never tested late.

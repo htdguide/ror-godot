@@ -934,8 +934,18 @@ against the rule applied to the parsed file, with and without the contacters and
 `c` (no ground contact) is read too, from the row or `set_node_defaults`, and every cinecam node
 gets it as upstream's does: such a node skips the ground, boxes and triangles, leaves the spawn's
 height alone and is not contactable (`a_node_marked_c_touches_no_ground`; 15 library vehicles mark
-nodes `c`). Not yet: lockstep islands on workers (serial today; separate actors already run on two
-cores), intra-actor collision, sleeping.
+nodes `c`). **Self-collision** too: upstream's `ResolveIntraActorCollisions` after the beams every
+substep — an actor's contacters against its own collision triangles, tyre nodes and a triangle's own
+corners skipped — so a crushed cab folds against itself (`a_vehicle_does_not_fold_through_itself`:
+a dropped contacter rests 20.0 mm, the collision range, above its own triangle and falls through
+with self-collision off or as a tyre; the hero's 32.7 m/s crash resolves 4424 self-contacts).
+**It is built and switched off by default, for a person to decide**: on, `a_recovered_rig_is_whole`
+breaks one cab beam (79-195) when the hero is recovered from its 0.40 m, and recovering it from
+0.30 to 0.50 m in 1 cm steps breaks none, on or off (`harness/dev/self_contact_probe.gd`) — a knife
+edge the extra contacts push one landing over, not a systematic fault, but that gate's claim came
+from a session and is not the new code's to loosen. At rest two hero contacters sit just inside
+their own triangles' 2 cm range (208 and 202, at the triangles' edges), which upstream's identical
+test would push too. Not yet: lockstep islands on workers (serial today; separate actors already run on two cores), sleeping.
 `meshwheels2` tyres are not contactable upstream either, so the hero's wheels pass into the other
 truck until the bodies meet.
 

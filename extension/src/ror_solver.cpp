@@ -202,6 +202,7 @@ void RorSolver::step_now(float dt, int substeps) {
 // the rig moves centimetres inside one call, and testing every box against every node at
 // 2 kHz would cost more than the simulation it is protecting.
 void RorSolver::begin_steps() {
+    m_collcabs.prepare(m_nodes, m_beams);
     follow_frame();
     select_nearby_obstacles();
 }
@@ -215,6 +216,11 @@ void RorSolver::substep(float dt, bool first) {
     m_drivetrain.step(dt, m_wheels.driven_spin() * RAD_PER_SEC_TO_RPM, first);
     m_wheels.apply(m_nodes, m_drivetrain.clutch_torque(), dt);
     accumulate_beam_forces();
+    // Upstream's `CalcCabCollisions`, after the beams and before the slide nodes: the rig's own
+    // contacters against its own collision triangles.
+    if (m_self_collision) {
+        m_self_contacts += resolve_intra_actor(m_collcabs, m_nodes, m_ground_models[0], dt);
+    }
     // Before the ground: a slide node is structure, and the contact laws below want a
     // node's structural force already in.
     apply_slide_nodes(m_slide_nodes, m_nodes);

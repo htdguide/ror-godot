@@ -156,6 +156,14 @@ public:
     // Which of a node's contact roles the file gives it: a `contacters` row, or a flexbody
     // wheel's rim. Either makes it hit other vehicles' collision triangles.
     void set_node_contact_role(int node, bool contacter, bool rim);
+    // A generated tyre node, which never collides with its own actor.
+    void set_node_tyre(int node);
+    // Upstream's self-collisions, on in upstream unless `sim_no_self_collisions`. **Off here by
+    // default until a person decides**: on, the hero recovered from 0.40 m breaks one cab beam
+    // (79-195) where 0.30-0.50 m in 1 cm steps break none — see PLAN §0.12, splitscreen.
+    void set_self_collision(bool enabled);
+    // How many self-contacts have been resolved since the solver was built.
+    int64_t self_contact_count() const;
     // Upstream's node option `c`: false lets the node pass through the ground and the scenery.
     void set_node_ground_contact(int node, bool touches);
     // How many nodes other vehicles' triangles can hit, by upstream's rule.
@@ -348,6 +356,8 @@ private:
     void begin_steps();
     void substep(float dt, bool first);
     RorCollCabs m_collcabs;
+    bool m_self_collision = false;
+    int64_t m_self_contacts = 0;
     void integrate(float dt);
     void apply_air_drag();
     static void apply_bound_law(const RorBeam &beam, float extension, float &spring, float &damping);

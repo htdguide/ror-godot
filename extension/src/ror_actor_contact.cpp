@@ -27,7 +27,16 @@ void RorCollCabs::add(int no, int na, int nb) {
     triangles.push_back(na);
     triangles.push_back(nb);
     rates.emplace_back();
+    intra_rates.emplace_back();
     prepared_nodes = 0;
+}
+
+void RorCollCabs::set_tyre(int node, size_t node_count) {
+    if (node < 0 || static_cast<size_t>(node) >= node_count) {
+        return;
+    }
+    tyre.resize(node_count, 0);
+    tyre[static_cast<size_t>(node)] = 1;
 }
 
 void RorCollCabs::set_roles(int node, size_t node_count, bool is_contacter, bool is_rim) {
@@ -56,6 +65,13 @@ void RorCollCabs::prepare(const NodeArray &nodes, const BeamArray &beams) {
     contactable.assign(nodes.size(), 0);
     rim.resize(nodes.size(), 0);
     contacter.resize(nodes.size(), 0);
+    tyre.resize(nodes.size(), 0);
+    contacter_list.clear();
+    for (size_t i = 0; i < nodes.size(); ++i) {
+        if (contacter[i]) {
+            contacter_list.push_back(static_cast<int>(i));
+        }
+    }
     std::vector<uint8_t> on_triangle(nodes.size(), 0);
     for (int node : triangles) {
         if (node >= 0 && static_cast<size_t>(node) < nodes.size()) {
@@ -83,6 +99,97 @@ void RorCollCabs::prepare(const NodeArray &nodes, const BeamArray &beams) {
     }
     prepared_nodes = nodes.size();
     prepared_beams = beams.size();
+}
+
+int resolve_intra_actor(RorCollCabs &cabs, NodeArray &nodes, const RorGroundModel &surface,
+                        float dt) {
+    if (cabs.contacter_list.empty() || cabs.count() == 0) {
+        return 0;
+    }
+    const float range = cabs.range;
+    const Vector3 pad(range, range, range);
+    int contacts = 0;
+    for (size_t t = 0; t < cabs.count(); ++t) {
+        RorCollCabRate &rate = cabs.intra_rates[t];
+        if (rate.rate > 0) {
+            rate.distance++;
+            rate.rate--;
+            continue;
+        }
+        if (rate.distance > 0) {
+            rate.rate = std::min(rate.distance, MAX_SKIP);
+            rate.distance = 0;
+        }
+        const int corner_o = cabs.triangles[t * 3];
+        const int corner_a = cabs.triangles[t * 3 + 1];
+        const int corner_b = cabs.triangles[t * 3 + 2];
+        RorNode &no = nodes[static_cast<size_t>(corner_o)];
+        RorNode &na = nodes[static_cast<size_t>(corner_a)];
+        RorNode &nb = nodes[static_cast<size_t>(corner_b)];
+        const Vector3 box_low = no.position.min(na.position).min(nb.position) - pad;
+        const Vector3 box_high = no.position.max(na.position).max(nb.position) + pad;
+        bool built = false;
+        bool collision = false;
+        Basis to_triangle;
+        Vector3 normal;
+        for (int index : cabs.contacter_list) {
+            RorNode &hit = nodes[static_cast<size_t>(index)];
+            const Vector3 &p = hit.position;
+            if (p.x < box_low.x || p.y < box_low.y || p.z < box_low.z || p.x > box_high.x ||
+                p.y > box_high.y || p.z > box_high.z) {
+                continue;
+            }
+            // "ignore wheel/chassis self contact", and a triangle never hits its own corners.
+            if (cabs.tyre[static_cast<size_t>(index)] || index == corner_o || index == corner_a ||
+                index == corner_b) {
+                continue;
+            }
+            if (!built) {
+                const Vector3 u = na.position - no.position;
+                const Vector3 v = nb.position - no.position;
+                normal = u.cross(v).normalized();
+                Basis spans;
+                spans.set_column(0, u);
+                spans.set_column(1, v);
+                spans.set_column(2, normal);
+                to_triangle = spans.inverse();
+                built = true;
+            }
+            const Vector3 local = to_triangle.xform(p - no.position);
+            const float alpha = static_cast<float>(local.x);
+            const float beta = static_cast<float>(local.y);
+            const float gamma = 1.0f - alpha - beta;
+            float distance = static_cast<float>(local.z);
+            if (alpha < 0.0f || beta < 0.0f || gamma < 0.0f || std::abs(distance) > range) {
+                continue;
+            }
+            collision = true;
+            Vector3 facing = normal;
+            if (distance < 0.0f) {
+                facing = -facing;
+                distance = -distance;
+            }
+            const float penetration = range - distance;
+            const Vector3 velocity =
+                    hit.velocity - (na.velocity * alpha + nb.velocity * beta + no.velocity * gamma);
+            const float triangle_mass = na.mass * alpha + nb.mass * beta + no.mass * gamma;
+            const float mass = (hit.mass * triangle_mass) / (hit.mass + triangle_mass);
+            const Vector3 force =
+                    ground_contact_force(hit, velocity, mass, facing, penetration, dt, surface);
+            hit.forces += force;
+            na.forces -= force * alpha;
+            nb.forces -= force * beta;
+            no.forces -= force * gamma;
+            ++contacts;
+        }
+        // Upstream's own numbers: a triangle that hit is tested every substep for a long while.
+        if (collision) {
+            rate.rate = -20000;
+        } else {
+            rate.rate++;
+        }
+    }
+    return contacts;
 }
 
 void reset_rates(RorCollCabs &cabs) {
