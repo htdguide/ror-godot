@@ -914,8 +914,34 @@ map, the gate fails. Two solvers already step on two workers, so SMP across acto
 Building it found two respawn faults that a one-truck window also has: the automatic box kept the
 gear it had reached (upstream's `startEngine` resets it through `offStart`, now ported), and the
 pedal ramp kept the throttle down for a quarter second after its key was let go, so a truck
-respawned in that window set off by itself. **Phase 2 is contact between the two** — today they
-pass through each other, because each `RorSolver` knows only its own nodes — and islands follow.
+respawned in that window set off by itself.
+
+**Phase 2 built, 2026-10-11: they collide.** `RorWorld` (C++) steps several solvers. Each call it
+partitions them into islands from their bounds and the causality bound — two actors share one when
+the gap between their boxes is under (v_max + v_max) x call length + collision range, derived
+fresh, no history — steps a lone actor on its own worker and an island of several in lockstep on
+the calling thread, with upstream's `ResolveInterActorCollisions` after every substep: each actor's
+collision triangles (`cab` rows with option c, p, u, D, F or S; 242 on the hero) against the other's
+contactable nodes, converted into the owner's frame for the contact only, through the ground's
+contact law on the relative velocity and reduced mass (`ror_actor_contact.cpp`, the law's second
+overload). `two_vehicles_collide`: 200 m apart two islands and 6 m one; 90 frames of lockstep
+without contact bit-equal to stepping alone; a truck thrown at a floating one at 8 m/s hands over
+69.1% of its momentum with the total conserved to 0.000%, and none without the world; dropping one
+triangle corner's share of the force (the third law broken once) drifts 1.2% and fails it.
+Not yet: lockstep islands on workers (serial today; separate actors already run on two cores),
+contacters and rim nodes (`contacters` unparsed; `meshwheels2` tyres are not contactable upstream
+either, so a wheel passes into the other truck until the bodies meet), intra-actor collision,
+sleeping.
+
+**Splitscreen is slow, and fullscreen slower — said from a session, 2026-10-11, not yet
+measured.** Suspects in order: the scene is drawn twice (two `SubViewport`s, each with its own
+shadow pass, sky and cloud march, at full window height); then the pixel count of fullscreen
+itself, which on a GTX 1070 at native 1080p is the whole story. The second is answered now:
+`GraphicsSettings` has a Resolution row (Native, 1440p, 1080p, 900p, 720p — the height the 3D image
+is drawn at, upscaled by FSR 2, never above the window), and the scale follows the window, which it
+did not: a window taken fullscreen by its title bar kept the scale of the size it opened at. The
+first wants `the_frame_costs_what_each_feature_costs` run with a split window before anything is
+changed.
 
 ### 0.13 Seeing a long way: the whole map, whatever size it is
 

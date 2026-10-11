@@ -52,6 +52,10 @@ var _left_indicator: bool = false
 var _right_indicator: bool = false
 var _seconds: float = 0.0
 var _cockpit: Node3D
+## When a `RorWorld` steps this vehicle together with others, `begin` reads the controls and works
+## out the substeps but leaves the stepping to the world, which reads them from here.
+var world_stepped: bool = false
+var substeps_wanted: int = 0
 ## Which key does what for this driver. A one-driver window keeps `DriveKeys.SOLO`; a split
 ## window hands each driver its own half of the keyboard.
 var keys: Dictionary = DriveKeys.SOLO
@@ -144,7 +148,8 @@ func begin(delta: float) -> void:
     var substeps: int = mini(int(wanted), DriveCfg.MAX_SUBSTEPS_PER_FRAME)
     _substep_remainder = wanted - float(substeps)
     _stepped = substeps > 0
-    if not _stepped:
+    substeps_wanted = substeps
+    if not _stepped or world_stepped:
         return
     if synchronous:
         solver.step(1.0 / DriveCfg.SUBSTEP_HZ, substeps)

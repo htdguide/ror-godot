@@ -4,6 +4,7 @@
 #include "ogre_mesh.h"
 #include "ror_flex.h"
 #include "ror_solver.h"
+#include "ror_world.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
@@ -20,6 +21,7 @@ void initialize_rorbridge_module(ModuleInitializationLevel p_level) {
     GDREGISTER_CLASS(rorgd::OgreMeshReader);
     GDREGISTER_CLASS(rorgd::DdsReader);
     GDREGISTER_CLASS(rorgd::RorSolver);
+    GDREGISTER_CLASS(rorgd::RorWorld);
 }
 
 void uninitialize_rorbridge_module(ModuleInitializationLevel p_level) {

@@ -151,6 +151,26 @@ void RorSolver::follow_frame() {
     ++m_frame_moves;
 }
 
+void RorSolver::add_collision_cab(int node_o, int node_a, int node_b) {
+    sync();
+    const int count = static_cast<int>(m_nodes.size());
+    if (node_o < 0 || node_a < 0 || node_b < 0 || node_o >= count || node_a >= count ||
+        node_b >= count) {
+        return;
+    }
+    m_collcabs.add(node_o, node_a, node_b);
+}
+
+int RorSolver::collision_cab_count() const {
+    sync();
+    return static_cast<int>(m_collcabs.count());
+}
+
+void RorSolver::set_collision_range(float metres) {
+    sync();
+    m_collcabs.range = metres;
+}
+
 Vector2i RorSolver::get_beam_nodes(int beam) const {
     sync();
     if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {

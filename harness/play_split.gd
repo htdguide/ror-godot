@@ -4,15 +4,12 @@ extends Node
 ##
 ## PLAN §0.12 names splitscreen as the cheapest honest test of everything multi-actor that does not
 ## need a network: two actors, two frames, two solvers, and a person able to drive one into the
-## other. This is its first step and it is only the window: a second vehicle with its own solver,
-## its own half of the keyboard (`DriveKeys`), its own chase camera and its own readout.
+## other. Here that is a second vehicle with its own solver, its own half of the keyboard
+## (`DriveKeys`), its own chase camera and its own readout.
 ##
-## **What it does not do yet: the two vehicles pass through each other.** Actor-to-actor contact
-## does not exist in the solver — `contacters` is unparsed and each `RorSolver` knows only its own
-## nodes — and is the next step, with islands after it.
-##
-## Each solver already steps on a worker of its own (`step_async`), so two vehicles are already two
-## cores: SMP across actors, which PLAN §0.12 schedules with islands, costs nothing to start with.
+## **The two vehicles collide**: both are stepped by one `RorWorld`, which puts them in one island
+## when the causality bound says they could touch this frame and resolves upstream's inter-actor
+## contact between them, and otherwise steps each on its own worker — two cores while apart.
 ##
 ## The 3D picture moves out of the root viewport into two `SubViewport`s that share its world, one
 ## per half, each with a copy of the session camera. The copy shares the camera's attributes
@@ -27,6 +24,8 @@ const HUD_FONT_PX: int = 14
 var first: PlayDrive = null
 var second: PlayDrive = null
 
+## Steps both vehicles together, and puts them in contact when they are near: see `RorWorld`.
+var _world: RorWorld = RorWorld.new()
 var _views: Array[PlayCamera] = []
 var _cameras: Array[Camera3D] = []
 var _ports: Array[SubViewport] = []
@@ -54,6 +53,7 @@ func setup(world: Node3D, camera: Camera3D, driver: PlayDrive, vehicle_spec: Str
     second = other
     first.keys = DriveKeys.SPLIT_LEFT
     second.keys = DriveKeys.SPLIT_RIGHT
+    _join_world()
     place_second()
     _build_halves(camera)
     print(DriveKeys.help(DriveKeys.SPLIT_LEFT, "LEFT "))
@@ -92,11 +92,16 @@ func hand_terrain(wanted: RorTerrain, data: Object) -> void:
 func replace_first(driver: PlayDrive) -> void:
     first = driver
     first.keys = DriveKeys.SPLIT_LEFT
+    _join_world()
 
 
+## The second driver's controls, then both vehicles stepped together. The session has already
+## called the first driver's `begin`, which worked out this frame's substeps and stepped nothing.
 func begin(delta: float) -> void:
-    if second != null:
-        second.begin(delta)
+    if second == null:
+        return
+    second.begin(delta)
+    _world.step(1.0 / DriveCfg.SUBSTEP_HZ, first.substeps_wanted)
 
 
 ## After both drivers have finished their frame: the second's pose, both cameras, both readouts.
@@ -176,3 +181,13 @@ func _build_halves(camera: Camera3D) -> void:
         _labels.append(label)
     camera.current = false
     copy_graphics(camera.get_viewport())
+
+
+## Both vehicles in one world, stepped by it rather than by themselves.
+func _join_world() -> void:
+    if first == null or second == null:
+        return
+    _world.clear()
+    for driver: PlayDrive in [first, second]:
+        driver.world_stepped = true
+        _world.add_solver(driver.solver as RorSolver)

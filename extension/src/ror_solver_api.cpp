@@ -233,6 +233,10 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("speed_limit_hits"), &RorSolver::speed_limit_hits);
     ClassDB::bind_method(D_METHOD("set_frame_follows", "follows"), &RorSolver::set_frame_follows);
     ClassDB::bind_method(D_METHOD("get_beam_nodes", "beam"), &RorSolver::get_beam_nodes);
+    ClassDB::bind_method(D_METHOD("add_collision_cab", "node_o", "node_a", "node_b"),
+                         &RorSolver::add_collision_cab);
+    ClassDB::bind_method(D_METHOD("collision_cab_count"), &RorSolver::collision_cab_count);
+    ClassDB::bind_method(D_METHOD("set_collision_range", "metres"), &RorSolver::set_collision_range);
     ClassDB::bind_method(D_METHOD("get_beam_damping", "beam"), &RorSolver::get_beam_damping);
     ClassDB::bind_method(D_METHOD("set_beam_damping", "beam", "damping"), &RorSolver::set_beam_damping);
     ClassDB::bind_method(D_METHOD("frame_moves"), &RorSolver::frame_moves);

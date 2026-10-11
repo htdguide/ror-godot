@@ -81,5 +81,8 @@ inline void ground_model_at(std::vector<RorGroundModel> &models, int index, Appl
 
 godot::Vector3 ground_contact_force(const RorNode &node, const godot::Vector3 &normal, float penetration,
                                     float dt, const RorGroundModel &model);
+godot::Vector3 ground_contact_force(const RorNode &node, const godot::Vector3 &velocity, float mass,
+                                    const godot::Vector3 &normal, float penetration, float dt,
+                                    const RorGroundModel &model);
 
 } // namespace rorgd

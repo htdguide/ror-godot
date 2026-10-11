@@ -9,6 +9,9 @@ extends RefCounted
 ## actuator. Spread across the callers, one of them always ends up with a rig that is
 ## subtly not the one the others are testing.
 
+## The cab options that make a triangle one other actors collide with. See `_add_collision_cabs`.
+const COLLISION_CAB_OPTIONS: PackedStringArray = ["c", "p", "u", "D", "F", "S"]
+
 ## Upstream's SimConstants defaults, for a rig whose beam defaults say nothing.
 const DEFAULT_SPRING: float = 9000000.0
 const DEFAULT_DAMP: float = 12000.0
@@ -71,6 +74,7 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
     # holding one, because a hole in the cab is worse than a beam that should have snapped.
     for node: int in truck.submeshes.cab_triangles:
         solver.set_node_cab(node, true)
+    _add_collision_cabs(solver, truck)
 
     _add_bounds(solver, truck)
     _add_wheels(solver, truck)
@@ -257,3 +261,22 @@ static func _configure_engine(solver: RefCounted, truck: TruckParser) -> void:
         drive["stall_rpm"] as float,
         drive["braking_torque"] as float
     )
+
+
+## The cab triangles other vehicles collide with: upstream's `collcabs`, the rows whose options
+## say `c` contact, `p` ten times tougher or `u` invulnerable, or their buoyant twins `D`, `F`
+## and `S` (ActorSpawner.cpp, the cab section). The rest are drawn and float but are not hit.
+static func _add_collision_cabs(solver: RefCounted, truck: TruckParser) -> void:
+    var triangles: PackedInt32Array = truck.submeshes.cab_triangles
+    var options: PackedStringArray = truck.submeshes.cab_options
+    for index: int in options.size():
+        var option: String = options[index]
+        var collides: bool = false
+        for letter: String in COLLISION_CAB_OPTIONS:
+            if option.contains(letter):
+                collides = true
+                break
+        if collides:
+            solver.add_collision_cab(
+                triangles[index * 3], triangles[index * 3 + 1], triangles[index * 3 + 2]
+            )

@@ -192,27 +192,35 @@ float RorSolver::get_beam_length(int beam) const {
 // same rate as the rest: its clutch couples an engine of 0.12 kg m2 to the road through a
 // stiff spring, and at frame rate that system does not integrate.
 void RorSolver::step_now(float dt, int substeps) {
-    // The obstacles near the rig, found once per call rather than per substep: they never move,
-    // the rig moves centimetres inside one call, and testing every box against every node at
-    // 2 kHz would cost more than the simulation it is protecting.
+    begin_steps();
+    for (int i = 0; i < substeps; ++i) {
+        substep(dt, i == 0);
+    }
+}
+
+// The obstacles near the rig, found once per call rather than per substep: they never move,
+// the rig moves centimetres inside one call, and testing every box against every node at
+// 2 kHz would cost more than the simulation it is protecting.
+void RorSolver::begin_steps() {
     follow_frame();
     select_nearby_obstacles();
-    for (int i = 0; i < substeps; ++i) {
-        integrate(dt);
-        apply_air_drag();
-        m_steering.update(dt, m_wheels.driven_speed(), m_beams);
-        // The first substep of a call stands in for upstream's per-frame pass, which is
-        // the rate it makes gear decisions at.
-        m_drivetrain.step(dt, m_wheels.driven_spin() * RAD_PER_SEC_TO_RPM, i == 0);
-        m_wheels.apply(m_nodes, m_drivetrain.clutch_torque(), dt);
-        accumulate_beam_forces();
-        // Before the ground: a slide node is structure, and the contact laws below want a
-        // node's structural force already in.
-        apply_slide_nodes(m_slide_nodes, m_nodes);
-        apply_triangle_forces(m_nodes, m_triangles, m_ground_models, dt);
-        // Last, because the contact law works on the node's fully accumulated force.
-        apply_ground_contact(dt);
-    }
+}
+
+void RorSolver::substep(float dt, bool first) {
+    integrate(dt);
+    apply_air_drag();
+    m_steering.update(dt, m_wheels.driven_speed(), m_beams);
+    // The first substep of a call stands in for upstream's per-frame pass, which is
+    // the rate it makes gear decisions at.
+    m_drivetrain.step(dt, m_wheels.driven_spin() * RAD_PER_SEC_TO_RPM, first);
+    m_wheels.apply(m_nodes, m_drivetrain.clutch_torque(), dt);
+    accumulate_beam_forces();
+    // Before the ground: a slide node is structure, and the contact laws below want a
+    // node's structural force already in.
+    apply_slide_nodes(m_slide_nodes, m_nodes);
+    apply_triangle_forces(m_nodes, m_triangles, m_ground_models, dt);
+    // Last, because the contact law works on the node's fully accumulated force.
+    apply_ground_contact(dt);
 }
 
 // Velocity from the force accumulated last step, then position from the new velocity,

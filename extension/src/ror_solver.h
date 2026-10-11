@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ror_actor_contact.h"
 #include "ror_drivetrain.h"
 #include "ror_ground.h"
 #include "ror_heightfield.h"
@@ -41,6 +42,9 @@ namespace rorgd {
 // opportunistically.
 class RorSolver : public godot::RefCounted {
     GDCLASS(RorSolver, godot::RefCounted)
+    // Steps several solvers together and resolves contact between them; reaches the nodes, the
+    // frame and the substep directly. See ror_world.h.
+    friend class RorWorld;
 
 protected:
     static void _bind_methods();
@@ -145,6 +149,12 @@ public:
     void add_node_force(int node, const godot::Vector3 &force);
     // Actuation. Changing a beam's rest length is how upstream moves a rig from within.
     void set_beam_rest_length(int beam, float length);
+    // A cab triangle other actors collide with: upstream's `collcab`, a `cab` row with option c, p
+    // or u (or their buoyant twins). Node order is the file's. See ror_actor_contact.h.
+    void add_collision_cab(int node_o, int node_a, int node_b);
+    int collision_cab_count() const;
+    // Upstream's `set_collision_range`; 0.02 m unless a file says otherwise.
+    void set_collision_range(float metres);
     // A beam's two nodes and its damping, read and set: for probes that change one family of
     // beams to see whether it is the cause of something, never for building a rig.
     godot::Vector2i get_beam_nodes(int beam) const;
@@ -326,6 +336,11 @@ private:
 
     // The step itself, with no waiting and no timing: what both `step` and the worker run.
     void step_now(float dt, int substeps);
+    // `step_now` in its two parts, so a world can interleave several solvers substep by substep:
+    // what is done once per call, then one substep. `first` is the call's first substep.
+    void begin_steps();
+    void substep(float dt, bool first);
+    RorCollCabs m_collcabs;
     void integrate(float dt);
     void apply_air_drag();
     static void apply_bound_law(const RorBeam &beam, float extension, float &spring, float &damping);

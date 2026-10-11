@@ -33,4 +33,7 @@ static func triangle(fields: PackedStringArray, id_to_index: Dictionary) -> Dict
         if node < 0:
             return {"error": "row references an unknown node"}
         out.append(node)
-    return {"error": "", "nodes": out}
+    # The fourth field is the triangle's options: `c` contact, `b` buoyant and the rest. Which of
+    # them make a collision triangle is the builder's business; the row keeps what it says.
+    var options: String = fields[3].strip_edges() if fields.size() > 3 else ""
+    return {"error": "", "nodes": out, "options": options}

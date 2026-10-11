@@ -25,6 +25,8 @@ var groups: Array[Dictionary] = []
 ## Every cab triangle in the file, flat, in node indices. The solver takes the cab as one surface
 ## and does not care which panel a triangle came from.
 var cab_triangles: PackedInt32Array = PackedInt32Array()
+## Each cab triangle's option letters, one entry per triangle in `cab_triangles` order.
+var cab_options: PackedStringArray = PackedStringArray()
 ## Every texture coordinate in the file, flat, with the node each belongs to beside it.
 var texcoord_nodes: PackedInt32Array = PackedInt32Array()
 var texcoords: PackedVector2Array = PackedVector2Array()
@@ -47,6 +49,7 @@ func read_cab(fields: PackedStringArray, id_to_index: Dictionary) -> String:
     if (row["error"] as String) != "":
         return row["error"] as String
     cab_triangles.append_array(row["nodes"] as PackedInt32Array)
+    cab_options.append(row["options"] as String)
     triangle(row["nodes"] as PackedInt32Array)
     return ""
 
