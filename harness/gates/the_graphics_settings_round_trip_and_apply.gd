@@ -95,6 +95,20 @@ func run(_harness: Node) -> Dictionary:
     loaded.apply_to_viewport(viewport)
     if not is_equal_approx(viewport.scaling_3d_scale, 1.0) or viewport.scaling_3d_mode != Viewport.SCALING_3D_MODE_BILINEAR:
         problems.append("auto scale on a 1080-row viewport read back as %.2f mode %d" % [viewport.scaling_3d_scale, viewport.scaling_3d_mode])
+    # A chosen resolution: 720p on a 2160-row window is a third, upscaled; Native is 1:1; and a
+    # resolution taller than the window never draws above it.
+    viewport.size = Vector2i(3840, 2160)
+    for case: Array in [[4, 720.0 / 2160.0], [0, 1.0], [2, 0.5]]:
+        loaded.set_value("resolution", case[0])
+        loaded.apply_to_viewport(viewport)
+        if absf(viewport.scaling_3d_scale - (case[1] as float)) > 0.001:
+            problems.append("resolution %s on 2160 rows read back as scale %.3f" % [
+                GraphicsSettings.RESOLUTIONS[case[0] as int], viewport.scaling_3d_scale])
+    viewport.size = Vector2i(1280, 720)
+    loaded.set_value("resolution", 1)
+    loaded.apply_to_viewport(viewport)
+    if not is_equal_approx(viewport.scaling_3d_scale, 1.0):
+        problems.append("1440p on a 720-row window drew at %.2f" % viewport.scaling_3d_scale)
     viewport.free()
     if not problems.is_empty():
         return fail("; ".join(problems), problems.size())

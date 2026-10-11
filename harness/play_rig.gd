@@ -76,6 +76,13 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
     _map.drive = _drive
     _graphics.load_from()
     _graphics.apply(get_viewport(), _world)
+    # The scale is worked out from the window's height, so it has to follow the window: going
+    # fullscreen by the title bar, or dragging a corner, kept the scale of the size it started at.
+    # Only the viewport's share — reapplying the window mode here would undo that very change.
+    get_viewport().size_changed.connect(func() -> void:
+        _graphics.apply_to_viewport(get_viewport())
+        if _split != null:
+            _split.copy_graphics(get_viewport()))
     if _split != null:
         _split.copy_graphics(get_viewport())
     _weather.after_put = func() -> void: _apply_graphics()

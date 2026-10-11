@@ -27,13 +27,20 @@ const CLOUD_LIGHT_STEPS: PackedInt32Array = [2, 2, 4]
 ## upscaled to the window. A fullscreen retina window is 2234 rows and 3.7 times the pixels of
 ## 1080p; drawn at 1440 rows with FSR 2 the full scene went from 37 ms to 21 ms.
 const AUTO_ROWS: float = 1440.0
+## The heights a person can ask the 3D image to be drawn at, upscaled to the window. Asked for
+## after a session found fullscreen far slower than a small window — on the dev Mac a fullscreen
+## window is 3.7 times the pixels of 1080p, and a GTX 1070 drawing native 1080p fullscreen is the
+## same story at a smaller scale. 1440p is the automatic cap this project already had.
+const RESOLUTIONS: PackedStringArray = ["Native", "1440p", "1080p", "900p", "720p"]
+const RESOLUTION_ROWS: PackedFloat32Array = [0.0, 1440.0, 1080.0, 900.0, 720.0]
 
 ## The defaults: what a fresh install draws with. Measured, not guessed: the first defaults
 ## put the shadow atlas at 8192 and TAA on, which were 5.6 and 2.5 ms a frame for nothing a
 ## person had asked for.
 const DEFAULTS: Dictionary = {
     "version": 2,
-    "window_mode": 0, "vsync": true, "max_fps": 0, "render_scale": 0.0, "upscaler": 1,
+    "window_mode": 0, "vsync": true, "max_fps": 0, "render_scale": 0.0, "resolution": 1,
+    "upscaler": 1,
     "anti_aliasing": 0, "shadow_quality": 1, "shadows": true, "cloud_quality": 1,
     "view_distance_m": 14000.0, "grass_distance_m": 220.0,
 }
@@ -107,16 +114,20 @@ func apply_clouds(environment: Environment) -> void:
     SkyClouds.set_parameter(environment, "light_steps", CLOUD_LIGHT_STEPS[quality])
 
 
-## The render scale a viewport gets: the stated one, or for 0 the automatic one for its height.
+## The render scale a viewport gets: the stated one, or for 0 the one that draws the chosen
+## resolution's rows on a viewport of its height.
 func effective_scale(viewport: Viewport) -> float:
     var stated: float = float(values["render_scale"])
     if stated > 0.0:
         return clampf(stated, 0.25, 2.0)
-    return scale_for(viewport.get_visible_rect().size.y)
+    var choice: int = clampi(int(values["resolution"]), 0, RESOLUTION_ROWS.size() - 1)
+    if RESOLUTION_ROWS[choice] <= 0.0:
+        return 1.0
+    return scale_for(viewport.get_visible_rect().size.y, RESOLUTION_ROWS[choice])
 
 
-static func scale_for(rows: float) -> float:
-    return clampf(minf(1.0, AUTO_ROWS / maxf(rows, 1.0)), 0.25, 1.0)
+static func scale_for(rows: float, target_rows: float = AUTO_ROWS) -> float:
+    return clampf(minf(1.0, target_rows / maxf(rows, 1.0)), 0.25, 1.0)
 
 
 ## The viewport's share, on its own so a gate can hold it on a viewport of its own.
@@ -148,9 +159,12 @@ func build_rows(rows: VBoxContainer, on_change: Callable) -> void:
     MenuWidgets.slider(rows, "Max fps (0 = off)", 0.0, 240.0, float(values["max_fps"]),
         func(value: float) -> void: _moved("max_fps", int(value), on_change), "%.0f")
     MenuWidgets.heading(rows, "Rendering")
+    MenuWidgets.options(rows, "Resolution", RESOLUTIONS, int(values["resolution"]),
+        func(index: int) -> void: _moved("resolution", index, on_change))
+    MenuWidgets.note(rows, "the 3D image's height, upscaled to the window; never above it")
     MenuWidgets.slider(rows, "Render scale", 0.0, 2.0, float(values["render_scale"]),
         func(value: float) -> void: _moved("render_scale", value, on_change), "%.2f")
-    MenuWidgets.note(rows, "0 is automatic: at most %d rows, upscaled" % int(AUTO_ROWS))
+    MenuWidgets.note(rows, "0 follows Resolution; anything else overrides it")
     MenuWidgets.options(rows, "Upscaler", UPSCALERS, int(values["upscaler"]),
         func(index: int) -> void: _moved("upscaler", index, on_change))
     MenuWidgets.options(rows, "Anti-aliasing", ANTI_ALIASING, int(values["anti_aliasing"]),
