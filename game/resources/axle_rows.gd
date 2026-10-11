@@ -1,18 +1,48 @@
 class_name AxleRows
 extends RefCounted
-## Reads `axles` and `interaxles` rows: which wheels share a differential, and which kinds it can
-## switch between.
+## Reads `axles`, `interaxles` and `transfercase` rows: which wheels share a differential, which
+## kinds it can switch between, and which axles a transfer case drives.
 ##
-## Upstream's `Parser::ParseAxles` and `ParseInterAxles`. An axle names its two wheels by their
-## axle nodes and lists differential types by letter, the first active:
+## Upstream's `Parser::ParseAxles`, `ParseInterAxles` and `ParseTransferCase`. An axle names its two
+## wheels by their axle nodes and lists differential types by letter, the first active:
 ##
-##   axles:      w1(n1 n2), w2(n3 n4), d(sl)
-##   interaxles: axle_1, axle_2, d(l)            (axles numbered from 1, in file order)
+##   axles:        w1(n1 n2), w2(n3 n4), d(sl)
+##   interaxles:   axle_1, axle_2, d(l)            (axles numbered from 1, in file order)
+##   transfercase: axle_1, axle_2, has_2wd, has_2wd_lo, ratios...   (axle_2 0 for none)
 ##
 ## The letters are `o` open, `l` locked, `s` split and `v` viscous; any other is dropped, as
 ## upstream drops it. An axle with none is open then locked, an interaxle locked.
 
 const TYPES: String = "olsv"
+
+
+## One row of `section` into `truck`'s lists; an error, or "".
+static func read(section: String, line: String, truck: TruckParser) -> String:
+    match section:
+        "axles":
+            truck.has_axles = true
+            return axle(line.split(","), truck.node_id_to_index, truck.axles)
+        "interaxles":
+            return interaxle(line.split(","), truck.interaxles)
+    return transfer_case(TruckLexer.fields(line), truck)
+
+
+## Upstream keeps every row and spawns each in turn, so the last valid one is the one a vehicle
+## drives with; the solver judges validity, so every row is kept. Its ratios start with 1, as
+## upstream's parser starts them, and the row's own follow.
+static func transfer_case(fields: PackedStringArray, truck: TruckParser) -> String:
+    if fields.size() < 2:
+        return "row names fewer than two axles"
+    var ratios: PackedFloat32Array = PackedFloat32Array([1.0])
+    for i: int in range(4, fields.size()):
+        ratios.append(fields[i].to_float())
+    truck.transfer_cases.append({
+        "a1": fields[0].to_int() - 1, "a2": fields[1].to_int() - 1,
+        "has_2wd": fields[2].to_int() != 0 if fields.size() > 2 else true,
+        "has_2wd_lo": fields[3].to_int() != 0 if fields.size() > 3 else false,
+        "ratios": ratios,
+    })
+    return ""
 
 
 ## `fields` are the row split on commas only, as upstream splits it: a wheel's two nodes are
@@ -91,3 +121,22 @@ static func toggle(solver: RefCounted, between_axles: bool) -> String:
             names.append(kinds.get(solver.wheel_differential_type(i), "?"))
     return "%s differentials: %s" % ["interaxle" if between_axles else "axle",
             ", ".join(names) if not names.is_empty() else "none"]
+
+
+## Upstream's transfer case keys, `toggleTransferCaseMode` or `toggleTransferCaseGearRatio`, and
+## what it then says.
+static func shift_transfer_case(solver: RefCounted, range_key: bool) -> String:
+    if range_key:
+        solver.toggle_transfer_case_ratio()
+    else:
+        solver.toggle_transfer_case_mode()
+    return transfer_case_name(solver)
+
+
+## Upstream's `getTransferCaseName`, as its console notice puts it.
+static func transfer_case_name(solver: RefCounted) -> String:
+    if not solver.has_transfer_case():
+        return "No transfercase installed on current vehicle!"
+    var ratio: float = solver.transfer_case_ratio()
+    return "Transfercase switched to: %s %s" % ["4WD" if solver.transfer_case_four_wd() else "2WD",
+            "Lo (%s:1)" % String.num(ratio, 5) if ratio > 1.0 else "Hi"]

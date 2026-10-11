@@ -33,6 +33,7 @@ void RorDrivetrain::configure(float min_rpm, float max_rpm, float torque, float 
         m_gear_ratios.push_back(gear * diff_ratio);
     }
     m_gear_count = static_cast<int>(forward_gears.size());
+    m_tcase_ratio = 1.0f;
     // A single flat point is the "default" torque model: full torque at every rpm. A
     // caller that knows better replaces it.
     if (m_curve_rpm.empty()) {
@@ -176,6 +177,20 @@ void RorDrivetrain::stop() {
     m_rpm = 0.0f;
     m_clutch = 0.0f;
     m_clutch_torque = 0.0f;
+}
+
+void RorDrivetrain::set_tcase_ratio(float ratio) {
+    if (ratio < 1.0f) {
+        return;
+    }
+    // Divided out and multiplied back in, as upstream does, so the ratios round the way its do.
+    for (float &gear : m_gear_ratios) {
+        gear /= m_tcase_ratio;
+    }
+    m_tcase_ratio = ratio;
+    for (float &gear : m_gear_ratios) {
+        gear *= m_tcase_ratio;
+    }
 }
 
 float RorDrivetrain::ratio_of(int gear) const {

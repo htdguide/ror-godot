@@ -255,6 +255,22 @@ public:
     godot::Vector2i axle_differential_axles(int index);
     // How far an axle's differential has wound its two wheels against each other, metres of tread.
     float wheel_differential_wind(int index);
+    // Upstream's transfer case, axles counted from 0 in file order and `axle_2` -1 for none;
+    // `ratios` start with 1, as upstream's parser starts them. False if upstream would skip it.
+    bool set_transfer_case(int axle_1, int axle_2, bool has_2wd, bool has_2wd_lo,
+                           const godot::PackedFloat32Array &ratios);
+    bool has_transfer_case();
+    // The axle always driven and the one driven only in 4WD; (-1, -1) for none.
+    godot::Vector2i transfer_case_axles();
+    // Upstream's two transfer case keys: 2WD and 4WD, and the next reduction; both need an engine.
+    void toggle_transfer_case_mode();
+    void toggle_transfer_case_ratio();
+    bool transfer_case_four_wd();
+    // The reduction in force, 1 for high range.
+    float transfer_case_ratio();
+    // How far the transfer case's locked differential has wound its two axles, metres of tread.
+    float transfer_case_wind();
+    int driven_wheel_count();
 
     // --- Drivetrain -------------------------------------------------------------
     void configure_engine(float min_rpm, float max_rpm, float torque, float diff_ratio, float reverse_gear,

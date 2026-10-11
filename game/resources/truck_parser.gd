@@ -91,9 +91,11 @@ var bounded_beams: Array[Dictionary]:
 ## Whether the rig declares an `axles` section. Upstream doubles a rig's drive torque when
 ## it does, for backwards compatibility, so it changes how hard the rig pulls.
 var has_axles: bool = false
-## `axles` and `interaxles` rows, as `AxleRows` reads them: the differentials between wheels.
+## `axles`, `interaxles` and `transfercase` rows, as `AxleRows` reads them: the differentials
+## between wheels and the transfer cases.
 var axles: Array[Dictionary] = []
 var interaxles: Array[Dictionary] = []
+var transfer_cases: Array[Dictionary] = []
 ## Driver's eye position from the cinecam section, in rig space. Empty when the vehicle
 ## declares none.
 var cinecam_position: Vector3 = Vector3.ZERO
@@ -271,11 +273,8 @@ func _parse_row(line: String) -> void:
             _parse_minimass(line)
         "cinecam":
             _parse_cinecam(line)
-        "axles":
-            has_axles = true
-            _note(_section, AxleRows.axle(line.split(","), node_id_to_index, axles), line)
-        "interaxles":
-            _note(_section, AxleRows.interaxle(line.split(","), interaxles), line)
+        "axles", "interaxles", "transfercase":
+            _note(_section, AxleRows.read(_section, line, self), line)
         "contacters":
             _note(_section, NodeRows.contacter(TruckLexer.fields(line), node_id_to_index, contacters), line)
         "flares", "flares2":

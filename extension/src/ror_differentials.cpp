@@ -83,6 +83,10 @@ int RorDifferentials::add_interaxle(int a, int b, const std::vector<DiffType> &t
     if (a == b || std::min(a, b) < 0 || std::max(a, b) >= static_cast<int>(m_wheel_diffs.size())) {
         return -1;
     }
+    if (m_has_transfer_case && std::min(a, b) == std::min(m_transfer_case.ax_1, m_transfer_case.ax_2) &&
+        std::max(a, b) == std::max(m_transfer_case.ax_1, m_transfer_case.ax_2)) {
+        return -1;
+    }
     RorDifferential diff;
     diff.a = a;
     diff.b = b;
@@ -90,6 +94,38 @@ int RorDifferentials::add_interaxle(int a, int b, const std::vector<DiffType> &t
     m_axle_diffs.push_back(diff);
     m_prepared = false;
     return static_cast<int>(m_axle_diffs.size()) - 1;
+}
+
+bool RorDifferentials::set_transfer_case(const RorTransferCase &transfer_case) {
+    const int declared = static_cast<int>(m_wheel_diffs.size());
+    if (transfer_case.ax_1 == transfer_case.ax_2 || transfer_case.ax_1 < 0 ||
+        std::max(transfer_case.ax_1, transfer_case.ax_2) >= declared) {
+        return false;
+    }
+    if (transfer_case.ax_2 < 0 && !transfer_case.has_2wd) {
+        return false;
+    }
+    m_transfer_case = transfer_case;
+    m_transfer_case.four_wd = !transfer_case.has_2wd;
+    m_transfer_case.diff = RorDifferential();
+    m_transfer_case.diff.a = transfer_case.ax_1;
+    m_transfer_case.diff.b = transfer_case.ax_2;
+    m_transfer_case.diff.types = {DiffType::LOCKED};
+    m_has_transfer_case = true;
+    m_prepared = false;
+    return true;
+}
+
+void RorDifferentials::reset_rotation() {
+    for (RorDifferential &d : m_wheel_diffs) {
+        d.delta_rotation = 0.0f;
+    }
+    for (RorDifferential &d : m_axle_diffs) {
+        d.delta_rotation = 0.0f;
+    }
+    if (m_has_transfer_case && m_transfer_case.four_wd) {
+        m_transfer_case.diff.delta_rotation = 0.0f;
+    }
 }
 
 void RorDifferentials::prepare(const std::vector<RorWheel> &wheels) {
@@ -114,6 +150,12 @@ void RorDifferentials::prepare(const std::vector<RorWheel> &wheels) {
     }
     if (m_axle_diffs.empty()) {
         for (size_t i = 1; i < m_wheel_diffs.size(); ++i) {
+            // The transfer case is what joins its two axles.
+            if (m_has_transfer_case &&
+                std::min(m_transfer_case.ax_1, m_transfer_case.ax_2) == static_cast<int>(i) - 1 &&
+                std::max(m_transfer_case.ax_1, m_transfer_case.ax_2) == static_cast<int>(i)) {
+                continue;
+            }
             RorDifferential diff;
             diff.a = static_cast<int>(i) - 1;
             diff.b = static_cast<int>(i);
@@ -123,30 +165,39 @@ void RorDifferentials::prepare(const std::vector<RorWheel> &wheels) {
     }
 }
 
-void RorDifferentials::distribute(std::vector<RorWheel> &wheels, float dt) {
+void RorDifferentials::split_axles(RorDifferential &diff, std::vector<RorWheel> &wheels, float dt) {
     const int count = static_cast<int>(wheels.size());
     auto valid = [count](const RorDifferential &d) {
         return d.a >= 0 && d.b >= 0 && d.a < count && d.b < count;
     };
-    for (RorDifferential &diff : m_axle_diffs) {
-        const RorDifferential &one = m_wheel_diffs[static_cast<size_t>(diff.a)];
-        const RorDifferential &two = m_wheel_diffs[static_cast<size_t>(diff.b)];
-        if (!valid(one) || !valid(two)) {
-            continue;
-        }
-        RorWheel &w1a = wheels[static_cast<size_t>(one.a)];
-        RorWheel &w1b = wheels[static_cast<size_t>(one.b)];
-        RorWheel &w2a = wheels[static_cast<size_t>(two.a)];
-        RorWheel &w2b = wheels[static_cast<size_t>(two.b)];
-        const float in = w1a.torque + w1b.torque + w2a.torque + w2b.torque;
-        float out_1 = 0.0f;
-        float out_2 = 0.0f;
-        diff.split((w1a.speed + w1b.speed) * 0.5f, (w2a.speed + w2b.speed) * 0.5f, in, dt, out_1, out_2);
-        w1a.torque = w1b.torque = out_1 * 0.5f;
-        w2a.torque = w2b.torque = out_2 * 0.5f;
+    const RorDifferential &one = m_wheel_diffs[static_cast<size_t>(diff.a)];
+    const RorDifferential &two = m_wheel_diffs[static_cast<size_t>(diff.b)];
+    if (!valid(one) || !valid(two)) {
+        return;
     }
+    RorWheel &w1a = wheels[static_cast<size_t>(one.a)];
+    RorWheel &w1b = wheels[static_cast<size_t>(one.b)];
+    RorWheel &w2a = wheels[static_cast<size_t>(two.a)];
+    RorWheel &w2b = wheels[static_cast<size_t>(two.b)];
+    const float in = w1a.torque + w1b.torque + w2a.torque + w2b.torque;
+    float out_1 = 0.0f;
+    float out_2 = 0.0f;
+    diff.split((w1a.speed + w1b.speed) * 0.5f, (w2a.speed + w2b.speed) * 0.5f, in, dt, out_1, out_2);
+    w1a.torque = w1b.torque = out_1 * 0.5f;
+    w2a.torque = w2b.torque = out_2 * 0.5f;
+}
+
+void RorDifferentials::distribute(std::vector<RorWheel> &wheels, float dt) {
+    for (RorDifferential &diff : m_axle_diffs) {
+        split_axles(diff, wheels, dt);
+    }
+    // Upstream runs the transfer case's after the others, and only in 4WD.
+    if (m_has_transfer_case && m_transfer_case.four_wd && m_transfer_case.ax_2 >= 0) {
+        split_axles(m_transfer_case.diff, wheels, dt);
+    }
+    const int count = static_cast<int>(wheels.size());
     for (RorDifferential &diff : m_wheel_diffs) {
-        if (!valid(diff)) {
+        if (diff.a < 0 || diff.b < 0 || diff.a >= count || diff.b >= count) {
             continue;
         }
         RorWheel &a = wheels[static_cast<size_t>(diff.a)];

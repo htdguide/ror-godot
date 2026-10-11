@@ -24,6 +24,8 @@ const SOLO: Dictionary = {
     "indicator_left": [KEY_Z], "indicator_right": [KEY_C], "indicators_off": [KEY_X],
     # Upstream's differential switches: each axle's own, and the ones between axles.
     "wheel_diffs": [KEY_V], "axle_diffs": [KEY_J],
+    # Upstream's transfer case keys, Ctrl+W and Shift+W there: 2WD or 4WD, and high or low range.
+    "transfer_case": [KEY_T], "transfer_range": [KEY_Y],
     # Command keys 1 to 10, in order: a vehicle's own rams, its doors on the hero. Upstream puts
     # them on F1-F12, which this window answers to itself.
     "commands": [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_0],
@@ -54,6 +56,7 @@ const NAMES: Dictionary = {
     "main_beam": "main beam", "indicator_left": "left indicator",
     "indicator_right": "right indicator", "indicators_off": "indicators off",
     "wheel_diffs": "axle differentials", "axle_diffs": "interaxle differentials",
+    "transfer_case": "2WD/4WD", "transfer_range": "high/low range",
     "commands": "commands 1-10 (doors, rams)",
 }
 

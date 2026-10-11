@@ -1,5 +1,7 @@
 #include "ror_solver.h"
 
+#include <algorithm>
+
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/string.hpp>
 
@@ -149,6 +151,85 @@ float RorSolver::wheel_differential_wind(int index) {
     sync();
     const RorDifferential *diff = m_wheels.differentials().wheel_diff(index);
     return diff == nullptr ? 0.0f : diff->delta_rotation;
+}
+
+bool RorSolver::set_transfer_case(int axle_1, int axle_2, bool has_2wd, bool has_2wd_lo,
+                                  const PackedFloat32Array &ratios) {
+    sync();
+    RorTransferCase transfer_case;
+    transfer_case.ax_1 = axle_1;
+    transfer_case.ax_2 = axle_2;
+    transfer_case.has_2wd = has_2wd;
+    transfer_case.has_2wd_lo = has_2wd_lo;
+    if (!ratios.is_empty()) {
+        transfer_case.ratios.assign(ratios.ptr(), ratios.ptr() + ratios.size());
+    }
+    return m_wheels.set_transfer_case(transfer_case);
+}
+
+bool RorSolver::has_transfer_case() {
+    sync();
+    return m_wheels.differentials().transfer_case() != nullptr;
+}
+
+Vector2i RorSolver::transfer_case_axles() {
+    sync();
+    const RorTransferCase *tc = m_wheels.differentials().transfer_case();
+    return tc == nullptr ? Vector2i(-1, -1) : Vector2i(tc->ax_1, tc->ax_2);
+}
+
+void RorSolver::toggle_transfer_case_mode() {
+    sync();
+    RorTransferCase *tc = m_wheels.differentials().transfer_case();
+    if (!m_drivetrain.configured() || tc == nullptr || tc->ax_2 < 0 || !tc->has_2wd) {
+        return;
+    }
+    // Leaving 4WD without a 2WD low range shifts back up to high first.
+    if (tc->four_wd && !tc->has_2wd_lo) {
+        for (size_t i = 0; i < tc->ratios.size(); ++i) {
+            toggle_transfer_case_ratio();
+            if (tc->ratios[0] == 1.0f) {
+                break;
+            }
+        }
+    }
+    tc->four_wd = !tc->four_wd;
+    m_wheels.set_axle_driven(tc->ax_2, tc->four_wd);
+}
+
+void RorSolver::toggle_transfer_case_ratio() {
+    sync();
+    RorTransferCase *tc = m_wheels.differentials().transfer_case();
+    if (!m_drivetrain.configured() || tc == nullptr || tc->ratios.size() < 2) {
+        return;
+    }
+    if (tc->four_wd || tc->has_2wd_lo) {
+        std::rotate(tc->ratios.begin(), tc->ratios.begin() + 1, tc->ratios.end());
+        m_drivetrain.set_tcase_ratio(tc->ratios[0]);
+    }
+}
+
+bool RorSolver::transfer_case_four_wd() {
+    sync();
+    const RorTransferCase *tc = m_wheels.differentials().transfer_case();
+    return tc != nullptr && tc->four_wd;
+}
+
+float RorSolver::transfer_case_ratio() {
+    sync();
+    const RorTransferCase *tc = m_wheels.differentials().transfer_case();
+    return tc == nullptr ? 1.0f : tc->ratios[0];
+}
+
+float RorSolver::transfer_case_wind() {
+    sync();
+    const RorTransferCase *tc = m_wheels.differentials().transfer_case();
+    return tc == nullptr ? 0.0f : tc->diff.delta_rotation;
+}
+
+int RorSolver::driven_wheel_count() {
+    sync();
+    return m_wheels.driven_count();
 }
 
 int RorSolver::wheel_differential_count() {
@@ -429,6 +510,16 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("axle_differential_axles", "index"), &RorSolver::axle_differential_axles);
     ClassDB::bind_method(D_METHOD("wheel_differential_wind", "index"), &RorSolver::wheel_differential_wind);
     ClassDB::bind_method(D_METHOD("wheel_differential_count"), &RorSolver::wheel_differential_count);
+    ClassDB::bind_method(D_METHOD("set_transfer_case", "axle_1", "axle_2", "has_2wd", "has_2wd_lo", "ratios"),
+                         &RorSolver::set_transfer_case);
+    ClassDB::bind_method(D_METHOD("has_transfer_case"), &RorSolver::has_transfer_case);
+    ClassDB::bind_method(D_METHOD("transfer_case_axles"), &RorSolver::transfer_case_axles);
+    ClassDB::bind_method(D_METHOD("toggle_transfer_case_mode"), &RorSolver::toggle_transfer_case_mode);
+    ClassDB::bind_method(D_METHOD("toggle_transfer_case_ratio"), &RorSolver::toggle_transfer_case_ratio);
+    ClassDB::bind_method(D_METHOD("transfer_case_four_wd"), &RorSolver::transfer_case_four_wd);
+    ClassDB::bind_method(D_METHOD("transfer_case_ratio"), &RorSolver::transfer_case_ratio);
+    ClassDB::bind_method(D_METHOD("transfer_case_wind"), &RorSolver::transfer_case_wind);
+    ClassDB::bind_method(D_METHOD("driven_wheel_count"), &RorSolver::driven_wheel_count);
     ClassDB::bind_method(D_METHOD("axle_differential_count"), &RorSolver::axle_differential_count);
     ClassDB::bind_method(D_METHOD("wheel_differential_type", "index"), &RorSolver::wheel_differential_type);
     ClassDB::bind_method(D_METHOD("axle_differential_type", "index"), &RorSolver::axle_differential_type);

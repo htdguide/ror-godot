@@ -71,6 +71,11 @@ public:
     RorDifferentials &differentials() { return m_diffs; }
     const RorDifferentials &differentials() const { return m_diffs; }
     void prepare_differentials() { m_diffs.prepare(m_wheels); }
+    // Upstream's `ProcessTransferCase`: false if the differentials refuse it. Otherwise only the
+    // case's first axle is driven, and its second as well when it has no 2WD.
+    bool set_transfer_case(const RorTransferCase &transfer_case);
+    // Upstream's `toggleTransferCaseMode` on the wheels: the second axle driven or not.
+    void set_axle_driven(int axle, bool driven);
 
     // Driver input, 0..1 each.
     void set_brake(float brake) { m_brake = brake; }

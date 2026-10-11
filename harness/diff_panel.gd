@@ -5,8 +5,12 @@ extends Control
 ## joining two axles on the shaft between their rows. A wheel fills with the torque it is getting,
 ## so a locked axle pulling one wheel back is something you can see.
 ##
-## The V and J keys switch the kinds (`AxleRows.toggle`); a pill that has just changed flashes, so
-## a key press is answered on screen as well as in the terminal. It follows the HUD: F1 hides both.
+## A transfer case is a shaft of its own between its two axles, faint in 2WD and locked in 4WD, with
+## its range beside the title.
+##
+## The V and J keys switch the kinds (`AxleRows.toggle`), T and Y the transfer case; a pill that has
+## just changed flashes, so a key press is answered on screen as well as in the terminal. It follows
+## the HUD: F1 hides both.
 
 const MARGIN_PX: float = 16.0
 const PAD_PX: float = 16.0
@@ -44,7 +48,8 @@ static func attach(hud: CanvasItem, source: Callable) -> DiffPanel:
     return panel
 
 
-## What the panel shows for `solver`: {axles: [{type, wheels}], shafts: [{type, axles}]}.
+## What the panel shows for `solver`: {axles: [{type, wheels}], shafts: [{type, axles}], transfer},
+## `transfer` {} or {axles, four_wd, ratio}.
 static func model(solver: RefCounted) -> Dictionary:
     var axles: Array[Dictionary] = []
     for i: int in solver.wheel_differential_count():
@@ -52,7 +57,11 @@ static func model(solver: RefCounted) -> Dictionary:
     var shafts: Array[Dictionary] = []
     for i: int in solver.axle_differential_count():
         shafts.append({"type": solver.axle_differential_type(i), "axles": solver.axle_differential_axles(i)})
-    return {"axles": axles, "shafts": shafts}
+    var transfer: Dictionary = {}
+    if solver.has_transfer_case():
+        transfer = {"axles": solver.transfer_case_axles(), "four_wd": solver.transfer_case_four_wd(),
+                "ratio": solver.transfer_case_ratio()}
+    return {"axles": axles, "shafts": shafts, "transfer": transfer}
 
 
 func _ready() -> void:
@@ -74,7 +83,8 @@ func _process(delta: float) -> void:
         _flash[key] = maxf(0.0, (_flash[key] as float) - delta)
     if shown:
         var rows: int = (_model["axles"] as Array).size()
-        size = Vector2(WIDTH_PX, HEADER_PX + PAD_PX * 2.0 + rows * ROW_PX + (rows - 1) * SHAFT_PX + FOOTER_PX)
+        var footer: float = FOOTER_PX * (2.0 if not (_model["transfer"] as Dictionary).is_empty() else 1.0)
+        size = Vector2(WIDTH_PX, HEADER_PX + PAD_PX * 2.0 + rows * ROW_PX + (rows - 1) * SHAFT_PX + footer)
         position = Vector2(get_viewport_rect().size.x - size.x - MARGIN_PX, MARGIN_PX)
         queue_redraw()
 
@@ -107,7 +117,11 @@ func _draw() -> void:
         var a: float = centres[mini(joined.x, joined.y)]
         var b: float = centres[maxi(joined.x, joined.y)]
         draw_line(Vector2(mid, a), Vector2(mid, b), Color(INK, 0.28), 2.0, true)
-        _pill(Vector2(mid, (a + b) * 0.5), shaft["type"] as String, "shaft%d%d" % [joined.x, joined.y])
+        _pill(Vector2(mid, (a + b) * 0.5), NAMES.get(shaft["type"], "?") as String, shaft["type"] == "l",
+                "shaft%d%d" % [joined.x, joined.y])
+    var transfer: Dictionary = _model["transfer"] as Dictionary
+    if not transfer.is_empty():
+        _transfer(transfer, centres, mid)
     var torques: Array = _model["torque"] as Array
     for i: int in axles.size():
         var y: float = centres[i]
@@ -116,11 +130,33 @@ func _draw() -> void:
         draw_line(Vector2(left.x + WHEEL.x, y), Vector2(right.x, y), Color(INK, 0.28), 2.0, true)
         _wheel(left, (torques[i] as Vector2).x)
         _wheel(right, (torques[i] as Vector2).y)
-        _pill(Vector2(mid, y), axles[i]["type"] as String, "axle%d" % i)
+        _pill(Vector2(mid, y), NAMES.get(axles[i]["type"], "?") as String, axles[i]["type"] == "l", "axle%d" % i)
 
     var y_keys: float = size.y - PAD_PX - 4.0
+    if not transfer.is_empty():
+        var x_tc: float = _key(Vector2(PAD_PX, y_keys), "T", "2WD/4WD")
+        _key(Vector2(x_tc + 14.0, y_keys), "Y", "range")
+        y_keys -= FOOTER_PX
     var x: float = _key(Vector2(PAD_PX, y_keys), "V", "axles")
     _key(Vector2(x + 14.0, y_keys), "J", "between axles")
+
+
+## The transfer case's shaft between its two axles, locked in 4WD and faint in 2WD, and its range
+## at the right of the title.
+func _transfer(transfer: Dictionary, centres: Array[float], mid: float) -> void:
+    var axles: Vector2i = transfer["axles"] as Vector2i
+    var four_wd: bool = transfer["four_wd"] as bool
+    var ratio: float = transfer["ratio"] as float
+    var range_text: String = "LO %s" % String.num(ratio, 2) if ratio > 1.0 else "HI"
+    var width: float = size.x - PAD_PX * 2.0
+    draw_string(_bold, Vector2(PAD_PX, PAD_PX + 12.0), range_text, HORIZONTAL_ALIGNMENT_RIGHT, width, 11,
+            ACCENT.lerp(INK, 1.0 - (_flash.get("range", 0.0) as float) / FLASH_S))
+    if axles.y < 0 or maxi(axles.x, axles.y) >= centres.size():
+        return
+    var a: float = centres[mini(axles.x, axles.y)]
+    var b: float = centres[maxi(axles.x, axles.y)]
+    draw_line(Vector2(mid, a), Vector2(mid, b), Color(INK, 0.28 if four_wd else 0.1), 2.0, true)
+    _pill(Vector2(mid, (a + b) * 0.5), "4WD" if four_wd else "2WD", four_wd, "transfer")
 
 
 ## A wheel, filled from the bottom by the share of the largest torque lately seen that it carries.
@@ -140,20 +176,20 @@ func _wheel(at: Vector2, torque: float) -> void:
         draw_style_box(fill, Rect2(Vector2(at.x, at.y + WHEEL.y - h), Vector2(WHEEL.x, h)))
 
 
-## A differential's kind on a pill centred at `centre`; it flashes the accent while `key` is fresh.
-func _pill(centre: Vector2, type: String, key: String) -> void:
-    var text: String = NAMES.get(type, "?") as String
+## `text` on a pill centred at `centre`, dark for something locked; it flashes the accent while
+## `key` is fresh.
+func _pill(centre: Vector2, text: String, dark: bool, key: String) -> void:
     var width: float = _bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 24.0
     var box: StyleBoxFlat = StyleBoxFlat.new()
     var flash: float = (_flash.get(key, 0.0) as float) / FLASH_S
-    var base: Color = INK if type == "l" else Color(1.0, 1.0, 1.0, 0.95)
+    var base: Color = INK if dark else Color(1.0, 1.0, 1.0, 0.95)
     box.bg_color = base.lerp(ACCENT, flash)
     box.set_corner_radius_all(11)
-    box.set_border_width_all(0 if type == "l" else 1)
+    box.set_border_width_all(0 if dark else 1)
     box.border_color = Color(INK, 0.18)
     box.anti_aliasing = true
     draw_style_box(box, Rect2(centre - Vector2(width * 0.5, 12.0), Vector2(width, 24.0)))
-    var ink: Color = Color.WHITE if type == "l" or flash > 0.5 else INK
+    var ink: Color = Color.WHITE if dark or flash > 0.5 else INK
     draw_string(_bold, centre + Vector2(-width * 0.5, 4.0), text, HORIZONTAL_ALIGNMENT_CENTER, width, 12, ink)
 
 
@@ -200,6 +236,10 @@ func _input(event: InputEvent) -> void:
             for shaft: Dictionary in _model["shafts"] as Array:
                 var joined: Vector2i = shaft["axles"] as Vector2i
                 _flash["shaft%d%d" % [joined.x, joined.y]] = FLASH_S
+        "transfer_case":
+            _flash["transfer"] = FLASH_S
+        "transfer_range":
+            _flash["range"] = FLASH_S
 
 
 func _note_changes(next: Dictionary) -> void:
@@ -210,6 +250,13 @@ func _note_changes(next: Dictionary) -> void:
     for i: int in mini(before.size(), after.size()):
         if before[i]["type"] != after[i]["type"]:
             _flash["axle%d" % i] = FLASH_S
+    var transfer_before: Dictionary = _model["transfer"] as Dictionary
+    var transfer_after: Dictionary = next["transfer"] as Dictionary
+    if not transfer_before.is_empty() and not transfer_after.is_empty():
+        if transfer_before["four_wd"] != transfer_after["four_wd"]:
+            _flash["transfer"] = FLASH_S
+        if transfer_before["ratio"] != transfer_after["ratio"]:
+            _flash["range"] = FLASH_S
     var shafts_before: Array = _model["shafts"] as Array
     var shafts_after: Array = next["shafts"] as Array
     for i: int in mini(shafts_before.size(), shafts_after.size()):

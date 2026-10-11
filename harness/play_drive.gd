@@ -236,6 +236,8 @@ func on_key(keycode: Key) -> bool:
             _recover()
         "wheel_diffs", "axle_diffs":
             print("DRIVE  %s" % AxleRows.toggle(solver, DriveKeys.action_of(keys, keycode) == "axle_diffs"))
+        "transfer_case", "transfer_range":
+            print("DRIVE  %s" % AxleRows.shift_transfer_case(solver, DriveKeys.action_of(keys, keycode) == "transfer_range"))
         _:
             return false
     return true

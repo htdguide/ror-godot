@@ -61,6 +61,9 @@ public:
     }
     bool running() const { return m_running; }
     bool configured() const { return m_gear_count > 0; }
+    // Upstream's `setTCaseRatio`: a transfer case's reduction multiplies every gear; below 1 ignored.
+    void set_tcase_ratio(float ratio);
+    float tcase_ratio() const { return m_tcase_ratio; }
     // Peak torque times the curve's value at `rpm`. Upstream's `getEnginePower`.
     float engine_power(float rpm) const;
 
@@ -81,6 +84,7 @@ private:
     std::vector<float> m_curve_tangent;
 
     int m_gear_count = 0;
+    float m_tcase_ratio = 1.0f;
     float m_min_rpm = 0.0f;
     float m_max_rpm = 0.0f;
     float m_torque = 0.0f;

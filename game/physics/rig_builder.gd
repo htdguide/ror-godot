@@ -342,10 +342,16 @@ static func _add_commands(solver: RefCounted, truck: TruckParser) -> void:
 static func _add_differentials(solver: RefCounted, truck: TruckParser, axle_nodes: Array[Vector2i]) -> void:
     for row: Dictionary in truck.axles:
         var nodes: Array = row["nodes"] as Array
-        var first: int = _wheel_on(axle_nodes, nodes[0] as int, nodes[1] as int)
-        var second: int = _wheel_on(axle_nodes, nodes[2] as int, nodes[3] as int)
-        if first >= 0 and second >= 0:
-            solver.add_axle(first, second, row["types"] as String)
+        # Upstream warns about a wheel it cannot find and keeps the axle on wheel 0, its default, so
+        # the axles after it keep their numbers.
+        var first: int = maxi(_wheel_on(axle_nodes, nodes[0] as int, nodes[1] as int), 0)
+        var second: int = maxi(_wheel_on(axle_nodes, nodes[2] as int, nodes[3] as int), 0)
+        solver.add_axle(first, second, row["types"] as String)
+    # Upstream spawns the transfer case between the axles and the interaxles: an interaxle between
+    # its two axles is then refused.
+    for tc: Dictionary in truck.transfer_cases:
+        solver.set_transfer_case(tc["a1"] as int, tc["a2"] as int, tc["has_2wd"] as bool,
+                tc["has_2wd_lo"] as bool, tc["ratios"] as PackedFloat32Array)
     for row: Dictionary in truck.interaxles:
         solver.add_interaxle(row["a"] as int, row["b"] as int, row["types"] as String)
 

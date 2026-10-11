@@ -15,6 +15,32 @@ int RorWheelSet::add(const RorWheel &wheel) {
     return static_cast<int>(m_wheels.size()) - 1;
 }
 
+bool RorWheelSet::set_transfer_case(const RorTransferCase &transfer_case) {
+    if (!m_diffs.set_transfer_case(transfer_case)) {
+        return false;
+    }
+    for (RorWheel &wheel : m_wheels) {
+        wheel.drive = WheelDrive::NONE;
+    }
+    m_driven_count = 0;
+    set_axle_driven(transfer_case.ax_1, true);
+    if (!transfer_case.has_2wd) {
+        set_axle_driven(transfer_case.ax_2, true);
+    }
+    return true;
+}
+
+void RorWheelSet::set_axle_driven(int axle, bool driven) {
+    const RorDifferential *diff = m_diffs.wheel_diff(axle);
+    if (diff == nullptr) {
+        return;
+    }
+    m_wheels[static_cast<size_t>(diff->a)].drive = driven ? WheelDrive::FORWARD : WheelDrive::NONE;
+    m_wheels[static_cast<size_t>(diff->b)].drive = driven ? WheelDrive::FORWARD : WheelDrive::NONE;
+    // Upstream counts the pair rather than recounting, so an axle naming one wheel twice counts two.
+    m_driven_count += driven ? 2 : -2;
+}
+
 void RorWheelSet::set_brake_forces(float foot, float handbrake) {
     m_brake_force = foot;
     // Upstream's default when a rig states no parking brake force of its own.
