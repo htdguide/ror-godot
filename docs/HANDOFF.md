@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-181 gates; `--all --every` 181 of 181 at the shocks2/3 commit (2026-10-12). `--order-check` has one
+182 gates; `--all --every` 182 of 182 at the yield-table commit (2026-10-12). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 

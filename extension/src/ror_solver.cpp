@@ -346,8 +346,8 @@ void RorSolver::set_beam_limits(int beam, float deform, float strength, float pl
     target.minmax_stress = deform;
     target.strength = strength;
     target.plastic_coef = plastic;
-    // Upstream exempts shocks, ropes and supports by bound, and hydros and commands by type.
-    target.deformable = deformable && target.bound == BeamBound::NORMAL;
+    // Upstream's `bm_type == BEAM_NORMAL`, which the caller knows by section (`BeamRows.NEVER_YIELDS`).
+    target.deformable = deformable;
 }
 
 void RorSolver::add_slide_node(int node, const PackedInt32Array &rail, float spring,

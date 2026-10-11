@@ -94,8 +94,8 @@ struct RorBeam {
     float strength = 0.0f;
     // How much of the elastic travel is kept when the beam yields. Upstream's default is zero.
     float plastic_coef = 0.0f;
-    // Only ordinary structural beams deform. A shock, a rope, a support beam and a hydro have
-    // their own laws and upstream exempts them.
+    // Upstream's `BEAM_NORMAL`: a `beams` row, whatever its options, may take a permanent set;
+    // shocks, `ropes`, hydros and commands (`BEAM_HYDRO`) never do. A SHOCK1 bound is exempt too.
     bool deformable = false;
     bool broken = false;
     // The force along the beam last substep, signed, as upstream keeps `beam.stress`: the command
