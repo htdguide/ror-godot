@@ -18,6 +18,8 @@ namespace {
 // Radians per second to RPM. Upstream's RAD_PER_SEC_TO_RPM, and the unit its drivetrain
 // expects the driveshaft speed in.
 constexpr float RAD_PER_SEC_TO_RPM = 9.5492965855137f;
+// Upstream's `SUPPORT_BEAM_LIMIT_DEFAULT`: how many of its own lengths a support beam stretches.
+constexpr float SUPPORT_BREAK_LIMIT = 4.0f;
 } // namespace
 
 int RorSolver::add_node(const Vector3 &position, float mass) {
@@ -314,6 +316,14 @@ void RorSolver::accumulate_beam_forces() {
         const Vector3 force = separation * (stress * inverted_length);
         a.forces += force;
         b.forces -= force;
+        // Upstream's support beam stretched past its limit, `long_bound` lengths or 4 by default:
+        // it carries this substep's (slack) force and then is gone.
+        if (beam.bound == BeamBound::SUPPORT && extension > 0.0f) {
+            const float limit = beam.long_bound > 0.0f ? beam.long_bound : SUPPORT_BREAK_LIMIT;
+            if (extension > beam.rest_length * limit) {
+                beam.broken = true;
+            }
+        }
     }
 }
 

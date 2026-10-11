@@ -93,8 +93,8 @@ steering, gears, ignition, lights, respawn, chase camera and a HUD. The solver h
 a driven rig needs, each a port of upstream's own law and each in its own file: ground contact with
 static and Stribeck friction (`ror_ground`), wheel torque and braking (`ror_wheels`), engine,
 gearbox and clutch (`ror_drivetrain`), steering through hydro rest length (`ror_steering`), per-node
-air drag, travel bounds for shocks, ropes and support beams, and a heightfield so it stands on
-terrain rather than a plane.
+air drag, travel bounds for shocks, ropes and support beams (which break past their limit), and a
+heightfield so it stands on terrain rather than a plane.
 
 **The 2 kHz gap is closed.** The rig settles at upstream's own rate and diverges at 1.5 kHz;
 `game/tools/stability_probe.gd` measures it by sweeping. Node masses did most of it (10 kHz to
@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-178 gates; `--all --every` 178 of 178 at the rope ram commit (2026-10-12). `--order-check` has one
+179 gates; `--all --every` 179 of 179 at the support beam commit (2026-10-12). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 

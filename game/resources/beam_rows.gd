@@ -123,8 +123,8 @@ static func plain(
         bound = BOUND_ROPE
     elif options.contains("s"):
         bound = BOUND_SUPPORT
-        # A support beam breaks once stretched this many times its own length. Only the
-        # bound is carried here; breaking is not modelled yet.
+        # A support beam breaks once stretched this many times its own length; the solver
+        # takes 0 as upstream's default of 4.
         long_bound = SUPPORT_BREAK_LIMIT_DEFAULT
         if fields.size() > BEAM_BREAK_LIMIT_FIELD:
             long_bound = maxf(fields[BEAM_BREAK_LIMIT_FIELD].to_float(), 0.0)
