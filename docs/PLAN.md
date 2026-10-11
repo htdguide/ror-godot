@@ -2347,11 +2347,11 @@ change to the RoR one.
 
 What it costs, roughly in order of size:
 
-1. **Licence first; the owner decides.** BeamNG.drive is closed source. Its own vehicles and the
-   shared parts most mods build on (`vehicles/common`) are BeamNG's and cannot ship here or be
-   assumed present. A mod's own files carry its author's terms. Reading the JBeam format is
-   interoperability; using BeamNG's files from a user's install may be restricted by its EULA.
-   Settle this before writing code; it decides whether the feature exists.
+1. **Licence: decided by the owner, 2026-10-12.** Format support only, the same as for RoR: no
+   vehicle ships, users load files they have, and the solver is this project's own, not BeamNG's.
+   What follows from it: a mod built on BeamNG's shared parts (`vehicles/common`) loads only if
+   the user supplies those parts too, so the loader resolves slots across every folder it is
+   pointed at and names a missing part rather than failing silently.
 2. **JBeam parsing.** Relaxed JSON; a vehicle is a tree of parts chosen by slots, with variables
    and per-part defaults. A parser and the slot resolver are the entry ticket.
 3. **More physics in the new solver kind.** Beam types beyond RoR's (anisotropic, bounded with
@@ -2371,7 +2371,7 @@ recordings the owner makes in the game (a vehicle's settle height, braking dista
 lap) that a gate replays. Without that, a JBeam actor is "behaves plausibly", which §0 does not
 accept as done.
 
-Suggested first step, when it is picked up: the licence decision, then a JBeam parser that loads
+Suggested first step, when it is picked up: a JBeam parser that loads
 one permissively licensed community vehicle's nodes and beams into the existing solver as a
 static shape, gated against the file, before any of 3-5.
 
