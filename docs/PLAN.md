@@ -948,7 +948,9 @@ evidence that it is a knife edge: recovering the hero from
 edge the extra contacts push one landing over, not a systematic fault, but that gate's claim came
 from a session and is not the new code's to loosen. At rest two hero contacters sit just inside
 their own triangles' 2 cm range (208 and 202, at the triangles' edges), which upstream's identical
-test would push too. Not yet: lockstep islands on workers (serial today; separate actors already run on two cores), sleeping.
+test would push too. Lockstep islands step on workers since 2026-10-11, each on its first member's, the others' workers
+held on a latch so a lone `sync` still waits for its island (`islands_step_in_parallel_as_they_would_in_turn`:
+4 islands bit-equal to serial, 1.1x one island; removing the latch is caught as a race). Not yet: sleeping.
 `meshwheels2` tyres are not contactable upstream either, so the hero's wheels pass into the other
 truck until the bodies meet.
 

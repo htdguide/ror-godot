@@ -3,6 +3,9 @@
 #include <godot_cpp/core/class_db.hpp>
 
 #include <algorithm>
+#include <condition_variable>
+#include <memory>
+#include <mutex>
 #include <numeric>
 
 using namespace godot;
@@ -23,6 +26,26 @@ size_t find_root(std::vector<size_t> &parent, size_t at) {
     return at;
 }
 
+// Opened once by the worker stepping an island; the other members' workers wait on it, so each
+// member's own worker is busy exactly as long as the island is.
+struct IslandLatch {
+    std::mutex mutex;
+    std::condition_variable opened;
+    bool open = false;
+
+    void release() {
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            open = true;
+        }
+        opened.notify_all();
+    }
+    void wait() {
+        std::unique_lock<std::mutex> lock(mutex);
+        opened.wait(lock, [this] { return open; });
+    }
+};
+
 } // namespace
 
 void RorWorld::_bind_methods() {
@@ -30,6 +53,8 @@ void RorWorld::_bind_methods() {
     ClassDB::bind_method(D_METHOD("clear"), &RorWorld::clear);
     ClassDB::bind_method(D_METHOD("solver_count"), &RorWorld::solver_count);
     ClassDB::bind_method(D_METHOD("step", "dt", "substeps"), &RorWorld::step);
+    ClassDB::bind_method(D_METHOD("set_parallel", "parallel"), &RorWorld::set_parallel);
+    ClassDB::bind_method(D_METHOD("is_parallel"), &RorWorld::is_parallel);
     ClassDB::bind_method(D_METHOD("last_island_count"), &RorWorld::last_island_count);
     ClassDB::bind_method(D_METHOD("last_lockstep_count"), &RorWorld::last_lockstep_count);
     ClassDB::bind_method(D_METHOD("last_contact_count"), &RorWorld::last_contact_count);
@@ -43,8 +68,24 @@ void RorWorld::add_solver(const Ref<RorSolver> &solver) {
     }
 }
 
+RorWorld::~RorWorld() {
+    sync_all();
+}
+
 void RorWorld::clear() {
+    sync_all();
     m_solvers.clear();
+}
+
+void RorWorld::sync_all() const {
+    for (const Ref<RorSolver> &solver : m_solvers) {
+        solver->sync();
+    }
+}
+
+int RorWorld::last_contact_count() const {
+    sync_all();
+    return m_last_contacts.load(std::memory_order_relaxed);
 }
 
 RorWorld::Bounds RorWorld::bounds_of(const RorSolver &solver) const {
@@ -105,9 +146,10 @@ bool RorWorld::shares_island(int first, int second, float dt, int substeps) cons
 }
 
 void RorWorld::step(float dt, int substeps) {
+    sync_all();
     m_last_islands = 0;
     m_last_lockstep = 0;
-    m_last_contacts = 0;
+    m_last_contacts.store(0, std::memory_order_relaxed);
     if (substeps <= 0 || m_solvers.empty()) {
         return;
     }
@@ -138,25 +180,49 @@ void RorWorld::step(float dt, int substeps) {
         }
         ++m_last_islands;
         if (members.size() == 1) {
-            m_solvers[members[0]]->step_async(dt, substeps);
+            if (m_parallel) {
+                m_solvers[members[0]]->step_async(dt, substeps);
+            } else {
+                m_solvers[members[0]]->step(dt, substeps);
+            }
             continue;
         }
         m_last_lockstep += static_cast<int>(members.size());
-        step_island(members, dt, substeps);
+        std::vector<RorSolver *> solvers;
+        for (size_t m : members) {
+            solvers.push_back(m_solvers[m].ptr());
+        }
+        if (!m_parallel) {
+            m_last_contacts.fetch_add(step_island(solvers, dt, substeps), std::memory_order_relaxed);
+            continue;
+        }
+        auto latch = std::make_shared<IslandLatch>();
+        for (size_t k = 1; k < solvers.size(); ++k) {
+            solvers[k]->m_worker.post([latch] { latch->wait(); });
+        }
+        // Raw pointers: the world holds every member and waits for them all before it lets one go
+        // (`clear`, the destructor, the next `step`). A reference held by the job could be the
+        // last one and free a solver on its own worker, which would then join itself.
+        std::atomic<int> *contacts = &m_last_contacts;
+        solvers[0]->m_worker.post([solvers, latch, contacts, dt, substeps] {
+            contacts->fetch_add(step_island(solvers, dt, substeps), std::memory_order_relaxed);
+            latch->release();
+        });
     }
 }
 
-void RorWorld::step_island(const std::vector<size_t> &members, float dt, int substeps) {
+int RorWorld::step_island(const std::vector<RorSolver *> &members, float dt, int substeps) {
     const int64_t began = steady_usec();
-    for (size_t m : members) {
-        RorSolver &solver = **m_solvers[m];
+    int contacts = 0;
+    for (RorSolver *member : members) {
+        RorSolver &solver = *member;
         solver.begin_steps();
         solver.m_collcabs.prepare(solver.m_nodes, solver.m_beams);
     }
     for (size_t i = 0; i < members.size(); ++i) {
         for (size_t j = i + 1; j < members.size(); ++j) {
-            RorSolver &a = **m_solvers[members[i]];
-            RorSolver &b = **m_solvers[members[j]];
+            RorSolver &a = *members[i];
+            RorSolver &b = *members[j];
             if (a.m_nodes.empty() || b.m_nodes.empty()) {
                 continue;
             }
@@ -168,31 +234,32 @@ void RorWorld::step_island(const std::vector<size_t> &members, float dt, int sub
         }
     }
     for (int step = 0; step < substeps; ++step) {
-        for (size_t m : members) {
-            m_solvers[m]->substep(dt, step == 0);
+        for (RorSolver *member : members) {
+            member->substep(dt, step == 0);
         }
-        for (size_t owner : members) {
-            RorSolver &a = **m_solvers[owner];
-            for (size_t other : members) {
+        for (RorSolver *owner : members) {
+            RorSolver &a = *owner;
+            for (RorSolver *other : members) {
                 if (other == owner) {
                     continue;
                 }
-                RorSolver &b = **m_solvers[other];
+                RorSolver &b = *other;
                 // The other actor's frame-local positions in the owner's frame. Both origins are
                 // whole multiples of 64 m, so the difference is exact.
                 const Vector3 offset(static_cast<float>(b.m_frame.x - a.m_frame.x), 0.0f,
                                      static_cast<float>(b.m_frame.z - a.m_frame.z));
-                m_last_contacts += resolve_inter_actor(a.m_collcabs, a.m_nodes,
+                contacts += resolve_inter_actor(a.m_collcabs, a.m_nodes,
                                                        a.m_ground_models[0], b.m_collcabs,
                                                        b.m_nodes, offset, dt);
             }
         }
     }
     const int64_t spent = steady_usec() - began;
-    for (size_t m : members) {
-        m_solvers[m]->m_step_usec.fetch_add(spent / static_cast<int64_t>(members.size()),
-                                            std::memory_order_relaxed);
+    for (RorSolver *member : members) {
+        member->m_step_usec.fetch_add(spent / static_cast<int64_t>(members.size()),
+                                      std::memory_order_relaxed);
     }
+    return contacts;
 }
 
 } // namespace rorgd
