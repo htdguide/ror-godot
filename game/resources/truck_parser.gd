@@ -78,6 +78,8 @@ var drivetrain: Dictionary = DriveRows.empty()
 ## One entry per `hydros` row: {beam: int, factor: float}. `beam` indexes `beams`, so the
 ## solver can find the beam a steering ram actuates without re-deriving it.
 var hydros: Array[Dictionary] = []
+## One entry per `commands`/`commands2` row: the key-driven rams. See `CommandRows`.
+var commands: Array[Dictionary] = []
 ## One entry per `flares` row: the vehicle's lamps. See FlareRows.
 var flares: Array[Dictionary] = []
 ## Which of the vehicle's own materials each lamp lights up: material name -> flare indices, from
@@ -271,7 +273,7 @@ func _parse_row(line: String) -> void:
         "flares", "flares2":
             BodyRows.flare(line, node_id_to_index, flares, errors, _section)
         "materialflarebindings":
-            _parse_material_flare(line)
+            _note("materialflarebinding", FlareRows.bind(TruckLexer.fields(line), material_flares), line)
         "ties":
             _parse_tie(line)
         "slidenodes":
@@ -359,17 +361,6 @@ func _parse_beam(line: String) -> void:
 
 
 ## `materialflarebindings`: which material a given lamp lights up.
-func _parse_material_flare(line: String) -> void:
-    var row: Dictionary = FlareRows.binding(TruckLexer.fields(line))
-    if (row["error"] as String) != "":
-        errors.append("materialflarebinding %s: %s" % [row["error"], line])
-        return
-    var material: String = row["material"] as String
-    var bound: PackedInt32Array = material_flares.get(material, PackedInt32Array())
-    bound.append(row["flare"] as int)
-    material_flares[material] = bound
-
-
 func _parse_minimass(line: String) -> void:
     var fields: PackedStringArray = TruckLexer.fields(line)
     if fields.size() >= 1:
@@ -390,6 +381,7 @@ func _parse_joint(line: String) -> void:
         return
     if _section == "hydros" and (row["factor"] as float) != 0.0:
         hydros.append({"beam": beams.size() / 2, "factor": row["factor"] as float})
+    CommandRows.collect(_section, fields, beams.size() / 2, commands)
     beam_table.record(row)
 
 

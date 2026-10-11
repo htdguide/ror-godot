@@ -283,6 +283,10 @@ func _read_controls(delta: float) -> void:
     solver.set_throttle(_throttle)
     solver.set_brake(_brake)
     solver.set_parking_brake(DriveKeys.held(keys, "parking"))
+    # Command keys, held: the vehicle's own rams move while their key is down.
+    var command_keys: Array = keys.get("commands", []) as Array
+    for index: int in command_keys.size():
+        solver.set_command_key(index + 1, 1.0 if Input.is_key_pressed(command_keys[index] as Key) else 0.0)
     if not is_nan(scripted_steer):
         steer = scripted_steer
     solver.set_steer_command(DriveCfg.steer_command(steer))

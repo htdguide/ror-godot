@@ -89,6 +89,9 @@ struct RorBeam {
     // their own laws and upstream exempts them.
     bool deformable = false;
     bool broken = false;
+    // The force along the beam last substep, signed, as upstream keeps `beam.stress`: the command
+    // rams' load on the engine is read from it.
+    float stress = 0.0f;
 };
 
 using NodeArray = std::vector<RorNode>;

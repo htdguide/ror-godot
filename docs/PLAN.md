@@ -1858,7 +1858,8 @@ milestone the `mod_corpus` gate from M1 acceptance 5 belongs to, and it is where
 asserting "loads or fails cleanly" and starts asserting fidelity per section.
 
 Scope, vehicles:
-- **Every section a ground rig uses.** The named gaps today: `commands2` not key-driven so doors do not open, differentials not modelled,
+- **Every section a ground rig uses.** The named gaps today: command key inertia and the `r` rope
+  option (the rams themselves move since 2026-10-11, keys 1-0), differentials not modelled,
   `fusedrag` given per-node drag instead of a fuselage vector, traction control and ABS absent,
   flares placed but not animated.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.

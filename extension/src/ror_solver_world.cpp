@@ -171,6 +171,29 @@ void RorSolver::set_node_contact_role(int node, bool contacter, bool rim) {
     m_collcabs.set_roles(node, m_nodes.size(), contacter, rim);
 }
 
+void RorSolver::add_command(int beam, int contract_key, int extend_key, float shorten_rate,
+                            float lengthen_rate, float max_contraction, float max_extension,
+                            bool force_restricted, bool auto_center, bool one_press,
+                            bool one_press_center, float engine_coupling, bool needs_engine) {
+    sync();
+    if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
+        return;
+    }
+    m_commands.add(beam, contract_key, extend_key, shorten_rate, lengthen_rate, max_contraction,
+                   max_extension, force_restricted, auto_center, one_press, one_press_center,
+                   engine_coupling, needs_engine);
+}
+
+int RorSolver::command_count() const {
+    sync();
+    return m_commands.count();
+}
+
+void RorSolver::set_command_key(int key, float value) {
+    sync();
+    m_commands.set_key(key, value);
+}
+
 void RorSolver::set_node_tyre(int node) {
     sync();
     m_collcabs.set_tyre(node, m_nodes.size());

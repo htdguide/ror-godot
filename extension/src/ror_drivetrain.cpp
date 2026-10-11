@@ -186,6 +186,30 @@ float RorDrivetrain::ratio_of(int gear) const {
     return m_gear_ratios[index];
 }
 
+// Upstream's `getCrankFactor`: how hard the engine can drive the rams, nothing at idle, five times
+// their stated rate flat out.
+float RorDrivetrain::crank_factor() const {
+    const float min_working_rpm = m_idle_rpm * 1.1f;
+    const float ratio = clampf((m_rpm - min_working_rpm) / (m_max_rpm - min_working_rpm), 0.0f, 1.0f);
+    return 5.0f * ratio;
+}
+
+// Upstream's `getPrimeMixture`: while the rams ask for power, open the throttle until the crank
+// factor reaches one.
+float RorDrivetrain::prime_mixture() const {
+    if (!m_priming) {
+        return 0.0f;
+    }
+    const float crank = crank_factor();
+    if (crank < 0.9f) {
+        return 1.0f;
+    }
+    if (crank < 1.0f) {
+        return 10.0f * (1.0f - crank);
+    }
+    return 0.0f;
+}
+
 float RorDrivetrain::idle_mixture() const {
     return m_rpm <= m_idle_rpm ? m_max_idle_mixture : m_min_idle_mixture;
 }
@@ -198,13 +222,18 @@ void RorDrivetrain::step(float dt, float wheel_rpm, bool do_update) {
     m_acc = m_commanded_acc;
     // Idling is a throttle floor, not a special case: it is why an engine in gear at rest
     // creeps forward instead of stalling the moment the driver lifts off.
-    const float acc = std::fmax(idle_mixture(), m_acc);
+    // And priming is another: rams asking for hydraulic power raise it until the pump turns.
+    const float acc = std::fmax(std::fmax(idle_mixture(), prime_mixture()), m_acc);
 
     float total_torque = 0.0f;
     if (m_running && m_contact) {
         total_torque += m_braking_torque * m_rpm / m_max_rpm * (1.0f - m_acc);
     } else if (!m_contact || !m_starter) {
         total_torque += m_braking_torque;
+    }
+    // What the hydraulic pump takes from the crank to drive the rams (upstream's `UpdateEngine`).
+    if (m_rpm > 100.0f) {
+        total_torque -= 8.0f * m_hydropump_work / (m_rpm * 0.105f * dt);
     }
     if (m_running && m_contact && m_rpm < m_max_rpm * OVERREV_RATIO) {
         total_torque += engine_power(m_rpm) * acc;

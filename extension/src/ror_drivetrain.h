@@ -52,6 +52,13 @@ public:
     int gear() const { return m_gear; }
     int gear_count() const { return m_gear_count; }
     float clutch() const { return m_clutch; }
+    float crank_factor() const;
+    float idle_rpm() const { return m_idle_rpm; }
+    // What the command rams ask of the engine: whether to prime it, and the pump's work.
+    void set_hydraulics(bool priming, float pump_work) {
+        m_priming = priming;
+        m_hydropump_work = pump_work;
+    }
     bool running() const { return m_running; }
     bool configured() const { return m_gear_count > 0; }
     // Peak torque times the curve's value at `rpm`. Upstream's `getEnginePower`.
@@ -64,6 +71,7 @@ private:
     void update_gear_choice(float dt);
     void update_auto_clutch(float acc);
     float idle_mixture() const;
+    float prime_mixture() const;
 
     std::vector<float> m_gear_ratios;
     // The torque curve's points and the Catmull-Rom tangents through them, so the curve
@@ -98,6 +106,8 @@ private:
     bool m_contact = false;
     bool m_starter = false;
     bool m_running = false;
+    bool m_priming = false;
+    float m_hydropump_work = 0.0f;
 
     int m_shifting = 0;
     int m_shift_val = 0;

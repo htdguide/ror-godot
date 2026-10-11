@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-170 gates; 170 of 170 at self-collision-on (`--all --every` stopped at 131, rest as one batch). `--order-check` has one
+171 gates; `--all --every` 171 of 171 at the command-rams commit (2026-10-11). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 
@@ -296,9 +296,9 @@ What M1 still owes is human: 5 below.
 - Differentials are not modelled. The hero rig's are all split, and a split differential chain
   reduces to the division `ror_wheels` already does, so this is invisible on this rig and wrong on
   one with locked or open diffs.
-- `commands2` beams hold the doors but are not key-driven, so the doors do not open. They are also
-  built as plain beams where upstream builds them as hydros with their own rate and travel; the
-  fold hunt flagged this twice and ruled it out as the cause, and it is still a divergence.
+- `commands`/`commands2` are rams now (`ror_commands.cpp`, upstream's `CalcCommands` with priming):
+  keys 1-0 in the solo window, the hero's doors on 1-4 (`a_ram_moves_by_its_rate_and_stops_at_its_bounds`).
+  Key inertia and the `r` rope option are not read.
 - Traction control and ABS are not implemented; neither is declared by the hero rig.
 - A vehicle that declares no `materialflarebindings` has no lit lamp glass, which is upstream's
   behaviour too — the hero truck declares none, so its lamps are the sprite and the beam and its

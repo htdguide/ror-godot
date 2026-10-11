@@ -153,3 +153,16 @@ static func binding(fields: PackedStringArray) -> Dictionary:
     if not fields[0].is_valid_int():
         return {"error": "flare number '%s' is not a number" % fields[0]}
     return {"error": "", "flare": fields[0].to_int(), "material": fields[1]}
+
+
+## A `materialflarebindings` row, recorded into `bindings` (material name -> flare indices).
+## Returns "" or what was wrong with the row.
+static func bind(fields: PackedStringArray, bindings: Dictionary) -> String:
+    var row: Dictionary = binding(fields)
+    if (row["error"] as String) != "":
+        return row["error"] as String
+    var material: String = row["material"] as String
+    var bound: PackedInt32Array = bindings.get(material, PackedInt32Array())
+    bound.append(row["flare"] as int)
+    bindings[material] = bound
+    return ""

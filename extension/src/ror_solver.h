@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ror_actor_contact.h"
+#include "ror_commands.h"
 #include "ror_drivetrain.h"
 #include "ror_ground.h"
 #include "ror_heightfield.h"
@@ -156,6 +157,15 @@ public:
     // Which of a node's contact roles the file gives it: a `contacters` row, or a flexbody
     // wheel's rim. Either makes it hit other vehicles' collision triangles.
     void set_node_contact_role(int node, bool contacter, bool rim);
+    // A key-driven ram: upstream's `commands`/`commands2`. See ror_commands.h. `beam` is the ram's
+    // own beam; keys are numbered 1 to 84 and either may be 0 for none.
+    void add_command(int beam, int contract_key, int extend_key, float shorten_rate,
+                     float lengthen_rate, float max_contraction, float max_extension,
+                     bool force_restricted, bool auto_center, bool one_press,
+                     bool one_press_center, float engine_coupling, bool needs_engine);
+    int command_count() const;
+    // A command key held (1) or let go (0), as a player's input.
+    void set_command_key(int key, float value);
     // A generated tyre node, which never collides with its own actor.
     void set_node_tyre(int node);
     // Upstream's self-collisions, on unless `sim_no_self_collisions`, and on here since the owner
@@ -356,6 +366,7 @@ private:
     void begin_steps();
     void substep(float dt, bool first);
     RorCollCabs m_collcabs;
+    RorCommands m_commands;
     bool m_self_collision = true;
     int64_t m_self_contacts = 0;
     void integrate(float dt);

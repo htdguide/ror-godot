@@ -240,6 +240,13 @@ void RorSolver::_bind_methods() {
                          &RorSolver::set_node_contact_role);
     ClassDB::bind_method(D_METHOD("contactable_count"), &RorSolver::contactable_count);
     ClassDB::bind_method(D_METHOD("set_node_tyre", "node"), &RorSolver::set_node_tyre);
+    ClassDB::bind_method(D_METHOD("add_command", "beam", "contract_key", "extend_key",
+                                  "shorten_rate", "lengthen_rate", "max_contraction",
+                                  "max_extension", "force_restricted", "auto_center", "one_press",
+                                  "one_press_center", "engine_coupling", "needs_engine"),
+                         &RorSolver::add_command);
+    ClassDB::bind_method(D_METHOD("command_count"), &RorSolver::command_count);
+    ClassDB::bind_method(D_METHOD("set_command_key", "key", "value"), &RorSolver::set_command_key);
     ClassDB::bind_method(D_METHOD("set_self_collision", "enabled"), &RorSolver::set_self_collision);
     ClassDB::bind_method(D_METHOD("self_contact_count"), &RorSolver::self_contact_count);
     ClassDB::bind_method(D_METHOD("set_node_ground_contact", "node", "touches"),

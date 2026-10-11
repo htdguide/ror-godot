@@ -77,6 +77,7 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
     _add_collision_cabs(solver, truck)
 
     _add_bounds(solver, truck)
+    _add_commands(solver, truck)
     _add_wheels(solver, truck)
     _add_steering(solver, truck)
     _configure_engine(solver, truck)
@@ -298,3 +299,17 @@ static func _add_collision_cabs(solver: RefCounted, truck: TruckParser) -> void:
         for node: int in range(truck.generated_from, truck.nodes.size()):
             if not truck.rim_nodes.has(node) and not truck.no_ground_contact.has(node):
                 solver.set_node_tyre(node)
+
+
+## The key-driven rams: upstream's `commands`/`commands2`, each row's beam made a ram. The hero's
+## doors are four of them, on keys 1 to 4. See `CommandRows` and ror_commands.h.
+static func _add_commands(solver: RefCounted, truck: TruckParser) -> void:
+    for row: Dictionary in truck.commands:
+        solver.add_command(
+            row["beam"] as int, row["contract_key"] as int, row["extend_key"] as int,
+            row["shorten_rate"] as float, row["lengthen_rate"] as float,
+            row["max_contraction"] as float, row["max_extension"] as float,
+            row["not_faster"] as bool, row["auto_center"] as bool, row["one_press"] as bool,
+            row["one_press_center"] as bool, row["affect_engine"] as float,
+            row["needs_engine"] as bool
+        )

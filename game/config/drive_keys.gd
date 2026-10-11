@@ -11,8 +11,9 @@ extends RefCounted
 ## the two split maps leave out what a split session does not need (indicators, main beam) and
 ## stay off every key the session itself answers to (F1-F8, M, P, Esc).
 
-## Held actions are read every frame; the rest fire once per press.
-const HELD: PackedStringArray = ["throttle", "brake", "left", "right", "parking"]
+## Held actions are read every frame; the rest fire once per press. `commands` is held too, one
+## key per command number.
+const HELD: PackedStringArray = ["throttle", "brake", "left", "right", "parking", "commands"]
 
 const SOLO: Dictionary = {
     "throttle": [KEY_UP], "brake": [KEY_DOWN], "left": [KEY_LEFT], "right": [KEY_RIGHT],
@@ -21,6 +22,9 @@ const SOLO: Dictionary = {
     "respawn": [KEY_R, KEY_BACKSPACE], "recover": [KEY_ENTER], "ignition": [KEY_I],
     "lights": [KEY_L, KEY_N], "main_beam": [KEY_K],
     "indicator_left": [KEY_Z], "indicator_right": [KEY_C], "indicators_off": [KEY_X],
+    # Command keys 1 to 10, in order: a vehicle's own rams, its doors on the hero. Upstream puts
+    # them on F1-F12, which this window answers to itself.
+    "commands": [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_0],
 }
 
 ## The left half of a split window.
@@ -47,6 +51,7 @@ const NAMES: Dictionary = {
     "respawn": "respawn", "recover": "recover", "ignition": "ignition", "lights": "lights",
     "main_beam": "main beam", "indicator_left": "left indicator",
     "indicator_right": "right indicator", "indicators_off": "indicators off",
+    "commands": "commands 1-10 (doors, rams)",
 }
 
 

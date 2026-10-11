@@ -211,6 +211,15 @@ void RorSolver::substep(float dt, bool first) {
     integrate(dt);
     apply_air_drag();
     m_steering.update(dt, m_wheels.driven_speed(), m_beams);
+    // Upstream's `CalcCommands`, after the hydros and before the engine, which it feeds.
+    if (!m_commands.empty()) {
+        const bool engine = m_drivetrain.gear_count() > 0;
+        const RorCommands::Power power = m_commands.update(
+                m_beams, dt, !engine || m_drivetrain.running(),
+                !engine || m_drivetrain.rpm() > m_drivetrain.idle_rpm() * 0.95f,
+                engine ? m_drivetrain.crank_factor() : 1.0f);
+        m_drivetrain.set_hydraulics(power.requested, power.work);
+    }
     // The first substep of a call stands in for upstream's per-frame pass, which is
     // the rate it makes gear decisions at.
     m_drivetrain.step(dt, m_wheels.driven_spin() * RAD_PER_SEC_TO_RPM, first);
@@ -298,6 +307,7 @@ void RorSolver::accumulate_beam_forces() {
         apply_bound_law(beam, extension, spring, damping);
         float stress = -spring * extension - damping * closing_speed;
         stress = apply_beam_deformation(beam, extension, spring, stress, m_nodes);
+        beam.stress = stress;
         if (beam.broken) {
             continue;
         }
