@@ -35,3 +35,5 @@ static func hand_to(solver: RefCounted, truck: TruckParser) -> void:
     var cruise: Dictionary = truck.drivetrain.get("cruise", {}) as Dictionary
     if not cruise.is_empty():
         solver.set_cruise_control(cruise["lower_limit"], cruise["can_brake"])
+    if truck.drivetrain.has("speed_limit"):
+        solver.set_speed_limiter(truck.drivetrain["speed_limit"])

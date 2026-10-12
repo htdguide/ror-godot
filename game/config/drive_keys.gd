@@ -119,10 +119,11 @@ static func is_cruise_key(keys: Dictionary, keycode: Key) -> bool:
     return keys == SOLO and Input.is_key_pressed(KEY_CTRL) and CRUISE_HELD.has(keycode)
 
 
-## Upstream's `UpdateCruiseControl`, once a frame after the driver's own controls, while it is on.
+## Upstream's `UpdateTruckFeatures` once a frame after the driver's own controls: the cruise
+## control while it is on (one driver's keys only), then the speed limiter, which every vehicle has.
 static func drive_cruise(solver: RefCounted, keys: Dictionary, delta: float) -> void:
-    if keys != SOLO or not solver.cruise_control_on():
-        return
-    var ctrl: bool = Input.is_key_pressed(KEY_CTRL)
-    solver.update_cruise_control(delta, 1.0 if held(keys, "brake") else 0.0, 1.0 if held(keys, "throttle") else 0.0,
-            ctrl and Input.is_key_pressed(KEY_R), ctrl and Input.is_key_pressed(KEY_F), ctrl and Input.is_key_pressed(KEY_SPACE))
+    if keys == SOLO and solver.cruise_control_on():
+        var ctrl: bool = Input.is_key_pressed(KEY_CTRL)
+        solver.update_cruise_control(delta, 1.0 if held(keys, "brake") else 0.0, 1.0 if held(keys, "throttle") else 0.0,
+                ctrl and Input.is_key_pressed(KEY_R), ctrl and Input.is_key_pressed(KEY_F), ctrl and Input.is_key_pressed(KEY_SPACE))
+    solver.update_speed_limiter()

@@ -41,7 +41,6 @@ const METADATA_KEYWORDS: Array[String] = [
     "add_animation",
     "prop_camera_mode",
     "flexbody_camera_mode",
-    "speedlimiter",
     "extcamera",
     "default_skin",
     "fileformatversion",
@@ -54,7 +53,7 @@ const METADATA_KEYWORDS: Array[String] = [
 ## becomes a row of a section named after itself. Left as data, `AntiLockBrakes 3.5, 15, 1500`
 ## under `brakes` was a second brakes row: 29 library files had a brake force of 0 and a parking
 ## brake of 2.75 N m.
-const LINE_SECTIONS: Array[String] = ["antilockbrakes", "tractioncontrol", "cruisecontrol"]
+const LINE_SECTIONS: Array[String] = ["antilockbrakes", "tractioncontrol", "cruisecontrol", "speedlimiter"]
 
 ## `forset` is deliberately absent: see `FLEXBODY_LINES`.
 const DIRECTIVES: Array[String] = [

@@ -82,7 +82,8 @@ public:
     void trigger_clutch(float clutch) { m_clutch = clutch; }
     // An engine trigger's `shift`, upstream's own shift with its clutch timing.
     void trigger_shift(int by) { shift(by); }
-    void trigger_acc(float acc) {
+    // Upstream's `setAcc`, which an engine trigger and the speed limiter use.
+    void set_acc(float acc) {
         m_acc = acc;
         m_commanded_acc = acc;
     }

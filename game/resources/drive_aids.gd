@@ -13,6 +13,13 @@ extends RefCounted
 
 ## Fills `drive["abs"]`, `drive["tc"]` or `drive["cruise"]` from one line; an error, or "".
 static func read(section: String, line: String, drive: Dictionary) -> String:
+    if section == "speedlimiter":
+        # Upstream's `ParseSpeedLimiter`: "SpeedLimiter max_speed", in metres a second.
+        var given: PackedStringArray = TruckLexer.fields(line)
+        if given.size() < 2:
+            return "speedlimiter states no speed"
+        drive["speed_limit"] = given[1].to_float()
+        return ""
     if section == "cruisecontrol":
         # Upstream's `ParseCruiseControl`: "CruiseControl min_speed, autobrake", the keyword
         # counted as the first of three arguments; `ProcessCruiseControl` keeps any speed.

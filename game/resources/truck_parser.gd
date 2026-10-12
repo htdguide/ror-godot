@@ -271,7 +271,7 @@ func _parse_row(line: String) -> void:
         # Five wheel sections, five field orders (`WheelRows`), and the rows that act on wheels:
         # which section a row came from is part of reading it.
         "wheels", "wheels2", "meshwheels", "meshwheels2", "flexbodywheels", "wheeldetachers", \
-                "antilockbrakes", "tractioncontrol", "cruisecontrol":
+                "antilockbrakes", "tractioncontrol", "cruisecontrol", "speedlimiter":
             _note(_section, WheelRig.read_row(self, _section, line), line)
         "cameras":
             _cameras.read_cameras(TruckLexer.fields(line))

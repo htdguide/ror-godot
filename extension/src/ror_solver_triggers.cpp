@@ -158,7 +158,7 @@ void RorSolver::engine_trigger(int type, float value) {
             m_wheels.set_brake(value);
             break;
         case ENGINE_TRIGGER_ACC:
-            m_drivetrain.trigger_acc(value);
+            m_drivetrain.set_acc(value);
             break;
         case ENGINE_TRIGGER_SHIFTUP:
             m_drivetrain.trigger_shift(1);

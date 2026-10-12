@@ -82,7 +82,9 @@ protected:
     float cruise_target_speed() const;
     float avg_wheel_speed() const;
     float commanded_throttle() const;
-    float brake_command() const;
+    float brake_command() const, wheel_speed() const;
+    void set_speed_limiter(float limit);
+    void update_speed_limiter();
     // Upstream's `engturbo` (`ror_solver_turbo.cpp`): `params` are the row's eleven, 9999 where unstated.
     void set_turbo(int version, float inertia_factor, int count, const godot::PackedFloat32Array &params);
     float turbo_psi() const;
@@ -570,11 +572,9 @@ private:
     int m_camera_roll = 0;
     float m_speedo_max_kph = 140.0f;
     RorAnimatorInputs animator_inputs() const;
-    bool m_cc_mode = false;
-    bool m_cc_can_brake = false;
-    float m_cc_target_speed = 0.0f;
-    float m_cc_target_rpm = 0.0f;
-    float m_cc_lower_limit = 0.0f;
+    // Upstream's cruise control (`cc_*`) and speed limiter (`sl_*`) state.
+    bool m_cc_mode = false, m_cc_can_brake = false, m_sl_enabled = false;
+    float m_cc_target_speed = 0.0f, m_cc_target_rpm = 0.0f, m_cc_lower_limit = 0.0f, m_sl_speed_limit = 0.0f;
     std::deque<float> m_cc_accs;
     // The world this solver is a member of, set by `RorWorld::add_solver`: a respawn lets go of
     // every other member's links to it.

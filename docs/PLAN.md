@@ -1872,8 +1872,9 @@ Scope, vehicles:
   upstream's `NEW` turbo, both versions, blow-off valve, wastegate and anti-lag
   (`the_turbo_is_upstreams`, bit-identical); the `OLD` turbo feeds only sound, which is not in. Cruise
   control is upstream's on every engine (Shift+Space; Ctrl+R/F/Space adjust), `cruisecontrol` its
-  lower limit and autobrake (`cruise_control_holds_…`); `speedlimiter` and the manual clutch key
-  that pauses it are not in, and its mass leaves out linked vehicles. `triggers` are upstream's,
+  lower limit and autobrake (`cruise_control_holds_…`), `speedlimiter` upstream's per-frame throttle
+  cap (`a_speed_limiter_holds_…`); the manual clutch key that pauses cruise control is not in, and
+  its mass leaves out linked vehicles. `triggers` are upstream's,
   keys, blockers, switches, hook groups and engine (`the_trigger_is_upstreams`, identical to
   upstream's step for step); their beams are not drawn. `animators` are upstream's on every input a
   ground vehicle has, with the `OLD` turbo their boost gauge reads (`the_animator_is_upstreams`);

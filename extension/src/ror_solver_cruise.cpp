@@ -72,6 +72,9 @@ void RorSolver::update_cruise_control(float dt, float brake_input, float acceler
         if (gear > 0) {
             m_cc_target_speed *= std::pow(2.0f, dt / 5.0f);
             m_cc_target_speed = std::max(m_cc_lower_limit, m_cc_target_speed);
+            if (m_sl_enabled) {
+                m_cc_target_speed = std::min(m_cc_target_speed, m_sl_speed_limit);
+            }
         } else if (gear == 0) {
             m_cc_target_rpm *= std::pow(2.0f, dt / 5.0f);
             m_cc_target_rpm = std::min(m_cc_target_rpm, m_drivetrain.max_rpm());
@@ -88,12 +91,32 @@ void RorSolver::update_cruise_control(float dt, float brake_input, float acceler
     }
     if (match) {
         m_cc_target_speed = std::max(m_wheels.avg_speed(), m_cc_target_speed);
+        if (m_sl_enabled) {
+            m_cc_target_speed = std::min(m_cc_target_speed, m_sl_speed_limit);
+        }
         m_cc_target_rpm = rpm;
     }
     if (m_cc_can_brake && m_wheels.avg_speed() > m_cc_target_speed + 0.5f && accelerate_input == 0.0f) {
         const float brake = (m_wheels.avg_speed() - m_cc_target_speed) * 0.5f;
         m_wheels.set_brake(std::min(brake, 1.0f));
     }
+}
+
+void RorSolver::set_speed_limiter(float limit) {
+    sync();
+    m_sl_enabled = true;
+    m_sl_speed_limit = limit;
+}
+
+// Upstream's speed limiter, once a frame after the cruise control: in gear, the throttle is held
+// to twice what is left of the limit, the wheel speed taken as 2% over the road's.
+void RorSolver::update_speed_limiter() {
+    sync();
+    if (!m_sl_enabled || !m_drivetrain.configured() || m_drivetrain.gear() == 0) {
+        return;
+    }
+    const float accl = (m_sl_speed_limit - std::abs(m_wheels.driven_speed() / 1.02f)) * 2.0f;
+    m_drivetrain.set_acc(std::clamp(accl, 0.0f, m_drivetrain.current_acc()));
 }
 
 bool RorSolver::cruise_control_on() const {
@@ -109,6 +132,11 @@ float RorSolver::cruise_target_speed() const {
 float RorSolver::avg_wheel_speed() const {
     sync();
     return m_wheels.avg_speed();
+}
+
+float RorSolver::wheel_speed() const {
+    sync();
+    return m_wheels.driven_speed();
 }
 
 float RorSolver::brake_command() const {
@@ -131,6 +159,9 @@ void RorSolver::bind_cruise_methods() {
     ClassDB::bind_method(D_METHOD("avg_wheel_speed"), &RorSolver::avg_wheel_speed);
     ClassDB::bind_method(D_METHOD("commanded_throttle"), &RorSolver::commanded_throttle);
     ClassDB::bind_method(D_METHOD("brake_command"), &RorSolver::brake_command);
+    ClassDB::bind_method(D_METHOD("wheel_speed"), &RorSolver::wheel_speed);
+    ClassDB::bind_method(D_METHOD("set_speed_limiter", "limit"), &RorSolver::set_speed_limiter);
+    ClassDB::bind_method(D_METHOD("update_speed_limiter"), &RorSolver::update_speed_limiter);
 }
 
 } // namespace rorgd
