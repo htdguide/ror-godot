@@ -68,16 +68,36 @@ void RorWorld::_bind_methods() {
 void RorWorld::add_solver(const Ref<RorSolver> &solver) {
     if (solver.is_valid()) {
         m_solvers.push_back(solver);
+        solver->m_world = this;
     }
 }
 
 RorWorld::~RorWorld() {
-    sync_all();
+    clear();
 }
 
 void RorWorld::clear() {
     sync_all();
+    for (const Ref<RorSolver> &solver : m_solvers) {
+        if (solver->m_world == this) {
+            solver->m_world = nullptr;
+        }
+    }
     m_solvers.clear();
+}
+
+// Every other member's hooks, ties and ropes on `solver` let go: upstream's
+// `DisjoinInterActorBeams`, on a respawn.
+void RorWorld::disjoin(RorSolver *solver) {
+    sync_all();
+    for (const Ref<RorSolver> &other : m_solvers) {
+        if (other.ptr() == solver) {
+            continue;
+        }
+        other->toggle_hooks_among({other.ptr()}, RorHook::RESET, -1, solver);
+        other->toggle_ties_among({other.ptr()}, -1, true, solver);
+        other->toggle_ropes_among({other.ptr()}, -1, true, solver);
+    }
 }
 
 std::vector<RorSolver *> RorWorld::members() const {

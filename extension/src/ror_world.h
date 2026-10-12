@@ -65,6 +65,7 @@ public:
     void toggle_ties(const godot::Ref<RorSolver> &solver, int group);
     // Upstream's rope key for `solver`'s ropes, reaching every vehicle's ropables in this world.
     void toggle_ropes(const godot::Ref<RorSolver> &solver, int group);
+    void disjoin(RorSolver *solver);
 
 private:
     struct Bounds {

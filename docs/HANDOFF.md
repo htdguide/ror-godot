@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-197 gates; `--all --every` 197 of 197 at the ropes commit (2026-10-12). `--order-check` has one
+198 gates; `--all --every` 198 of 198 at the respawn-links commit (2026-10-12). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 
@@ -299,7 +299,7 @@ What M1 still owes is human: 5 below.
   keys 1-0 in the solo window, the hero's doors on 1-4 (`a_ram_moves_by_its_rate_and_stops_at_its_bounds`).
   Key and hydro inertia and the respawn reset are upstream's (`a_hydro_follows_…`); `r` rams are ropes.
 - Hooks (L), ties (O) and ropes (Ctrl+L) are upstream's, between vehicles of one world
-  (`a_hook_locks_…`, `a_tie_takes_the_nearest_ropable_…`, `a_rope_rides_on_the_nearest_ropable`).
+  (`a_hook_locks_…`, `a_tie_takes_…`, `a_rope_rides_…`); a respawn frees links to it (`a_respawn_…`).
 - A vehicle that declares no `materialflarebindings` has no lit lamp glass, which is upstream's
   behaviour too — the hero truck declares none, so its lamps are the sprite and the beam and its
   lenses never change. Giving it lit glass means authoring a two-frame lens texture and four

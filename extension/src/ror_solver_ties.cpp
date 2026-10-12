@@ -78,10 +78,14 @@ void RorSolver::untie(RorTie &tie) {
 
 // Upstream's `tieToggle`: if any tie of the group is tied, every one of them lets go; if none was,
 // a toggle ties each to the nearest free ropable within its reach.
-void RorSolver::toggle_ties_among(const std::vector<RorSolver *> &actors, int group, bool reset) {
+// With `only_to`, a reset lets go only of the ties on that vehicle, upstream's `forceunlock_filter`.
+void RorSolver::toggle_ties_among(const std::vector<RorSolver *> &actors, int group, bool reset, RorSolver *only_to) {
     bool tied_any = false;
     for (RorTie &tie : m_ties) {
         if (group != -1 && tie.group != -1 && tie.group != group) {
+            continue;
+        }
+        if (reset && only_to != nullptr && tie.tied && tie.target != only_to) {
             continue;
         }
         if (tie.tied) {
@@ -183,9 +187,12 @@ void RorSolver::toggle_ropes(int group) {
 
 // Upstream's `ropeToggle`, rope by rope: a locked rope lets go; with a toggle, an unlocked one
 // locks to the nearest free ropable nearer its root than its length, on any vehicle, its own too.
-void RorSolver::toggle_ropes_among(const std::vector<RorSolver *> &actors, int group, bool reset) {
+void RorSolver::toggle_ropes_among(const std::vector<RorSolver *> &actors, int group, bool reset, RorSolver *only_to) {
     for (RorRope &rope : m_ropes) {
         if (group != -1 && rope.group != -1 && rope.group != group) {
+            continue;
+        }
+        if (reset && only_to != nullptr && rope.locked && rope.target != only_to) {
             continue;
         }
         if (rope.locked) {
@@ -299,6 +306,15 @@ bool RorSolver::tie_locked_to_self(int index) {
            m_ties[static_cast<size_t>(index)].target == nullptr;
 }
 
+Vector2i RorSolver::ropable_attached(int index) {
+    sync();
+    if (index < 0 || index >= static_cast<int>(m_ropables.size())) {
+        return Vector2i();
+    }
+    const RorRopable &ropable = m_ropables[static_cast<size_t>(index)];
+    return Vector2i(ropable.attached_ties, ropable.attached_ropes);
+}
+
 void RorSolver::bind_tie_methods() {
     ClassDB::bind_method(D_METHOD("add_tie", "root", "reach", "rate", "min_length", "max_stress", "group", "no_self_lock",
                                   "spring", "damp", "strength", "deform"),
@@ -311,6 +327,7 @@ void RorSolver::bind_tie_methods() {
     ClassDB::bind_method(D_METHOD("tie_ropable", "index"), &RorSolver::tie_ropable);
     ClassDB::bind_method(D_METHOD("tie_locked_to_self", "index"), &RorSolver::tie_locked_to_self);
     ClassDB::bind_method(D_METHOD("add_rope", "beam"), &RorSolver::add_rope);
+    ClassDB::bind_method(D_METHOD("ropable_attached", "index"), &RorSolver::ropable_attached);
     ClassDB::bind_method(D_METHOD("toggle_ropes", "group"), &RorSolver::toggle_ropes);
     ClassDB::bind_method(D_METHOD("rope_count"), &RorSolver::rope_count);
     ClassDB::bind_method(D_METHOD("rope_ropable", "index"), &RorSolver::rope_ropable);

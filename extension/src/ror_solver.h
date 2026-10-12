@@ -28,6 +28,8 @@
 
 namespace rorgd {
 
+class RorWorld;
+
 // The node/beam core of Rigs of Rods' soft-body simulation, and the force sources that
 // make a rig a vehicle rather than a structure.
 //
@@ -296,6 +298,8 @@ public:
     int rope_count();
     int rope_ropable(int index);
     bool rope_locked_to_self(int index);
+    // How many ties and how many ropes hold ropable `index`.
+    godot::Vector2i ropable_attached(int index);
     // The force along the beam last substep, signed as upstream's `beam.stress`: negative pulls.
     float get_beam_stress(int beam) const;
     // Runs the beam pass alone `passes` times, forces cleared before each and nothing integrated,
@@ -507,17 +511,20 @@ private:
                          float &damping) const;
     std::vector<RorShock> m_shocks;
     std::vector<RorHook> m_hooks;
-    void toggle_hooks_among(const std::vector<RorSolver *> &actors, int mode, int group);
+    void toggle_hooks_among(const std::vector<RorSolver *> &actors, int mode, int group, RorSolver *only_to = nullptr);
     void calc_hooks(float dt);
     void apply_inter_actor_links(const std::vector<RorSolver *> &island);
     void apply_link_beam(RorBeam &beam, RorSolver *other, int far);
     std::vector<RorTie> m_ties;
     std::vector<RorRopable> m_ropables;
-    void toggle_ties_among(const std::vector<RorSolver *> &actors, int group, bool reset);
+    void toggle_ties_among(const std::vector<RorSolver *> &actors, int group, bool reset, RorSolver *only_to = nullptr);
     void untie(RorTie &tie);
     void calc_ties(float dt);
     std::vector<RorRope> m_ropes;
-    void toggle_ropes_among(const std::vector<RorSolver *> &actors, int group, bool reset);
+    // The world this solver is a member of, set by `RorWorld::add_solver`: a respawn lets go of
+    // every other member's links to it.
+    RorWorld *m_world = nullptr;
+    void toggle_ropes_among(const std::vector<RorSolver *> &actors, int group, bool reset, RorSolver *only_to = nullptr);
     void calc_ropes(bool inter_actor);
     int m_direction_pos = -1;
     int m_direction_dir = -1;

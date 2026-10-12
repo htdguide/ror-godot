@@ -1,4 +1,5 @@
 #include "ror_solver.h"
+#include "ror_world.h"
 
 // Putting a damaged rig back the way it was built.
 //
@@ -52,6 +53,10 @@ void RorSolver::repair() {
     toggle_ties_among({this}, -1, true);
     // And every rope, upstream's `ROPE_RESET`.
     toggle_ropes_among({this}, -1, true);
+    // And, upstream's `DisjoinInterActorBeams`, every other vehicle's links to this one.
+    if (m_world != nullptr) {
+        m_world->disjoin(this);
+    }
     if (m_undamaged_beams.size() != m_beams.size()) {
         return;
     }

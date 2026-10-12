@@ -85,8 +85,14 @@ void RorSolver::toggle_hooks(int mode, int group) {
 }
 
 // Upstream's `hookToggle`, over `actors` in order, each a vehicle the hooks may reach.
-void RorSolver::toggle_hooks_among(const std::vector<RorSolver *> &actors, int mode, int group) {
+// With `only_to`, a reset lets go only of the hooks locked to that vehicle, upstream's
+// `forceunlock_filter`.
+void RorSolver::toggle_hooks_among(const std::vector<RorSolver *> &actors, int mode, int group, RorSolver *only_to) {
     for (RorHook &hook : m_hooks) {
+        if (mode == RorHook::RESET && only_to != nullptr && hook.state != RorHook::State::UNLOCKED &&
+            hook.target != only_to) {
+            continue;
+        }
         if (mode == RorHook::TOGGLE && group == -1 && hook.group <= -2) {
             continue;
         }
