@@ -1866,9 +1866,9 @@ Scope, vehicles:
   flares placed but not animated.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
 - **A section inventory as a gate**: done 2026-10-12 as `every_keyword_is_read_where_upstream_reads_it`
-  (all 120 of upstream's keywords open or keep a section as its parser does). Named gap: modules
-  (`section`, `sectionconfig`) are recognised but every module is read, so a file with alternatives
-  (the Star Monster's wheel sets) builds all of them.
+  (all 120 of upstream's keywords open, keep or close a section as its parser does). Modules
+  (`section` ... `end_section`) build the root plus upstream's default, the first by name
+  (`a_vehicle_is_built_from_…`); named gap: no way yet for the player to choose another.
 
 Scope, terrains:
 - **Procedural roads** from `.tobj` `road`/`road2`, which are reported as unread lines today.

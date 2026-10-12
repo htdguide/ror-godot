@@ -11,8 +11,10 @@ extends GateBase
 ## The oracle is upstream's own source: its keyword list (`IDENTIFY_KEYWORD_REGEX_STRING`, in the
 ## order of the `Keyword` enum, each marked as standing alone or carrying values) and the switch in
 ## `Parser::ProcessCurrentLine`, where every keyword it names returns without opening a section and
-## every other one begins its own. Each keyword is put between two `nodes` rows and the document read.
-## `end` closes the open section; `forset` belongs to the flexbody above it, upstream's and ours.
+## every other one begins its own, except that `end` and the module lines (`section`, `end_section`,
+## whose handler `ProcessChangeModuleLine` begins no block) close the open one. Each keyword is put
+## between two `nodes` rows inside a module and the document read. `forset` belongs to the flexbody
+## above it.
 
 const REGEXES: String = "vendor/rigs-of-rods/source/main/resources/rig_def_fileformat/RigDef_Regexes.h"
 const PARSER: String = "vendor/rigs-of-rods/source/main/resources/rig_def_fileformat/RigDef_Parser.cpp"
@@ -40,19 +42,23 @@ func run(_harness: Node) -> Dictionary:
         return ok("skipped: vendor/rigs-of-rods is not checked out", 0)
     var keywords: Array[Array] = _keywords(root)
     var enum_names: PackedStringArray = _enum_names(root)
-    var stays: PackedStringArray = _switch_cases(root)
+    var cases: Dictionary = _switch_cases(root)
+    var stays: PackedStringArray = cases["stays"]
+    var closes: PackedStringArray = cases["closes"]
     if keywords.size() < 100 or enum_names.size() < keywords.size() or stays.size() < 30:
         return fail("upstream's lists did not read: %d keywords, %d enum names, %d switch cases" % [keywords.size(), enum_names.size(), stays.size()])
     var wrong: PackedStringArray = PackedStringArray()
     var opened: int = 0
     var kept: int = 0
+    var closed: int = 0
     for i: int in keywords.size():
         var word: String = keywords[i][0]
         var standalone: bool = keywords[i][1]
         var opens: bool = not stays.has(enum_names[i + 1])
         var line: String = word if standalone else word + " 1, 2"
         var document: TruckDocument = TruckDocument.new()
-        document.read("t\nnodes\n0, 0, 0, 0\n%s\n1, 1, 1, 1\nend" % line)
+        # Inside a module, so `end_section` has one to end: upstream ignores it in the root.
+        document.read("t\nsection 1 m\nnodes\n0, 0, 0, 0\n%s\n1, 1, 1, 1\nend" % line)
         var after: String = ""
         var keyword_row_in_nodes: bool = false
         for row: Dictionary in document.rows:
@@ -60,9 +66,10 @@ func run(_harness: Node) -> Dictionary:
                 after = row["section"]
             if row["line"] == line and row["section"] == "nodes" and not bool(row["header"]):
                 keyword_row_in_nodes = true
-        if word.to_lower() == "end":
+        if closes.has(enum_names[i + 1]):
+            closed += 1
             if after == "nodes":
-                wrong.append("end: the row after it is still a nodes row")
+                wrong.append("%s closes the open section upstream; the row after it is still a nodes row" % word)
             continue
         if opens:
             opened += 1
@@ -76,7 +83,7 @@ func run(_harness: Node) -> Dictionary:
                 wrong.append("%s was read as a row of nodes" % word)
     if not wrong.is_empty():
         return fail("%d of %d keywords cut differently from upstream: %s" % [wrong.size(), keywords.size(), "; ".join(wrong)], wrong.size())
-    return ok("%d keywords: %d open a section, %d leave it open, end closes it; all as upstream" % [keywords.size(), opened, kept], keywords.size())
+    return ok("%d keywords: %d open a section, %d leave it open, %d close it; all as upstream" % [keywords.size(), opened, kept, closed], keywords.size())
 
 
 ## [name, standalone] per keyword, in the order of `Keyword` from 1.
@@ -101,14 +108,29 @@ func _enum_names(root: String) -> PackedStringArray:
     return out
 
 
-## The keywords `ProcessCurrentLine`'s switch names before its `default:`, which return without
-## opening a section; `INVALID` and `END` are handled apart.
-func _switch_cases(root: String) -> PackedStringArray:
+## The keywords `ProcessCurrentLine`'s switch names before its `default:`: {stays, closes}. A case
+## group whose handler changes module or begins the empty block closes the open section; every other
+## returns leaving it open. `INVALID` is no keyword.
+func _switch_cases(root: String) -> Dictionary:
     var text: String = FileAccess.get_file_as_string(root.path_join(PARSER))
     var start: int = text.find("switch (keyword)")
     var body: String = text.substr(start, text.find("default:", start) - start)
-    var out: PackedStringArray = PackedStringArray()
-    for m: RegExMatch in RegEx.create_from_string("case Keyword::([A-Z0-9_]+):").search_all(body):
-        if m.get_string(1) != "INVALID" and m.get_string(1) != "END":
-            out.append(m.get_string(1))
-    return out
+    var stays: PackedStringArray = PackedStringArray()
+    var closes: PackedStringArray = PackedStringArray()
+    var pending: PackedStringArray = PackedStringArray()
+    for line: String in body.split("\n"):
+        var m: RegExMatch = RegEx.create_from_string("case Keyword::([A-Z0-9_]+):").search(line)
+        if m != null:
+            if m.get_string(1) != "INVALID":
+                pending.append(m.get_string(1))
+            continue
+        if pending.is_empty():
+            continue
+        if line.contains("ProcessChangeModuleLine") or line.contains("ParseDirectiveSection()") \
+                or line.contains("BeginBlock(Keyword::INVALID)"):
+            closes.append_array(pending)
+            pending.clear()
+        elif line.contains("return;") or line.contains("break;"):
+            stays.append_array(pending)
+            pending.clear()
+    return {"stays": stays, "closes": closes}

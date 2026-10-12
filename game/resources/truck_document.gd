@@ -79,6 +79,13 @@ var name: String = ""
 var rows: Array[Dictionary] = []
 
 var _order: Dictionary = {}
+## Upstream's modules (`section VERSION NAME` ... `end_section`), sorted by name as upstream's
+## `std::map` keeps them; and the one a vehicle is built with besides the root. With no choice made
+## the game takes the first (`GameContext`: "Preselected config doesn't exist -> use first").
+var modules: PackedStringArray = PackedStringArray()
+var selected_module: String = ""
+## The module the row being read belongs to; "" is the root.
+var _module: String = ""
 
 
 func _init() -> void:
@@ -115,6 +122,12 @@ func read(text: String) -> void:
         # word?" first files it as a section and never acts on it. 56 of this checkout's 69
         # vehicles declare it, and it is what lets a file mean a yield stress below upstream's
         # 400 kN floor — swallowed, every one of them had its bodywork welded solid.
+        if TruckLexer.keyword_in(line, TruckLexer.CLOSES_THE_SECTION) != "" and not line.contains(" "):
+            section = ""
+            continue
+        if TruckLexer.keyword_in(line, ["section", "end_section"]) != "":
+            section = _change_module(line, section)
+            continue
         var keyword: String = TruckLexer.line_section_of(line)
         if keyword != "":
             _append(keyword, line, false, beams, node_defaults, inertia, detacher)
@@ -166,14 +179,41 @@ func read(text: String) -> void:
         _append(section, line, false, beams, node_defaults, inertia, detacher)
 
 
-## The rows in the order upstream spawns them, with the file's order kept inside each section.
+## Upstream's `ProcessChangeModuleLine`: `section VERSION NAME` enters module NAME, `end_section`
+## goes back to the root; either closes the open section. A malformed line, re-entering the current
+## module, or `end_section` in the root is ignored. Returns the section now open.
+func _change_module(line: String, section: String) -> String:
+    var fields: PackedStringArray = TruckLexer.fields(line)
+    if fields[0].to_lower() == "end_section":
+        if _module == "":
+            return section
+        _module = ""
+        return ""
+    if fields.size() < 3 or fields[2] == _module:
+        return section
+    _module = fields[2]
+    if not modules.has(_module):
+        modules.append(_module)
+        modules.sort()
+        selected_module = modules[0]
+    return ""
+
+
+## The rows in the order upstream spawns them, with the file's order kept inside each section: the
+## root's and then the selected module's, as upstream's spawner walks its selected modules for each
+## section in turn. Rows of the modules not selected are left out.
 func in_spawn_order() -> Array[Dictionary]:
-    var out: Array[Dictionary] = rows.duplicate()
+    var out: Array[Dictionary] = []
+    for row: Dictionary in rows:
+        if row["module"] == "" or row["module"] == selected_module:
+            out.append(row)
     # A stable sort, so two rows of the same section — or of two sections that share a place,
     # as a submesh's `texcoords` and `cab` do — stay in the order the file wrote them.
     out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
         if int(a["order"]) != int(b["order"]):
             return int(a["order"]) < int(b["order"])
+        if (a["module"] == "") != (b["module"] == ""):
+            return a["module"] == ""
         return int(a["at"]) < int(b["at"])
     )
     return out
@@ -198,4 +238,5 @@ func _append(
         "nodes": node_defaults,
         "inertia": inertia,
         "detacher": detacher,
+        "module": _module,
     })

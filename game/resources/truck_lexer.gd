@@ -47,9 +47,6 @@ const METADATA_KEYWORDS: Array[String] = [
     "fileformatversion",
     "set_collision_range",
     "submesh_groundmodel",
-    # A module boundary. Upstream reads it at once and keeps the open section; which modules a
-    # vehicle is built from is not modelled yet, so every module is read.
-    "section",
 ]
 
 ## Keywords upstream reads on their own line, arguments and all, without changing the open
@@ -70,7 +67,6 @@ const DIRECTIVES: Array[String] = [
     "set_skeleton_settings",
     "detacher_group",
     "enable_advanced_deformation",
-    "end_section",
     # Bare flags upstream records without changing the open section. Taken for section headers,
     # each would have dropped every row after it until the next header.
     "disabledefaultsounds",
@@ -86,11 +82,11 @@ const DIRECTIVES: Array[String] = [
     "hookgroup",
     "nodecollision",
     "rigidifiers",
-    # A stray end of a comment or description block changes nothing upstream: the block itself
-    # lasts until the next keyword, which ours already does by opening a section.
-    "end_comment",
-    "end_description",
 ]
+
+## Bare keywords that close the open section, upstream's `BeginBlock(INVALID)`: the rows after one
+## are nobody's until the next header.
+const CLOSES_THE_SECTION: Array[String] = ["end", "end_comment", "end_description"]
 
 ## Keywords that carry values on their line and yet open a section of their own: upstream's parser
 ## does not name them in its switch, so they begin a block like any bare section header.
