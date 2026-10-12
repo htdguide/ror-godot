@@ -37,6 +37,19 @@ WANTED = [
     ("main/physics/Differentials.cpp", "void Differential::CalcOpenDiff(DifferentialData& diff_data)"),
     ("main/physics/Differentials.cpp", "void Differential::CalcViscousDiff(DifferentialData& diff_data)"),
     ("main/physics/Differentials.cpp", "void Differential::CalcLockedDiff(DifferentialData& diff_data)"),
+    (
+        "main/physics/SlideNode.cpp",
+        "Ogre::Vector3 NearestPointOnLine(const Ogre::Vector3& pt1, const Ogre::Vector3& pt2, const Ogre::Vector3& tp)",
+    ),
+    ("main/physics/SlideNode.cpp", "SlideNode::SlideNode(node_t* slidingNode, RailGroup* slidingRail):"),
+    ("main/physics/SlideNode.cpp", "void SlideNode::UpdateForces(float dt)"),
+    ("main/physics/SlideNode.cpp", "RailSegment* RailGroup::FindClosestSegment(const Ogre::Vector3& point)"),
+    ("main/physics/SlideNode.cpp", "RailSegment* RailSegment::CheckCurSlideSegment(const Ogre::Vector3& point)"),
+    ("main/physics/SlideNode.cpp", "void SlideNode::UpdatePosition()"),
+    ("main/physics/SlideNode.cpp", "void SlideNode::ResetPositions()"),
+    ("main/physics/SlideNode.cpp", "Ogre::Real SlideNode::getLenTo(const RailSegment* rail, const Ogre::Vector3& point)"),
+    ("main/physics/SlideNode.cpp", "Ogre::Real SlideNode::getLenTo(const beam_t* beam, const Ogre::Vector3& point)"),
+    ("main/physics/SlideNode.cpp", "Ogre::Vector3 SlideNode::CalcCorrectiveForces()"),
 ]
 
 PROLOGUE = """// GENERATED — do not edit. Produced by tools/parity/extract.py from the pinned
@@ -48,6 +61,7 @@ PROLOGUE = """// GENERATED — do not edit. Produced by tools/parity/extract.py 
 #include "actor_shocks.h"
 #include "differentials.h"
 #include "ApproxMath.h"
+#include "SlideNode.h"
 
 #include <algorithm>
 #include <cmath>

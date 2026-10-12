@@ -50,12 +50,14 @@
 #include "rig_types.h"
 #include "actor_shocks.h"
 #include "differentials.h"
+#include "SlideNode.h"
 
 #include <sstream>
 #include <vector>
 
 #include <cstdio>
 #include <iostream>
+#include <limits>
 #include <string>
 
 const Ogre::Vector3 Ogre::Vector3::ZERO = Ogre::Vector3(0.0f, 0.0f, 0.0f);
@@ -275,10 +277,110 @@ static bool run_fuse(const std::string &line) {
     return true;
 }
 
+// `slide n_nodes n_beams n_rail n_steps node spring break tolerance dt`, then the nodes' positions,
+// the beams as node pairs, the rail's nodes and the slide node's position before each step.
+// Upstream's `SlideNode`, built as `ActorSpawner::ProcessSlidenode` builds one; the rail is
+// `ActorSpawner::CreateRail` transcribed, as it is a spawner member that reads the whole actor.
+// Prints, per step, whether it has broken and every node's force.
+static bool run_slide(const std::string &line) {
+    std::istringstream in(line.substr(5));
+    int n_nodes = 0, n_beams = 0, n_rail = 0, n_steps = 0, node = 0;
+    float spring = 0, breaking = 0, tolerance = 0, dt = 0;
+    std::string breaking_text;
+    if (!(in >> n_nodes >> n_beams >> n_rail >> n_steps >> node >> spring >> breaking_text >> tolerance >> dt)) {
+        return false;
+    }
+    breaking = breaking_text == "inf" ? std::numeric_limits<float>::infinity() : std::stof(breaking_text);
+    std::vector<node_t> nodes(static_cast<size_t>(n_nodes));
+    for (node_t &each : nodes) {
+        in >> each.AbsPosition.x >> each.AbsPosition.y >> each.AbsPosition.z;
+    }
+    std::vector<beam_t> beams(static_cast<size_t>(n_beams));
+    for (beam_t &each : beams) {
+        int a = 0, b = 0;
+        in >> a >> b;
+        each.p1 = &nodes[static_cast<size_t>(a)];
+        each.p2 = &nodes[static_cast<size_t>(b)];
+    }
+    std::vector<int> rail(static_cast<size_t>(n_rail));
+    for (int &each : rail) {
+        in >> each;
+    }
+    std::vector<Ogre::Vector3> path(static_cast<size_t>(n_steps));
+    for (Ogre::Vector3 &each : path) {
+        in >> each.x >> each.y >> each.z;
+    }
+    if (!in) {
+        return false;
+    }
+    // CreateRail: the first beam either way round between each pair, linked as upstream links them.
+    RoR::RailGroup *group = new RoR::RailGroup();
+    for (size_t i = 0; i + 1 < rail.size(); ++i) {
+        beam_t *found = nullptr;
+        for (beam_t &each : beams) {
+            node_t *a = &nodes[static_cast<size_t>(rail[i])];
+            node_t *b = &nodes[static_cast<size_t>(rail[i + 1])];
+            if ((each.p1 == a && each.p2 == b) || (each.p2 == a && each.p1 == b)) {
+                found = &each;
+                break;
+            }
+        }
+        if (found == nullptr) {
+            delete group;
+            group = nullptr;
+            break;
+        }
+        group->rg_segments.emplace_back(found);
+    }
+    if (group != nullptr) {
+        const size_t num_seg = group->rg_segments.size();
+        for (size_t i = 1; i < (num_seg - 1); ++i) {
+            group->rg_segments[i].rs_prev = &group->rg_segments[i - 1];
+            group->rg_segments[i].rs_next = &group->rg_segments[i + 1];
+        }
+        const bool is_loop = (rail.front() == rail.back());
+        if (group->rg_segments.size() > 1) {
+            group->rg_segments[0].rs_next = &group->rg_segments[1];
+            group->rg_segments[num_seg - 1].rs_prev = &group->rg_segments[num_seg - 2];
+            if (is_loop) {
+                group->rg_segments[0].rs_prev = &group->rg_segments[num_seg - 1];
+                group->rg_segments[num_seg - 1].rs_next = &group->rg_segments[0];
+            }
+        }
+    }
+    RoR::SlideNode slide(&nodes[static_cast<size_t>(node)], nullptr);
+    slide.SetSpringRate(spring);
+    slide.SetBreakForce(breaking);
+    slide.SetCorThreshold(tolerance);
+    slide.SetDefaultRail(group);
+    for (const Ogre::Vector3 &at : path) {
+        nodes[static_cast<size_t>(node)].AbsPosition = at;
+        for (node_t &each : nodes) {
+            each.Forces = Ogre::Vector3(0, 0, 0);
+        }
+        slide.UpdatePosition();
+        slide.UpdateForces(dt);
+        std::printf("%d", slide.sn_slide_broken ? 1 : 0);
+        for (const node_t &each : nodes) {
+            std::printf(" %.9g %.9g %.9g", each.Forces.x, each.Forces.y, each.Forces.z);
+        }
+        std::printf("\n");
+    }
+    delete group;
+    return true;
+}
+
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("slide", 0) == 0) {
+            if (!run_slide(line)) {
+                std::fprintf(stderr, "oracle: malformed slide case: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("fuse", 0) == 0) {

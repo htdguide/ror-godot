@@ -59,6 +59,10 @@ protected:
     static void bind_wheel_methods();
     static void bind_hook_methods();
     static void bind_tie_methods();
+    static void bind_slide_methods();
+    static godot::PackedFloat32Array slide_probe(const godot::PackedVector3Array &positions, const godot::PackedInt32Array &pairs,
+                                                 const godot::PackedInt32Array &rail, int node, float spring, float break_force,
+                                                 float tolerance, const godot::PackedVector3Array &path, float dt);
 
 public:
     // Returns the new node's index.
@@ -417,6 +421,7 @@ public:
     // A node held against a rail: upstream's `slidenodes`. `rail` is the rail's nodes in order.
     void add_slide_node(int node, const godot::PackedInt32Array &rail, float spring,
                         float break_force, float tolerance);
+    void reset_slide_nodes();
     int slide_node_count() const;
     // A terrain's own collision meshes, as triangles. `clear_collision_triangles` goes with
     // `clear_obstacles`: a world has one set of static collision and these are half of it.

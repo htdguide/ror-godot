@@ -198,6 +198,8 @@ static func place(
         solver.set_node_velocity(i, Vector3.ZERO)
     for beam: int in solver.beam_count():
         solver.set_beam_rest_length(beam, solver.get_beam_reference_length(beam))
+    # Upstream's `resetSlideNodes`, with the nodes back where they belong.
+    solver.reset_slide_nodes()
     solver.set_steer_command(0.0)
 
 

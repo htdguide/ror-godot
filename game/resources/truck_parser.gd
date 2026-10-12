@@ -1,8 +1,6 @@
 class_name TruckParser
 extends RefCounted
-## Reads the Rigs of Rods vehicle format well enough to measure and render a real rig.
-##
-## Each section's rules are upstream's `RigDef::Parser` and `ActorSpawner`, held by the gates.
+## Reads the Rigs of Rods vehicle format. Each section's rules are upstream's `RigDef::Parser` and `ActorSpawner`, held by the gates.
 ##
 ## Sections that are not understood are counted rather than skipped silently, so the
 ## parser can report how much of a file it actually accounted for.
@@ -102,11 +100,12 @@ var has_cinecam: bool = false
 ## driver's eye. Which one a caller wants depends on what it is for, so the choice is
 ## left to the caller rather than made here.
 var cinecams: PackedVector3Array = PackedVector3Array()
-## Hooks, lock groups and ties: what links this vehicle to others. See `TruckLinks`.
+## Hooks, lock groups, ties, ropes and ropables. See `TruckLinks`.
 var links: TruckLinks = TruckLinks.new()
-## Every `slidenodes` row: a node that runs along a rail instead of being pinned to one place.
-## Eight vehicles here declare them and all eight are strut cars. See `SlideNodeRows`.
+## Every `slidenodes` row, and `railgroups` (id -> nodes) for one naming a rail with `g`. See
+## `SlideNodeRows`.
 var slide_nodes: Array[Dictionary] = []
+var rail_groups: Dictionary = {}
 ## Upstream's `nd_contacter` nodes (`contacters`), and the rim nodes a `flexbodywheels` row makes:
 ## both collide with other vehicles' cabs. See `RigBuilder._add_collision_cabs`.
 var contacters: PackedInt32Array = PackedInt32Array()
@@ -290,8 +289,8 @@ func _parse_row(line: String) -> void:
             _note("materialflarebinding", FlareRows.bind(TruckLexer.fields(line), material_flares), line)
         "ties", "ropables", "hooks", "lockgroups":
             _note(_section, links.read(_section, line, node_id_to_index, beam_defaults, beam_table.detacher_group), line)
-        "slidenodes":
-            _note("slidenode", SlideNodeRows.read(self, line), line)
+        "slidenodes", "railgroups":
+            _note(_section.trim_suffix("s"), SlideNodeRows.read(self, _section, line), line)
         _:
             if DriveRows.handles(_section):
                 var error: String = DriveRows.read(_section, TruckLexer.fields(line), drivetrain)

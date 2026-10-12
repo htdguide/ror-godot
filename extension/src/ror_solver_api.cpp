@@ -368,6 +368,7 @@ void RorSolver::_bind_methods() {
     bind_wheel_methods();
     bind_hook_methods();
     bind_tie_methods();
+    bind_slide_methods();
     ClassDB::bind_method(D_METHOD("add_node", "position", "mass"), &RorSolver::add_node);
     ClassDB::bind_method(D_METHOD("add_beam", "node_a", "node_b", "rest_length", "spring", "damping"),
                          &RorSolver::add_beam);
@@ -453,6 +454,7 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_beam_rest_length", "beam", "length"), &RorSolver::set_beam_rest_length);
     ClassDB::bind_method(D_METHOD("set_beam_limits", "beam", "deform", "strength", "plastic_coef", "deformable"),
                          &RorSolver::set_beam_limits);
+    ClassDB::bind_method(D_METHOD("reset_slide_nodes"), &RorSolver::reset_slide_nodes);
     ClassDB::bind_method(D_METHOD("add_slide_node", "node", "rail", "spring", "break_force",
                                   "tolerance"),
                          &RorSolver::add_slide_node);

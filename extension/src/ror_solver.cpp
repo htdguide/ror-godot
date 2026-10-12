@@ -248,7 +248,7 @@ void RorSolver::substep(float dt, bool first) {
     }
     // Before the ground: a slide node is structure, and the contact laws below want a
     // node's structural force already in.
-    apply_slide_nodes(m_slide_nodes, m_nodes);
+    apply_slide_nodes(m_slide_nodes, m_nodes, m_beams, dt);
     apply_triangle_forces(m_nodes, m_triangles, m_ground_models, dt);
     // Last, because the contact law works on the node's fully accumulated force.
     apply_ground_contact(dt);
@@ -363,16 +363,26 @@ void RorSolver::set_beam_limits(int beam, float deform, float strength, float pl
 void RorSolver::add_slide_node(int node, const PackedInt32Array &rail, float spring,
                                float break_force, float tolerance) {
     sync();
-    if (node < 0 || node >= static_cast<int>(m_nodes.size()) || rail.size() < 2) { return; }
+    if (node < 0 || node >= static_cast<int>(m_nodes.size())) { return; }
+    // Upstream's `ProcessSlidenode`, after the beams its rail is made of.
     RorSlideNode slide;
     slide.node = node;
-    slide.rail.reserve(static_cast<size_t>(rail.size()));
-    for (int i = 0; i < rail.size(); ++i) { slide.rail.push_back(rail[i]); }
-    slide.spring = spring;
-    slide.tolerance = tolerance;
-    // Upstream's "never breaks" is an infinite force; this carries it as zero.
-    slide.break_force = std::isfinite(break_force) ? break_force : 0.0f;
+    std::vector<int> nodes;
+    for (int i = 0; i < rail.size(); ++i) { nodes.push_back(rail[i]); }
+    build_rail(nodes, m_beams, slide.rail);
+    slide.spring = std::fabs(spring);
+    slide.break_force = std::fabs(break_force);
+    slide.initial_threshold = slide.threshold = std::fabs(tolerance);
+    reset_slide_node(slide, m_nodes, m_beams);
     m_slide_nodes.push_back(slide);
+}
+
+// Upstream's `resetSlideNodes`, which its `SyncReset` calls once the nodes are back in place.
+void RorSolver::reset_slide_nodes() {
+    sync();
+    for (RorSlideNode &slide : m_slide_nodes) {
+        reset_slide_node(slide, m_nodes, m_beams);
+    }
 }
 
 int RorSolver::slide_node_count() const {
