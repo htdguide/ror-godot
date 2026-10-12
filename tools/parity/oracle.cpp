@@ -270,7 +270,7 @@ static bool run_fuse(const std::string &line) {
                     &front.Velocity.y, &front.Velocity.z, &front.AbsPosition.y) != 6) {
         return false;
     }
-    Airfoil airfoil;
+    FuseAirfoilShim airfoil;
     actor.m_fusealge_airfoil = &airfoil;
     actor.m_fusealge_front = &front;
     actor.m_fusealge_back = &front;
@@ -421,11 +421,19 @@ static bool run_turbo(const std::string &line) {
 // The trigger and animator modes, in oracle_trigger.cpp and oracle_anim.cpp.
 bool run_trigger(const std::string &line);
 bool run_anim(const std::string &line);
+bool run_wing(const std::string &line);
 
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("wing", 0) == 0) {
+            if (!run_wing(line)) {
+                std::fprintf(stderr, "oracle: malformed wing case: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("anim", 0) == 0) {

@@ -28,7 +28,7 @@ python3 "$PARITY/extract.py" "$UPSTREAM" "$BUILD/upstream_generated.cpp" || exit
 # reproduce upstream's arithmetic, not improve on it.
 clang++ -std=c++17 -O2 -ffp-contract=off \
     -I"$PARITY/shim" -I"$UPSTREAM/main/physics" \
-    "$PARITY/oracle.cpp" "$PARITY/oracle_trigger.cpp" "$PARITY/oracle_anim.cpp" "$BUILD/upstream_generated.cpp" \
+    "$PARITY/oracle.cpp" "$PARITY/oracle_trigger.cpp" "$PARITY/oracle_anim.cpp" "$PARITY/oracle_wing.cpp" "$BUILD/upstream_generated.cpp" \
     -o "$BINARY" || { echo "build_parity.sh: compile failed" >&2; exit 1; }
 
 echo "build_parity.sh: built ${BINARY#"$REPO_ROOT"/}"

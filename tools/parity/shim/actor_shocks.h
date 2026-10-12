@@ -137,7 +137,7 @@ struct wheeldetacher_t {
 // Upstream's `Airfoil`: `CalcFuseDrag` asks it for the fuselage's drag coefficient and multiplies
 // it by the fuselage's side area, which is zero because the spawner sets its back node to its front
 // node. Any finite answer gives the same result.
-struct Airfoil {
+struct FuseAirfoilShim {
     void getparams(float, float, float, float *cl, float *cd, float *cm) { *cl = 0.5f; *cd = 0.3f; *cm = 0.0f; }
 };
 
@@ -212,6 +212,8 @@ struct CVar {
 // cases has none, so these are never called.
 enum class AeroEngineType { AE_UNKNOWN, AE_XPROP };
 struct AeroEngine {
+    float getpropwash() { return 0; }
+    Ogre::Vector3 getAxis() { return Ogre::Vector3(0, 0, 0); }
     float getRPMpc() { return 0; }
     float getThrottle() { return 0; }
     AeroEngineType getType() { return AeroEngineType::AE_UNKNOWN; }
@@ -336,7 +338,7 @@ public:
     Ogre::Vector3 getDirection() { return direction; }
     void CalcWheels(bool doUpdate, int num_steps);
     // What `CalcFuseDrag` reads and writes.
-    Airfoil *m_fusealge_airfoil = nullptr;
+    FuseAirfoilShim *m_fusealge_airfoil = nullptr;
     node_t *m_fusealge_front = nullptr;
     node_t *m_fusealge_back = nullptr;
     float m_fusealge_width = 0.0f;

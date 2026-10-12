@@ -63,6 +63,11 @@ WANTED = [
     ("main/physics/ActorSpawner.cpp", "void ActorSpawner::ProcessTrigger(RigDef::Trigger & def)"),
     ("main/physics/ActorForcesEuler.cpp", "void Actor::CalcHydros()"),
     ("main/physics/Actor.cpp", "void Actor::CalcAnimators(hydrobeam_t const& hydrobeam, float &cstate, int &div)"),
+    ("main/physics/air/Airfoil.cpp", "Airfoil::Airfoil(Ogre::String const& fname)"),
+    ("main/physics/air/Airfoil.cpp", "void Airfoil::getparams(float a, float cratio, float cdef, float* ocl, float* ocd, float* ocm)"),
+    ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::setControlDeflection(float val)"),
+    ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::enableInducedDrag(float span, float area, bool l)"),
+    ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::updateForces()"),
 ]
 
 # Blocks lifted out of a longer function, each given a function of its own: (source, the block's
@@ -73,6 +78,23 @@ BLOCKS = [
         "if (m_engine_has_turbo)",
         "void Engine::UpdateTurbo(float dt, float acc)\n{\n",
         "\n}\n\nvoid reset_frand() { mirand = 1; }\n",
+    ),
+    # `updateVerticesPhysics`' break test: its three vectors (upstream's lines above it) and its
+    # two lines, the `else` lifted by the next block.
+    (
+        "main/physics/flex/FlexAirfoil.cpp",
+        "if (breakable) {broken=",
+        "void FlexAirfoil::updateBroken()\n{\n"
+        "    Vector3 vx=nodes[nfrd].AbsPosition-nodes[nfld].AbsPosition;\n"
+        "    Vector3 vzl=nodes[nbld].AbsPosition-nodes[nfld].AbsPosition;\n"
+        "    Vector3 vzr=nodes[nbrd].AbsPosition-nodes[nfrd].AbsPosition;\n    ",
+        "\n",
+    ),
+    (
+        "main/physics/flex/FlexAirfoil.cpp",
+        "else {broken=(vx.crossProduct(vzl)",
+        "    ",
+        "\n}\n",
     ),
 ]
 
@@ -88,6 +110,7 @@ PROLOGUE = """// GENERATED — do not edit. Produced by tools/parity/extract.py 
 #include "SlideNode.h"
 #include "engine_turbo.h"
 #include "spawner_trigger.h"
+#include "flex_airfoil.h"
 
 #include <algorithm>
 #include <cmath>

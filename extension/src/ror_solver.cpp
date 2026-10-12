@@ -212,6 +212,7 @@ void RorSolver::step_now(float dt, int substeps) {
 // the rig moves centimetres inside one call, and testing every box against every node at
 // 2 kHz would cost more than the simulation it is protecting.
 void RorSolver::begin_steps() {
+    m_wing_set.update_frame(m_nodes);
     // Alone, the hook requests its triggers queued are carried out here; a world does it for all.
     if (m_world == nullptr && !m_trigger_hook_requests.empty()) {
         run_trigger_hook_requests({this});
@@ -228,6 +229,8 @@ void RorSolver::substep(float dt, bool first) {
     calc_hooks(dt);
     calc_ropes(false);
     integrate(dt);
+    // Upstream's `CalcAircraftForces`: the wings, before the fuselage drag.
+    m_wing_set.update_forces(m_nodes);
     apply_air_drag();
     if (m_steering.has_animators()) {
         const RorAnimatorInputs inputs = animator_inputs();

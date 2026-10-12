@@ -141,6 +141,7 @@ func parse_file(path: String) -> String:
         return "cannot open '%s': %s" % [path, error_string(FileAccess.get_open_error())]
     var text: String = file.get_as_text()
     file.close()
+    links.mod_dir = path.get_base_dir()
     return parse_text(text, module)
 
 
@@ -287,7 +288,7 @@ func _parse_row(line: String) -> void:
             BodyRows.flare(line, node_id_to_index, flares, errors, _section, _inertia)
         "materialflarebindings":
             _note("materialflarebinding", FlareRows.bind(TruckLexer.fields(line), material_flares), line)
-        "ties", "ropables", "hooks", "lockgroups", "triggers", "animators":
+        "ties", "ropables", "hooks", "lockgroups", "triggers", "animators", "wings":
             _note(_section, links.read(_section, line, node_id_to_index, beam_defaults, beam_table.detacher_group, _inertia), line)
         "slidenodes", "railgroups":
             _note(_section.trim_suffix("s"), SlideNodeRows.read(self, _section, line), line)

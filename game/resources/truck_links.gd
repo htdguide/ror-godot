@@ -29,6 +29,10 @@ var triggers: Array[Dictionary] = []
 ## Every `animators` row (`AnimatorRows`), with the beam defaults, detacher group and inertia
 ## defaults in force at it, as `ProcessAnimator` reads them.
 var animators: Array[Dictionary] = []
+## Every `wings` row (`WingRows`).
+var wings: Array[Dictionary] = []
+## The folder the file was read from, where its own airfoils are; "" for text.
+var mod_dir: String = ""
 ## {node, group, multilock} per `ropables` row, upstream's `ParseRopables`.
 var ropables: Array[Dictionary] = []
 
@@ -66,6 +70,8 @@ func build(solver: RefCounted, node_count: int) -> void:
         solver.add_ropable(ropable["node"], ropable["group"], ropable["multilock"])
     for beam: int in ropes:
         solver.add_rope(beam)
+    if not wings.is_empty():
+        WingRows.build(solver, wings, mod_dir)
     for row: Dictionary in animators:
         var hydro: int = solver.add_animator(row["a"], row["b"], row["factor"], row["flags"], row["param"],
                 row["short_limit"], row["long_limit"], row["spring"], row["damp"], row["strength"], row["detacher"])
@@ -109,6 +115,11 @@ func read(section: String, line: String, id_to_index: Dictionary, defaults: Beam
                 "options": fields[6] if fields.size() > 6 else "", "timer": fields[7].to_float() if fields.size() > 7 else 0.0,
                 "detacher": detacher,
             })
+        "wings":
+            var wing: Dictionary = WingRows.read(fields, id_to_index)
+            if (wing["error"] as String) != "":
+                return wing["error"] as String
+            wings.append(wing)
         "animators":
             var row: Dictionary = AnimatorRows.read(line, id_to_index)
             if (row["error"] as String) != "":

@@ -10,10 +10,13 @@
 #pragma once
 
 #include <cmath>
+#include <limits>
 
 namespace Ogre {
 
 using Real = float;
+
+struct Quaternion;
 
 struct Vector3 {
     float x = 0.0f, y = 0.0f, z = 0.0f;
@@ -53,27 +56,9 @@ struct Vector3 {
     }
     bool isZeroLength() const { return squaredLength() < 1e-06 * 1e-06; }
 
-    // OgreVector.h's `getRotationTo` (Sam Hocevar's "quaternion from two vectors"), reduced to the
-    // `w` of the normalised result, which is all `CalcFuseDrag` reads.
-    struct RotationW {
-        float w;
-    };
-    RotationW getRotationTo(const Vector3 &dest) const {
-        const float a = std::sqrt(squaredLength() * dest.squaredLength());
-        float b = a + dest.dotProduct(*this);
-        if (std::fabs(b - 2 * a) <= 1.192092896e-07f || a == 0) {
-            return {1.0f};
-        }
-        Vector3 axis;
-        if (b < 1e-06f * a) {
-            b = 0.0f;
-            axis = std::fabs(x) > std::fabs(z) ? Vector3(-y, x, 0.0f) : Vector3(0.0f, -z, y);
-        } else {
-            axis = crossProduct(dest);
-        }
-        const float len = std::sqrt(b * b + axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
-        return {len > 0.0f ? b * (1.0f / len) : b};
-    }
+    // OgreVector.h's `getRotationTo` (Sam Hocevar's "quaternion from two vectors"), with the
+    // default zero fallback axis; `Quaternion` is below.
+    Quaternion getRotationTo(const Vector3 &dest) const;
 
     Vector3 operator+(const Vector3 &o) const { return Vector3(x + o.x, y + o.y, z + o.z); }
     Vector3 operator-(const Vector3 &o) const { return Vector3(x - o.x, y - o.y, z - o.z); }
@@ -88,11 +73,83 @@ struct Vector3 {
 
 inline Vector3 operator*(float s, const Vector3 &v) { return v * s; }
 
-// OgrePlane.h, the constructor and `projectVector` upstream's `CalcWheels` uses.
+// OgreMath.h's `Degree`, as `FlexAirfoil::updateForces` reads one.
+struct Degree {
+    float mDeg = 0.0f;
+    float valueDegrees() const { return mDeg; }
+    // `Math::DegreesToRadians`: `fDeg2Rad = PI / Real(180.0)`.
+    float valueRadians() const {
+        static const float PI = float(4.0 * std::atan(1.0));
+        static const float fDeg2Rad = PI / float(180.0);
+        return mDeg * fDeg2Rad;
+    }
+};
+
+// OgreQuaternion.h/.cpp: the constructor, `normalise` and `ToAngleAxis`.
+struct Quaternion {
+    float w = 1.0f, x = 0.0f, y = 0.0f, z = 0.0f;
+    Quaternion() = default;
+    Quaternion(float fW, float fX, float fY, float fZ) : w(fW), x(fX), y(fY), z(fZ) {}
+    float Norm() const { return std::sqrt(w * w + x * x + y * y + z * z); }
+    float normalise() {
+        const float len = Norm();
+        const float s = 1.0f / len;
+        w *= s;
+        x *= s;
+        y *= s;
+        z *= s;
+        return len;
+    }
+    // `ToAngleAxis(Radian&, Vector3&)` with `Math::ACos`, and the `Degree&` overload's conversion
+    // (`Math::RadiansToDegrees`, `fRad2Deg = Real(180.0) / PI`).
+    void ToAngleAxis(Degree &angle, Vector3 &axis) const {
+        static const float PI = float(4.0 * std::atan(1.0));
+        float radians = 0.0f;
+        const float fSqrLength = x * x + y * y + z * z;
+        if (fSqrLength > 0.0) {
+            const float acos_w = (-1.0 < w) ? (w < 1.0 ? std::acos(w) : 0.0f) : PI;
+            radians = float(2.0) * acos_w;
+            const float fInvLength = float(1.) / std::sqrt(fSqrLength);
+            axis.x = x * fInvLength;
+            axis.y = y * fInvLength;
+            axis.z = z * fInvLength;
+        } else {
+            axis = Vector3(1.0f, 0.0f, 0.0f);
+        }
+        static const float fRad2Deg = float(180.0) / PI;
+        angle.mDeg = radians * fRad2Deg;
+    }
+};
+
+inline Quaternion Vector3::getRotationTo(const Vector3 &dest) const {
+    float a = std::sqrt(squaredLength() * dest.squaredLength());
+    float b = a + dest.dotProduct(*this);
+    if (std::abs(2 * a - b) <= std::numeric_limits<float>::epsilon() || a == 0) {
+        return Quaternion();
+    }
+    Vector3 axis;
+    if (b < (float)1e-06 * a) {
+        b = (float)0.0;
+        axis = std::abs(x) > std::abs(z) ? Vector3(-y, x, (float)0.0) : Vector3((float)0.0, -z, y);
+    } else {
+        axis = crossProduct(dest);
+    }
+    Quaternion q(b, axis.x, axis.y, axis.z);
+    q.normalise();
+    return q;
+}
+
+// OgrePlane.h: the constructors (the three-point one by `Math::calculateBasicFaceNormal`) and
+// `projectVector`.
 struct Plane {
     Vector3 normal;
     float d = 0.0f;
     Plane(const Vector3 &n, const Vector3 &point) : normal(n), d(-n.dotProduct(point)) {}
+    Plane(const Vector3 &p0, const Vector3 &p1, const Vector3 &p2) {
+        normal = (p1 - p0).crossProduct(p2 - p0);
+        normal.normalise();
+        d = -normal.dotProduct(p0);
+    }
     Vector3 projectVector(const Vector3 &v) const {
         const float m00 = 1.0f - normal.x * normal.x, m01 = -normal.x * normal.y, m02 = -normal.x * normal.z;
         const float m10 = -normal.y * normal.x, m11 = 1.0f - normal.y * normal.y, m12 = -normal.y * normal.z;

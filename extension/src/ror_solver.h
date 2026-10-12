@@ -7,6 +7,7 @@
 #include "ror_heightfield.h"
 #include "ror_hooks.h"
 #include "ror_triggers.h"
+#include "ror_wings.h"
 #include "ror_obstacles.h"
 #include "ror_node.h"
 #include "ror_shocks.h"
@@ -57,6 +58,15 @@ protected:
     static void bind_cruise_methods();
     static void bind_trigger_methods();
     static void bind_animator_methods();
+    static void bind_wing_methods();  // Upstream's wings (`ror_solver_wings.cpp`, `ror_wings.cpp`).
+    int add_wing(const godot::PackedInt32Array &nodes, const godot::String &type, float chord_point, float min_deflection,
+                 float max_deflection, const godot::String &afl, float lift_coef);
+    void finish_wings();
+    void set_aero_controls(float aileron, float rudder, float elevator, int flap);
+    int wing_count();
+    bool wing_broken(int index);
+    godot::Vector3 wing_induced(int index);
+    static godot::PackedStringArray wing_probe(const godot::String &afl, const godot::Array &params, const godot::PackedVector3Array &start, const godot::Array &steps);
     // Upstream's animators (`ror_solver_animators.cpp`): a NaN limit is one the row did not state.
     int add_animator(int a, int b, float factor, int flags, float param, float short_limit, float long_limit,
                      float spring, float damp, float strength, int detacher_group);
@@ -83,8 +93,7 @@ protected:
     float avg_wheel_speed() const;
     float commanded_throttle() const;
     float brake_command() const, wheel_speed() const;
-    void set_speed_limiter(float limit);
-    void update_speed_limiter();
+    void set_speed_limiter(float limit), update_speed_limiter();
     // Upstream's `engturbo` (`ror_solver_turbo.cpp`): `params` are the row's eleven, 9999 where unstated.
     void set_turbo(int version, float inertia_factor, int count, const godot::PackedFloat32Array &params);
     float turbo_psi() const;
@@ -99,27 +108,20 @@ protected:
                                                  float tolerance, const godot::PackedVector3Array &path, float dt);
 
 public:
-    // Returns the new node's index.
-    int add_node(const godot::Vector3 &position, float mass);
+    int add_node(const godot::Vector3 &position, float mass);  // Returns the new node's index.
     // Returns the new beam's index. A rest length of 0 or less takes the current
     // separation of the two nodes, which is how a rig at spawn defines itself.
     int add_beam(int node_a, int node_b, float rest_length, float spring, float damping);
 
     void set_gravity(const godot::Vector3 &gravity);
-    // A ceiling on every node's speed, in m/s, applied as the velocity is integrated. Upstream
-    // has none; this project needs one because the causality bound of PLAN §0.12 is derived from
-    // it, and a bound that a bad collision can exceed is not a bound. Defaults to 1000 km/h.
-    // Each solver is one actor, so this is the per-actor v_max that section asks for.
+    // A ceiling on every node's speed, in m/s (default 1000 km/h): upstream has none; PLAN §0.12's
+    // causality bound, the per-actor v_max, is derived from it.
     void set_speed_limit(float metres_per_second);
     float speed_limit() const;
-    // How many times a node's speed has been cut to the limit since the solver was built. Zero
-    // on any run the limit did not touch, which is how a gate tells a clamp that changed nothing
-    // from one that rewrote the run.
+    // How many times a node's speed has been cut to the limit since the solver was built.
     int64_t speed_limit_hits() const;
-    // Whether the rig's frame follows it (PLAN §0.12, ror_frame.h). On by default. Off, the
-    // frame stays where it is — at the world origin, for a solver that has not moved it — and
-    // `set_frame_origin` is ignored, so nodes are stored in world coordinates as they were before
-    // frames existed: the control a gate compares against.
+    // Whether the rig's frame follows it (PLAN §0.12, ror_frame.h), on by default. Off, nodes are
+    // stored in world coordinates as before frames existed: the control a gate compares against.
     void set_frame_follows(bool follows);
     // How many times the frame has moved since the solver was built.
     int64_t frame_moves() const;
@@ -151,14 +153,11 @@ public:
     // "surface"}. Selects around the point first, so it answers about the whole park rather than
     // about whatever the rig happened to be near.
     godot::Dictionary obstacle_contact(const godot::Vector3 &position);
-    // Ground height and surface normal where the solver believes they are. The terrain that
-    // is drawn and the terrain that is collided against have to agree, and this is the side
-    // of that comparison the solver owns.
+    // Ground height and surface normal where the solver believes they are, for comparison with
+    // the terrain that is drawn.
     float ground_height_at(const godot::Vector3 &position) const;
     godot::Vector3 ground_normal_at(const godot::Vector3 &position) const;
-    // Runs the ground contact law once on a node described entirely by its arguments, and
-    // returns the force it produces. Nothing is stored and no node is touched: this exists so
-    // the law can be compared against Rigs of Rods' own, case by case, without a rig.
+    // The ground contact law once, on a node its arguments describe, for comparison with upstream's.
     godot::Vector3 ground_contact_probe(const godot::Vector3 &velocity, const godot::Vector3 &forces,
                                         float mass, float friction_coef, const godot::Vector3 &normal,
                                         float penetration, float dt) const;
@@ -569,6 +568,7 @@ private:
     void engine_trigger(int type, float value);
     void calc_trigger(int i, float diff, bool hooks);
     void run_trigger_hook_requests(const std::vector<RorSolver *> &actors);
+    RorWingSet m_wing_set;
     int m_camera_roll = 0;
     float m_speedo_max_kph = 140.0f;
     RorAnimatorInputs animator_inputs() const;
