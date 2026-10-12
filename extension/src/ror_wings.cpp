@@ -1,5 +1,7 @@
 #include "ror_wings.h"
 
+#include "ror_aero.h"
+
 #include "ror_approx.h"
 #include "ror_ogre_math.h"
 
@@ -15,51 +17,6 @@ using namespace godot;
 
 namespace rorgd {
 
-namespace {
-
-// Ogre 1.11's `Vector3::getRotationTo` (Sam Hocevar's "quaternion from two vectors") followed by
-// `Quaternion::ToAngleAxis`, as `FlexAirfoil::updateForces` uses them: the angle in degrees and
-// the axis.
-void rotation_angle_axis(const Vector3 &from, const Vector3 &dest, float &degrees, Vector3 &axis) {
-    float w = 1.0f, x = 0.0f, y = 0.0f, z = 0.0f;
-    const float a = std::sqrt(static_cast<float>(from.length_squared()) * static_cast<float>(dest.length_squared()));
-    float b = a + static_cast<float>(dest.dot(from));
-    if (!(std::abs(b - 2 * a) <= std::numeric_limits<float>::epsilon() || a == 0)) {
-        Vector3 c;
-        if (b < 1e-06f * a) {
-            b = 0.0f;
-            c = std::abs(static_cast<float>(from.x)) > std::abs(static_cast<float>(from.z)) ? Vector3(-from.y, from.x, 0.0f)
-                                                                                           : Vector3(0.0f, -from.z, from.y);
-        } else {
-            c = from.cross(dest);
-        }
-        w = b;
-        x = c.x;
-        y = c.y;
-        z = c.z;
-        const float len = std::sqrt(w * w + x * x + y * y + z * z);
-        const float s = 1.0f / len;
-        w *= s;
-        x *= s;
-        y *= s;
-        z *= s;
-    }
-    const float sqr = x * x + y * y + z * z;
-    float radians = 0.0f;
-    if (sqr > 0.0) {
-        // `Math::ACos`, then `2.0 * Radian`, the 2 a Real.
-        const float acos_w = (-1.0 < w) ? (w < 1.0 ? std::acos(w) : 0.0f) : static_cast<float>(4.0 * std::atan(1.0));
-        radians = 2.0f * acos_w;
-        const float inv = 1.0f / std::sqrt(sqr);
-        axis = Vector3(x * inv, y * inv, z * inv);
-    } else {
-        axis = Vector3(1.0f, 0.0f, 0.0f);
-    }
-    const float pi = static_cast<float>(4.0 * std::atan(1.0));
-    degrees = radians * (180.0f / pi);
-}
-
-} // namespace
 
 void RorAirfoil::load(const String &text) {
     bool process = false;
@@ -174,13 +131,17 @@ void RorWing::update_broken(const NodeArray &nodes) {
     broken = breakable ? (broken || stretched) : stretched;
 }
 
-void RorWing::update_forces(NodeArray &nodes) {
+void RorWing::update_forces(NodeArray &nodes, const std::vector<std::unique_ptr<RorAeroEngine>> *engines) {
     if (!airfoil || broken) {
         return;
     }
     RorNode &fld = nodes[static_cast<size_t>(nfld)];
     RorNode &frd = nodes[static_cast<size_t>(nfrd)];
-    const Vector3 wind = -(fld.velocity + frd.velocity) / 2.0;
+    Vector3 wind = -(fld.velocity + frd.velocity) / 2.0;
+    for (size_t i = 0; engines != nullptr && i < wash_engines.size(); i++) {
+        const RorAeroEngine &engine = *(*engines)[static_cast<size_t>(wash_engines[i])];
+        wind -= engine.axis() * static_cast<float>(0.5 * wash_ratios[i] * engine.propwash());
+    }
     const float wspeed = static_cast<float>(wind.length());
     const auto at = [&nodes](int n) { return nodes[static_cast<size_t>(n)].position; };
     const Vector3 chordv = ((at(nbld) - at(nfld)) + (at(nbrd) - at(nfrd))) / 2.0;
@@ -197,7 +158,7 @@ void RorWing::update_forces(NodeArray &nodes) {
     const Vector3 pwind = ogre_project(plane, -wind);
     Vector3 dumb;
     float angle = 0.0f;
-    rotation_angle_axis(chordv, -pwind, angle, dumb);
+    ogre_rotation_angle_axis(chordv, -pwind, angle, dumb);
     aoa = angle;
     if (static_cast<float>(dumb.dot(spanv)) > 0) {
         aoa = -aoa;
@@ -262,10 +223,51 @@ int RorWingSet::add(RorWing wing, const NodeArray &nodes) {
     return count() - 1;
 }
 
-// Upstream's wing closure, once every wing is built.
+RorWingSet::RorWingSet() = default;
+RorWingSet::~RorWingSet() = default;
+
+int RorWingSet::add_engine(std::unique_ptr<RorAeroEngine> engine) {
+    m_engines.push_back(std::move(engine));
+    return engine_count() - 1;
+}
+
+void RorWingSet::reset_engines() {
+    for (std::unique_ptr<RorAeroEngine> &engine : m_engines) {
+        engine->reset();
+    }
+}
+
+// Upstream's wing closure, then its `WashCalculator`: a wing between 0 and 15 m behind a prop along
+// x, within its radius in height, takes the share of its span along z the prop's disc covers.
 void RorWingSet::finish(const NodeArray &nodes) {
     if (m_first == -1 || m_wings.empty()) {
         return;
+    }
+    const auto at = [&nodes](int n) { return nodes[static_cast<size_t>(n)].position; };
+    for (int p = 0; p < engine_count(); p++) {
+        const Vector3 prop = at(m_engines[static_cast<size_t>(p)]->noderef());
+        const float radius = m_engines[static_cast<size_t>(p)]->radius();
+        for (RorWing &wing : m_wings) {
+            const Vector3 wcent = (at(wing.nfld) + at(wing.nfrd)) / 2.0;
+            if (wcent.x > prop.x && wcent.x < prop.x + 15.0 && wcent.y > prop.y - radius && wcent.y < prop.y + radius) {
+                const float wleft = at(wing.nfld).z;
+                const float wright = at(wing.nfrd).z;
+                const float pleft = prop.z + radius;
+                const float pright = prop.z - radius;
+                float aleft = wleft;
+                if (pleft < aleft) {
+                    aleft = pleft;
+                }
+                float aright = wright;
+                if (pright > aright) {
+                    aright = pright;
+                }
+                if (aright < aleft) {
+                    wing.wash_engines.push_back(p);
+                    wing.wash_ratios.push_back((aleft - aright) / (wleft - wright));
+                }
+            }
+        }
     }
     RorWing &first = m_wings[static_cast<size_t>(m_first)];
     RorWing &last = m_wings.back();
@@ -308,9 +310,13 @@ void RorWingSet::update_frame(const NodeArray &nodes) {
     }
 }
 
-void RorWingSet::update_forces(NodeArray &nodes) {
+// Upstream's `CalcAircraftForces`: the engines, then the wings in their wash.
+void RorWingSet::update_forces(NodeArray &nodes, float dt, bool do_update) {
+    for (std::unique_ptr<RorAeroEngine> &engine : m_engines) {
+        engine->update_forces(nodes, dt, do_update);
+    }
     for (RorWing &wing : m_wings) {
-        wing.update_forces(nodes);
+        wing.update_forces(nodes, &m_engines);
     }
 }
 

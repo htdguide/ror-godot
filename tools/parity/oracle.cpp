@@ -422,11 +422,19 @@ static bool run_turbo(const std::string &line) {
 bool run_trigger(const std::string &line);
 bool run_anim(const std::string &line);
 bool run_wing(const std::string &line);
+bool run_aero(const std::string &line);
 
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("aero", 0) == 0) {
+            if (!run_aero(line)) {
+                std::fprintf(stderr, "oracle: malformed aero case: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("wing", 0) == 0) {

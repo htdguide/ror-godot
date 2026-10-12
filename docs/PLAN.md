@@ -1882,9 +1882,11 @@ Scope, vehicles:
 - **Aircraft** (in progress, the user's choice of 2026-10-13): `wings` are upstream's `FlexAirfoil`
   physics on upstream's and the mods' airfoils, induced drag as the spawner sets it
   (`the_wing_is_upstreams`, bit-identical; 873 of the corpus's 875 wings build, two name no airfoil).
-  A vehicle with aero engine rows flies on upstream's airplane keys (arrows, Z/X, B, P, 1/2;
-  `aircraft_controls_are_upstreams`). Next: the wing mesh; turboprops, pistonprops and turbojets
-  with their throttle keys and prop wash; hydros' aileron, rudder and elevator flags.
+  A vehicle with aero engine rows flies on upstream's airplane keys (arrows, Z/X, B, P, 1/2,
+  PgUp/PgDn, Ctrl+Home, R; `aircraft_controls_are_upstreams`). Turboprops, piston props and
+  turbojets are upstream's, with the prop wash over the wings (`the_aero_engine_is_upstreams`,
+  bit-identical; all 67 corpus engines build). Next: the wing mesh; then a first flight in a window.
+  Not in: the autopilot, air brakes, screw props, hydros' aileron/rudder/elevator flags.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
 - **A section inventory as a gate**: done 2026-10-12 as `every_keyword_is_read_where_upstream_reads_it`
   (all 120 of upstream's keywords open, keep or close a section as its parser does). Modules

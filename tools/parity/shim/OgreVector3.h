@@ -67,8 +67,18 @@ struct Vector3 {
     Vector3 &operator+=(const Vector3 &o) { x += o.x; y += o.y; z += o.z; return *this; }
     Vector3 &operator-=(const Vector3 &o) { x -= o.x; y -= o.y; z -= o.z; return *this; }
     Vector3 &operator*=(float s) { x *= s; y *= s; z *= s; return *this; }
-    Vector3 &operator/=(float s) { x /= s; y /= s; z /= s; return *this; }
-    Vector3 operator/(float s) const { return Vector3(x / s, y / s, z / s); }
+    // OgreVector.h 1.11: `Real fInv = 1.0f / s; return fInv * *this;` and the same in place.
+    Vector3 &operator/=(float s) {
+        const float fInv = 1.0f / s;
+        x *= fInv;
+        y *= fInv;
+        z *= fInv;
+        return *this;
+    }
+    Vector3 operator/(float s) const {
+        const float fInv = 1.0f / s;
+        return Vector3(fInv * x, fInv * y, fInv * z);
+    }
 };
 
 inline Vector3 operator*(float s, const Vector3 &v) { return v * s; }
@@ -76,6 +86,8 @@ inline Vector3 operator*(float s, const Vector3 &v) { return v * s; }
 // OgreMath.h's `Degree`, as `FlexAirfoil::updateForces` reads one.
 struct Degree {
     float mDeg = 0.0f;
+    Degree() = default;
+    explicit Degree(float d) : mDeg(d) {}
     float valueDegrees() const { return mDeg; }
     // `Math::DegreesToRadians`: `fDeg2Rad = PI / Real(180.0)`.
     float valueRadians() const {
@@ -90,6 +102,26 @@ struct Quaternion {
     float w = 1.0f, x = 0.0f, y = 0.0f, z = 0.0f;
     Quaternion() = default;
     Quaternion(float fW, float fX, float fY, float fZ) : w(fW), x(fX), y(fY), z(fZ) {}
+    // `Quaternion(const Radian&, const Vector3&)` from a Degree: `FromAngleAxis`, the half angle
+    // `0.5 * Radian` (a Real), `Math::Sin` and `Math::Cos` of it.
+    Quaternion(const Degree &angle, const Vector3 &axis) {
+        const float radians = angle.valueRadians();
+        const float half = float(0.5) * radians;
+        const float fSin = std::sin(half);
+        w = std::cos(half);
+        x = fSin * axis.x;
+        y = fSin * axis.y;
+        z = fSin * axis.z;
+    }
+    // `Quaternion::operator*(const Vector3&)`, the nVidia SDK implementation.
+    Vector3 operator*(const Vector3 &v) const {
+        Vector3 qvec(x, y, z);
+        Vector3 uv = qvec.crossProduct(v);
+        Vector3 uuv = qvec.crossProduct(uv);
+        uv *= (2.0f * w);
+        uuv *= 2.0f;
+        return v + uv + uuv;
+    }
     float Norm() const { return std::sqrt(w * w + x * x + y * y + z * z); }
     float normalise() {
         const float len = Norm();
@@ -145,6 +177,7 @@ struct Plane {
     Vector3 normal;
     float d = 0.0f;
     Plane(const Vector3 &n, const Vector3 &point) : normal(n), d(-n.dotProduct(point)) {}
+    Plane(const Vector3 &rkNormal, float fConstant) : normal(rkNormal), d(-fConstant) {}
     Plane(const Vector3 &p0, const Vector3 &p1, const Vector3 &p2) {
         normal = (p1 - p0).crossProduct(p2 - p0);
         normal.normalise();

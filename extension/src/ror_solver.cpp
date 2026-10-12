@@ -229,8 +229,8 @@ void RorSolver::substep(float dt, bool first) {
     calc_hooks(dt);
     calc_ropes(false);
     integrate(dt);
-    // Upstream's `CalcAircraftForces`: the wings, before the fuselage drag.
-    m_wing_set.update_forces(m_nodes);
+    // Upstream's `CalcAircraftForces`: the aero engines and the wings, before the fuselage drag.
+    m_wing_set.update_forces(m_nodes, dt, first);
     apply_air_drag();
     if (m_steering.has_animators()) {
         const RorAnimatorInputs inputs = animator_inputs();

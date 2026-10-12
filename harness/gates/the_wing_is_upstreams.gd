@@ -4,7 +4,7 @@ extends GateBase
 ## corners from the wind over it, its angle of attack, its control surface's deflection and the air
 ## density at its height; a panel stretched past twice its area breaks and pushes no more. Compared
 ## step by step with those functions compiled from the pinned submodule (`tools/build_parity.sh`),
-## on the game's own airfoils and those the corpus ships.
+## on the game's own airfoils and those the corpus ships, half of them in a prop's wash.
 ##
 ## Ours read no wings: 107 corpus files declare them, and no aircraft flew.
 ##
@@ -166,7 +166,8 @@ func _case(rng: RandomNumberGenerator, root: String) -> Dictionary:
     var params: Array = [type, _f1(rng.randf_range(0.5, 1.0)) if rng.randf() < 0.7 else -1.0,
             _f1(rng.randf_range(5.0, 30.0)) if rng.randf() < 0.7 else -1.0, _f1(rng.randf_range(5.0, 30.0)) if rng.randf() < 0.7 else -1.0,
             _f1(rng.randf_range(0.5, 1.5)), true, rng.randf() < 0.5, _f1(rng.randf_range(4.0, 20.0)), _f1(rng.randf_range(4.0, 40.0)),
-            rng.randf() < 0.5]
+            rng.randf() < 0.5, _f1(rng.randf_range(0.1, 1.0)) if rng.randf() < 0.5 else 0.0, _f1(rng.randf_range(0.0, 40.0)),
+            _f((basis * Vector3(0, 0, -1)).normalized())]
     var steps: Array = []
     var stretch: float = 1.0
     var wind_dir: Vector3 = Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-0.5, 0.5), rng.randf_range(-1.0, 1.0)).normalized()
@@ -188,8 +189,10 @@ func _case(rng: RandomNumberGenerator, root: String) -> Dictionary:
 func _line(c: Dictionary) -> String:
     var p: Array = c["params"]
     var path: String = c["afl"] if c["afl"] == "-" else SourceScan.repo_root().path_join(c["afl"])
+    var axis: Vector3 = p[12]
     var parts: PackedStringArray = PackedStringArray(["wing", path, p[0], _n(p[1]), _n(p[2]), _n(p[3]), _n(p[4]),
-            "1" if p[5] else "0", "1" if p[6] else "0", _n(p[7]), _n(p[8]), "1" if p[9] else "0", str(STEPS)])
+            "1" if p[5] else "0", "1" if p[6] else "0", _n(p[7]), _n(p[8]), "1" if p[9] else "0", _n(p[10]), _n(p[11]),
+            _n(axis.x), _n(axis.y), _n(axis.z), str(STEPS)])
     for v: Vector3 in c["start"] as PackedVector3Array:
         parts.append_array([_n(v.x), _n(v.y), _n(v.z)])
     for step: Array in c["steps"]:

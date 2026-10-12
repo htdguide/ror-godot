@@ -212,16 +212,16 @@ struct CVar {
 // cases has none, so these are never called.
 enum class AeroEngineType { AE_UNKNOWN, AE_XPROP };
 struct AeroEngine {
-    float getpropwash() { return 0; }
-    Ogre::Vector3 getAxis() { return Ogre::Vector3(0, 0, 0); }
+    // What a wing's wash reads, set by the oracle's wing cases.
+    float propwash = 0;
+    Ogre::Vector3 axis;
+    float getpropwash() { return propwash; }
+    Ogre::Vector3 getAxis() { return axis; }
     float getRPMpc() { return 0; }
     float getThrottle() { return 0; }
     AeroEngineType getType() { return AeroEngineType::AE_UNKNOWN; }
     bool getIgnition() { return false; }
     bool isFailed() { return false; }
-};
-struct Turboprop : AeroEngine {
-    float indicated_torque = 0, max_torque = 1, pitch = 0;
 };
 struct AeroEnginePtr {
     AeroEngine *p = nullptr;

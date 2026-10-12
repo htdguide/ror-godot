@@ -7,7 +7,8 @@
 #include <string>
 #include <vector>
 
-// `wing afl type chordratio mindef maxdef liftcoef breakable induced span area left n_steps`, the
+// `wing afl type chordratio mindef maxdef liftcoef breakable induced span area left wash_ratio
+// propwash axis_x axis_y axis_z n_steps` (a wash ratio of 0 is none), the
 // eight nodes' starting positions (front-left-down, front-right-down, front-left-up,
 // front-right-up, then the back four), then per step the control value, the eight positions and
 // the two front-down nodes' velocities. `afl` is a file path, or "-" for none. The constructor's
@@ -18,8 +19,10 @@ bool run_wing(const std::string &line) {
     std::string afl, type;
     float chordratio = 0, mindef = 0, maxdef = 0, liftcoef = 0, span = 0, area = 0;
     int breakable = 0, induced = 0, left = 0, n_steps = 0;
+    float wash_ratio = 0;
+    AeroEngine engine;
     if (!(in >> afl >> type >> chordratio >> mindef >> maxdef >> liftcoef >> breakable >> induced >> span >> area >> left >>
-          n_steps)) {
+          wash_ratio >> engine.propwash >> engine.axis.x >> engine.axis.y >> engine.axis.z >> n_steps)) {
         return false;
     }
     std::vector<node_t> nodes(8);
@@ -51,6 +54,14 @@ bool run_wing(const std::string &line) {
     fa.rratio = (nodes[fa.nfrd].RelPosition - nodes[fa.nfru].RelPosition).length() / (nodes[fa.nfrd].RelPosition - nodes[fa.nbrd].RelPosition).length();
     if (induced) {
         fa.enableInducedDrag(span, area, left != 0);
+    }
+    AeroEnginePtr engines[1];
+    engines[0].p = &engine;
+    fa.aeroengines = engines;
+    if (wash_ratio > 0) {
+        fa.washpropnum[0] = 0;
+        fa.washpropratio[0] = wash_ratio;
+        fa.free_wash = 1;
     }
     for (int step = 0; step < n_steps; ++step) {
         float control = 0;

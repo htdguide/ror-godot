@@ -9,6 +9,8 @@
 
 namespace rorgd {
 
+class RorAeroEngine;
+
 // Upstream's `Airfoil` (physics/air/Airfoil.cpp): an X-Plane `.afl` polar read into lift, drag and
 // moment coefficients every tenth of a degree from -180 to 180. One that cannot be read is all
 // zeros, as upstream's is.
@@ -44,6 +46,9 @@ struct RorWing {
     bool id_left = false;
     float aoa = 0.0f;
     std::shared_ptr<RorAirfoil> airfoil;
+    // Upstream's prop wash: which engines blow over the wing, and what share of it each covers.
+    std::vector<int> wash_engines;
+    std::vector<float> wash_ratios;
 
     // Upstream's constructor, its physics: the control surface kind and the break reference.
     void setup(const NodeArray &nodes);
@@ -51,24 +56,34 @@ struct RorWing {
     void enable_induced_drag(float span, float area, bool left);
     // Upstream's `updateVerticesPhysics`, its physics: a panel stretched past its reference breaks.
     void update_broken(const NodeArray &nodes);
-    void update_forces(NodeArray &nodes);
+    // `engines` are the vehicle's aero engines, whose wash adds to the wind; null for none.
+    void update_forces(NodeArray &nodes, const std::vector<std::unique_ptr<RorAeroEngine>> *engines = nullptr);
 };
 
-// A vehicle's wings, with what upstream's spawner and actor keep for them: the induced drag run
-// being built, and the aileron, rudder, elevator and flap the control surfaces follow.
+// A vehicle's wings and aero engines, with what upstream's spawner and actor keep for them: the
+// induced drag run being built, the prop wash over each wing, and the aileron, rudder, elevator and
+// flap the control surfaces follow.
 class RorWingSet {
 public:
+    RorWingSet();
+    ~RorWingSet();
     int add(RorWing wing, const NodeArray &nodes);
+    int add_engine(std::unique_ptr<RorAeroEngine> engine);
+    // Upstream's wing closure and `WashCalculator`, once every wing and engine is built.
     void finish(const NodeArray &nodes);
+    int engine_count() const { return static_cast<int>(m_engines.size()); }
+    RorAeroEngine &engine(int index) { return *m_engines[static_cast<size_t>(index)]; }
+    void reset_engines();
     void set_controls(float aileron, float rudder, float elevator, int flap);
     // Upstream's `updateVisual` for the wings, once a frame.
     void update_frame(const NodeArray &nodes);
-    void update_forces(NodeArray &nodes);
+    void update_forces(NodeArray &nodes, float dt, bool do_update);
     int count() const { return static_cast<int>(m_wings.size()); }
     const RorWing &at(int index) const { return m_wings[static_cast<size_t>(index)]; }
 
 private:
     std::vector<RorWing> m_wings;
+    std::vector<std::unique_ptr<RorAeroEngine>> m_engines;
     int m_first = -1;
     float m_area = 0.0f;
     float m_aileron = 0.0f, m_rudder = 0.0f, m_elevator = 0.0f;

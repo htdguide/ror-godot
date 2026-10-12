@@ -73,6 +73,9 @@ func build(solver: RefCounted, node_count: int) -> void:
         solver.add_ropable(ropable["node"], ropable["group"], ropable["multilock"])
     for beam: int in ropes:
         solver.add_rope(beam)
+    # The engines first: the wings' prop wash, worked out as the last wing closes, needs them.
+    for row: Dictionary in aero_engines:
+        _build_engine(solver, row)
     if not wings.is_empty():
         WingRows.build(solver, wings, mod_dir)
     for row: Dictionary in animators:
@@ -87,6 +90,21 @@ func build(solver: RefCounted, node_count: int) -> void:
     for t: Dictionary in triggers:
         solver.add_trigger(t["a"], t["b"], t["contraction"], t["expansion"], t["short"], t["long"], t["options"],
                 t["timer"], t["detacher"])
+
+
+## Upstream's `ProcessTurboprop2`, `ProcessPistonprop` and `ProcessTurbojet`: a turboprop's pitch
+## is upstream's variable -10, a piston prop's its own.
+func _build_engine(solver: RefCounted, row: Dictionary) -> void:
+    var f: PackedStringArray = row["fields"]
+    match row["section"]:
+        "turbojets":
+            solver.add_turbojet(row["nodes"], f[3].to_int() != 0, f[4].to_float(), f[5].to_float(), f[7].to_float())
+        "turboprops":
+            solver.add_turboprop(row["nodes"], f[6].to_float(), WingRows.airfoil_text(f[7], mod_dir), false, -10.0)
+        "turboprops2":
+            solver.add_turboprop(row["nodes"], f[7].to_float(), WingRows.airfoil_text(f[8], mod_dir), false, -10.0)
+        "pistonprops":
+            solver.add_turboprop(row["nodes"], f[7].to_float(), WingRows.airfoil_text(f[9], mod_dir), true, f[8].to_float())
 
 
 ## One row of `section`; an error, or "".
@@ -118,8 +136,29 @@ func read(section: String, line: String, id_to_index: Dictionary, defaults: Beam
                 "options": fields[6] if fields.size() > 6 else "", "timer": fields[7].to_float() if fields.size() > 7 else 0.0,
                 "detacher": detacher,
             })
-        "turboprops2", "pistonprops", "turbojets":
-            aero_engines.append({"section": section, "fields": fields})
+        "turboprops", "turboprops2", "pistonprops", "turbojets":
+            var minimum: int = {"turboprops": 8, "turboprops2": 9, "pistonprops": 10, "turbojets": 9}[section]
+            if fields.size() < minimum:
+                return "row has %d fields, expected at least %d" % [fields.size(), minimum]
+            var nodes: PackedInt32Array = PackedInt32Array()
+            for i: int in (3 if section == "turbojets" else 7 if section != "turboprops" else 6):
+                # Upstream's `GetArgNullableNode` for a third or fourth blade or a couple node: -1 is
+                # no node. Any other negative number is its absolute value, as upstream's sequential
+                # importer reads every numbered node reference.
+                var nullable: bool = section != "turbojets" and i >= 4
+                var id: String = fields[i]
+                if nullable and id.to_float() == -1.0:
+                    nodes.append(-1)
+                    continue
+                if id.begins_with("-") and id.substr(1).is_valid_int():
+                    id = id.substr(1)
+                var node: int = int(id_to_index.get(id, -1))
+                if node < 0:
+                    return "row references an unknown node"
+                nodes.append(node)
+            if section == "turboprops":
+                nodes.append(-1)
+            aero_engines.append({"section": section, "fields": fields, "nodes": nodes})
         "wings":
             var wing: Dictionary = WingRows.read(fields, id_to_index)
             if (wing["error"] as String) != "":

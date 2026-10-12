@@ -3,8 +3,10 @@ extends RefCounted
 ## An airplane's controls, upstream's `GameContext::UpdateAirplaneInputEvents` and its default keys:
 ## the arrows bank (aileron, which also steers the nose wheel through the hydros) and pitch
 ## (elevator), Z and X the rudder, B the brake, P the parking brake, 1 and 2 a step of flaps less or
-## more, Ctrl+1 and Ctrl+2 none or full. The three surfaces follow their keys at 4 a second, as
-## upstream's `smoothValue` moves them.
+## more, Ctrl+1 and Ctrl+2 none or full; PgUp and PgDn a twentieth of throttle more or less every
+## tenth of a second held, Ctrl+PgUp and Ctrl+PgDn full and none, Ctrl+Home the engines on or off,
+## R the reversers. The three surfaces follow their keys at 4 a second, as upstream's
+## `smoothValue` moves them.
 ##
 ## A vehicle is an airplane, as upstream decides it, when it has aero engines (`ar_driveable`).
 
@@ -17,6 +19,8 @@ var elevator: float = 0.0
 var rudder: float = 0.0
 var flap: int = 0
 var parking: bool = false
+## Upstream's `getEventBoolValueBounce(..., 0.1)`: a held throttle key repeats every tenth of a second.
+var _throttle_wait: float = 0.0
 
 
 ## One frame: the surfaces smoothed towards the keys, the brake, all handed to `solver`.
@@ -33,11 +37,25 @@ func read(solver: RefCounted, delta: float) -> void:
     solver.set_parking_brake(parking)
     if not parking:
         solver.set_brake(_key(KEY_B) * BRAKE)
+    var step: float = _key(KEY_PAGEUP) - _key(KEY_PAGEDOWN)
+    _throttle_wait -= delta
+    if step == 0.0 or Input.is_key_pressed(KEY_CTRL):
+        _throttle_wait = 0.0
+    elif _throttle_wait <= 0.0:
+        solver.aero_command("throttle_step", 0.05 * step)
+        _throttle_wait = 0.1
 
 
 ## A key press: the flaps and the parking brake. Whether it was one of these.
-func on_key(keycode: Key) -> bool:
+func on_key(keycode: Key, solver: RefCounted = null) -> bool:
     var ctrl: bool = Input.is_key_pressed(KEY_CTRL)
+    if solver != null:
+        var command: Array = [] if not ctrl and keycode != KEY_R else \
+                {KEY_PAGEUP: ["throttle", 1.0], KEY_PAGEDOWN: ["throttle", 0.0], KEY_HOME: ["start", 0.0], KEY_R: ["reverse", 0.0]}.get(keycode, [])
+        if not command.is_empty():
+            solver.aero_command(command[0], command[1])
+            print("DRIVE  engines: %s" % command[0])
+            return true
     match keycode:
         KEY_P:
             parking = not parking

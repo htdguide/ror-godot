@@ -68,6 +68,18 @@ WANTED = [
     ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::setControlDeflection(float val)"),
     ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::enableInducedDrag(float span, float area, bool l)"),
     ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::updateForces()"),
+    ("main/physics/air/TurboProp.cpp", "void Turboprop::updateForces(float dt, int doUpdate)"),
+    ("main/physics/air/TurboProp.cpp", "void Turboprop::setThrottle(float val)"),
+    ("main/physics/air/TurboProp.cpp", "void Turboprop::reset()"),
+    ("main/physics/air/TurboProp.cpp", "void Turboprop::toggleReverse()"),
+    ("main/physics/air/TurboProp.cpp", "void Turboprop::flipStart()"),
+    ("main/physics/air/TurboJet.cpp", "Turbojet::Turbojet(ActorPtr actor, NodeNum_t tnodefront, NodeNum_t tnodeback, NodeNum_t tnoderef, RigDef::Turbojet & def)"),
+    ("main/physics/air/TurboJet.cpp", "void Turbojet::updateForces(float dt, int doUpdate)"),
+    ("main/physics/air/TurboJet.cpp", "void Turbojet::setThrottle(float val)"),
+    ("main/physics/air/TurboJet.cpp", "void Turbojet::reset()"),
+    ("main/physics/air/TurboJet.cpp", "void Turbojet::toggleReverse()"),
+    ("main/physics/air/TurboJet.cpp", "void Turbojet::flipStart()"),
+    ("main/physics/air/TurboJet.cpp", "void Turbojet::setRPM(float _rpm)"),
 ]
 
 # Blocks lifted out of a longer function, each given a function of its own: (source, the block's
@@ -111,6 +123,7 @@ PROLOGUE = """// GENERATED — do not edit. Produced by tools/parity/extract.py 
 #include "engine_turbo.h"
 #include "spawner_trigger.h"
 #include "flex_airfoil.h"
+#include "aero_engines.h"
 
 #include <algorithm>
 #include <cmath>

@@ -3,6 +3,7 @@
 #include <godot_cpp/variant/vector3.hpp>
 
 #include <cmath>
+#include <limits>
 
 namespace rorgd {
 
@@ -48,5 +49,74 @@ inline godot::Vector3 ogre_rotate_y(float angle, const godot::Vector3 &v) {
     uuv *= 2.0f;
     return v + uv + uuv;
 }
+
+// `Vector3 / s`: Ogre multiplies by `1.0f / s`, which is not the same as dividing when 1/s is
+// inexact.
+inline godot::Vector3 ogre_div(const godot::Vector3 &v, float s) {
+    const float inv = 1.0f / s;
+    return godot::Vector3(inv * v.x, inv * v.y, inv * v.z);
+}
+
+// Ogre 1.11's `PI` and its degree-radian factors, all Reals.
+inline float ogre_pi() { return static_cast<float>(4.0 * std::atan(1.0)); }
+inline float ogre_deg2rad() { return ogre_pi() / 180.0f; }
+
+// `Quaternion(Degree(degrees), axis) * v`: `FromAngleAxis` (half the angle as `0.5 * Radian`, a
+// Real) and the nVidia-SDK rotation.
+inline godot::Vector3 ogre_rotate_degrees(float degrees, const godot::Vector3 &axis, const godot::Vector3 &v) {
+    const float radians = degrees * ogre_deg2rad();
+    const float half = 0.5f * radians;
+    const float s = std::sin(half);
+    const float w = std::cos(half);
+    const godot::Vector3 q(s * axis.x, s * axis.y, s * axis.z);
+    godot::Vector3 uv = q.cross(v);
+    godot::Vector3 uuv = q.cross(uv);
+    uv *= (2.0f * w);
+    uuv *= 2.0f;
+    return v + uv + uuv;
+}
+
+// Ogre 1.11's `godot::Vector3::getRotationTo` (Sam Hocevar's "quaternion from two vectors") followed by
+// `Quaternion::ToAngleAxis`, as `FlexAirfoil::updateForces` uses them: the angle in degrees and
+// the axis.
+inline void ogre_rotation_angle_axis(const godot::Vector3 &from, const godot::Vector3 &dest, float &degrees, godot::Vector3 &axis) {
+    float w = 1.0f, x = 0.0f, y = 0.0f, z = 0.0f;
+    const float a = std::sqrt(static_cast<float>(from.length_squared()) * static_cast<float>(dest.length_squared()));
+    float b = a + static_cast<float>(dest.dot(from));
+    if (!(std::abs(b - 2 * a) <= std::numeric_limits<float>::epsilon() || a == 0)) {
+        godot::Vector3 c;
+        if (b < 1e-06f * a) {
+            b = 0.0f;
+            c = std::abs(static_cast<float>(from.x)) > std::abs(static_cast<float>(from.z)) ? godot::Vector3(-from.y, from.x, 0.0f)
+                                                                                           : godot::Vector3(0.0f, -from.z, from.y);
+        } else {
+            c = from.cross(dest);
+        }
+        w = b;
+        x = c.x;
+        y = c.y;
+        z = c.z;
+        const float len = std::sqrt(w * w + x * x + y * y + z * z);
+        const float s = 1.0f / len;
+        w *= s;
+        x *= s;
+        y *= s;
+        z *= s;
+    }
+    const float sqr = x * x + y * y + z * z;
+    float radians = 0.0f;
+    if (sqr > 0.0) {
+        // `Math::ACos`, then `2.0 * Radian`, the 2 a Real.
+        const float acos_w = (-1.0 < w) ? (w < 1.0 ? std::acos(w) : 0.0f) : static_cast<float>(4.0 * std::atan(1.0));
+        radians = 2.0f * acos_w;
+        const float inv = 1.0f / std::sqrt(sqr);
+        axis = godot::Vector3(x * inv, y * inv, z * inv);
+    } else {
+        axis = godot::Vector3(1.0f, 0.0f, 0.0f);
+    }
+    const float pi = static_cast<float>(4.0 * std::atan(1.0));
+    degrees = radians * (180.0f / pi);
+}
+
 
 } // namespace rorgd

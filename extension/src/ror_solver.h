@@ -62,6 +62,11 @@ protected:
     int add_wing(const godot::PackedInt32Array &nodes, const godot::String &type, float chord_point, float min_deflection,
                  float max_deflection, const godot::String &afl, float lift_coef);
     void finish_wings();
+    int add_turboprop(const godot::PackedInt32Array &nodes, float power, const godot::String &afl, bool piston, float pitch);
+    int add_turbojet(const godot::PackedInt32Array &nodes, bool reversable, float dry_thrust, float wet_thrust, float back_diameter);
+    void aero_command(const godot::String &action, float value);
+    godot::Dictionary aero_state(int index);
+    static godot::PackedStringArray aero_probe(const godot::String &kind, const godot::PackedInt32Array &ids, const godot::Array &params, const godot::PackedVector3Array &positions, const godot::PackedFloat32Array &masses, const godot::String &afl, const godot::Array &steps);
     void set_aero_controls(float aileron, float rudder, float elevator, int flap);
     int wing_count();
     godot::Dictionary wing_state(int index);
@@ -252,9 +257,7 @@ public:
     // Gives a beam a travel range and what happens outside it. `bound_type` is a BeamBound.
     // `precompression` scales the beam's rest and reference length, which is how a shock is
     // installed already under load. See ror_node.h for what each bound type means.
-    // What a beam yields at and what it breaks at, from the file's own `set_beam_defaults`.
-    // A strength of zero leaves the beam unbreakable and undeformable, which is what every
-    // beam was before this existed.
+    // What a beam yields at and breaks at (`set_beam_defaults`); a strength of 0 is unbreakable.
     void set_beam_limits(int beam, float deform, float strength, float plastic_coef,
                          bool deformable = true);
     // Whether a beam has broken, and what its rest length is now: a bent beam's rest length is
@@ -432,10 +435,8 @@ public:
     void step(float dt, int substeps);
 
     // --- Threading --------------------------------------------------------------
-    // The same step on the solver's own thread, while the caller gets on with its frame. Every
-    // other entry point waits for it first, so a caller that reads positions straight after
-    // posting gets the stepped ones and loses the overlap; one that reads them before posting
-    // keeps it. PlayDrive is that caller. See ror_solver_thread.cpp.
+    // The same step on the solver's own thread; every other entry point waits for it first, so
+    // read before posting to keep the overlap (PlayDrive does). See ror_solver_thread.cpp.
     void step_async(float dt, int substeps);
     // Waits for a posted step. Every entry point calls this; it is public for a caller that
     // wants to wait on purpose.

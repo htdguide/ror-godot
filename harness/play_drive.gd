@@ -197,7 +197,7 @@ func _snapshot() -> void:
 
 
 func on_key(keycode: Key) -> bool:
-    if DriveKeys.is_cruise_key(keys, keycode) or (_airplane != null and _airplane.on_key(keycode)):
+    if DriveKeys.is_cruise_key(keys, keycode) or (_airplane != null and _airplane.on_key(keycode, solver)):
         return true
     var action: String = DriveKeys.action_of(keys, keycode)
     if keys == DriveKeys.SOLO and Input.is_key_pressed(KEY_SHIFT) and DriveKeys.SOLO_SHIFTED.values().has(keycode):

@@ -27,6 +27,8 @@ struct node_t {
     bool nd_has_mesh_contact = false;
     // What `Actor::CalcFuseDrag` reads.
     Ogre::Vector3 AbsPosition;
+    // What `Turboprop::updateForces` reads.
+    Ogre::Real mass = 1.0f;
 };
 
 // Upstream's ground_model_t, reduced to the fields the contact law reads. The defaults are
