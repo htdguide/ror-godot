@@ -222,6 +222,14 @@ func on_key(keycode: Key) -> bool:
             else:
                 _start_engine()
             print("DRIVE  engine %s" % ("running" if solver.engine_running() else "off"))
+        "ties", "hook" when action == "ties" or Input.is_key_pressed(KEY_CTRL):
+            # Upstream's `TIE_TOGGLE`, or with Ctrl its `ROPE_TOGGLE`, on group -1.
+            var ties: bool = action == "ties"
+            if world != null:
+                world.call("toggle_ties" if ties else "toggle_ropes", solver, -1)
+            else:
+                solver.call("toggle_ties" if ties else "toggle_ropes", -1)
+            print("DRIVE  %s toggled" % ("ties" if ties else "ropes"))
         "hook":
             # Upstream's `HOOK_TOGGLE` on group -1, or with Alt its `HOOK_UNLOCK` of the auto-locks.
             var mode: int = 1 if Input.is_key_pressed(KEY_ALT) else 2
@@ -231,13 +239,6 @@ func on_key(keycode: Key) -> bool:
             else:
                 solver.toggle_hooks(mode, group)
             print("DRIVE  hooks %s" % ("auto-locks let go" if mode == 1 else "toggled"))
-        "ties":
-            # Upstream's `TIE_TOGGLE` on group -1.
-            if world != null:
-                world.toggle_ties(solver, -1)
-            else:
-                solver.toggle_ties(-1)
-            print("DRIVE  ties toggled")
         "recover":
             _recover()
         "wheel_diffs", "axle_diffs":

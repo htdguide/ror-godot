@@ -46,6 +46,18 @@ struct RorRopable {
     int group = -1;
     bool multilock = false;
     int attached_ties = 0;
+    int attached_ropes = 0;
+};
+
+// Upstream's `rope_t`: a `ropes` beam whose end node, locked, rides on the nearest free ropable
+// within the beam's length. Its group is upstream's hard-coded 0.
+struct RorRope {
+    int beam = -1;
+    int group = 0;
+    bool locked = false;
+    // The ropable it is locked to: on another solver (null for its own), by index there.
+    RorSolver *target = nullptr;
+    int ropable = -1;
 };
 
 // Upstream's `tie_t`: a rope from `root` that reaches up to its beam's reference length for the

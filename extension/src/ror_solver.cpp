@@ -218,8 +218,10 @@ void RorSolver::begin_steps() {
 }
 
 void RorSolver::substep(float dt, bool first) {
-    // Upstream's `CalcForcesEulerPrepare`: the hooks reel in before the step integrates.
+    // Upstream's `CalcForcesEulerPrepare`: the hooks reel in and the ropes take their ropables
+    // before the step integrates.
     calc_hooks(dt);
+    calc_ropes(false);
     integrate(dt);
     apply_air_drag();
     m_steering.update(dt, m_wheels.driven_speed(), m_beams);

@@ -66,7 +66,7 @@ const NAMES: Dictionary = {
     "respawn": "respawn", "recover": "recover", "ignition": "ignition", "lights": "lights",
     "main_beam": "main beam", "indicator_left": "left indicator",
     "indicator_right": "right indicator", "indicators_off": "indicators off",
-    "hazards": "hazards", "fog_lights": "fog lights", "hook": "hooks (Alt: let auto-locks go)",
+    "hazards": "hazards", "fog_lights": "fog lights", "hook": "hooks (Alt: let auto-locks go, Ctrl: ropes)",
     "wheel_diffs": "axle differentials", "axle_diffs": "interaxle differentials",
     "transfer_case": "2WD/4WD", "transfer_range": "high/low range",
     "ties": "ties",

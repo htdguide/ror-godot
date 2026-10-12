@@ -62,6 +62,7 @@ void RorWorld::_bind_methods() {
                          &RorWorld::shares_island);
     ClassDB::bind_method(D_METHOD("toggle_hooks", "solver", "mode", "group"), &RorWorld::toggle_hooks);
     ClassDB::bind_method(D_METHOD("toggle_ties", "solver", "group"), &RorWorld::toggle_ties);
+    ClassDB::bind_method(D_METHOD("toggle_ropes", "solver", "group"), &RorWorld::toggle_ropes);
 }
 
 void RorWorld::add_solver(const Ref<RorSolver> &solver) {
@@ -101,6 +102,13 @@ void RorWorld::toggle_ties(const Ref<RorSolver> &solver, int group) {
     }
 }
 
+void RorWorld::toggle_ropes(const Ref<RorSolver> &solver, int group) {
+    sync_all();
+    if (solver.is_valid()) {
+        solver->toggle_ropes_among(members(), group, false);
+    }
+}
+
 void RorWorld::join_hooked(std::vector<size_t> &parent) const {
     for (size_t i = 0; i < m_solvers.size(); ++i) {
         std::vector<const RorSolver *> targets;
@@ -109,6 +117,9 @@ void RorWorld::join_hooked(std::vector<size_t> &parent) const {
         }
         for (const RorTie &tie : m_solvers[i]->m_ties) {
             targets.push_back(tie.target);
+        }
+        for (const RorRope &rope : m_solvers[i]->m_ropes) {
+            targets.push_back(rope.target);
         }
         for (const RorSolver *target : targets) {
             if (target == nullptr) {
@@ -290,6 +301,10 @@ int RorWorld::step_island(const std::vector<RorSolver *> &members, float dt, int
         }
     }
     for (int step = 0; step < substeps; ++step) {
+        // Upstream prepares every actor before it computes any: ropes locked to another member.
+        for (RorSolver *member : members) {
+            member->calc_ropes(true);
+        }
         for (RorSolver *member : members) {
             member->substep(dt, step == 0);
         }

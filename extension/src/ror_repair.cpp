@@ -50,6 +50,8 @@ void RorSolver::repair() {
     toggle_hooks_among({this}, RorHook::RESET, -1);
     // And every tie, upstream's `TIE_RESET`, giving back the ropables it held.
     toggle_ties_among({this}, -1, true);
+    // And every rope, upstream's `ROPE_RESET`.
+    toggle_ropes_among({this}, -1, true);
     if (m_undamaged_beams.size() != m_beams.size()) {
         return;
     }

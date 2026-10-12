@@ -63,6 +63,8 @@ public:
     void toggle_hooks(const godot::Ref<RorSolver> &solver, int mode, int group);
     // Upstream's tie key for `solver`'s ties, reaching every vehicle's ropables in this world.
     void toggle_ties(const godot::Ref<RorSolver> &solver, int group);
+    // Upstream's rope key for `solver`'s ropes, reaching every vehicle's ropables in this world.
+    void toggle_ropes(const godot::Ref<RorSolver> &solver, int group);
 
 private:
     struct Bounds {
@@ -75,7 +77,7 @@ private:
     // Steps one island in lockstep on the calling thread; returns the contacts it resolved.
     static int step_island(const std::vector<RorSolver *> &members, float dt, int substeps);
     void sync_all() const;
-    // Joins into one island every pair a hook or a tie links, whatever their distance.
+    // Joins into one island every pair a hook, a tie or a rope links, whatever their distance.
     void join_hooked(std::vector<size_t> &parent) const;
     std::vector<RorSolver *> members() const;
 

@@ -289,6 +289,13 @@ public:
     float tie_length(int index);
     int tie_ropable(int index);
     bool tie_locked_to_self(int index);
+    // Upstream's ropes: beam `beam` (a `ropes` row) is one. `toggle_ropes` reaches this vehicle's
+    // own ropables only; `RorWorld::toggle_ropes` every vehicle's.
+    int add_rope(int beam);
+    void toggle_ropes(int group);
+    int rope_count();
+    int rope_ropable(int index);
+    bool rope_locked_to_self(int index);
     // The force along the beam last substep, signed as upstream's `beam.stress`: negative pulls.
     float get_beam_stress(int beam) const;
     // Runs the beam pass alone `passes` times, forces cleared before each and nothing integrated,
@@ -509,6 +516,9 @@ private:
     void toggle_ties_among(const std::vector<RorSolver *> &actors, int group, bool reset);
     void untie(RorTie &tie);
     void calc_ties(float dt);
+    std::vector<RorRope> m_ropes;
+    void toggle_ropes_among(const std::vector<RorSolver *> &actors, int group, bool reset);
+    void calc_ropes(bool inter_actor);
     int m_direction_pos = -1;
     int m_direction_dir = -1;
     float m_direction_yaw = 0.0f;

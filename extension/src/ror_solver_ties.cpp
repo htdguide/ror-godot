@@ -4,9 +4,11 @@
 
 #include <cmath>
 
-// Upstream's ties (`Actor::tieToggle`, `Actor::CalcTies`) and the ropables they take: a tie
-// reaches up to its length for the nearest free ropable on any vehicle of the world, its own too
-// unless it says `s`, and shortens until it is tight.
+// Upstream's ties (`Actor::tieToggle`, `Actor::CalcTies`) and ropes (`Actor::ropeToggle`,
+// `Actor::CalcRopes`), and the ropables they take. A tie reaches up to its length for the nearest
+// free ropable on any vehicle of the world, its own too unless it says `s`, and shortens until it
+// is tight. A rope is a beam of the vehicle whose end node, locked, rides on the nearest free
+// ropable within its length and hands that ropable every force it gathers.
 
 using namespace godot;
 
@@ -163,6 +165,107 @@ void RorSolver::calc_ties(float dt) {
     }
 }
 
+int RorSolver::add_rope(int beam) {
+    sync();
+    if (beam < 0 || beam >= static_cast<int>(m_beams.size())) {
+        return -1;
+    }
+    RorRope rope;
+    rope.beam = beam;
+    m_ropes.push_back(rope);
+    return static_cast<int>(m_ropes.size()) - 1;
+}
+
+void RorSolver::toggle_ropes(int group) {
+    sync();
+    toggle_ropes_among({this}, group, false);
+}
+
+// Upstream's `ropeToggle`, rope by rope: a locked rope lets go; with a toggle, an unlocked one
+// locks to the nearest free ropable nearer its root than its length, on any vehicle, its own too.
+void RorSolver::toggle_ropes_among(const std::vector<RorSolver *> &actors, int group, bool reset) {
+    for (RorRope &rope : m_ropes) {
+        if (group != -1 && rope.group != -1 && rope.group != group) {
+            continue;
+        }
+        if (rope.locked) {
+            RorSolver *owner = rope.target != nullptr ? rope.target : this;
+            owner->m_ropables[static_cast<size_t>(rope.ropable)].attached_ropes -= 1;
+            rope.locked = false;
+            rope.target = nullptr;
+            rope.ropable = -1;
+            continue;
+        }
+        if (reset) {
+            continue;
+        }
+        const RorBeam &beam = m_beams[static_cast<size_t>(rope.beam)];
+        const Vector3 root = world_of(m_frame, m_nodes[static_cast<size_t>(beam.a)].position);
+        float best = beam.rest_length;
+        RorSolver *found = nullptr;
+        int found_ropable = -1;
+        for (RorSolver *actor : actors) {
+            for (size_t r = 0; r < actor->m_ropables.size(); ++r) {
+                const RorRopable &ropable = actor->m_ropables[r];
+                if (!ropable.multilock && ropable.attached_ropes > 0) {
+                    continue;
+                }
+                const float gap = static_cast<float>(
+                        (root - world_of(actor->m_frame, actor->m_nodes[static_cast<size_t>(ropable.node)].position)).length());
+                if (gap < best) {
+                    best = gap;
+                    found = actor;
+                    found_ropable = static_cast<int>(r);
+                }
+            }
+        }
+        if (found == nullptr) {
+            continue;
+        }
+        rope.locked = true;
+        rope.target = found == this ? nullptr : found;
+        rope.ropable = found_ropable;
+        found->m_ropables[static_cast<size_t>(found_ropable)].attached_ropes += 1;
+    }
+}
+
+// Upstream's `CalcRopes`, before the step integrates: the end node of each locked rope is put on
+// its ropable with its velocity, and the force it gathered last step goes to the ropable. Ropes
+// locked to another vehicle only, or to this one only, by `inter_actor`; the world runs the first
+// for every member before any member's step, as upstream prepares every actor before computing.
+void RorSolver::calc_ropes(bool inter_actor) {
+    for (RorRope &rope : m_ropes) {
+        if (!rope.locked || (rope.target != nullptr) != inter_actor) {
+            continue;
+        }
+        RorSolver *owner = rope.target != nullptr ? rope.target : this;
+        RorNode &end = m_nodes[static_cast<size_t>(m_beams[static_cast<size_t>(rope.beam)].b)];
+        RorNode &locked = owner->m_nodes[static_cast<size_t>(owner->m_ropables[static_cast<size_t>(rope.ropable)].node)];
+        const Vector3 offset(static_cast<float>(owner->m_frame.x - m_frame.x), 0.0f,
+                             static_cast<float>(owner->m_frame.z - m_frame.z));
+        end.position = locked.position + offset;
+        end.velocity = locked.velocity;
+        locked.forces += end.forces;
+        end.forces = Vector3();
+    }
+}
+
+int RorSolver::rope_count() {
+    sync();
+    return static_cast<int>(m_ropes.size());
+}
+
+int RorSolver::rope_ropable(int index) {
+    sync();
+    return index >= 0 && index < static_cast<int>(m_ropes.size()) ? m_ropes[static_cast<size_t>(index)].ropable : -1;
+}
+
+bool RorSolver::rope_locked_to_self(int index) {
+    sync();
+    return index >= 0 && index < static_cast<int>(m_ropes.size()) && m_ropes[static_cast<size_t>(index)].locked &&
+           m_ropes[static_cast<size_t>(index)].target == nullptr;
+}
+
 int RorSolver::tie_count() {
     sync();
     return static_cast<int>(m_ties.size());
@@ -207,6 +310,11 @@ void RorSolver::bind_tie_methods() {
     ClassDB::bind_method(D_METHOD("tie_length", "index"), &RorSolver::tie_length);
     ClassDB::bind_method(D_METHOD("tie_ropable", "index"), &RorSolver::tie_ropable);
     ClassDB::bind_method(D_METHOD("tie_locked_to_self", "index"), &RorSolver::tie_locked_to_self);
+    ClassDB::bind_method(D_METHOD("add_rope", "beam"), &RorSolver::add_rope);
+    ClassDB::bind_method(D_METHOD("toggle_ropes", "group"), &RorSolver::toggle_ropes);
+    ClassDB::bind_method(D_METHOD("rope_count"), &RorSolver::rope_count);
+    ClassDB::bind_method(D_METHOD("rope_ropable", "index"), &RorSolver::rope_ropable);
+    ClassDB::bind_method(D_METHOD("rope_locked_to_self", "index"), &RorSolver::rope_locked_to_self);
 }
 
 } // namespace rorgd

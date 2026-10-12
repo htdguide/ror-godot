@@ -2,7 +2,7 @@ class_name TruckLinks
 extends RefCounted
 ## What a vehicle file says about linking to other vehicles: its hooks (nodes with option `h`, and
 ## the `hooks` rows that set them up), its lock groups (`lockgroups`, and `lockgroup_default_nolock`)
-## its ties (`ties`) and the ropables a tie takes (`ropables`).
+## its ties (`ties`), its ropes (`ropes`) and the ropables both take (`ropables`).
 ##
 ## Upstream's `ParseHook`, `ParseLockgroups` and `ProcessNode`'s hook beam. A hook's beam takes the
 ## beam defaults in force at its node's row: their spring, a tenth of their damping, a hundred times
@@ -21,6 +21,8 @@ var default_nolock: bool = false
 ## a ropable. See `BeamRows.tie`; each also carries the rope's beam defaults at its row (upstream's
 ## `ProcessTie`: their scaled spring, damping and break figure) and its detacher group.
 var ties: Array[Dictionary] = []
+## The beam index of each `ropes` row: the beam is built as any other, and is a rope besides.
+var ropes: PackedInt32Array = PackedInt32Array()
 ## {node, group, multilock} per `ropables` row, upstream's `ParseRopables`.
 var ropables: Array[Dictionary] = []
 
@@ -35,8 +37,8 @@ func add_hook_node(node: int, defaults: BeamDefaults) -> void:
     })
 
 
-## Gives `solver` upstream's hooks, lock groups, ties and ropables from this file: each `h` node's rope beam, its
-## `hooks` row, which nodes a hook may lock to, and each tie's rope and each ropable.
+## Gives `solver` upstream's hooks, lock groups, ties, ropes and ropables from this file: each `h` node's rope beam, its
+## `hooks` row, which nodes a hook may lock to, each tie's rope, each rope and each ropable.
 func build(solver: RefCounted, node_count: int) -> void:
     for hook: Dictionary in hook_nodes:
         solver.add_hook(hook["node"], hook["spring"], hook["damp"], hook["strength"], hook["deform"])
@@ -56,6 +58,8 @@ func build(solver: RefCounted, node_count: int) -> void:
             solver.set_beam_detacher_group(beam, tie["detacher"])
     for ropable: Dictionary in ropables:
         solver.add_ropable(ropable["node"], ropable["group"], ropable["multilock"])
+    for beam: int in ropes:
+        solver.add_rope(beam)
 
 
 ## One row of `section`; an error, or "".

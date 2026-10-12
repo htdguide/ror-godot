@@ -381,6 +381,8 @@ func _parse_joint(line: String) -> void:
     if _section == "hydros" and (row["factor"] as float) != 0.0:
         hydros.append(CommandRows.hydro(fields, beams.size() / 2, row["factor"] as float, _inertia))
     CommandRows.collect(_section, fields, beams.size() / 2, commands, _inertia)
+    if _section == "ropes":
+        links.ropes.append(beams.size() / 2)
     beam_table.record(row)
 
 
