@@ -15,6 +15,8 @@
 #include <cmath>
 #include <sstream>
 #include <string>
+#include <array>
+#include <unordered_map>
 #include <vector>
 
 using Ogre::Real;
@@ -44,9 +46,27 @@ enum ShockFlags {
     SHOCK_FLAG_ISSHOCK2 = BITMASK(5),
     SHOCK_FLAG_ISSHOCK3 = BITMASK(6),
     SHOCK_FLAG_SOFTBUMP = BITMASK(7),
+    SHOCK_FLAG_ISTRIGGER = BITMASK(8),
+    SHOCK_FLAG_TRG_BLOCKER = BITMASK(9),
+    SHOCK_FLAG_TRG_CMD_SWITCH = BITMASK(10),
+    SHOCK_FLAG_TRG_CMD_BLOCKER = BITMASK(11),
+    SHOCK_FLAG_TRG_BLOCKER_A = BITMASK(12),
+    SHOCK_FLAG_TRG_HOOK_UNLOCK = BITMASK(13),
+    SHOCK_FLAG_TRG_HOOK_LOCK = BITMASK(14),
+    SHOCK_FLAG_TRG_CONTINUOUS = BITMASK(15),
+    SHOCK_FLAG_TRG_ENGINE = BITMASK(16),
+};
+enum EngineTriggerType {
+    TRG_ENGINE_CLUTCH = 0, TRG_ENGINE_BRAKE = 1, TRG_ENGINE_ACC = 2, TRG_ENGINE_RPM = 3,
+    TRG_ENGINE_SHIFTUP = 4, TRG_ENGINE_SHIFTDOWN = 5
 };
 
 struct shock_t {
+    // What `CalcTriggers` reads and writes; upstream zeroes the whole struct.
+    int beamid = 0;
+    bool trigger_enabled = false;
+    float trigger_switch_state = 0, trigger_boundary_t = 0;
+    int trigger_cmdlong = 0, trigger_cmdshort = 0, last_debug_state = 0;
     int flags = 0;
     float springin = 0, dampin = 0, springout = 0, dampout = 0;
     float sprogin = 0, dprogin = 0, sprogout = 0, dprogout = 0;
@@ -114,6 +134,57 @@ struct Airfoil {
     void getparams(float, float, float, float *cl, float *cd, float *cm) { *cl = 0.5f; *cd = 0.3f; *cm = 0.0f; }
 };
 
+// SimData.h's command key and its array, as upstream writes them.
+static const int MAX_COMMANDS = 84;
+struct command_t {
+    int commandValueState = 0;
+    float commandValue = 0;
+    float triggerInputValue = 0.f;
+    float playerInputValue = 0.f;
+    bool trigger_cmdkeyblock_state = false;
+};
+class CmdKeyArray {
+public:
+    command_t &operator[](int index) {
+        if (index >= 0 && index <= MAX_COMMANDS) {
+            return m_commandkey[index];
+        } else if (index < 0) {
+            return m_virtualkey[index];
+        } else {
+            return m_dummykey;
+        }
+    }
+private:
+    std::array<command_t, MAX_COMMANDS + 1> m_commandkey;
+    std::unordered_map<int, command_t> m_virtualkey;
+    command_t m_dummykey;
+};
+
+#ifndef LOG
+#define LOG(message)
+#endif
+
+// A hook trigger's request, which upstream queues as a message for the game loop; recorded here.
+enum class ActorLinkingRequestType { INVALID, HOOK_LOCK, HOOK_UNLOCK };
+struct ActorLinkingRequest {
+    int alr_actor_instance_id = -1;
+    ActorLinkingRequestType alr_type = ActorLinkingRequestType::INVALID;
+    int alr_hook_group = -1;
+};
+enum MsgType { MSG_SIM_ACTOR_LINKING_REQUESTED };
+struct Message {
+    Message(MsgType, ActorLinkingRequest *rq) : request(rq) {}
+    ActorLinkingRequest *request;
+};
+struct GameContext {
+    std::vector<std::string> requests;
+    void PushMessage(Message m) {
+        requests.push_back(std::string(m.request->alr_type == ActorLinkingRequestType::HOOK_LOCK ? "lock " : "unlock ") +
+                           std::to_string(m.request->alr_hook_group));
+        delete m.request;
+    }
+};
+
 namespace RoR {
 template <size_t N> struct Str {
     std::ostringstream out;
@@ -129,6 +200,7 @@ struct Console {
 };
 namespace App {
 inline Console *GetConsole() { static Console console; return &console; }
+inline GameContext *GetGameContext() { static GameContext context; return &context; }
 }
 struct Buoyance {
     enum { BUOY_NORMAL, BUOY_DRAGONLY, BUOY_DRAGLESS };
@@ -164,7 +236,14 @@ public:
     bool ar_parking_brake = false;
     int m_num_proped_wheels = 0;
     float m_odometer_total = 0, m_odometer_user = 0;
-    struct Engine { void setWheelSpin(float) {} } *ar_engine = nullptr;
+    // The engine calls a trigger makes, recorded for the oracle to print.
+    struct Engine {
+        std::vector<std::string> calls;
+        void setWheelSpin(float) {}
+        void setClutch(float v) { calls.push_back("clutch " + std::to_string(v)); }
+        void setAcc(float v) { calls.push_back("acc " + std::to_string(v)); }
+        void shift(int by) { calls.push_back("shift " + std::to_string(by)); }
+    } *ar_engine = nullptr;
     // The camera direction upstream computes from its camera nodes; the oracle is handed it.
     Ogre::Vector3 direction;
     Ogre::Vector3 getDirection() { return direction; }
@@ -179,7 +258,14 @@ public:
     void CalcFuseDrag();
 
     template <size_t N> void LogBeamNodes(Str<N> &, beam_t &) {}
-    void CalcTriggers(int, Real, bool) {}
+    // What `CalcTriggers` and `engineTriggerHelper` read and write (`actor_triggers.h`).
+    CmdKeyArray ar_command_key;
+    shock_t *ar_shocks = nullptr;
+    int ar_num_shocks = 0;
+    bool m_trigger_debug_enabled = false;
+    std::vector<bool> ar_beams_invisible;
+    void CalcTriggers(int i, Real difftoBeamL, bool trigger_hooks);
+    void engineTriggerHelper(int engineNumber, EngineTriggerType type, float triggerValue);
     void CalcBeams(bool trigger_hooks);
     int GetNumActiveConnectedBeams(int nodeid);
     void CalcShocks2(int i, Real difftoBeamL, Real &k, Real &d, Real v);

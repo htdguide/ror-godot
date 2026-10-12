@@ -52,6 +52,7 @@
 #include "differentials.h"
 #include "SlideNode.h"
 #include "engine_turbo.h"
+#include "spawner_trigger.h"
 
 #include <sstream>
 #include <vector>
@@ -413,10 +414,20 @@ static bool run_turbo(const std::string &line) {
     return true;
 }
 
+// The trigger mode, in oracle_trigger.cpp.
+bool run_trigger(const std::string &line);
+
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("trigger", 0) == 0) {
+            if (!run_trigger(line)) {
+                std::fprintf(stderr, "oracle: malformed trigger case: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("turbo", 0) == 0) {

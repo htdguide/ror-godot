@@ -55,10 +55,29 @@ void RorCommands::set_key_inertia(int key, float start_delay, float stop_delay, 
 void RorCommands::reset() {
     for (RorCommandKey &key : m_keys) {
         key.player_input = 0.0f;
+        key.trigger_input = 0.0f;
         key.value = 0.0f;
     }
     for (RorCommandState &state : m_states) {
         state.auto_moving_mode = 0;
+    }
+}
+
+RorCommandKey &RorCommands::key(int index) {
+    if (index >= 0 && index <= MAX_COMMAND_KEYS) {
+        return m_keys[static_cast<size_t>(index)];
+    }
+    if (index < 0) {
+        return m_virtual_keys[index];
+    }
+    return m_dummy_key;
+}
+
+void RorCommands::read_keys() {
+    for (int i = 1; i <= MAX_COMMAND_KEYS; ++i) {
+        RorCommandKey &key = m_keys[static_cast<size_t>(i)];
+        key.value = std::max(key.player_input, key.trigger_input);
+        key.trigger_input = 0.0f;
     }
 }
 
@@ -75,9 +94,9 @@ RorCommands::Power RorCommands::update(BeamArray &beams, float dt, bool engine_r
     for (RorCommandState &state : m_states) {
         state.auto_move_lock = false;
     }
+    read_keys();
     for (int i = 1; i <= MAX_COMMAND_KEYS; ++i) {
         RorCommandKey &key = m_keys[static_cast<size_t>(i)];
-        key.value = key.player_input;
         if (key.value >= 0.5f) {
             for (const RorCommandBeam &entry : key.beams) {
                 RorCommandState &state = m_states[static_cast<size_t>(entry.state)];

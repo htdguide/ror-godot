@@ -239,6 +239,10 @@ void RorWorld::step(float dt, int substeps) {
             solver->toggle_hooks_among(everyone, RorHook::LOCK, -2);
         }
     }
+    // Then the hook requests each vehicle's triggers queued last frame, in vehicle order.
+    for (RorSolver *solver : everyone) {
+        solver->run_trigger_hook_requests(everyone);
+    }
     std::vector<Bounds> bounds;
     for (const Ref<RorSolver> &solver : m_solvers) {
         solver->sync();

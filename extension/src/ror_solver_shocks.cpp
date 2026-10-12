@@ -15,6 +15,7 @@ void RorSolver::apply_bound_law(const RorBeam &beam, float extension, float clos
                                 float &damping) const {
     switch (beam.bound) {
         case BeamBound::NORMAL:
+        case BeamBound::TRIGGER:
             return;
         case BeamBound::SHOCK1: {
             // How far past a bound the beam is, in metres. Not normalised, so the handover

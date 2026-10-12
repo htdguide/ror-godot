@@ -4,9 +4,13 @@
 #pragma once
 
 #define MAXTURBO 4
+#ifndef SOUND_START
 #define SOUND_START(actor, trig)
 #define SOUND_STOP(actor, trig)
+#endif
+#ifndef LOG
 #define LOG(message)
+#endif
 
 namespace RoR {
 

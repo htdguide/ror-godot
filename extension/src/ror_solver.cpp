@@ -212,12 +212,17 @@ void RorSolver::step_now(float dt, int substeps) {
 // the rig moves centimetres inside one call, and testing every box against every node at
 // 2 kHz would cost more than the simulation it is protecting.
 void RorSolver::begin_steps() {
+    // Alone, the hook requests its triggers queued are carried out here; a world does it for all.
+    if (m_world == nullptr && !m_trigger_hook_requests.empty()) {
+        run_trigger_hook_requests({this});
+    }
     m_collcabs.prepare(m_nodes, m_beams);
     follow_frame();
     select_nearby_obstacles();
 }
 
 void RorSolver::substep(float dt, bool first) {
+    m_first_substep = first;
     // Upstream's `CalcForcesEulerPrepare`: the hooks reel in and the ropes take their ropables
     // before the step integrates.
     calc_hooks(dt);
@@ -297,7 +302,8 @@ void RorSolver::apply_air_drag() {
 }
 
 void RorSolver::accumulate_beam_forces() {
-    for (RorBeam &beam : m_beams) {
+    for (size_t index = 0; index < m_beams.size(); ++index) {
+        RorBeam &beam = m_beams[index];
         if (beam.broken || beam.disabled || beam.inter_actor) {
             continue;
         }
@@ -321,6 +327,9 @@ void RorSolver::accumulate_beam_forces() {
         float spring = beam.spring;
         float damping = beam.damping;
         apply_bound_law(beam, extension, closing_speed, spring, damping);
+        if (beam.bound == BeamBound::TRIGGER) {
+            calc_trigger(static_cast<int>(index), extension, m_first_substep);
+        }
         float stress = -spring * extension - damping * closing_speed;
         // Kept before deformation softens it, as upstream keeps `beam.stress`.
         beam.stress = stress;

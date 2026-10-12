@@ -78,6 +78,14 @@ public:
     // the engine's own outside a shift, as `autoSetAcc` does.
     void auto_set_acc(float acc) { m_commanded_acc = acc; }
     float min_rpm() const { return m_min_rpm; }
+    // An engine trigger's `setClutch` and `setAcc`.
+    void trigger_clutch(float clutch) { m_clutch = clutch; }
+    // An engine trigger's `shift`, upstream's own shift with its clutch timing.
+    void trigger_shift(int by) { shift(by); }
+    void trigger_acc(float acc) {
+        m_acc = acc;
+        m_commanded_acc = acc;
+    }
     float inertia() const { return m_inertia; }
 
 private:

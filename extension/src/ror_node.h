@@ -59,6 +59,8 @@ enum class BeamBound {
     // `shocks3`: separate rates in and out with two damping slopes split by speed, ramping to the
     // structural rates past either bound (`ror_shocks.cpp`).
     SHOCK3 = 5,
+    // A `triggers` row: no force at all, only what it does past its bounds (`ror_solver_triggers.cpp`).
+    TRIGGER = 6,
 };
 
 // A damped spring between two nodes. `rest_length` is live: steering and commands work

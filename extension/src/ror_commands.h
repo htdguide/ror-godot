@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 namespace rorgd {
@@ -39,6 +40,10 @@ struct RorCommandBeam {
 struct RorCommandKey {
     std::vector<RorCommandBeam> beams;
     float player_input = 0.0f;
+    // What a trigger beam asked of the key since the last command pass (upstream's
+    // `triggerInputValue`), and whether triggers are kept off it (`trigger_cmdkeyblock_state`).
+    float trigger_input = 0.0f;
+    bool trigger_blocked = false;
     float value = 0.0f;
     RorKeyInertia inertia;
 };
@@ -58,6 +63,12 @@ public:
     void set_key_inertia(int key, float start_delay, float stop_delay, const RorSpline *start,
                          const RorSpline *stop);
     bool key_has_inertia(int key) const;
+    // Upstream's `CmdKeyArray`: keys 0 to 84 are real, a negative one is a 'virtual' key made on
+    // first use, and anything above is a dummy.
+    RorCommandKey &key(int index);
+    // `CalcCommands`' first line for every key: its value is the larger of the player's and the
+    // triggers' input, and the triggers' is used up.
+    void read_keys();
     // Upstream's `SyncReset`: every key let go and every ram's one-press state cleared. Key
     // inertia is not reset there, so it is not here.
     void reset();
@@ -75,6 +86,8 @@ public:
 
 private:
     std::array<RorCommandKey, MAX_COMMAND_KEYS + 1> m_keys{};
+    std::unordered_map<int, RorCommandKey> m_virtual_keys;
+    RorCommandKey m_dummy_key;
     std::vector<RorCommandState> m_states;
     int m_count = 0;
 };

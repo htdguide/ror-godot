@@ -1873,7 +1873,9 @@ Scope, vehicles:
   (`the_turbo_is_upstreams`, bit-identical); the `OLD` turbo feeds only sound, which is not in. Cruise
   control is upstream's on every engine (Shift+Space; Ctrl+R/F/Space adjust), `cruisecontrol` its
   lower limit and autobrake (`cruise_control_holds_…`); `speedlimiter` and the manual clutch key
-  that pauses it are not in, and its mass leaves out linked vehicles.
+  that pauses it are not in, and its mass leaves out linked vehicles. `triggers` are upstream's,
+  keys, blockers, switches, hook groups and engine (`the_trigger_is_upstreams`, identical to
+  upstream's step for step); their beams are not drawn.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
 - **A section inventory as a gate**: done 2026-10-12 as `every_keyword_is_read_where_upstream_reads_it`
   (all 120 of upstream's keywords open, keep or close a section as its parser does). Modules

@@ -23,6 +23,9 @@ var default_nolock: bool = false
 var ties: Array[Dictionary] = []
 ## The beam index of each `ropes` row: the beam is built as any other, and is a rope besides.
 var ropes: PackedInt32Array = PackedInt32Array()
+## Every `triggers` row, upstream's `ParseTriggers`: {a, b, contraction, expansion, short, long,
+## options, timer, detacher}; the solver builds the beam and its behaviour (`add_trigger`).
+var triggers: Array[Dictionary] = []
 ## {node, group, multilock} per `ropables` row, upstream's `ParseRopables`.
 var ropables: Array[Dictionary] = []
 
@@ -60,6 +63,10 @@ func build(solver: RefCounted, node_count: int) -> void:
         solver.add_ropable(ropable["node"], ropable["group"], ropable["multilock"])
     for beam: int in ropes:
         solver.add_rope(beam)
+    # In file order, so a blocker's "the next n triggers" are the rows below it, as upstream's are.
+    for t: Dictionary in triggers:
+        solver.add_trigger(t["a"], t["b"], t["contraction"], t["expansion"], t["short"], t["long"], t["options"],
+                t["timer"], t["detacher"])
 
 
 ## One row of `section`; an error, or "".
@@ -77,6 +84,19 @@ func read(section: String, line: String, id_to_index: Dictionary, defaults: Beam
                 "no_self_lock": (row["options"] as String).contains("s"),
             })
             ties.append(row)
+        "triggers":
+            if fields.size() < 6:
+                return "row has %d fields, expected at least 6" % fields.size()
+            var a: int = int(id_to_index.get(fields[0], -1))
+            var b: int = int(id_to_index.get(fields[1], -1))
+            if a < 0 or b < 0:
+                return "row references an unknown node"
+            triggers.append({
+                "a": a, "b": b, "contraction": fields[2].to_float(), "expansion": fields[3].to_float(),
+                "short": fields[4].to_int(), "long": fields[5].to_int(),
+                "options": fields[6] if fields.size() > 6 else "", "timer": fields[7].to_float() if fields.size() > 7 else 0.0,
+                "detacher": detacher,
+            })
         "ropables":
             var node: int = int(id_to_index.get(fields[0], -1)) if not fields.is_empty() else -1
             if node < 0:

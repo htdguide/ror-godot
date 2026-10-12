@@ -6,6 +6,7 @@
 #include "ror_ground.h"
 #include "ror_heightfield.h"
 #include "ror_hooks.h"
+#include "ror_triggers.h"
 #include "ror_obstacles.h"
 #include "ror_node.h"
 #include "ror_shocks.h"
@@ -63,6 +64,18 @@ protected:
     static void bind_slide_methods();
     static void bind_turbo_methods();
     static void bind_cruise_methods();
+    static void bind_trigger_methods();
+    // Upstream's triggers (`ror_solver_triggers.cpp`): a `triggers` row each, the beam index or -1
+    // when upstream deactivates the row.
+    int add_trigger(int a, int b, float contraction_limit, float expansion_limit, int short_action, int long_action,
+                    const godot::String &options, float boundary_timer, int detacher_group);
+    int trigger_count();
+    bool trigger_enabled(int beam);
+    godot::Vector2i trigger_commands(int beam);
+    float command_value(int key);
+    bool command_trigger_blocked(int key);
+    static godot::PackedStringArray trigger_probe(const godot::PackedVector3Array &positions, const godot::Array &rows,
+                                                  const godot::Array &steps);
     // Upstream's cruise control (`ror_solver_cruise.cpp`).
     void set_cruise_control(float lower_limit, bool can_brake);
     void toggle_cruise_control();
@@ -547,6 +560,15 @@ private:
     void untie(RorTie &tie);
     void calc_ties(float dt);
     std::vector<RorRope> m_ropes;
+    std::vector<RorTrigger> m_triggers;
+    std::vector<std::pair<int, int>> m_trigger_hook_requests;
+    bool m_first_substep = false;
+    // The probe's record of engine trigger calls; null in a running vehicle.
+    std::vector<std::string> *m_trigger_log = nullptr;
+    RorTrigger *trigger_of(int beam);
+    void engine_trigger(int type, float value);
+    void calc_trigger(int i, float diff, bool hooks);
+    void run_trigger_hook_requests(const std::vector<RorSolver *> &actors);
     bool m_cc_mode = false;
     bool m_cc_can_brake = false;
     float m_cc_target_speed = 0.0f;

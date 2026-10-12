@@ -58,6 +58,9 @@ WANTED = [
     ),
     ("main/gameplay/Engine.cpp", "float Engine::getTurboPSI()"),
     ("main/gameplay/Engine.cpp", "float Engine::getTurboPower()"),
+    ("main/physics/Actor.cpp", "void Actor::CalcTriggers(int i, Real difftoBeamL, bool trigger_hooks)"),
+    ("main/physics/Actor.cpp", "void Actor::engineTriggerHelper(int engineNumber, EngineTriggerType type, float triggerValue)"),
+    ("main/physics/ActorSpawner.cpp", "void ActorSpawner::ProcessTrigger(RigDef::Trigger & def)"),
 ]
 
 # Blocks lifted out of a longer function, each given a function of its own: (source, the block's
@@ -82,6 +85,7 @@ PROLOGUE = """// GENERATED — do not edit. Produced by tools/parity/extract.py 
 #include "ApproxMath.h"
 #include "SlideNode.h"
 #include "engine_turbo.h"
+#include "spawner_trigger.h"
 
 #include <algorithm>
 #include <cmath>
