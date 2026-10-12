@@ -339,6 +339,8 @@ public:
     float engine_clutch() const;
     float engine_torque() const;
     bool engine_running() const;
+    // The ignition key's contact, which the dashboard's ignition and battery lamps read.
+    bool engine_contact() const;
     bool has_engine() const;
     // Average tread speed of the driven wheels, m/s. The rig's road speed as its own
     // drivetrain measures it.

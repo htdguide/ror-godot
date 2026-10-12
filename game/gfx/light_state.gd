@@ -23,6 +23,14 @@ var blink: Blink = Blink.NONE
 ## Upstream's custom lights 1 to 10, as 0 to 9.
 var custom: Array[bool] = [false, false, false, false, false, false, false, false, false, false]
 var parking_brake: bool = false
+## The engine as the dashboard reads it: the ignition key's contact, whether it runs, its rpm.
+var contact: bool = false
+var running: bool = false
+var rpm: float = 0.0
+## Whether the indicators were lit as the last update left them: upstream's dashboard is updated
+## before the flares, so its `signal_warning` reads the frame before.
+var _left_lit: bool = false
+var _right_lit: bool = false
 
 var _flares: Array[Dictionary] = []
 var _blink_left: PackedFloat32Array = PackedFloat32Array()
@@ -85,9 +93,17 @@ func follow_controls(brake: float, parking: bool, gear: int) -> void:
     reverse = gear < 0
 
 
+## The engine, for the dashboard lamps.
+func follow_engine(has_contact: bool, is_running: bool, engine_rpm: float) -> void:
+    contact = has_contact
+    running = is_running
+    rpm = engine_rpm
+
+
 ## Every lamp's intensity after `dt` seconds, 0 to 1.
 func update(dt: float) -> PackedFloat32Array:
     var out: PackedFloat32Array = PackedFloat32Array()
+    var warning: bool = _left_lit and _right_lit
     for i: int in _flares.size():
         var flare: Dictionary = _flares[i]
         var delay: float = float(flare.get("blink_s", 0.0))
@@ -98,12 +114,17 @@ func update(dt: float) -> PackedFloat32Array:
                 _blink_on[i] = not _blink_on[i]
         else:
             _blink_on[i] = true
-        var visible: bool = _switch_of(flare) and _blink_on[i]
+        var visible: bool = _switch_of(flare, warning) and _blink_on[i]
+        # Upstream's `m_blinker_*_lit`: the last indicator of each side decides.
+        if flare["type"] == FlareRows.BLINKER_LEFT:
+            _left_lit = visible
+        elif flare["type"] == FlareRows.BLINKER_RIGHT:
+            _right_lit = visible
         out.append(_fade(i, visible, dt))
     return out
 
 
-func _switch_of(flare: Dictionary) -> bool:
+func _switch_of(flare: Dictionary, warning: bool) -> bool:
     match flare["type"] as String:
         FlareRows.HEADLIGHT, FlareRows.TAIL_LIGHT:
             return headlights
@@ -125,8 +146,23 @@ func _switch_of(flare: Dictionary) -> bool:
             var number: int = int(flare.get("control", -1))
             return number >= 0 and number < custom.size() and custom[number]
         FlareRows.DASHBOARD:
-            # The only dashboard input modelled is the parking brake.
-            return flare.get("dashboard", "") == "parkingbrake" and parking_brake
+            return _dashboard(str(flare.get("dashboard", "")), warning)
+    return false
+
+
+## Upstream's dashboard inputs a lamp can name, as `Actor::updateDashBoards` sets them; any other
+## name is dark (upstream disables a lamp naming an input it does not know).
+func _dashboard(input: String, warning: bool) -> bool:
+    match input:
+        "parkingbrake":
+            return parking_brake
+        "engine_ignition", "engine_battery":
+            return contact and not running
+        "signal_warning":
+            return warning
+        "rpm":
+            # A float input read as a bool through upstream's data union: the float's lowest byte.
+            return PackedFloat32Array([rpm]).to_byte_array()[0] != 0
     return false
 
 

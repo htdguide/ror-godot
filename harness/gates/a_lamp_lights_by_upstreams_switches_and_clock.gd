@@ -18,7 +18,9 @@ extends GateBase
 ##   which at 0.017 s a frame is every 30 frames;
 ## - fade: a `flares3` lamp on the `linear` curve with a 2 s start is at half after 1 s;
 ## - sprite: as big as the cosine between its facing and the camera, 0 from behind and past 500 m,
-##   and 1 from anywhere for a lamp of negative size.
+##   and 1 from anywhere for a lamp of negative size;
+## - dashboard: ignition and battery lamps with the key on and the engine off, the warning lamp a
+##   frame behind both indicators, the rpm lamp by its float's lowest byte.
 
 const FLARE_ROWS: String = """lights
 globals
@@ -38,6 +40,9 @@ flares2
 0, 1, 2, 0.5, 0.5, 0.0, u, 12
 0, 1, 2, 0.5, 0.5, 0.0, x, -1, -1
 0, 1, 2, 0.5, 0.5, 0.0, b, -1, 250, -2
+0, 1, 2, 0.5, 0.5, 0.0, d, engine_battery
+0, 1, 2, 0.5, 0.5, 0.0, d, signal_warning
+0, 1, 2, 0.5, 0.5, 0.0, d, rpm
 flares3
 0, 1, 2, 0.5, 0.5, 0.0, f, -1, 0
 materialflarebindings
@@ -66,8 +71,8 @@ static func meta() -> Dictionary:
 func run(_harness: Node) -> Dictionary:
     var truck: TruckParser = TruckParser.new()
     var error: String = truck.parse_text(FLARE_ROWS)
-    if error != "" or truck.flares.size() != 10:
-        return fail("the flare rows did not parse to 10 lamps: %s (%d)" % [error, truck.flares.size()])
+    if error != "" or truck.flares.size() != 13:
+        return fail("the flare rows did not parse to 13 lamps: %s (%d)" % [error, truck.flares.size()])
     var f: Array[Dictionary] = truck.flares
     var parsed: Array = [
         [f[2]["blink_s"], 0.5], [f[0]["blink_s"], 0.0], [f[7]["blink_s"], 0.5], [f[8]["blink_s"], 0.25],
@@ -119,9 +124,27 @@ func run(_harness: Node) -> Dictionary:
     # The fade: the flares3 headlight on `linear`, 2 s to warm.
     light = LightState.of(truck)
     light.headlights = true
-    var warm: float = light.update(1.0)[9]
+    var warm: float = light.update(1.0)[12]
     if absf(warm - 0.5) > 1e-4:
         return fail("the flares3 lamp is at %.4f after 1 s of a 2 s linear warm-up, not 0.5" % warm)
+
+    # The dashboard: ignition and battery with the key on and the engine not running; the warning
+    # lamp a frame behind the hazards, as upstream updates its dashboard before its flares; rpm
+    # as a float read through a bool, lit by its lowest byte (800.0 has a zero one, 812.3 not).
+    light = LightState.of(truck)
+    light.follow_engine(true, false, 800.0)
+    var dash: PackedFloat32Array = light.update(DT)
+    if dash[9] != 1.0 or dash[11] != 0.0:
+        return fail("key on, engine off at 800 rpm: battery lamp %.1f (should be lit), rpm lamp %.1f (should be dark)" % [dash[9], dash[11]])
+    light.follow_engine(true, true, 812.3)
+    dash = light.update(DT)
+    if dash[9] != 0.0 or dash[11] != 1.0:
+        return fail("engine running at 812.3 rpm: battery lamp %.1f (should be dark), rpm lamp %.1f (should be lit)" % [dash[9], dash[11]])
+    light.blink = LightState.Blink.WARN
+    var first: float = light.update(DT)[10]
+    var second: float = light.update(DT)[10]
+    if first != 0.0 or second != 1.0:
+        return fail("the warning lamp read %.1f on the hazards' first frame and %.1f on the second; upstream's is a frame behind" % [first, second])
 
     # The sprite.
     var lamp: Transform3D = Transform3D(Basis.IDENTITY, Vector3.ZERO)

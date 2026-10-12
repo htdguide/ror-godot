@@ -323,6 +323,11 @@ bool RorSolver::engine_running() const {
     return m_drivetrain.running();
 }
 
+bool RorSolver::engine_contact() const {
+    sync();
+    return m_drivetrain.contact();
+}
+
 bool RorSolver::has_engine() const {
     sync();
     return m_drivetrain.configured();
@@ -531,6 +536,7 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("engine_gear_count"), &RorSolver::engine_gear_count);
     ClassDB::bind_method(D_METHOD("engine_clutch"), &RorSolver::engine_clutch);
     ClassDB::bind_method(D_METHOD("engine_torque"), &RorSolver::engine_torque);
+    ClassDB::bind_method(D_METHOD("engine_contact"), &RorSolver::engine_contact);
     ClassDB::bind_method(D_METHOD("engine_running"), &RorSolver::engine_running);
     ClassDB::bind_method(D_METHOD("has_engine"), &RorSolver::has_engine);
     ClassDB::bind_method(D_METHOD("road_speed"), &RorSolver::road_speed);

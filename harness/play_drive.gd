@@ -190,6 +190,7 @@ func _snapshot() -> void:
         "clutch": solver.engine_clutch(),
         "gear": solver.engine_gear(),
         "running": solver.engine_running(),
+        "contact": solver.engine_contact(),
     }
 
 
@@ -350,7 +351,7 @@ func _respawn() -> void:
 ## the instruments. Updated per frame from the state the controls left behind.
 func _apply_cabin() -> void:
     _lights.apply(_built["lamps"] as Array[Node3D], truck, _seconds, _brake, DriveKeys.held(keys, "parking"),
-            -1 if _selector < 0 else 1)
+            -1 if _selector < 0 else 1, _state)
     Cockpit.turn_wheel(_built, truck, float(_state.get("steer", 0.0)))
     Cockpit.update(
         _cockpit, float(_state.get("rpm", 0.0)), float(_state.get("road_speed", 0.0)), lights_on()

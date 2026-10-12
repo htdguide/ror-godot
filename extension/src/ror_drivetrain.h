@@ -60,6 +60,7 @@ public:
         m_hydropump_work = pump_work;
     }
     bool running() const { return m_running; }
+    bool contact() const { return m_contact; }
     bool configured() const { return m_gear_count > 0; }
     // Upstream's `setTCaseRatio`: a transfer case's reduction multiplies every gear; below 1 ignored.
     void set_tcase_ratio(float ratio);

@@ -53,10 +53,14 @@ func set_headlights(on: bool) -> void:
 
 
 ## Shows the lamps for the controls as they stand, `seconds` being the window's clock.
-func apply(lamps: Array[Node3D], truck: TruckParser, seconds: float, brake: float, parking: bool, gear: int) -> void:
+## `engine` is the frame's snapshot: {"contact", "running", "rpm"}.
+func apply(lamps: Array[Node3D], truck: TruckParser, seconds: float, brake: float, parking: bool, gear: int,
+        engine: Dictionary = {}) -> void:
     var dt: float = 0.0 if _seconds < 0.0 else maxf(seconds - _seconds, 0.0)
     _seconds = seconds
     state.follow_controls(brake, parking, gear)
+    state.follow_engine(bool(engine.get("contact", false)), bool(engine.get("running", false)),
+            float(engine.get("rpm", 0.0)))
     var camera: Variant = null
     if not lamps.is_empty() and lamps[0].is_inside_tree() and lamps[0].get_viewport().get_camera_3d() != null:
         camera = lamps[0].get_viewport().get_camera_3d().global_position
