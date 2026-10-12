@@ -22,45 +22,6 @@ std::vector<float> to_vector(const PackedFloat32Array &array) {
 
 // --- Wheels ---------------------------------------------------------------------
 
-int RorSolver::add_wheel(int axis_a, int axis_b, int first_tread, int tread_count, int arm_node, float radius,
-                         int drive, int brake) {
-    sync();
-    const int nodes = static_cast<int>(m_nodes.size());
-    if (axis_a < 0 || axis_b < 0 || axis_a >= nodes || axis_b >= nodes || first_tread < 0 ||
-        first_tread + tread_count > nodes || tread_count <= 0) {
-        return -1;
-    }
-    RorWheel wheel;
-    wheel.axis_a = axis_a;
-    wheel.axis_b = axis_b;
-    wheel.first_tread = first_tread;
-    wheel.tread_count = tread_count;
-    wheel.radius = radius;
-    wheel.drive = static_cast<WheelDrive>(drive);
-    wheel.brake = static_cast<WheelBrake>(brake);
-    // Upstream sums the tread nodes' own masses rather than taking the row's stated wheel
-    // mass, so a wheel whose nodes were floored by minimass weighs what it actually
-    // weighs in the simulation.
-    wheel.mass = 0.0f;
-    for (int i = 0; i < tread_count; ++i) {
-        wheel.mass += m_nodes[static_cast<size_t>(first_tread + i)].mass;
-    }
-    if (wheel.mass <= 0.0f) {
-        wheel.mass = 1.0f;
-    }
-    wheel.arm_node = (arm_node >= 0 && arm_node < nodes) ? arm_node : axis_a;
-    // The axle end nearest the arm carries the reaction. Upstream picks it by distance
-    // rather than by which node the file named first.
-    const float to_a = static_cast<float>(
-            (m_nodes[static_cast<size_t>(axis_a)].position - m_nodes[static_cast<size_t>(wheel.arm_node)].position)
-                    .length());
-    const float to_b = static_cast<float>(
-            (m_nodes[static_cast<size_t>(axis_b)].position - m_nodes[static_cast<size_t>(wheel.arm_node)].position)
-                    .length());
-    wheel.near_attach_node = to_a < to_b ? axis_a : axis_b;
-    return m_wheels.add(wheel);
-}
-
 void RorSolver::set_has_axles(bool has_axles) {
     sync();
     m_wheels.set_has_axles(has_axles);
@@ -399,6 +360,7 @@ float RorSolver::steer_state() const {
 // --- Script surface -------------------------------------------------------------
 
 void RorSolver::_bind_methods() {
+    bind_wheel_methods();
     ClassDB::bind_method(D_METHOD("add_node", "position", "mass"), &RorSolver::add_node);
     ClassDB::bind_method(D_METHOD("add_beam", "node_a", "node_b", "rest_length", "spring", "damping"),
                          &RorSolver::add_beam);

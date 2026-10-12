@@ -69,8 +69,30 @@ struct beam_t {
     shock_t *shock = nullptr;
 };
 
+// SimConstants.h
+#define PHYSICS_DT 0.0005f
+static const float RAD_PER_SEC_TO_RPM = 9.5492965855137f;
+
+// Application.h, numbered as upstream numbers them.
+enum class WheelPropulsion : int { NONE = 0, FORWARD = 1, BACKWARD = 2 };
+enum class WheelBraking : int { NONE = 0, FOOT_HAND = 1, FOOT_HAND_SKID_LEFT = 2, FOOT_HAND_SKID_RIGHT = 3, FOOT_ONLY = 4 };
+
+// SimData.h, the fields `CalcWheels` reads and writes.
 struct wheel_t {
+    int wh_num_nodes = 0;
+    node_t *wh_nodes[50] = {};
+    node_t *wh_axis_node_0 = nullptr;
+    node_t *wh_axis_node_1 = nullptr;
+    node_t *wh_arm_node = nullptr;
+    node_t *wh_near_attach_node = nullptr;
+    WheelBraking wh_braking = WheelBraking::NONE;
+    WheelPropulsion wh_propulsed = WheelPropulsion::NONE;
+    float wh_radius = 0, wh_mass = 0, wh_speed = 0, wh_avg_speed = 0, wh_torque = 0;
+    float wh_last_torque = 0, wh_last_retorque = 0, wh_net_rp = 0;
+    float wh_alb_coef = 0, wh_tc_coef = 0;
     bool wh_is_detached = false;
+    float debug_rpm = 0, debug_torque = 0;
+    Ogre::Vector3 debug_vel, debug_slip, debug_force, debug_scaled_cforce;
 };
 struct wheeldetacher_t {
     int wd_wheel_id = 0;
@@ -81,6 +103,8 @@ struct wheeldetacher_t {
 // exist so the code that would write them compiles.
 #define SOUND_MODULATE(...) ((void)0)
 #define SOUND_PLAY_ONCE(...) ((void)0)
+#define SOUND_START(...) ((void)0)
+#define SOUND_STOP(...) ((void)0)
 #define TOSTRING(x) std::to_string(x)
 
 namespace RoR {
@@ -121,6 +145,23 @@ public:
     int ar_instance_id = 0;
     bool m_beam_break_debug_enabled = false;
     bool m_beam_deform_debug_enabled = false;
+
+    // What `CalcWheels` reads besides the wheels.
+    int ar_num_wheels = 0;
+    float tc_timer = 0, alb_timer = 0, tc_pulse_time = 0, alb_pulse_time = 0;
+    bool tc_pulse_state = false, alb_pulse_state = false, tc_mode = false, alb_mode = false;
+    float tc_ratio = 0, alb_ratio = 0, alb_minspeed = 0, tc_wheelslip_constant = 0.25f;
+    bool m_antilockbrake = false, m_tractioncontrol = false;
+    float ar_wheel_spin = 0, ar_wheel_speed = 0, ar_avg_wheel_speed = 0;
+    float ar_brake_force = 0, ar_brake = 0, m_handbrake_force = 0, ar_hydro_dir_state = 0, ar_total_mass = 1;
+    bool ar_parking_brake = false;
+    int m_num_proped_wheels = 0;
+    float m_odometer_total = 0, m_odometer_user = 0;
+    struct Engine { void setWheelSpin(float) {} } *ar_engine = nullptr;
+    // The camera direction upstream computes from its camera nodes; the oracle is handed it.
+    Ogre::Vector3 direction;
+    Ogre::Vector3 getDirection() { return direction; }
+    void CalcWheels(bool doUpdate, int num_steps);
 
     template <size_t N> void LogBeamNodes(Str<N> &, beam_t &) {}
     void CalcTriggers(int, Real, bool) {}

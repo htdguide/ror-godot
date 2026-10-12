@@ -233,7 +233,7 @@ void RorSolver::substep(float dt, bool first) {
     // The first substep of a call stands in for upstream's per-frame pass, which is
     // the rate it makes gear decisions at.
     m_drivetrain.step(dt, m_wheels.driven_spin() * RAD_PER_SEC_TO_RPM, first);
-    m_wheels.apply(m_nodes, m_drivetrain.clutch_torque(), dt);
+    m_wheels.apply(m_nodes, m_drivetrain.clutch_torque(), direction(), m_steering.state(), dt);
     accumulate_beam_forces();
     // Upstream's `CalcCabCollisions`, after the beams and before the slide nodes: the rig's own
     // contacters against its own collision triangles.

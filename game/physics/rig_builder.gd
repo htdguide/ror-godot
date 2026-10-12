@@ -247,6 +247,7 @@ static func _add_wheels(solver: RefCounted, truck: TruckParser) -> void:
         truck.drivetrain["brake_force"] as float,
         truck.drivetrain["parking_brake_force"] as float
     )
+    DriveAidSetup.hand_to(solver, truck)
 
 
 static func _add_steering(solver: RefCounted, truck: TruckParser) -> void:

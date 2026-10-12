@@ -236,6 +236,9 @@ func on_key(keycode: Key) -> bool:
             _recover()
         "wheel_diffs", "axle_diffs":
             print("DRIVE  %s" % AxleRows.toggle(solver, DriveKeys.action_of(keys, keycode) == "axle_diffs"))
+        "antilock", "traction_control":
+            var kind: String = "abs" if DriveKeys.action_of(keys, keycode) == "antilock" else "tc"
+            print("DRIVE  %s %s" % [kind.to_upper(), "on" if solver.toggle_drive_aid(kind) else "off"])
         "transfer_case", "transfer_range":
             print("DRIVE  %s" % AxleRows.shift_transfer_case(solver, DriveKeys.action_of(keys, keycode) == "transfer_range"))
         _:

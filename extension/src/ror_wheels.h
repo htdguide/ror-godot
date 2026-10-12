@@ -12,10 +12,11 @@ namespace rorgd {
 // How a wheel is driven. Upstream's `WheelPropulsion`, from the `propulsed` field.
 enum class WheelDrive { NONE = 0, FORWARD = 1, BACKWARD = 2 };
 
-// What a wheel's brakes answer to. Upstream's `WheelBraking`, from the `braked` field.
-// Only whether the handbrake applies matters here; the two skid variants brake one side
-// under steering lock, which is a handbrake-turn behaviour and is not modelled yet.
-enum class WheelBrake { NONE = 0, FOOT_HAND = 1, FOOT_ONLY = 2, FOOT_HAND_SKID_LEFT = 3, FOOT_HAND_SKID_RIGHT = 4 };
+// What a wheel's brakes answer to: upstream's `WheelBraking`, from the `braked` field, numbered as
+// upstream numbers it ("DO NOT MODIFY NUMBERS - de/serialized from/to truck definition file"). Until
+// 2026-10-12 this had foot-only at 2 and the skid brakes at 3 and 4, so a passenger car's foot-only
+// front wheels (4) took the handbrake. The skid brakes brake one side under steering lock.
+enum class WheelBrake { NONE = 0, FOOT_HAND = 1, FOOT_HAND_SKID_LEFT = 2, FOOT_HAND_SKID_RIGHT = 3, FOOT_ONLY = 4 };
 
 // The wheels of a rig: where the drivetrain's torque becomes force on the tread.
 //
@@ -56,6 +57,32 @@ struct RorWheel {
     // Upstream's `wh_is_detached`: taken off by a detacher group. It is handed no drive torque,
     // pushes nothing, and its speed is no longer measured; the differentials read its partner's.
     bool detached = false;
+    // Upstream's `wh_tc_coef` and `wh_alb_coef`: how far traction control and the anti-lock brake
+    // last held this wheel back. Zero until the first pulse sets them, as upstream's start.
+    float tc_coef = 0.0f;
+    float alb_coef = 0.0f;
+};
+
+// Upstream's traction control or anti-lock brake (`tc_*`, `alb_*`): its regulation ratio, its pulse
+// and the timer that drives it, and whether it held a wheel back this step.
+struct RorDriveAid {
+    bool on = false;
+    bool toggle = true;
+    float ratio = 0.0f;
+    float pulse_time = 0.0f;
+    float min_speed = 0.0f;
+    float timer = 0.0f;
+    bool pulse_state = false;
+    bool active = false;
+
+    // Upstream's per-step pulse: the timer runs on, and past the pulse time flips the state.
+    void tick(float dt) {
+        timer += dt;
+        if (timer >= pulse_time) {
+            timer = 0.0f;
+            pulse_state = !pulse_state;
+        }
+    }
 };
 
 // The wheel set of one rig.
@@ -97,8 +124,15 @@ public:
 
     // Turns one step's drivetrain torque into force on every tread node, and measures
     // what the wheels are doing while it is there. `clutch_torque` is what the drivetrain
-    // delivered to the driveshaft.
-    void apply(NodeArray &nodes, float clutch_torque, float dt);
+    // delivered to the driveshaft; `direction` is the vehicle's forward (upstream's
+    // `getDirection`) and `steer` its steering state, which the driving aids and skid brakes read.
+    void apply(NodeArray &nodes, float clutch_torque, const godot::Vector3 &direction, float steer, float dt);
+    // Upstream's `CalcWheels` alone, on the torques the wheels already hold: aids, brakes, force
+    // on the tread, speed, reaction. Public so it can be compared with upstream's case by case.
+    void apply_wheels(NodeArray &nodes, const godot::Vector3 &direction, float steer, float dt);
+    RorDriveAid &traction_control() { return m_tc; }
+    RorDriveAid &antilock() { return m_abs; }
+    RorWheel &wheel(int index) { return m_wheels[static_cast<size_t>(index)]; }
 
     // Average spin of the driven wheels, rad/s. What the drivetrain's clutch closes on.
     float driven_spin() const { return m_driven_spin; }
@@ -116,6 +150,8 @@ private:
     bool m_parking_brake = false;
     float m_driven_spin = 0.0f;
     float m_driven_speed = 0.0f;
+    RorDriveAid m_tc;
+    RorDriveAid m_abs;
 };
 
 } // namespace rorgd

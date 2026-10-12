@@ -27,17 +27,30 @@ struct Vector3 {
     float squaredLength() const { return x * x + y * y + z * z; }
     float length() const { return std::sqrt(squaredLength()); }
 
-    // Ogre's normalise() is in place and returns the length it had. Code that relies on both
-    // halves of that is why this cannot be a free function returning a normalised copy.
+    // Ogre 1.11's `normalise()` (OgreVector.h, the version upstream builds with): in place, by the
+    // inverse length, only when the length is above zero, returning the length it had.
     float normalise() {
         const float len = length();
-        if (len > 1e-08f) {
-            x /= len;
-            y /= len;
-            z /= len;
+        if (len > 0.0f) {
+            const float inv = 1.0f / len;
+            x *= inv;
+            y *= inv;
+            z *= inv;
         }
         return len;
     }
+    Vector3 normalisedCopy() const {
+        Vector3 ret = *this;
+        ret.normalise();
+        return ret;
+    }
+    Vector3 crossProduct(const Vector3 &v) const {
+        return Vector3(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
+    }
+    Vector3 midPoint(const Vector3 &v) const {
+        return Vector3((x + v.x) * 0.5f, (y + v.y) * 0.5f, (z + v.z) * 0.5f);
+    }
+    bool isZeroLength() const { return squaredLength() < 1e-06 * 1e-06; }
 
     Vector3 operator+(const Vector3 &o) const { return Vector3(x + o.x, y + o.y, z + o.z); }
     Vector3 operator-(const Vector3 &o) const { return Vector3(x - o.x, y - o.y, z - o.z); }
@@ -46,8 +59,24 @@ struct Vector3 {
     Vector3 &operator+=(const Vector3 &o) { x += o.x; y += o.y; z += o.z; return *this; }
     Vector3 &operator-=(const Vector3 &o) { x -= o.x; y -= o.y; z -= o.z; return *this; }
     Vector3 &operator*=(float s) { x *= s; y *= s; z *= s; return *this; }
+    Vector3 &operator/=(float s) { x /= s; y /= s; z /= s; return *this; }
+    Vector3 operator/(float s) const { return Vector3(x / s, y / s, z / s); }
 };
 
 inline Vector3 operator*(float s, const Vector3 &v) { return v * s; }
+
+// OgrePlane.h, the constructor and `projectVector` upstream's `CalcWheels` uses.
+struct Plane {
+    Vector3 normal;
+    float d = 0.0f;
+    Plane(const Vector3 &n, const Vector3 &point) : normal(n), d(-n.dotProduct(point)) {}
+    Vector3 projectVector(const Vector3 &v) const {
+        const float m00 = 1.0f - normal.x * normal.x, m01 = -normal.x * normal.y, m02 = -normal.x * normal.z;
+        const float m10 = -normal.y * normal.x, m11 = 1.0f - normal.y * normal.y, m12 = -normal.y * normal.z;
+        const float m20 = -normal.z * normal.x, m21 = -normal.z * normal.y, m22 = 1.0f - normal.z * normal.z;
+        return Vector3(m00 * v.x + m01 * v.y + m02 * v.z, m10 * v.x + m11 * v.y + m12 * v.z,
+                       m20 * v.x + m21 * v.y + m22 * v.z);
+    }
+};
 
 } // namespace Ogre

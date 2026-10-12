@@ -18,6 +18,7 @@
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
@@ -51,6 +52,8 @@ class RorSolver : public godot::RefCounted {
 
 protected:
     static void _bind_methods();
+    // The wheels' driving aids' and the vehicle direction's methods (`ror_solver_wheels.cpp`).
+    static void bind_wheel_methods();
 
 public:
     // Returns the new node's index.
@@ -240,6 +243,23 @@ public:
     void set_beam_detacher_group(int beam, int group);
     void add_wheel_detacher(int wheel, int group);
     bool wheel_detached(int wheel) const;
+    // The vehicle's forward, upstream's `getDirection`: from node `pos` towards it from node `dir`
+    // (its camera nodes), turned `yaw` radians about up when upstream had to pick `dir` itself.
+    void set_direction_nodes(int pos, int dir, float yaw);
+    godot::Vector3 direction() const;
+    // Upstream's traction control ("tc") and anti-lock brake ("abs"), from their file lines.
+    void set_drive_aid(const godot::String &kind, bool on, bool toggle, float ratio, float pulse_time,
+                       float min_speed);
+    // The aid's toggle key; does nothing for one stated NOTOGGLE. Returns whether it is now on.
+    bool toggle_drive_aid(const godot::String &kind);
+    bool drive_aid_on(const godot::String &kind);
+    // Whether the aid held a wheel back on the last substep.
+    bool drive_aid_active(const godot::String &kind);
+    // Runs the wheel step alone (upstream's `CalcWheels`) once, on wheel state and aid state the
+    // caller sets, node forces cleared first, for comparison against upstream's case by case.
+    godot::Dictionary wheel_pass_probe(const godot::PackedFloat32Array &wheel_states,
+                                       const godot::PackedFloat32Array &aid_states, const godot::Vector3 &direction,
+                                       float steer, float dt);
     // The force along the beam last substep, signed as upstream's `beam.stress`: negative pulls.
     float get_beam_stress(int beam) const;
     // Runs the beam pass alone `passes` times, forces cleared before each and nothing integrated,
@@ -446,6 +466,9 @@ private:
     void apply_bound_law(const RorBeam &beam, float extension, float closing_speed, float &spring,
                          float &damping) const;
     std::vector<RorShock> m_shocks;
+    int m_direction_pos = -1;
+    int m_direction_dir = -1;
+    float m_direction_yaw = 0.0f;
     // {wheel, group} per `wheeldetachers` row.
     std::vector<std::pair<int, int>> m_wheel_detachers;
     // A beam of `group` broke by strength: the rest of the group goes, and its wheels come off.

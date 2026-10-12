@@ -1861,9 +1861,9 @@ asserting "loads or fails cleanly" and starts asserting fidelity per section.
 
 Scope, vehicles:
 - **Every section a ground rig uses.** The named gaps today (rams move, ramp by
-  their inertia and honour `r` ropes; differentials, the transfer case and detacher groups are in,
-  2026-10-11/12):
-  `fusedrag` given per-node drag instead of a fuselage vector, traction control and ABS absent,
+  their inertia and honour `r` ropes; differentials, the transfer case, detacher groups, traction
+  control and ABS are in, 2026-10-11/12):
+  `fusedrag` given per-node drag instead of a fuselage vector,
   flares placed but not animated.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
 - **A section inventory as a gate**: every section upstream's `RigDef::Parser` knows, against what

@@ -25,6 +25,17 @@
 //             strength plastic_coef detacher_group                (beam_count lines)
 //   out: one line per node: fx fy fz; then one per beam: L stress strength broken
 //
+// A line starting `wheels` runs `Actor::CalcWheels(false, 1)` once on the rig that follows:
+//
+//   in:  wheels node_count wheel_count
+//        globals dir_x dir_y dir_z brake_force brake parking handbrake_force steer proped_wheels
+//        aids tc_on tc_ratio tc_pulse tc_timer tc_state abs_on abs_ratio abs_pulse abs_min abs_timer abs_state
+//        node x y z vx vy vz                                       (node_count lines)
+//        wheel axis0 axis1 first_tread tread_count arm near radius mass braking propulsed torque speed
+//              avg_speed last_torque last_retorque tc_coef alb_coef detached    (wheel_count lines)
+//   out: one line per node: fx fy fz; one per wheel: last_torque speed avg_speed last_retorque
+//        tc_coef alb_coef net_rp; then: wheel_spin wheel_speed tc_active abs_active
+//
 // A line starting `diff` runs one of `Differential`'s four laws:
 //
 //   in:  diff <s|o|v|l> speed0 speed1 in_torque dt delta_rotation
@@ -168,10 +179,89 @@ static bool run_beams(const std::string &header) {
     return true;
 }
 
+// One rig of wheels; false if the block is malformed.
+static bool run_wheels(const std::string &header) {
+    int node_count = 0, wheel_count = 0;
+    if (std::sscanf(header.c_str(), "wheels %d %d", &node_count, &wheel_count) != 2) {
+        return false;
+    }
+    RoR::Actor actor;
+    std::string line;
+    int parking = 0, tc_on = 0, tc_state = 0, abs_on = 0, abs_state = 0;
+    if (!std::getline(std::cin, line) ||
+        std::sscanf(line.c_str(), "globals %f %f %f %f %f %d %f %f %d", &actor.direction.x, &actor.direction.y,
+                    &actor.direction.z, &actor.ar_brake_force, &actor.ar_brake, &parking, &actor.m_handbrake_force,
+                    &actor.ar_hydro_dir_state, &actor.m_num_proped_wheels) != 9) {
+        return false;
+    }
+    actor.ar_parking_brake = parking != 0;
+    if (!std::getline(std::cin, line) ||
+        std::sscanf(line.c_str(), "aids %d %f %f %f %d %d %f %f %f %f %d", &tc_on, &actor.tc_ratio, &actor.tc_pulse_time,
+                    &actor.tc_timer, &tc_state, &abs_on, &actor.alb_ratio, &actor.alb_pulse_time, &actor.alb_minspeed,
+                    &actor.alb_timer, &abs_state) != 11) {
+        return false;
+    }
+    actor.tc_mode = tc_on != 0;
+    actor.tc_pulse_state = tc_state != 0;
+    actor.alb_mode = abs_on != 0;
+    actor.alb_pulse_state = abs_state != 0;
+    std::vector<node_t> nodes(static_cast<size_t>(node_count));
+    for (node_t &n : nodes) {
+        if (!std::getline(std::cin, line) ||
+            std::sscanf(line.c_str(), "node %f %f %f %f %f %f", &n.RelPosition.x, &n.RelPosition.y, &n.RelPosition.z,
+                        &n.Velocity.x, &n.Velocity.y, &n.Velocity.z) != 6) {
+            return false;
+        }
+    }
+    std::vector<wheel_t> wheels(static_cast<size_t>(wheel_count));
+    for (wheel_t &w : wheels) {
+        int a0 = 0, a1 = 0, first = 0, count = 0, arm = 0, near = 0, braking = 0, propulsed = 0, detached = 0;
+        if (!std::getline(std::cin, line) ||
+            std::sscanf(line.c_str(), "wheel %d %d %d %d %d %d %f %f %d %d %f %f %f %f %f %f %f %d", &a0, &a1, &first,
+                        &count, &arm, &near, &w.wh_radius, &w.wh_mass, &braking, &propulsed, &w.wh_torque, &w.wh_speed,
+                        &w.wh_avg_speed, &w.wh_last_torque, &w.wh_last_retorque, &w.wh_tc_coef, &w.wh_alb_coef,
+                        &detached) != 18) {
+            return false;
+        }
+        w.wh_axis_node_0 = &nodes[static_cast<size_t>(a0)];
+        w.wh_axis_node_1 = &nodes[static_cast<size_t>(a1)];
+        w.wh_num_nodes = count;
+        for (int j = 0; j < count; ++j) {
+            w.wh_nodes[j] = &nodes[static_cast<size_t>(first + j)];
+        }
+        w.wh_arm_node = &nodes[static_cast<size_t>(arm)];
+        w.wh_near_attach_node = &nodes[static_cast<size_t>(near)];
+        w.wh_braking = static_cast<WheelBraking>(braking);
+        w.wh_propulsed = static_cast<WheelPropulsion>(propulsed);
+        w.wh_is_detached = detached != 0;
+    }
+    actor.ar_nodes = nodes.data();
+    actor.ar_wheels = wheels.data();
+    actor.ar_num_wheels = wheel_count;
+    actor.CalcWheels(false, 1);
+    for (const node_t &n : nodes) {
+        std::printf("%.9g %.9g %.9g\n", n.Forces.x, n.Forces.y, n.Forces.z);
+    }
+    for (const wheel_t &w : wheels) {
+        std::printf("%.9g %.9g %.9g %.9g %.9g %.9g %.9g\n", w.wh_last_torque, w.wh_speed, w.wh_avg_speed,
+                    w.wh_last_retorque, w.wh_tc_coef, w.wh_alb_coef, w.wh_net_rp);
+    }
+    std::printf("%.9g %.9g %d %d\n", actor.ar_wheel_spin, actor.ar_wheel_speed, actor.m_tractioncontrol ? 1 : 0,
+                actor.m_antilockbrake ? 1 : 0);
+    return true;
+}
+
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("wheels", 0) == 0) {
+            if (!run_wheels(line)) {
+                std::fprintf(stderr, "oracle: malformed wheels block: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("beams", 0) == 0) {

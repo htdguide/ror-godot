@@ -1,5 +1,7 @@
 #include "ror_wheels.h"
 
+#include "ror_ogre_math.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -47,7 +49,7 @@ void RorWheelSet::set_brake_forces(float foot, float handbrake) {
     m_handbrake_force = handbrake > 0.0f ? handbrake : 2.0f * foot;
 }
 
-void RorWheelSet::apply(NodeArray &nodes, float clutch_torque, float dt) {
+void RorWheelSet::apply(NodeArray &nodes, float clutch_torque, const Vector3 &direction, float steer, float dt) {
     if (dt <= 0.0f || m_wheels.empty()) {
         return;
     }
@@ -66,93 +68,127 @@ void RorWheelSet::apply(NodeArray &nodes, float clutch_torque, float dt) {
     }
     m_diffs.prepare(m_wheels);
     m_diffs.distribute(m_wheels, dt);
+    apply_wheels(nodes, direction, steer, dt);
+}
 
+// Upstream's `Actor::CalcWheels`, line for line, without its sounds and debug fields.
+void RorWheelSet::apply_wheels(NodeArray &nodes, const Vector3 &direction, float steer, float dt) {
+    m_tc.tick(dt);
+    m_abs.tick(dt);
+    m_abs.active = false;
+    m_tc.active = false;
     m_driven_spin = 0.0f;
     m_driven_speed = 0.0f;
+    // Upstream's `tc_wheelslip_constant`.
+    constexpr float TC_WHEELSLIP = 0.25f;
     for (RorWheel &wheel : m_wheels) {
-        if (wheel.tread_count <= 0 || wheel.radius <= 0.0f || wheel.detached) {
+        if (wheel.detached || wheel.tread_count <= 0 || wheel.radius <= 0.0f) {
             continue;
+        }
+        const float relspeed = static_cast<float>(nodes[0].velocity.dot(direction));
+        const float curspeed = std::fabs(relspeed);
+        const float wheel_slip = std::fabs(wheel.speed - relspeed) / std::max(1.0f, curspeed);
+
+        // Traction control: a driven wheel spinning faster than the vehicle moves loses torque.
+        if (m_tc.on && std::fabs(wheel.torque) > 0.0f && std::fabs(wheel.speed) > curspeed &&
+            wheel_slip > TC_WHEELSLIP) {
+            if (m_tc.pulse_state) {
+                wheel.tc_coef = curspeed / std::fabs(wheel.speed);
+                wheel.tc_coef = std::pow(wheel.tc_coef, m_tc.ratio);
+            }
+            const float tc_coef = std::pow(wheel.tc_coef, std::min(std::abs(wheel.speed) / 5.0f, 1.0f));
+            wheel.torque *= tc_coef;
+            m_tc.active = true;
+        } else {
+            wheel.tc_coef = 1.0f;
         }
 
         if (wheel.brake != WheelBrake::NONE) {
-            float stopping = m_brake_force * m_brake;
+            const float abrake = m_brake_force * m_brake;
+            float hbrake = 0.0f;
             if (m_parking_brake && wheel.brake != WheelBrake::FOOT_ONLY) {
-                stopping += m_handbrake_force;
+                hbrake = m_handbrake_force;
             }
-            if (stopping > 0.0f) {
-                // The torque that would bring this wheel to a stop in one step, less
-                // whatever the last step already took out of it. Braking is a target
-                // rather than a constant force, which is what stops a braked wheel
+            // Directional braking: a skid-steer wheel brakes on its side of the steering.
+            float dbrake = 0.0f;
+            if ((wheel.speed < 20.0f) &&
+                (((wheel.brake == WheelBrake::FOOT_HAND_SKID_LEFT) && (steer > 0.0f)) ||
+                 ((wheel.brake == WheelBrake::FOOT_HAND_SKID_RIGHT) && (steer < 0.0f)))) {
+                dbrake = m_brake_force * std::abs(steer);
+            }
+            if (abrake != 0.0f || dbrake != 0.0f || hbrake != 0.0f) {
+                float adbrake = abrake + dbrake;
+                // Anti-lock: a braked wheel turning slower than the vehicle moves is let off.
+                if (m_abs.on && curspeed > m_abs.min_speed && curspeed > std::fabs(wheel.speed) && (adbrake > 0.0f) &&
+                    wheel_slip > 0.25f) {
+                    if (m_abs.pulse_state) {
+                        wheel.alb_coef = std::fabs(wheel.speed) / curspeed;
+                        wheel.alb_coef = std::pow(wheel.alb_coef, m_abs.ratio);
+                    }
+                    adbrake *= wheel.alb_coef;
+                    m_abs.active = true;
+                }
+                // The torque that would stop this wheel in one step, less what the last step
+                // already took out of it: braking is a target, which keeps a braked wheel from
                 // oscillating about zero.
                 float force = -wheel.average_speed * wheel.radius * wheel.mass / dt;
                 force -= wheel.last_retorque;
-                if (wheel.speed > 0.0f) {
-                    wheel.torque += std::fmax(std::fmin(force, 0.0f), -stopping);
+                if (wheel.speed > 0) {
+                    wheel.torque += std::max(std::min(force, 0.0f), -(adbrake + hbrake));
                 } else {
-                    wheel.torque += std::fmin(std::fmax(force, 0.0f), stopping);
+                    wheel.torque += std::max(std::min(force, +(adbrake + hbrake)), 0.0f);
                 }
+            } else {
+                wheel.alb_coef = 1.0f;
             }
         }
 
-        const Vector3 axis =
-                (nodes[static_cast<size_t>(wheel.axis_b)].position - nodes[static_cast<size_t>(wheel.axis_a)].position)
-                        .normalized();
-        const float per_node = wheel.torque / static_cast<float>(wheel.tread_count);
-        const float expected_before = wheel.speed;
+        // Application to the wheel: a tangential force on every tread node about the axle.
+        const Vector3 axis = ogre_normalised(nodes[static_cast<size_t>(wheel.axis_b)].position -
+                                             nodes[static_cast<size_t>(wheel.axis_a)].position);
+        const float axis_precalc = wheel.torque / static_cast<float>(wheel.tread_count);
+        float expected_wheel_speed = wheel.speed;
         wheel.speed = 0.0f;
-
         for (int j = 0; j < wheel.tread_count; ++j) {
-            RorNode &tread = nodes[static_cast<size_t>(wheel.first_tread + j)];
+            RorNode &outer = nodes[static_cast<size_t>(wheel.first_tread + j)];
             const RorNode &inner = nodes[static_cast<size_t>((j % 2) ? wheel.axis_b : wheel.axis_a)];
-            Vector3 radius = tread.position - inner.position;
-            const float length = static_cast<float>(radius.length());
-            if (length <= 0.0f) {
-                continue;
-            }
-            const float inverse = 1.0f / length;
+            Vector3 radius = outer.position - inner.position;
+            const float inverted_rlen = 1.0f / static_cast<float>(radius.length());
             if (wheel.drive == WheelDrive::BACKWARD) {
                 radius = -radius;
             }
-            // Unit tangent about the axle. Scaling by 1/length a second time turns a
-            // torque into the force that delivers it at this node's actual radius, so a
-            // squashed tyre pushes harder at its flattened contact patch.
-            const Vector3 direction = axis.cross(radius) * inverse;
-            tread.forces += direction * (per_node * inverse);
-            wheel.speed += static_cast<float>((tread.velocity - inner.velocity).dot(direction));
+            const Vector3 dir = axis.cross(radius) * inverted_rlen;
+            outer.forces += dir * axis_precalc * inverted_rlen;
+            wheel.speed += static_cast<float>((outer.velocity - inner.velocity).dot(dir));
         }
         wheel.speed /= static_cast<float>(wheel.tread_count);
         wheel.rotation += (wheel.speed / wheel.radius) * dt;
-        wheel.average_speed = wheel.average_speed * 0.99f + wheel.speed * 0.1f;
-
-        if (wheel.drive != WheelDrive::NONE) {
-            m_driven_speed += wheel.speed / static_cast<float>(m_driven_count);
-            m_driven_spin += (wheel.speed / wheel.radius) / static_cast<float>(m_driven_count);
+        // Upstream overweights the average on purpose, for its braking estimate, in double.
+        wheel.average_speed = static_cast<float>(wheel.average_speed * 0.99 + wheel.speed * 0.1);
+        if (wheel.drive == WheelDrive::FORWARD) {
+            const float speedacc = wheel.speed / static_cast<float>(m_driven_count);
+            m_driven_speed += speedacc;
+            m_driven_spin += speedacc / wheel.radius;
         }
+        expected_wheel_speed += ((wheel.last_torque / wheel.radius) / wheel.mass) * dt;
+        wheel.last_retorque = wheel.mass * (wheel.speed - expected_wheel_speed) / dt;
 
-        // What the wheel's own inertia should have done with the last step's torque, and
-        // therefore how much of this step's braking estimate has already been spent.
-        const float expected = expected_before + ((wheel.last_torque / wheel.radius) / wheel.mass) * dt;
-        wheel.last_retorque = wheel.mass * (wheel.speed - expected) / dt;
-
-        // Reaction torque: driving a wheel pushes back along the suspension arm.
-        if (std::fabs(wheel.torque) > 0.01f) {
-            const RorNode &attach = nodes[static_cast<size_t>(wheel.near_attach_node)];
-            const Vector3 arm = nodes[static_cast<size_t>(wheel.arm_node)].position - attach.position;
-            // The part of the arm that is square to the axle: only that part can carry a
-            // reaction about it.
-            Vector3 lever = arm - axis * static_cast<float>(arm.dot(axis));
-            const float offset = static_cast<float>((arm - lever).length());
-            const float lever_length = static_cast<float>(lever.length());
-            if (lever_length > 0.01f && offset * 2.0f < lever_length) {
-                lever /= lever_length;
-                const Vector3 force = axis.cross(lever) *
-                        ((0.5f * wheel.torque / lever_length) * (1.0f - ((offset * 2.0f) / lever_length)));
-                nodes[static_cast<size_t>(wheel.arm_node)].forces -= force;
-                nodes[static_cast<size_t>(wheel.near_attach_node)].forces += force;
-            }
+        // Reaction torque: driving a wheel pushes back along its suspension arm, or the rig would
+        // gain angular momentum from nothing.
+        const RorNode &attach = nodes[static_cast<size_t>(wheel.near_attach_node)];
+        RorNode &arm = nodes[static_cast<size_t>(wheel.arm_node)];
+        const Vector3 rradius = arm.position - attach.position;
+        Vector3 projected = ogre_project(axis, rradius);
+        const float offset = static_cast<float>((rradius - projected).length());
+        const float rlen = ogre_normalise(projected);
+        if (rlen > 0.01 && offset * 2.0f < rlen && std::fabs(wheel.torque) > 0.01f) {
+            Vector3 cforce = axis.cross(projected);
+            cforce *= (0.5f * wheel.torque / rlen) * (1.0f - ((offset * 2.0f) / rlen));
+            arm.forces -= cforce;
+            nodes[static_cast<size_t>(wheel.near_attach_node)].forces += cforce;
         }
-
         wheel.last_torque = wheel.torque;
+        wheel.torque = 0.0f;
     }
 }
 
