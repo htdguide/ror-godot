@@ -294,6 +294,10 @@ static func _configure_engine(solver: RefCounted, truck: TruckParser) -> void:
         drive["stall_rpm"] as float,
         drive["braking_torque"] as float
     )
+    # Upstream's `ProcessEngturbo`, after `engoption` as its spawner orders them.
+    if drive.has("turbo"):
+        var turbo: Dictionary = drive["turbo"]
+        solver.set_turbo(turbo["version"], turbo["inertia_factor"], turbo["count"], turbo["params"])
 
 
 ## The cab triangles other vehicles collide with: upstream's `collcabs`, the rows whose options

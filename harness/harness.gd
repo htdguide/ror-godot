@@ -341,7 +341,6 @@ func _open_console() -> void:
 
 
 ## Runs one console command and exits with its verdict. The command line's whole gate mode.
-##
 ## `HARNESS_COMMAND` carries the answer for a caller that wants the result rather than the
 ## per-gate lines `gate run` prints on its way through.
 func _run_command(line: String) -> void:
@@ -381,12 +380,19 @@ func setup_for(shot: String, weather: String = "") -> String:
 ## Plumbing
 
 
+## An engine ended from outside says so; a suite that stopped silently cost runs to tell apart.
+func _notification(what: int) -> void:
+    if what == NOTIFICATION_WM_CLOSE_REQUEST:
+        print("HARNESS_QUIT {\"code\": -1, \"from\": \"the window was asked to close\"}")
+
+
 func _die(code: int, message: String) -> void:
     printerr("HARNESS_ERROR " + message)
     _quit(code)
 
 
 func _quit(code: int) -> void:
+    print("HARNESS_QUIT {\"code\": %d, \"from\": %s}" % [code, JSON.stringify(str(get_stack().slice(1, 3)))])
     if _run_started:
         return
     _run_started = true

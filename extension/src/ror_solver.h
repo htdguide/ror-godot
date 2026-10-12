@@ -60,6 +60,16 @@ protected:
     static void bind_hook_methods();
     static void bind_tie_methods();
     static void bind_slide_methods();
+    static void bind_turbo_methods();
+    // Upstream's `engturbo` (`ror_solver_turbo.cpp`): `params` are the row's eleven, 9999 where unstated.
+    void set_turbo(int version, float inertia_factor, int count, const godot::PackedFloat32Array &params);
+    float turbo_psi() const;
+    // The torque the engine makes at `rpm` at full throttle: upstream's `getEnginePower`, turbo included.
+    float engine_power_at(float rpm) const;
+    static godot::PackedFloat32Array turbo_probe(int version, float inertia_factor, int count,
+                                                 const godot::PackedFloat32Array &params, const godot::PackedFloat32Array &acc,
+                                                 const godot::PackedFloat32Array &cur_acc, const godot::PackedFloat32Array &rpm,
+                                                 const godot::PackedByteArray &running, float max_rpm, float engine_torque, float dt);
     static godot::PackedFloat32Array slide_probe(const godot::PackedVector3Array &positions, const godot::PackedInt32Array &pairs,
                                                  const godot::PackedInt32Array &rail, int node, float spring, float break_force,
                                                  float tolerance, const godot::PackedVector3Array &path, float dt);

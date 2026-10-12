@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ror_turbo.h"
+
 #include <vector>
 
 namespace rorgd {
@@ -8,8 +10,8 @@ namespace rorgd {
 //
 // A port of upstream's `Engine` reduced to what a ground vehicle with a keyboard needs:
 // the torque curve, the engine's rotational inertia, the clutch that couples it to the
-// wheels, and upstream's automatic gearbox. Turbo, aero engines, manual clutch ranges,
-// gear-shift sounds and the analogue input smoothing are not here.
+// wheels, upstream's automatic gearbox and the `engturbo` turbo (`RorTurbo`). Aero engines,
+// manual clutch ranges, gear-shift sounds and the analogue input smoothing are not here.
 //
 // Nothing in this file knows about Godot or about nodes. It takes the wheels' rotation
 // speed in and gives a torque out, which is exactly the interface upstream's
@@ -67,8 +69,11 @@ public:
     float tcase_ratio() const { return m_tcase_ratio; }
     // Peak torque times the curve's value at `rpm`. Upstream's `getEnginePower`.
     float engine_power(float rpm) const;
+    // The `engturbo` turbo, whose power `engine_power` adds as upstream's `getEnginePower` does.
+    RorTurbo &turbo() { return m_turbo; }
 
 private:
+    float curve_power(float rpm) const;
     // The gear ratio in force, indexed upstream's way: 0 reverse, 1 neutral, 2 first.
     float ratio_of(int gear) const;
     void shift(int by);
@@ -89,6 +94,7 @@ private:
     float m_min_rpm = 0.0f;
     float m_max_rpm = 0.0f;
     float m_torque = 0.0f;
+    RorTurbo m_turbo;
     float m_idle_rpm = 0.0f;
     float m_stall_rpm = 300.0f;
     float m_inertia = 10.0f;

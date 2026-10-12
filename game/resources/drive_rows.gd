@@ -1,6 +1,6 @@
 class_name DriveRows
 extends RefCounted
-## Parses the sections that describe a drivetrain: `globals`, `engine`, `engoption`,
+## Parses the sections that describe a drivetrain: `globals`, `engine`, `engoption`, `engturbo`,
 ## `brakes`, `torquecurve` and `fusedrag`.
 ##
 ## Read together they are a complete specification of how a rig accelerates and stops. The
@@ -14,7 +14,7 @@ extends RefCounted
 ## engine's own setter takes them.
 
 const SECTIONS: Array[String] = [
-    "globals", "engine", "engoption", "brakes", "torquecurve", "fusedrag",
+    "globals", "engine", "engoption", "engturbo", "brakes", "torquecurve", "fusedrag",
 ]
 ## Upstream's SimConstants defaults for anything a file leaves out. A negative clutch force
 ## means "pick by engine type", which the drivetrain does.
@@ -72,6 +72,8 @@ static func read(section: String, fields: PackedStringArray, drive: Dictionary) 
             return _engine(fields, drive)
         "engoption":
             return _engoption(fields, drive)
+        "engturbo":
+            return _engturbo(fields, drive)
         "brakes":
             return _brakes(fields, drive)
         "torquecurve":
@@ -112,6 +114,19 @@ static func _engine(fields: PackedStringArray, drive: Dictionary) -> String:
         return "engine row states no forward gear"
     drive["gears"] = gears
     drive["has_engine"] = true
+    return ""
+
+
+## Upstream's `ParseEngturbo`: "version, inertia factor, turbo count, param1 [, .. param11]", a
+## parameter the row leaves out being upstream's 9999, and no more than four turbos.
+static func _engturbo(fields: PackedStringArray, drive: Dictionary) -> String:
+    if fields.size() < 4:
+        return "engturbo row has %d fields, expected at least 4" % fields.size()
+    var params: PackedFloat32Array = PackedFloat32Array()
+    for i: int in 11:
+        params.append(fields[3 + i].to_float() if fields.size() > 3 + i else 9999.0)
+    drive["turbo"] = {"version": fields[0].to_int(), "inertia_factor": fields[1].to_float(),
+            "count": mini(fields[2].to_int(), 4), "params": params}
     return ""
 
 

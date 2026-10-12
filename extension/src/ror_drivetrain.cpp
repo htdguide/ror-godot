@@ -102,6 +102,10 @@ void RorDrivetrain::set_torque_curve(const std::vector<float> &rpm, const std::v
 // the same distance apart in the parameter whatever their rpm says, which is only exact
 // when the points are evenly spaced — and upstream's models are.
 float RorDrivetrain::engine_power(float rpm) const {
+    return curve_power(rpm) + m_turbo.power(m_torque);
+}
+
+float RorDrivetrain::curve_power(float rpm) const {
     const size_t count = m_curve_ratio.size();
     if (count == 0) {
         return m_torque;
@@ -169,6 +173,7 @@ void RorDrivetrain::start() {
     m_rpm = m_idle_rpm;
     m_gear = 1;
     m_selector = 1;
+    m_turbo.reset();
 }
 
 void RorDrivetrain::stop() {
@@ -239,6 +244,8 @@ void RorDrivetrain::step(float dt, float wheel_rpm, bool do_update) {
     // creeps forward instead of stalling the moment the driver lifts off.
     // And priming is another: rams asking for hydraulic power raise it until the pump turns.
     const float acc = std::fmax(std::fmax(idle_mixture(), prime_mixture()), m_acc);
+    // Upstream's turbo pass comes first in `UpdateEngine`, before the torque it feeds.
+    m_turbo.update(dt, acc, m_acc, m_rpm, m_max_rpm, m_running);
 
     float total_torque = 0.0f;
     if (m_running && m_contact) {

@@ -361,6 +361,8 @@ for line in sys.stdin:
     accounted="$(printf '%s\n' "$output" | sed -n 's/.*HARNESS_SUITE_DONE .*"planned": *\([0-9]*\).*/\1/p' | tail -1)"
     if [[ -z "$accounted" ]]; then
         echo "gate.sh: the engine stopped before the suite finished: $ran of ${planned:-?} gates ran" >&2
+        # What the engine said on its way out, which is the only record of why.
+        printf '%s\n' "$output" | grep -E "HARNESS_QUIT|HARNESS_ERROR|HARNESS_GATE_BEGIN" | tail -3 | cut -c1-300 >&2
         cleanup_plan
         return 1
     fi

@@ -50,6 +50,25 @@ WANTED = [
     ("main/physics/SlideNode.cpp", "Ogre::Real SlideNode::getLenTo(const RailSegment* rail, const Ogre::Vector3& point)"),
     ("main/physics/SlideNode.cpp", "Ogre::Real SlideNode::getLenTo(const beam_t* beam, const Ogre::Vector3& point)"),
     ("main/physics/SlideNode.cpp", "Ogre::Vector3 SlideNode::CalcCorrectiveForces()"),
+    (
+        "main/gameplay/Engine.cpp",
+        "void Engine::SetTurboOptions(int type, float tinertiaFactor, int nturbos, float param1, float param2, "
+        "float param3, float param4, float param5, float param6, float param7, float param8, float param9, "
+        "float param10, float param11)",
+    ),
+    ("main/gameplay/Engine.cpp", "float Engine::getTurboPSI()"),
+    ("main/gameplay/Engine.cpp", "float Engine::getTurboPower()"),
+]
+
+# Blocks lifted out of a longer function, each given a function of its own: (source, the block's
+# first line, what goes before it, what goes after it).
+BLOCKS = [
+    (
+        "main/gameplay/Engine.cpp",
+        "if (m_engine_has_turbo)",
+        "void Engine::UpdateTurbo(float dt, float acc)\n{\n",
+        "\n}\n\nvoid reset_frand() { mirand = 1; }\n",
+    ),
 ]
 
 PROLOGUE = """// GENERATED — do not edit. Produced by tools/parity/extract.py from the pinned
@@ -62,6 +81,7 @@ PROLOGUE = """// GENERATED — do not edit. Produced by tools/parity/extract.py 
 #include "differentials.h"
 #include "ApproxMath.h"
 #include "SlideNode.h"
+#include "engine_turbo.h"
 
 #include <algorithm>
 #include <cmath>
@@ -121,6 +141,9 @@ def main() -> None:
         if not source.is_file():
             raise SystemExit(f"extract.py: {source} does not exist")
         pieces.append(f"// From {relative}\n{extract(source, signature)}\n")
+    for relative, first_line, before, after in BLOCKS:
+        source = root / relative
+        pieces.append(f"// From {relative}, a block of a longer function\n{before}{extract(source, first_line)}{after}")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(pieces), encoding="utf-8")
     print(f"extract.py: wrote {out} from {len(WANTED)} upstream function(s)")

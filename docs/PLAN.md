@@ -1868,7 +1868,9 @@ Scope, vehicles:
   lock, reel and pull between vehicles (`--add` puts one behind yours), ties take ropables and
   shorten (O), and ropes ride on them (Ctrl+L). Slide nodes are upstream's `SlideNode` on beam rails, loops
   and `railgroups` included (`the_slide_node_is_upstreams`, bit-identical); the slide-node lock key
-  (`toggleSlideNodeLock`, attach rate and distance, `c` constraints) is not bound yet.
+  (`toggleSlideNodeLock`, attach rate and distance, `c` constraints) is not bound yet. `engturbo` is
+  upstream's `NEW` turbo, both versions, blow-off valve, wastegate and anti-lag
+  (`the_turbo_is_upstreams`, bit-identical); the `OLD` turbo feeds only sound, which is not in.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
 - **A section inventory as a gate**: done 2026-10-12 as `every_keyword_is_read_where_upstream_reads_it`
   (all 120 of upstream's keywords open, keep or close a section as its parser does). Modules

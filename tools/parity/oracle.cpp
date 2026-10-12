@@ -51,6 +51,7 @@
 #include "actor_shocks.h"
 #include "differentials.h"
 #include "SlideNode.h"
+#include "engine_turbo.h"
 
 #include <sstream>
 #include <vector>
@@ -370,10 +371,59 @@ static bool run_slide(const std::string &line) {
     return true;
 }
 
+// `turbo version inertia count p1 .. p11 max_rpm torque dt steps`, then per step the throttle with
+// its mixtures, the driver's throttle, the engine rpm and whether it runs. Upstream's own
+// `SetTurboOptions` and turbo pass; prints per step every turbo's rpm, every blow-off rpm and
+// `getTurboPower`.
+static bool run_turbo(const std::string &line) {
+    std::istringstream in(line.substr(5));
+    int version = 0, count = 0, steps = 0;
+    float inertia = 0, p[11], max_rpm = 0, torque = 0, dt = 0;
+    in >> version >> inertia >> count;
+    for (float &each : p) {
+        in >> each;
+    }
+    in >> max_rpm >> torque >> dt >> steps;
+    if (!in) {
+        return false;
+    }
+    reset_frand();
+    RoR::Engine engine;
+    engine.m_engine_max_rpm = max_rpm;
+    engine.m_engine_torque = torque;
+    engine.SetTurboOptions(version, inertia, count, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10]);
+    for (int step = 0; step < steps; ++step) {
+        float acc = 0, cur_acc = 0, rpm = 0;
+        int running = 0;
+        if (!(in >> acc >> cur_acc >> rpm >> running)) {
+            return false;
+        }
+        engine.m_cur_acc = cur_acc;
+        engine.m_cur_engine_rpm = rpm;
+        engine.m_engine_is_running = running != 0;
+        engine.UpdateTurbo(dt, acc);
+        for (int i = 0; i < MAXTURBO; ++i) {
+            std::printf("%.9g ", engine.m_cur_turbo_rpm[i]);
+        }
+        for (int i = 0; i < MAXTURBO; ++i) {
+            std::printf("%.9g ", engine.m_turbo_bov_rpm[i]);
+        }
+        std::printf("%.9g\n", engine.getTurboPower());
+    }
+    return true;
+}
+
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("turbo", 0) == 0) {
+            if (!run_turbo(line)) {
+                std::fprintf(stderr, "oracle: malformed turbo case: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("slide", 0) == 0) {
