@@ -12,6 +12,8 @@
 #                                        the right; the two trucks collide
 #   tools/play.sh --truck --add <dir>:<file>[,...]  undriven vehicles behind yours, in the same
 #                                        world (a trailer, a load); dirs relative to the repository
+#   any <file> may end @<module> to build that module of a file with `section` blocks (the window
+#                                        lists them on load; the first by name otherwise)
 #   tools/play.sh --truck --frame-log    print the median and worst frame time every 300 frames
 #   tools/play.sh --truck --collision    what the terrain is solid as, drawn over everything: a
 #                                        box with nothing in it is geometry that is missing, and

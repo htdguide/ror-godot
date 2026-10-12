@@ -2,11 +2,7 @@ class_name TruckParser
 extends RefCounted
 ## Reads the Rigs of Rods vehicle format well enough to measure and render a real rig.
 ##
-## Not the production parser: the plan keeps upstream's own RigDef parser, wrapped in the
-## GDExtension, because fifteen years of tolerance for malformed files lives in it. This
-## reads the structural sections so real vehicle data can be loaded, measured and
-## rendered before the C++ side exists, and so the eventual C++ path has something to be
-## checked against.
+## Each section's rules are upstream's `RigDef::Parser` and `ActorSpawner`, held by the gates.
 ##
 ## Sections that are not understood are counted rather than skipped silently, so the
 ## parser can report how much of a file it actually accounted for.
@@ -130,17 +126,23 @@ var node_defaults: NodeRows.Defaults = NodeRows.Defaults.new()
 ## The structural rates in force where the file last set them. Public because a generated
 ## flexbody wheel builds its tread at these rather than at the tyre's — tread is carcass.
 var beam_defaults: BeamDefaults = BeamDefaults.new()
+## The file's modules by name, and the one built besides the root.
+var modules: PackedStringArray = PackedStringArray()
+var selected_module: String = ""
 var _section: String = ""
 var _inertia: Dictionary = CommandRows.NO_INERTIA
 
 
+## `path` may end `@<module>` to build that module besides the root; see `TruckDocument.choose`.
 func parse_file(path: String) -> String:
+    var module: String = path.get_file().get_slice("@", 1) if path.get_file().contains("@") else ""
+    path = path.trim_suffix("@" + module) if module != "" else path
     var file: FileAccess = FileAccess.open(path, FileAccess.READ)
     if file == null:
         return "cannot open '%s': %s" % [path, error_string(FileAccess.get_open_error())]
     var text: String = file.get_as_text()
     file.close()
-    return parse_text(text)
+    return parse_text(text, module)
 
 
 ## Reads a vehicle file in two passes: the file is cut into rows where it stands, and the rows
@@ -151,9 +153,14 @@ func parse_file(path: String) -> String:
 ## nodes by its own keyword order rather than by the file's layout — see `TruckDocument`. Walked
 ## in file order instead, 30 of this checkout's 70 actors reference a wheel node from a `props`
 ## or `flexbodies` row written above the wheel section, and every one of those rows was dropped.
-func parse_text(text: String) -> String:
+func parse_text(text: String, module: String = "") -> String:
     var document: TruckDocument = TruckDocument.new()
     document.read(text)
+    var chosen: String = document.choose(module)
+    if chosen != "":
+        return chosen
+    modules = document.modules
+    selected_module = document.selected_module
     links.default_nolock = document.lockgroup_default_nolock
     name = document.name
     var generated: bool = false

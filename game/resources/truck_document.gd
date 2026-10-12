@@ -203,6 +203,17 @@ func _change_module(line: String, section: String) -> String:
     return ""
 
 
+## Builds the vehicle with module `chosen` besides the root, as upstream's selector does; an error
+## naming the modules there are when the file has none of that name. "" keeps the first.
+func choose(chosen: String) -> String:
+    if chosen == "":
+        return ""
+    if not modules.has(chosen):
+        return "no module '%s'; the file has %s" % [chosen, ", ".join(modules) if not modules.is_empty() else "none"]
+    selected_module = chosen
+    return ""
+
+
 ## The rows in the order upstream spawns them, with the file's order kept inside each section: the
 ## root's and then the selected module's, as upstream's spawner walks its selected modules for each
 ## section in turn. Rows of the modules not selected are left out.

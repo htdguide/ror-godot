@@ -62,6 +62,8 @@ var keys: Dictionary = DriveKeys.SOLO
 func setup(built: Dictionary) -> String:
     _built = built
     truck = built["truck"] as TruckParser
+    if truck.modules.size() > 1:
+        print("DRIVE  modules %s; built with %s (choose with <file>@<module>)" % [", ".join(truck.modules), truck.selected_module])
     var rig: Dictionary = RigBuilder.build(truck, DriveCfg.SPAWN_HEIGHT_M)
     if (rig["error"] as String) != "":
         return rig["error"] as String

@@ -1871,7 +1871,8 @@ Scope, vehicles:
 - **A section inventory as a gate**: done 2026-10-12 as `every_keyword_is_read_where_upstream_reads_it`
   (all 120 of upstream's keywords open, keep or close a section as its parser does). Modules
   (`section` ... `end_section`) build the root plus upstream's default, the first by name
-  (`a_vehicle_is_built_from_…`); named gap: no way yet for the player to choose another.
+  (`a_vehicle_is_built_from_…`), or the one a spec names as `<file>@<module>` (`--vehicle`,
+  `--add`); the window lists them on load. Named gap: no chooser in the Drive tab yet.
 
 Scope, terrains:
 - **Procedural roads** from `.tobj` `road`/`road2`, which are reported as unread lines today.
