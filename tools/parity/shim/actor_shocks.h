@@ -22,10 +22,17 @@
 using Ogre::Real;
 
 namespace Ogre {
+using String = std::string;
 struct Math {
     // OgreMath.h: `std::max(std::min(val, maxval), minval)`.
     template <typename T> static T Clamp(T val, T minval, T maxval) {
         return std::max(std::min(val, maxval), minval);
+    }
+    // OgreMath.cpp 1.11: `fRad2Deg = Real(180.0) / PI`, `PI = Real(4.0 * atan(1.0))`.
+    static float RadiansToDegrees(float radians) {
+        static const float PI = float(4.0 * std::atan(1.0));
+        static const float fRad2Deg = float(180.0) / PI;
+        return radians * fRad2Deg;
     }
 };
 } // namespace Ogre
@@ -164,6 +171,72 @@ private:
 #define LOG(message)
 #endif
 
+// What `CalcHydros` and `CalcAnimators` read (SimData.h, SimConstants.h), with upstream's names.
+enum HydroFlags {
+    HYDRO_FLAG_SPEED = BITMASK(1), HYDRO_FLAG_DIR = BITMASK(2), HYDRO_FLAG_AILERON = BITMASK(3),
+    HYDRO_FLAG_RUDDER = BITMASK(4), HYDRO_FLAG_ELEVATOR = BITMASK(5), HYDRO_FLAG_REV_AILERON = BITMASK(6),
+    HYDRO_FLAG_REV_RUDDER = BITMASK(7), HYDRO_FLAG_REV_ELEVATOR = BITMASK(8),
+};
+enum AnimFlags : unsigned int {
+    ANIM_FLAG_AIRSPEED = BITMASK(1), ANIM_FLAG_VVI = BITMASK(2), ANIM_FLAG_ALTIMETER = BITMASK(3),
+    ANIM_FLAG_AOA = BITMASK(4), ANIM_FLAG_FLAP = BITMASK(5), ANIM_FLAG_AIRBRAKE = BITMASK(6),
+    ANIM_FLAG_ROLL = BITMASK(7), ANIM_FLAG_PITCH = BITMASK(8), ANIM_FLAG_THROTTLE = BITMASK(9),
+    ANIM_FLAG_RPM = BITMASK(10), ANIM_FLAG_ACCEL = BITMASK(11), ANIM_FLAG_BRAKE = BITMASK(12),
+    ANIM_FLAG_CLUTCH = BITMASK(13), ANIM_FLAG_TACHO = BITMASK(14), ANIM_FLAG_SPEEDO = BITMASK(15),
+    ANIM_FLAG_PBRAKE = BITMASK(16), ANIM_FLAG_TURBO = BITMASK(17), ANIM_FLAG_SHIFTER = BITMASK(18),
+    ANIM_FLAG_AETORQUE = BITMASK(19), ANIM_FLAG_AEPITCH = BITMASK(20), ANIM_FLAG_AESTATUS = BITMASK(21),
+    ANIM_FLAG_TORQUE = BITMASK(22), ANIM_FLAG_HEADING = BITMASK(23), ANIM_FLAG_DIFFLOCK = BITMASK(24),
+    ANIM_FLAG_BRUDDER = BITMASK(29), ANIM_FLAG_BTHROTTLE = BITMASK(30),
+};
+static const float FLAP_ANGLES[6] = {0.f, -0.07f, -0.17f, -0.33f, -0.67f, -1.f};
+// The oracle's animators run with no inertia: upstream's `CmdKeyInertia` passes its input through
+// until it is configured, which ours is held to by the hydro inertia gate.
+struct CmdKeyInertiaShim {
+    float CalcCmdKeyDelay(float in, float) { return in; }
+};
+struct hydrobeam_t {
+    uint16_t hb_beam_index{0};
+    float hb_ref_length{0};
+    float hb_speed{0};
+    unsigned int hb_flags{0};
+    unsigned int hb_anim_flags{0};
+    float hb_anim_param{0};
+    CmdKeyInertiaShim hb_inertia;
+};
+// Upstream's console variables CalcHydros reads for analogue steering, at their defaults.
+struct CVar {
+    float value;
+    float getFloat() const { return value; }
+};
+// The parts of aero engines, wings and screw props the animators would read; a vehicle in these
+// cases has none, so these are never called.
+enum class AeroEngineType { AE_UNKNOWN, AE_XPROP };
+struct AeroEngine {
+    float getRPMpc() { return 0; }
+    float getThrottle() { return 0; }
+    AeroEngineType getType() { return AeroEngineType::AE_UNKNOWN; }
+    bool getIgnition() { return false; }
+    bool isFailed() { return false; }
+};
+struct Turboprop : AeroEngine {
+    float indicated_torque = 0, max_torque = 1, pitch = 0;
+};
+struct AeroEnginePtr {
+    AeroEngine *p = nullptr;
+    AeroEngine *operator->() { return p; }
+    AeroEngine *GetRef() { return p; }
+};
+struct Screwprop {
+    float getRudder() { return 0; }
+    float getThrottle() { return 0; }
+};
+struct FlexAirfoilShim {
+    float aoa = 0;
+};
+struct wing_t {
+    FlexAirfoilShim *fa = nullptr;
+};
+
 // A hook trigger's request, which upstream queues as a message for the game loop; recorded here.
 enum class ActorLinkingRequestType { INVALID, HOOK_LOCK, HOOK_UNLOCK };
 struct ActorLinkingRequest {
@@ -198,7 +271,10 @@ struct Console {
     enum MessageArea { CONSOLE_SYSTEM_NOTICE };
     void putMessage(int, int, const std::string &) {}
 };
+class Differential;
 namespace App {
+inline CVar *io_analog_smoothing = new CVar{1.0f};
+inline CVar *io_analog_sensitivity = new CVar{1.0f};
 inline Console *GetConsole() { static Console console; return &console; }
 inline GameContext *GetGameContext() { static GameContext context; return &context; }
 }
@@ -241,6 +317,17 @@ public:
         std::vector<std::string> calls;
         void setWheelSpin(float) {}
         void setClutch(float v) { calls.push_back("clutch " + std::to_string(v)); }
+        // What the animators read, set by the oracle from each step.
+        float crank = 0, rpm = 0, shift_up_rpm = 1, turbo_psi = 0, acc = 0, clutch = 0;
+        int gear = 0, num_gears = 0;
+        float getCrankFactor() { return crank; }
+        int getGear() { return gear; }
+        int getNumGears() { return num_gears; }
+        float getRPM() { return rpm; }
+        float getShiftUpRPM() { return shift_up_rpm; }
+        float getTurboPSI() { return turbo_psi; }
+        float getAcc() { return acc; }
+        float getClutch() { return clutch; }
         void setAcc(float v) { calls.push_back("acc " + std::to_string(v)); }
         void shift(int by) { calls.push_back("shift " + std::to_string(by)); }
     } *ar_engine = nullptr;
@@ -265,6 +352,32 @@ public:
     bool m_trigger_debug_enabled = false;
     std::vector<bool> ar_beams_invisible;
     void CalcTriggers(int i, Real difftoBeamL, bool trigger_hooks);
+    // What `CalcHydros` and `CalcAnimators` read and write.
+    float ar_hydro_dir_command = 0, ar_hydro_dir_wheel_display = 0;
+    bool ar_hydro_speed_coupling_active = false, ar_hydro_speed_coupling_enabled = false;
+    float ar_hydro_aileron_state = 0, ar_hydro_aileron_command = 0, ar_hydro_rudder_state = 0;
+    float ar_hydro_rudder_command = 0, ar_hydro_elevator_state = 0, ar_hydro_elevator_command = 0;
+    std::vector<hydrobeam_t> ar_hydros;
+    Screwprop *ar_screwprops[1] = {nullptr};
+    int ar_num_screwprops = 0;
+    Differential *m_wheel_diffs[1] = {nullptr};
+    int m_num_wheel_diffs = 0;
+    float ar_anim_previous_crank = 0, ar_anim_shift_timer = 0;
+    int m_previous_gear = 0;
+    float ar_guisettings_speedo_max_kph = 140.f;
+    AeroEnginePtr ar_aeroengines[1];
+    int ar_num_aeroengines = 0;
+    wing_t *ar_wings = nullptr;
+    int ar_num_wings = 0;
+    float ar_airbrake_intensity = 0;
+    int ar_aerial_flap = 0;
+    int ar_main_camera_node_pos = 0, ar_main_camera_node_dir = 0, ar_main_camera_node_roll = 0;
+    Ogre::Vector3 GetCameraDir() { return (ar_nodes[ar_main_camera_node_pos].RelPosition - ar_nodes[ar_main_camera_node_dir].RelPosition).normalisedCopy(); }
+    Ogre::Vector3 GetCameraRoll() { return (ar_nodes[ar_main_camera_node_pos].RelPosition - ar_nodes[ar_main_camera_node_roll].RelPosition).normalisedCopy(); }
+    // The heading animator flag has no option that sets it.
+    float getRotation() { return 0.0f; }
+    void CalcHydros();
+    void CalcAnimators(hydrobeam_t const &hydrobeam, float &cstate, int &div);
     void engineTriggerHelper(int engineNumber, EngineTriggerType type, float triggerValue);
     void CalcBeams(bool trigger_hooks);
     int GetNumActiveConnectedBeams(int nodeid);

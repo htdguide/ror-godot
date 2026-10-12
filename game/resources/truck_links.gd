@@ -26,6 +26,9 @@ var ropes: PackedInt32Array = PackedInt32Array()
 ## Every `triggers` row, upstream's `ParseTriggers`: {a, b, contraction, expansion, short, long,
 ## options, timer, detacher}; the solver builds the beam and its behaviour (`add_trigger`).
 var triggers: Array[Dictionary] = []
+## Every `animators` row (`AnimatorRows`), with the beam defaults, detacher group and inertia
+## defaults in force at it, as `ProcessAnimator` reads them.
+var animators: Array[Dictionary] = []
 ## {node, group, multilock} per `ropables` row, upstream's `ParseRopables`.
 var ropables: Array[Dictionary] = []
 
@@ -63,6 +66,14 @@ func build(solver: RefCounted, node_count: int) -> void:
         solver.add_ropable(ropable["node"], ropable["group"], ropable["multilock"])
     for beam: int in ropes:
         solver.add_rope(beam)
+    for row: Dictionary in animators:
+        var hydro: int = solver.add_animator(row["a"], row["b"], row["factor"], row["flags"], row["param"],
+                row["short_limit"], row["long_limit"], row["spring"], row["damp"], row["strength"], row["detacher"])
+        # Upstream gives an animator the inertia defaults in force, when both delays are set.
+        var inertia: Dictionary = row["inertia"]
+        if hydro >= 0 and float(inertia.get("start_delay", 0.0)) > 0.0 and float(inertia.get("stop_delay", 0.0)) > 0.0:
+            solver.set_hydro_inertia(hydro, inertia["start_delay"], inertia["stop_delay"], inertia["start_function"],
+                    inertia["stop_function"])
     # In file order, so a blocker's "the next n triggers" are the rows below it, as upstream's are.
     for t: Dictionary in triggers:
         solver.add_trigger(t["a"], t["b"], t["contraction"], t["expansion"], t["short"], t["long"], t["options"],
@@ -70,7 +81,8 @@ func build(solver: RefCounted, node_count: int) -> void:
 
 
 ## One row of `section`; an error, or "".
-func read(section: String, line: String, id_to_index: Dictionary, defaults: BeamDefaults, detacher: int) -> String:
+func read(section: String, line: String, id_to_index: Dictionary, defaults: BeamDefaults, detacher: int,
+        inertia: Dictionary = {}) -> String:
     var fields: PackedStringArray = TruckLexer.fields(line)
     match section:
         "ties":
@@ -97,6 +109,13 @@ func read(section: String, line: String, id_to_index: Dictionary, defaults: Beam
                 "options": fields[6] if fields.size() > 6 else "", "timer": fields[7].to_float() if fields.size() > 7 else 0.0,
                 "detacher": detacher,
             })
+        "animators":
+            var row: Dictionary = AnimatorRows.read(line, id_to_index)
+            if (row["error"] as String) != "":
+                return row["error"] as String
+            row.merge({"spring": defaults.spring(), "damp": defaults.damp(), "strength": defaults.breaking_strength(),
+                    "detacher": detacher, "inertia": inertia})
+            animators.append(row)
         "ropables":
             var node: int = int(id_to_index.get(fields[0], -1)) if not fields.is_empty() else -1
             if node < 0:

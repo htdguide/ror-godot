@@ -22,5 +22,8 @@ public:
     static void CalcOpenDiff(DifferentialData &diff_data);
     static void CalcViscousDiff(DifferentialData &diff_data);
     static void CalcLockedDiff(DifferentialData &diff_data);
+    // What the difflock animator asks (`GetDifferentialTypeName`), set by the oracle.
+    Ogre::String type_name;
+    Ogre::String GetDifferentialTypeName() { return type_name; }
 };
 } // namespace RoR

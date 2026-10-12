@@ -1875,7 +1875,9 @@ Scope, vehicles:
   lower limit and autobrake (`cruise_control_holds_…`); `speedlimiter` and the manual clutch key
   that pauses it are not in, and its mass leaves out linked vehicles. `triggers` are upstream's,
   keys, blockers, switches, hook groups and engine (`the_trigger_is_upstreams`, identical to
-  upstream's step for step); their beams are not drawn.
+  upstream's step for step); their beams are not drawn. `animators` are upstream's on every input a
+  ground vehicle has, with the `OLD` turbo their boost gauge reads (`the_animator_is_upstreams`);
+  their beams are not drawn, and they read the wheel speed one substep late.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
 - **A section inventory as a gate**: done 2026-10-12 as `every_keyword_is_read_where_upstream_reads_it`
   (all 120 of upstream's keywords open, keep or close a section as its parser does). Modules

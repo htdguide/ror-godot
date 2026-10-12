@@ -14,7 +14,7 @@ extends RefCounted
 ## engine's own setter takes them.
 
 const SECTIONS: Array[String] = [
-    "globals", "engine", "engoption", "engturbo", "brakes", "torquecurve", "fusedrag",
+    "globals", "engine", "engoption", "engturbo", "brakes", "torquecurve", "fusedrag", "guisettings",
 ]
 ## Upstream's SimConstants defaults for anything a file leaves out. A negative clutch force
 ## means "pick by engine type", which the drivetrain does.
@@ -74,6 +74,13 @@ static func read(section: String, fields: PackedStringArray, drive: Dictionary) 
             return _engoption(fields, drive)
         "engturbo":
             return _engturbo(fields, drive)
+        "guisettings":
+            # Upstream's `ProcessGuiSettings`, the one key physics reads: `speedoMax`, the speed the
+            # `speedo` animator scales by, kept only between 10 and 32000 km/h.
+            if fields.size() >= 2 and fields[0] == "speedoMax":
+                var kph: float = fields[1].to_float()
+                drive["speedo_max"] = kph if kph > 10.0 and kph < 32000.0 else 140.0
+            return ""
         "brakes":
             return _brakes(fields, drive)
         "torquecurve":

@@ -9,12 +9,13 @@ namespace rorgd {
 // proportion to its pressure (version 2, with blow-off valve, wastegate and anti-lag). Fields are
 // upstream's, integers where upstream's are, and the arithmetic keeps upstream's double literals.
 //
-// Without an `engturbo` row an engine has upstream's `OLD` turbo, which only feeds sounds and the
-// gauge; it is not modelled here.
+// Without an `engturbo` row a truck engine has upstream's `OLD` turbo, one rotor that only feeds
+// sounds, the gauge and the `turbo` animators: `old_mode`, off for a car or an electric engine.
 struct RorTurbo {
     static constexpr int MAXTURBO = 4;
 
     bool enabled = false;
+    bool old_mode = true;
     int version = 1;
     float inertia_factor = 1.0f;
     int count = 1;

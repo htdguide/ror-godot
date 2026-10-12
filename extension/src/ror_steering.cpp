@@ -12,11 +12,22 @@ void RorSteering::add_hydro(int beam_index, float factor) {
     m_hydros.push_back(hydro);
 }
 
+int RorSteering::add_animator(int beam_index, float factor, uint32_t flags, float param) {
+    Hydro hydro;
+    hydro.beam = beam_index;
+    hydro.factor = factor;
+    hydro.anim_flags = flags;
+    hydro.anim_param = param;
+    m_hydros.push_back(hydro);
+    m_animators += 1;
+    return count() - 1;
+}
+
 void RorSteering::set_command(float command) {
     m_command = std::fmax(-1.0f, std::fmin(1.0f, command));
 }
 
-void RorSteering::update(float dt, float road_speed, BeamArray &beams) {
+void RorSteering::update(float dt, float road_speed, BeamArray &beams, const RorAnimatorInputs *inputs) {
     if (dt <= 0.0f) {
         return;
     }
@@ -42,6 +53,29 @@ void RorSteering::update(float dt, float road_speed, BeamArray &beams) {
             continue;
         }
         RorBeam &beam = beams[static_cast<size_t>(hydro.beam)];
+        if (hydro.anim_flags != 0) {
+            // Upstream's `CalcHydros` for an animator: no hydro flags, so its state is what
+            // `CalcAnimators` makes of nothing, averaged over what it read, through its inertia.
+            if (inputs == nullptr) {
+                continue;
+            }
+            float cstate = 0.0f;
+            int div = 0;
+            calc_animator(hydro.anim_flags, hydro.anim_param, *inputs, m_memory, cstate, div);
+            if (div) {
+                cstate /= (float)div;
+                cstate = hydro.inertia.calc(cstate, dt);
+                float factor = 1.0 - cstate * hydro.factor;
+                if (factor < 1.0f - beam.short_bound) {
+                    factor = 1.0f - beam.short_bound;
+                }
+                if (factor > 1.0f + beam.long_bound) {
+                    factor = 1.0f + beam.long_bound;
+                }
+                beam.rest_length = beam.reference_length * factor;
+            }
+            continue;
+        }
         const float own = hydro.inertia.calc(state, dt);
         beam.rest_length = beam.reference_length * (1.0f - own * hydro.factor);
     }
@@ -60,6 +94,7 @@ bool RorSteering::hydro_has_inertia(int hydro) const {
 
 void RorSteering::reset() {
     m_state = 0.0f;
+    // The animators' shared memory (previous crank, gear, shift timer) is not reset upstream.
     for (Hydro &hydro : m_hydros) {
         hydro.inertia.reset();
     }

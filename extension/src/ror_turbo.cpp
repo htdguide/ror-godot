@@ -56,6 +56,19 @@ float RorTurbo::frand() {
 
 void RorTurbo::update(float dt, float acc, float cur_acc, float engine_rpm, float engine_max_rpm, bool running) {
     if (!enabled) {
+        if (!old_mode) {
+            return;
+        }
+        // Upstream's `OLD` turbo.
+        float turbotorque = 0.0f;
+        const float inertia = 0.000003f;
+        turbotorque -= rpm[0] / 200000.0f;
+        if (rpm[0] < 200000.0f && running && cur_acc > 0.06f) {
+            turbotorque += 1.5f * cur_acc * (engine_rpm / engine_max_rpm);
+        } else {
+            turbotorque += 0.1f * (engine_rpm / engine_max_rpm);
+        }
+        rpm[0] += dt * turbotorque / inertia;
         return;
     }
     for (int i = 0; i < count; i++) {
@@ -123,6 +136,9 @@ void RorTurbo::update(float dt, float acc, float cur_acc, float engine_rpm, floa
 }
 
 float RorTurbo::psi() const {
+    if (!enabled) {
+        return rpm[0] / 10000.0f;
+    }
     float total = 0;
     for (int i = 0; i < count; i++) {
         total += (has_bov ? bov_rpm[i] : rpm[i]) / 10000.0f;

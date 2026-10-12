@@ -61,6 +61,8 @@ WANTED = [
     ("main/physics/Actor.cpp", "void Actor::CalcTriggers(int i, Real difftoBeamL, bool trigger_hooks)"),
     ("main/physics/Actor.cpp", "void Actor::engineTriggerHelper(int engineNumber, EngineTriggerType type, float triggerValue)"),
     ("main/physics/ActorSpawner.cpp", "void ActorSpawner::ProcessTrigger(RigDef::Trigger & def)"),
+    ("main/physics/ActorForcesEuler.cpp", "void Actor::CalcHydros()"),
+    ("main/physics/Actor.cpp", "void Actor::CalcAnimators(hydrobeam_t const& hydrobeam, float &cstate, int &div)"),
 ]
 
 # Blocks lifted out of a longer function, each given a function of its own: (source, the block's

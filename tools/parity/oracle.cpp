@@ -63,6 +63,7 @@
 #include <string>
 
 const Ogre::Vector3 Ogre::Vector3::ZERO = Ogre::Vector3(0.0f, 0.0f, 0.0f);
+const Ogre::Vector3 Ogre::Vector3::UNIT_Y = Ogre::Vector3(0.0f, 1.0f, 0.0f);
 
 namespace RoR {
 Ogre::Vector3 primitiveCollision(node_t *node, Ogre::Vector3 velocity, float mass,
@@ -392,7 +393,10 @@ static bool run_turbo(const std::string &line) {
     RoR::Engine engine;
     engine.m_engine_max_rpm = max_rpm;
     engine.m_engine_torque = torque;
-    engine.SetTurboOptions(version, inertia, count, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10]);
+    // Version 0: no `engturbo` row, the engine's own `OLD` turbo.
+    if (version != 0) {
+        engine.SetTurboOptions(version, inertia, count, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10]);
+    }
     for (int step = 0; step < steps; ++step) {
         float acc = 0, cur_acc = 0, rpm = 0;
         int running = 0;
@@ -414,13 +418,21 @@ static bool run_turbo(const std::string &line) {
     return true;
 }
 
-// The trigger mode, in oracle_trigger.cpp.
+// The trigger and animator modes, in oracle_trigger.cpp and oracle_anim.cpp.
 bool run_trigger(const std::string &line);
+bool run_anim(const std::string &line);
 
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("anim", 0) == 0) {
+            if (!run_anim(line)) {
+                std::fprintf(stderr, "oracle: malformed anim case: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("trigger", 0) == 0) {

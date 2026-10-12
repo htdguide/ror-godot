@@ -8,7 +8,8 @@ extends GateBase
 ##
 ## Ours had no turbo: 61 corpus files declare one, and every one of them drove without it.
 ##
-## Cases cover both versions, one to four turbos, an operating rpm, the blow-off valve, the
+## Cases cover the `OLD` turbo every truck engine has without the row (only its boost is read, by
+## the `turbo` animator and the gauge), both versions, one to four turbos, an operating rpm, the blow-off valve, the
 ## wastegate's flutter, compressor surge and anti-lag, under throttle that comes and goes with the
 ## engine sweeping its range and sometimes stalled.
 
@@ -105,7 +106,8 @@ func run(_harness: Node) -> Dictionary:
 
 
 func _case(rng: RandomNumberGenerator, n: int) -> Dictionary:
-    var version: int = 1 if n % 3 == 0 else 2
+    # Every fifth case has no engturbo row: the engine's own OLD turbo, whose boost a gauge reads.
+    var version: int = 0 if n % 5 == 4 else (1 if n % 3 == 0 else 2)
     var count: int = rng.randi_range(1, 4)
     var params: PackedFloat32Array = PackedFloat32Array()
     for k: int in 11:

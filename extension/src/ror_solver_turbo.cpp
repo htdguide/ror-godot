@@ -42,7 +42,10 @@ PackedFloat32Array RorSolver::turbo_probe(int version, float inertia_factor, int
                                           const PackedFloat32Array &rpm, const PackedByteArray &running,
                                           float max_rpm, float engine_torque, float dt) {
     RorTurbo turbo;
-    apply_options(turbo, version, inertia_factor, count, params);
+    // Version 0: no `engturbo` row, the engine's own `OLD` turbo.
+    if (version != 0) {
+        apply_options(turbo, version, inertia_factor, count, params);
+    }
     PackedFloat32Array out;
     for (int step = 0; step < acc.size(); ++step) {
         turbo.update(dt, acc[step], cur_acc[step], rpm[step], max_rpm, running[step] != 0);

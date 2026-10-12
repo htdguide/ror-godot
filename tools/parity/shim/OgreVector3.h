@@ -22,6 +22,7 @@ struct Vector3 {
     Vector3(float in_x, float in_y, float in_z) : x(in_x), y(in_y), z(in_z) {}
 
     static const Vector3 ZERO;
+    static const Vector3 UNIT_Y;
 
     float dotProduct(const Vector3 &other) const { return x * other.x + y * other.y + z * other.z; }
     float squaredLength() const { return x * x + y * y + z * z; }

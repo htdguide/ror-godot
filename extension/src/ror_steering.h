@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ror_animators.h"
 #include "ror_inertia.h"
 #include "ror_node.h"
 
@@ -20,6 +21,9 @@ public:
     // `factor` is the row's stated fraction of rest length, signed: the rams on opposite
     // sides of a rack carry opposite signs so one pushes while the other pulls.
     void add_hydro(int beam_index, float factor);
+    // An `animators` row: a hydro moved by what `flags` (upstream's `hb_anim_flags`) read rather
+    // than by the steering, its factor clamped by its beam's own bounds. Returns its hydro index.
+    int add_animator(int beam_index, float factor, uint32_t flags, float param);
     int count() const { return static_cast<int>(m_hydros.size()); }
 
     // Where the driver is asking the wheels to go, -1 to 1.
@@ -30,7 +34,10 @@ public:
     // self-centres towards zero whenever the driver is not asking.
     float state() const { return m_state; }
 
-    void update(float dt, float road_speed, BeamArray &beams);
+    // `inputs` is what the animators read this substep; null when the vehicle has none.
+    void update(float dt, float road_speed, BeamArray &beams, const RorAnimatorInputs *inputs = nullptr);
+    bool has_animators() const { return m_animators > 0; }
+    const RorAnimatorMemory &animator_memory() const { return m_memory; }
     // Upstream's `hb_inertia`: a hydro's state follows the steering through its own inertia.
     void set_hydro_inertia(int hydro, float start_delay, float stop_delay, const RorSpline *start,
                            const RorSpline *stop);
@@ -42,8 +49,12 @@ private:
     struct Hydro {
         int beam = 0;
         float factor = 0.0f;
+        uint32_t anim_flags = 0;
+        float anim_param = 0.0f;
         RorKeyInertia inertia;
     };
+    int m_animators = 0;
+    RorAnimatorMemory m_memory;
 
     std::vector<Hydro> m_hydros;
     float m_command = 0.0f;

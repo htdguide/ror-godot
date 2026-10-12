@@ -36,19 +36,10 @@ class RorWorld;
 // make a rig a vehicle rather than a structure.
 //
 // Point masses joined by damped springs, integrated with symplectic (semi-implicit)
-// Euler exactly as upstream does it: velocity from the force accumulated during the
-// previous step, then position from the new velocity, then the accumulator reset to
-// gravity for every other force to add onto.
-//
-// The force sources run in upstream's order, which is part of its behaviour rather than an
-// implementation detail: air drag, then steering, then the drivetrain and the wheels, then
-// the beams, then ground contact. Each lives in its own file and knows nothing about
-// Godot, so each can be checked on its own.
-//
-// Not here yet: beam deformation and breaking, shock travel bounds, command beams,
-// buoyancy, aerodynamics beyond node drag, and collision against anything but a flat
-// plane. Those are separate force sources upstream and are added deliberately rather than
-// opportunistically.
+// Euler exactly as upstream does it: velocity from the force accumulated during the previous step,
+// then position from the new velocity, then the accumulator reset to gravity. The force sources
+// run in upstream's order, which is part of its behaviour; each lives in its own file and knows
+// nothing about Godot, so each can be checked on its own.
 class RorSolver : public godot::RefCounted {
     GDCLASS(RorSolver, godot::RefCounted)
     // Steps several solvers together and resolves contact between them; reaches the nodes, the
@@ -65,6 +56,13 @@ protected:
     static void bind_turbo_methods();
     static void bind_cruise_methods();
     static void bind_trigger_methods();
+    static void bind_animator_methods();
+    // Upstream's animators (`ror_solver_animators.cpp`): a NaN limit is one the row did not state.
+    int add_animator(int a, int b, float factor, int flags, float param, float short_limit, float long_limit,
+                     float spring, float damp, float strength, int detacher_group);
+    void set_camera_roll_node(int node);
+    void set_speedo_max(float kph);
+    static godot::PackedStringArray animator_probe(const godot::Array &rows, const godot::Array &steps);
     // Upstream's triggers (`ror_solver_triggers.cpp`): a `triggers` row each, the beam index or -1
     // when upstream deactivates the row.
     int add_trigger(int a, int b, float contraction_limit, float expansion_limit, int short_action, int long_action,
@@ -569,6 +567,9 @@ private:
     void engine_trigger(int type, float value);
     void calc_trigger(int i, float diff, bool hooks);
     void run_trigger_hook_requests(const std::vector<RorSolver *> &actors);
+    int m_camera_roll = 0;
+    float m_speedo_max_kph = 140.0f;
+    RorAnimatorInputs animator_inputs() const;
     bool m_cc_mode = false;
     bool m_cc_can_brake = false;
     float m_cc_target_speed = 0.0f;

@@ -24,6 +24,9 @@ static func hand_to(solver: RefCounted, truck: TruckParser) -> void:
         var d: Vector3 = truck.nodes[dir] - reference
         yaw = atan2(d.dot(Vector3(0.0, 0.0, 1.0)), d.dot(Vector3(1.0, 0.0, 0.0)))
     solver.set_direction_nodes(pos, dir, yaw)
+    # The roll node upstream's `GetCameraRoll` reads, node 0 without a camera; and `speedoMax`.
+    solver.set_camera_roll_node(int(truck.camera_nodes.get("roll", 0)))
+    solver.set_speedo_max(float(truck.drivetrain.get("speedo_max", 140.0)))
     for kind: String in ["tc", "abs"]:
         var aid: Dictionary = truck.drivetrain.get(kind, {}) as Dictionary
         if not aid.is_empty():

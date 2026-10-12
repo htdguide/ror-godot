@@ -229,7 +229,12 @@ void RorSolver::substep(float dt, bool first) {
     calc_ropes(false);
     integrate(dt);
     apply_air_drag();
-    m_steering.update(dt, m_wheels.driven_speed(), m_beams);
+    if (m_steering.has_animators()) {
+        const RorAnimatorInputs inputs = animator_inputs();
+        m_steering.update(dt, m_wheels.driven_speed(), m_beams, &inputs);
+    } else {
+        m_steering.update(dt, m_wheels.driven_speed(), m_beams);
+    }
     // Upstream's `CalcCommands`, after the hydros and before the engine, which it feeds.
     if (!m_commands.empty()) {
         const bool engine = m_drivetrain.gear_count() > 0;

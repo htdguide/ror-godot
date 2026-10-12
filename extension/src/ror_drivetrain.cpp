@@ -67,6 +67,8 @@ void RorDrivetrain::set_options(float inertia, char type, float clutch_force, fl
     m_post_shift_time = std::fmax(0.0f, m_post_shift_time);
     m_clutch_time = clampf(m_clutch_time, 0.0f, 0.9f * m_shift_time);
     m_stall_rpm = clampf(m_stall_rpm, 0.0f, 0.9f * m_idle_rpm);
+    // Upstream's `SetEngineOptions`: a car or an electric motor has no `OLD` turbo.
+    m_turbo.old_mode = !(type == 'c' || type == 'e');
     // A car or an electric motor gets a lighter default clutch than a lorry.
     if (m_clutch_force < 0.0f) {
         m_clutch_force = (type == 'c' || type == 'e') ? 5000.0f : 10000.0f;
