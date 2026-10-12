@@ -120,7 +120,12 @@ public:
 
     // Driver input, 0..1 each.
     void set_brake(float brake) { m_brake = brake; }
+    float brake() const { return m_brake; }
     void set_parking_brake(bool on) { m_parking_brake = on; }
+    bool parking_brake() const { return m_parking_brake; }
+    // Upstream's `ar_avg_wheel_speed`: the driven wheels' speed, smoothed every substep.
+    float avg_speed() const { return m_avg_speed; }
+    void reset_avg_speed() { m_avg_speed = 0.0f; }
 
     // Turns one step's drivetrain torque into force on every tread node, and measures
     // what the wheels are doing while it is there. `clutch_torque` is what the drivetrain
@@ -150,6 +155,7 @@ private:
     bool m_parking_brake = false;
     float m_driven_spin = 0.0f;
     float m_driven_speed = 0.0f;
+    float m_avg_speed = 0.0f;
     RorDriveAid m_tc;
     RorDriveAid m_abs;
 };

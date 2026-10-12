@@ -1,6 +1,6 @@
 class_name DriveAids
 extends RefCounted
-## Reads `AntiLockBrakes` and `TractionControl` lines: upstream's `ParseAntiLockBrakes` and
+## Reads `AntiLockBrakes`, `TractionControl` and `CruiseControl` lines: upstream's `ParseAntiLockBrakes` and
 ## `ParseTractionControl`, then the clamps its spawner applies (`ProcessAntiLockBrakes`,
 ## `ProcessTractionControl`).
 ##
@@ -11,8 +11,16 @@ extends RefCounted
 ## no longer used upstream; ABS reads its pulse only when a fourth field follows it, a quirk kept.
 
 
-## Fills `drive["abs"]` or `drive["tc"]` from one line; an error, or "".
+## Fills `drive["abs"]`, `drive["tc"]` or `drive["cruise"]` from one line; an error, or "".
 static func read(section: String, line: String, drive: Dictionary) -> String:
+    if section == "cruisecontrol":
+        # Upstream's `ParseCruiseControl`: "CruiseControl min_speed, autobrake", the keyword
+        # counted as the first of three arguments; `ProcessCruiseControl` keeps any speed.
+        var fields: PackedStringArray = TruckLexer.fields(line)
+        if fields.size() < 3:
+            return "cruisecontrol states %d values, needs 2" % (fields.size() - 1)
+        drive["cruise"] = {"lower_limit": fields[1].to_float(), "can_brake": fields[2].to_int() != 0}
+        return ""
     var keyword_length: int = "antilockbrakes".length() if section == "antilockbrakes" else "tractioncontrol".length()
     var tokens: PackedStringArray = line.substr(keyword_length).split(",")
     if tokens.size() < 2:

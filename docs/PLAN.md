@@ -1870,7 +1870,10 @@ Scope, vehicles:
   and `railgroups` included (`the_slide_node_is_upstreams`, bit-identical); the slide-node lock key
   (`toggleSlideNodeLock`, attach rate and distance, `c` constraints) is not bound yet. `engturbo` is
   upstream's `NEW` turbo, both versions, blow-off valve, wastegate and anti-lag
-  (`the_turbo_is_upstreams`, bit-identical); the `OLD` turbo feeds only sound, which is not in.
+  (`the_turbo_is_upstreams`, bit-identical); the `OLD` turbo feeds only sound, which is not in. Cruise
+  control is upstream's on every engine (Shift+Space; Ctrl+R/F/Space adjust), `cruisecontrol` its
+  lower limit and autobrake (`cruise_control_holds_…`); `speedlimiter` and the manual clutch key
+  that pauses it are not in, and its mass leaves out linked vehicles.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
 - **A section inventory as a gate**: done 2026-10-12 as `every_keyword_is_read_where_upstream_reads_it`
   (all 120 of upstream's keywords open, keep or close a section as its parser does). Modules

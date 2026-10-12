@@ -47,6 +47,9 @@ void RorSolver::repair() {
     m_commands.reset();
     m_wheels.differentials().reset_rotation();
     m_wheels.reattach_all();
+    // Upstream's `SyncReset` also switches cruise control off and zeroes the smoothed wheel speed.
+    m_wheels.reset_avg_speed();
+    m_cc_mode = false;
     // Upstream's `HOOK_RESET`: every hook let go, its auto-lock free to try again at once.
     toggle_hooks_among({this}, RorHook::RESET, -1);
     // And every tie, upstream's `TIE_RESET`, giving back the ropables it held.

@@ -1,15 +1,12 @@
 class_name PlayDrive
 extends RefCounted
-## Drives a built vehicle from the keyboard: the solver runs, the rig moves, the mesh
-## follows.
+## Drives a built vehicle from the keyboard: the solver runs, the rig moves, the mesh follows.
 ##
 ## Everything a person needs in order to say whether the thing drives right, and nothing
 ## else. The controls are read here, the solver is stepped here, and the pose is pushed to
 ## the renderer here, so there is one place to look when the window and the gates disagree.
-##
 ## The cab is driven from the same place: the steering wheel turns, the gauges read the
 ## drivetrain, and the lamps light by what the vehicle is doing rather than all together.
-
 
 var solver: RefCounted
 var truck: TruckParser
@@ -202,6 +199,8 @@ func _snapshot() -> void:
 
 
 func on_key(keycode: Key) -> bool:
+    if DriveKeys.is_cruise_key(keys, keycode):
+        return true
     var action: String = DriveKeys.action_of(keys, keycode)
     if keys == DriveKeys.SOLO and Input.is_key_pressed(KEY_SHIFT) and DriveKeys.SOLO_SHIFTED.values().has(keycode):
         action = DriveKeys.SOLO_SHIFTED.find_key(keycode)
@@ -248,6 +247,9 @@ func on_key(keycode: Key) -> bool:
         "antilock", "traction_control":
             var kind: String = "abs" if action == "antilock" else "tc"
             print("DRIVE  %s %s" % [kind.to_upper(), "on" if solver.toggle_drive_aid(kind) else "off"])
+        "cruise_control":
+            solver.toggle_cruise_control()
+            print("DRIVE  cruise control %s" % ("on" if solver.cruise_control_on() else "off"))
         "transfer_case", "transfer_range":
             print("DRIVE  %s" % AxleRows.shift_transfer_case(solver, DriveKeys.action_of(keys, keycode) == "transfer_range"))
         _:
@@ -298,7 +300,7 @@ func _read_controls(delta: float) -> void:
         steer -= 1.0
     solver.set_throttle(_throttle)
     solver.set_brake(_brake)
-    solver.set_parking_brake(DriveKeys.held(keys, "parking"))
+    solver.set_parking_brake(DriveKeys.held(keys, "parking") and not DriveKeys.cruise_modifier(keys))
     # Command keys, held: the vehicle's own rams move while their key is down.
     var command_keys: Array = keys.get("commands", []) as Array
     # Not while Ctrl is down: Ctrl and a digit is a user light.
@@ -308,6 +310,7 @@ func _read_controls(delta: float) -> void:
     if not is_nan(scripted_steer):
         steer = scripted_steer
     solver.set_steer_command(DriveCfg.steer_command(steer))
+    DriveKeys.drive_cruise(solver, keys, delta)
 
 
 ## Poses the vehicle from the last snapshot. Asks the solver nothing.

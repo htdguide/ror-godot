@@ -15,6 +15,7 @@
 #include "ror_steering.h"
 #include "ror_wheels.h"
 
+#include <deque>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
@@ -61,6 +62,16 @@ protected:
     static void bind_tie_methods();
     static void bind_slide_methods();
     static void bind_turbo_methods();
+    static void bind_cruise_methods();
+    // Upstream's cruise control (`ror_solver_cruise.cpp`).
+    void set_cruise_control(float lower_limit, bool can_brake);
+    void toggle_cruise_control();
+    void update_cruise_control(float dt, float brake_input, float accelerate_input, bool faster, bool slower, bool match);
+    bool cruise_control_on() const;
+    float cruise_target_speed() const;
+    float avg_wheel_speed() const;
+    float commanded_throttle() const;
+    float brake_command() const;
     // Upstream's `engturbo` (`ror_solver_turbo.cpp`): `params` are the row's eleven, 9999 where unstated.
     void set_turbo(int version, float inertia_factor, int count, const godot::PackedFloat32Array &params);
     float turbo_psi() const;
@@ -536,6 +547,12 @@ private:
     void untie(RorTie &tie);
     void calc_ties(float dt);
     std::vector<RorRope> m_ropes;
+    bool m_cc_mode = false;
+    bool m_cc_can_brake = false;
+    float m_cc_target_speed = 0.0f;
+    float m_cc_target_rpm = 0.0f;
+    float m_cc_lower_limit = 0.0f;
+    std::deque<float> m_cc_accs;
     // The world this solver is a member of, set by `RorWorld::add_solver`: a respawn lets go of
     // every other member's links to it.
     RorWorld *m_world = nullptr;

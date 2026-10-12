@@ -190,6 +190,7 @@ void RorWheelSet::apply_wheels(NodeArray &nodes, const Vector3 &direction, float
         wheel.last_torque = wheel.torque;
         wheel.torque = 0.0f;
     }
+    m_avg_speed = static_cast<float>(m_avg_speed * 0.995 + m_driven_speed * 0.005);
 }
 
 } // namespace rorgd

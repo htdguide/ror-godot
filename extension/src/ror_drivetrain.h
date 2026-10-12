@@ -71,6 +71,14 @@ public:
     float engine_power(float rpm) const;
     // The `engturbo` turbo, whose power `engine_power` adds as upstream's `getEnginePower` does.
     RorTurbo &turbo() { return m_turbo; }
+    // What cruise control reads and drives (upstream's `getAccToHoldRPM`, `getAcc`, `autoSetAcc`).
+    float acc_to_hold_rpm() const;
+    float current_acc() const { return m_shifting ? m_acc : m_commanded_acc; }
+    // Ours keeps upstream's `m_auto_cur_acc` as the commanded throttle, which `step` turns into
+    // the engine's own outside a shift, as `autoSetAcc` does.
+    void auto_set_acc(float acc) { m_commanded_acc = acc; }
+    float min_rpm() const { return m_min_rpm; }
+    float inertia() const { return m_inertia; }
 
 private:
     float curve_power(float rpm) const;

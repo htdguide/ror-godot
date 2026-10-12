@@ -39,8 +39,11 @@ const SOLO: Dictionary = {
 }
 
 ## Actions on Shift and a key in the one-driver window: upstream's driving aid toggles.
-const SOLO_SHIFTED: Dictionary = {"antilock": KEY_B, "traction_control": KEY_T}
-const SHIFTED_NAMES: Dictionary = {"antilock": "ABS", "traction_control": "traction control"}
+const SOLO_SHIFTED: Dictionary = {"antilock": KEY_B, "traction_control": KEY_T, "cruise_control": KEY_SPACE}
+const SHIFTED_NAMES: Dictionary = {"antilock": "ABS", "traction_control": "traction control",
+        "cruise_control": "cruise control (Ctrl+R faster, Ctrl+F slower, Ctrl+Space match)"}
+## Rigs of Rods' cruise control adjusting keys, held: faster, slower, match the current speed.
+const CRUISE_HELD: Array[Key] = [KEY_R, KEY_F, KEY_SPACE]
 
 ## The left half of a split window.
 const SPLIT_LEFT: Dictionary = {
@@ -104,3 +107,22 @@ static func help(keys: Dictionary, label: String) -> String:
         for action: String in SOLO_SHIFTED:
             parts.append("Shift+%s %s" % [OS.get_keycode_string(SOLO_SHIFTED[action]), SHIFTED_NAMES[action]])
     return "%s  %s" % [label, ", ".join(parts)]
+
+
+## Shift+Space and Ctrl+Space are cruise control's, so Space with either is not the handbrake.
+static func cruise_modifier(keys: Dictionary) -> bool:
+    return keys == SOLO and (Input.is_key_pressed(KEY_SHIFT) or Input.is_key_pressed(KEY_CTRL))
+
+
+## Whether `keycode` with Ctrl down is a cruise control key in `keys`, which nothing else may take.
+static func is_cruise_key(keys: Dictionary, keycode: Key) -> bool:
+    return keys == SOLO and Input.is_key_pressed(KEY_CTRL) and CRUISE_HELD.has(keycode)
+
+
+## Upstream's `UpdateCruiseControl`, once a frame after the driver's own controls, while it is on.
+static func drive_cruise(solver: RefCounted, keys: Dictionary, delta: float) -> void:
+    if keys != SOLO or not solver.cruise_control_on():
+        return
+    var ctrl: bool = Input.is_key_pressed(KEY_CTRL)
+    solver.update_cruise_control(delta, 1.0 if held(keys, "brake") else 0.0, 1.0 if held(keys, "throttle") else 0.0,
+            ctrl and Input.is_key_pressed(KEY_R), ctrl and Input.is_key_pressed(KEY_F), ctrl and Input.is_key_pressed(KEY_SPACE))

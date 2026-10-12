@@ -105,6 +105,10 @@ float RorDrivetrain::engine_power(float rpm) const {
     return curve_power(rpm) + m_turbo.power(m_torque);
 }
 
+float RorDrivetrain::acc_to_hold_rpm() const {
+    return (-m_braking_torque * std::pow(m_rpm / m_max_rpm, 2.0f)) / engine_power(m_rpm);
+}
+
 float RorDrivetrain::curve_power(float rpm) const {
     const size_t count = m_curve_ratio.size();
     if (count == 0) {
