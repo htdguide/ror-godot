@@ -278,8 +278,8 @@ func _parse_row(line: String) -> void:
             _note(_section, AxleRows.read(_section, line, self), line)
         "contacters":
             _note(_section, NodeRows.contacter(TruckLexer.fields(line), node_id_to_index, contacters), line)
-        "flares", "flares2":
-            BodyRows.flare(line, node_id_to_index, flares, errors, _section)
+        "flares", "flares2", "flares3":
+            BodyRows.flare(line, node_id_to_index, flares, errors, _section, _inertia)
         "materialflarebindings":
             _note("materialflarebinding", FlareRows.bind(TruckLexer.fields(line), material_flares), line)
         "ties":

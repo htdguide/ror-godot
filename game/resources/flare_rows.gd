@@ -47,23 +47,31 @@ const DASHBOARD: String = "d"
 
 ## Lamps that throw light down the road, rather than merely being seen.
 const PROJECTING: Array[String] = [HEADLIGHT, HIGH_BEAM, FOG_LIGHT]
-## Upstream's defaults for a row that states -1 or -2 for its size.
+## Upstream's defaults for a row that states -1 or -2 for its size (`ActorSpawner::AddBaseFlare`).
+## Any other negative size is kept: the sprite is then drawn full size from every angle.
 const DEFAULT_HEADLIGHT_SIZE: float = 1.0
 const DEFAULT_SIZE: float = 0.5
-## A blink delay of -2 means "the default for this type", which blinks only for indicators.
-const DEFAULT_BLINK_MS: int = 400
+## A blink delay of -2 is "the default for this type", which blinks only an indicator, and -1 is
+## the default blink itself: half a second each way.
+const DEFAULT_BLINK_S: float = 0.5
+## Upstream's `MAX_CLIGHTS`: user lights are numbered 1 to 10, and 12 is the old parking brake lamp.
+const MAX_CUSTOM_LIGHTS: int = 10
+const LEGACY_PARKING_BRAKE_CONTROL: int = 12
+const TYPES: String = "fhgtbRslrud"
 
 
 static func handles(section: String) -> bool:
-    return section == "flares" or section == "flares2"
+    return section == "flares" or section == "flares2" or section == "flares3"
 
 
-## Returns {"error", "ref", "x", "y", "offset", "type", "control", "blink_ms", "size",
+## Returns {"error", "ref", "x", "y", "offset", "type", "control", "dashboard", "blink_s", "size",
 ## "material"}. `offset` is (offset_x, offset_y); `type` is one of the letters above.
 static func row(
     fields: PackedStringArray, id_to_index: Dictionary, has_offset_z: bool = false
 ) -> Dictionary:
-    var least: int = 7 if has_offset_z else 6
+    # Upstream's `CheckNumArguments(6)` for `flares2`/`flares3` and 5 for `flares`: the type and
+    # all after it may be left out.
+    var least: int = 6 if has_offset_z else 5
     if fields.size() < least:
         return {"error": "row has %d fields, expected at least %d" % [fields.size(), least]}
     var ref: int = int(id_to_index.get(fields[0], -1))
@@ -74,14 +82,32 @@ static func row(
     # Where the type letter and everything after it begins.
     var at: int = 6 if has_offset_z else 5
     # The type letter is case-sensitive: 'r' is a right indicator and 'R' is a reversing
-    # light, and they are neither the same lamp nor the same colour.
-    var type: String = fields[at].substr(0, 1)
+    # light, and they are neither the same lamp nor the same colour. An unknown one is a
+    # headlight, as upstream's `GetArgFlareType` falls back.
+    var type: String = fields[at].substr(0, 1) if fields.size() > at else HEADLIGHT
+    if not TYPES.contains(type):
+        type = HEADLIGHT
     var blink_ms: int = fields[at + 2].to_int() if fields.size() > at + 2 else -2
     if blink_ms == -2:
-        blink_ms = DEFAULT_BLINK_MS if type == BLINKER_LEFT or type == BLINKER_RIGHT else 0
+        blink_ms = -1 if type == BLINKER_LEFT or type == BLINKER_RIGHT else 0
     var size: float = fields[at + 3].to_float() if fields.size() > at + 3 else -2.0
-    if size < 0.0:
-        size = DEFAULT_HEADLIGHT_SIZE if type == HEADLIGHT else DEFAULT_SIZE
+    if size == -2.0 and type == HEADLIGHT:
+        size = DEFAULT_HEADLIGHT_SIZE
+    elif size == -2.0 or size == -1.0:
+        size = DEFAULT_SIZE
+    # The control field is a user light's number for `u` and a dashboard input's name for `d`.
+    var control: int = -1
+    var dashboard: String = ""
+    var stated: String = fields[at + 1] if fields.size() > at + 1 else ""
+    if type == USER:
+        var number: int = stated.to_int()
+        if number == LEGACY_PARKING_BRAKE_CONTROL:
+            type = DASHBOARD
+            dashboard = "parkingbrake"
+        else:
+            control = clampi(number, 1, MAX_CUSTOM_LIGHTS) - 1
+    elif type == DASHBOARD:
+        dashboard = stated
     var material: String = fields[at + 4] if fields.size() > at + 4 else ""
     return {
         "error": "",
@@ -94,8 +120,10 @@ static func row(
             fields[5].to_float() if has_offset_z else 0.0
         ),
         "type": type,
-        "control": fields[at + 1].to_int() if fields.size() > at + 1 else -1,
-        "blink_ms": blink_ms,
+        "control": control,
+        "dashboard": dashboard,
+        # Seconds each way, 0 for a lamp that does not blink.
+        "blink_s": DEFAULT_BLINK_S if blink_ms == -1 else float(blink_ms) / 1000.0,
         "size": size,
         "material": material,
     }
@@ -155,14 +183,18 @@ static func binding(fields: PackedStringArray) -> Dictionary:
     return {"error": "", "flare": fields[0].to_int(), "material": fields[1]}
 
 
-## A `materialflarebindings` row, recorded into `bindings` (material name -> flare indices).
+## A `materialflarebindings` row, recorded into `bindings` (material name -> flare indices, one).
 ## Returns "" or what was wrong with the row.
+##
+## **A material follows its first binding only.** Upstream's `FindFlareBindingForMaterial` returns
+## the first row naming the material, and the flare number is the lamp's index from 0. The Mazda
+## binds one glass to four lamps, headlight and brake light among them; binding all four let the
+## last one applied decide, so the brake lamp put the headlamp glass out with the headlights on.
 static func bind(fields: PackedStringArray, bindings: Dictionary) -> String:
     var row: Dictionary = binding(fields)
     if (row["error"] as String) != "":
         return row["error"] as String
     var material: String = row["material"] as String
-    var bound: PackedInt32Array = bindings.get(material, PackedInt32Array())
-    bound.append(row["flare"] as int)
-    bindings[material] = bound
+    if not bindings.has(material):
+        bindings[material] = PackedInt32Array([row["flare"] as int])
     return ""

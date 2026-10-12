@@ -80,11 +80,10 @@ const GLOW_LUMENS: Dictionary = {
 const GLOW_DEFAULT_LUMENS: float = 15.0
 
 
-## How hard the pedal has to be pressed before the brake lights come on, and how fast an
-## indicator blinks. Upstream's own blink delay is per flare and in milliseconds; this is the
-## default it uses when a row does not say.
-const BRAKE_THRESHOLD: float = 0.08
-const BLINK_PERIOD_S: float = 0.8
+## Upstream hides a lamp's sprite beyond this distance from the camera.
+const SPRITE_RANGE_M: float = 500.0
+## And lights a lamp's own glass (`MaterialFlares`) above this intensity.
+const GLASS_LIT_ABOVE: float = 0.3
 
 
 ## Builds every lamp under `root`, in the space `render_frame` maps rig coordinates into.
@@ -173,56 +172,61 @@ static func apply_pose(
 ## light at all; a driven vehicle uses `apply_state`.
 static func set_lit(lamps: Array[Node3D], truck: TruckParser, lit: bool) -> void:
     for i: int in mini(lamps.size(), truck.flares.size()):
-        _set_lamp(lamps[i], lit)
+        _set_lamp(lamps[i], 1.0 if lit else 0.0)
 
 
-## Lights each lamp by what the vehicle is doing: headlights with the switch, brake lights with
-## the pedal, reversing lights with the gear, indicators with the stalk and the clock.
-##
-## `state` is {"headlights", "brake", "reverse", "left", "right", "seconds"}. The types are
-## upstream's own letters, read by `FlareRows`; what is on when is this project's reading of them,
-## and it is here rather than in the parser because it is a rule about driving rather than about
-## the file format.
+## Lights each lamp from a plain description of the controls, {"headlights", "high_beam", "brake",
+## "reverse", "left", "right", "seconds"}, through a fresh `LightState`: for checks that pose one
+## moment. A driven vehicle keeps its own `LightState` and calls `apply_lights` every frame.
 static func apply_state(lamps: Array[Node3D], truck: TruckParser, state: Dictionary) -> void:
-    var headlights: bool = bool(state.get("headlights", false))
-    # The main beam, which is a second filament rather than a second switch: it only means
-    # anything while the lights are on.
-    var main_beam: bool = headlights and bool(state.get("high_beam", false))
-    var braking: bool = float(state.get("brake", 0.0)) > BRAKE_THRESHOLD
-    var reversing: bool = bool(state.get("reverse", false))
-    var seconds: float = float(state.get("seconds", 0.0))
-    var blink: bool = fmod(seconds, BLINK_PERIOD_S) < BLINK_PERIOD_S * 0.5
-    var truck_has_high: bool = _has_type(truck, FlareRows.HIGH_BEAM)
-    for i: int in mini(lamps.size(), truck.flares.size()):
-        var type: String = type_of(lamps[i], truck.flares[i])
-        var lit: bool = false
-        match type:
-            FlareRows.HIGH_BEAM:
-                lit = main_beam
-            FlareRows.HEADLIGHT, FlareRows.FOG_LIGHT, FlareRows.TAIL_LIGHT, \
-            FlareRows.SIDELIGHT, FlareRows.DASHBOARD:
-                lit = headlights
-            FlareRows.BRAKE_LIGHT:
-                # A tail light that also brakes: on with the switch, brighter on the pedal. With
-                # one emission level to give it, the pedal wins.
-                lit = braking or headlights
-            FlareRows.REVERSE_LIGHT:
-                lit = reversing
-            FlareRows.BLINKER_LEFT:
-                lit = bool(state.get("left", false)) and blink
-            FlareRows.BLINKER_RIGHT:
-                lit = bool(state.get("right", false)) and blink
-            _:
-                lit = false
-        _set_lamp(lamps[i], lit)
-        # A vehicle with no `h` row of its own — which is most of them, the hero truck
-        # included — puts its low beams onto the main-beam pattern instead, the way a
-        # two-filament bulb does.
-        if type == FlareRows.HEADLIGHT:
+    var light: LightState = LightState.of(truck)
+    light.headlights = bool(state.get("headlights", false))
+    light.sidelights = light.headlights
+    light.high_beams = light.headlights and bool(state.get("high_beam", false))
+    light.follow_controls(float(state.get("brake", 0.0)), false, -1 if bool(state.get("reverse", false)) else 1)
+    if bool(state.get("left", false)):
+        light.blink = LightState.Blink.LEFT
+    elif bool(state.get("right", false)):
+        light.blink = LightState.Blink.RIGHT
+    apply_lights(lamps, truck, light, light.update(float(state.get("seconds", 0.0))))
+
+
+## Shows each lamp at its intensity (`LightState.update`), as upstream's `GfxActor::UpdateFlares`:
+## the sprite while the intensity is above zero, brighter as it is higher (a `flares3` lamp fading
+## in), the lamp's own glass above 0.3, and its light while lit. Seen from `camera`, a sprite is as
+## big as the lamp faces it, gone from behind and beyond 500 m; a lamp of negative size is always
+## full size. Without a camera every sprite is full size.
+static func apply_lights(lamps: Array[Node3D], truck: TruckParser, light: LightState,
+        intensities: PackedFloat32Array, camera: Variant = null) -> void:
+    var main_beam_pattern: bool = light.headlights and light.high_beams and not _has_type(truck, FlareRows.HIGH_BEAM)
+    for i: int in mini(mini(lamps.size(), truck.flares.size()), intensities.size()):
+        var intensity: float = intensities[i]
+        var amplitude: float = 1.0
+        if camera != null and lamps[i].is_inside_tree():
+            amplitude = sprite_amplitude(lamps[i].global_transform, camera as Vector3, float(truck.flares[i]["size"]))
+        _set_lamp(lamps[i], intensity, amplitude)
+        # A vehicle with no `h` row of its own — the hero truck among them — puts its low beams
+        # onto the main-beam pattern, the way a two-filament bulb does.
+        if type_of(lamps[i], truck.flares[i]) == FlareRows.HEADLIGHT:
             var beam: SpotLight3D = lamps[i].get_node_or_null(^"Beam") as SpotLight3D
-            var wanted: String = "high" if main_beam and not truck_has_high else "low"
+            var wanted: String = "high" if main_beam_pattern else "low"
             if beam != null and HeadBeam.kind_of(beam) != wanted:
                 HeadBeam.aim(beam, wanted)
+
+
+## How big a lamp's sprite is drawn, 0 to 1, seen from `camera`: upstream's `amplitude`, the cosine
+## between the lamp's facing and the way to the camera, 0 when it faces away or is past 500 m. A
+## negative size means always 1.
+static func sprite_amplitude(lamp: Transform3D, camera: Vector3, size: float) -> float:
+    var to_camera: Vector3 = camera - lamp.origin
+    var distance: float = to_camera.length()
+    if distance > SPRITE_RANGE_M:
+        return 0.0
+    if size < 0.0:
+        return 1.0
+    if distance <= 0.0:
+        return 1.0
+    return maxf(0.0, (-lamp.basis.z.normalized()).dot(to_camera / distance))
 
 
 ## What a lamp is for: the type its row states, unless building it decided otherwise. See
@@ -240,9 +244,10 @@ static func _points_forward(holder: Node3D) -> bool:
     return (-holder.transform.basis.z).dot(Vector3.FORWARD) > FORWARD_DOT
 
 
-static func _set_lamp(lamp: Node3D, lit: bool) -> void:
+static func _set_lamp(lamp: Node3D, intensity: float, amplitude: float = 1.0) -> void:
+    var lit: bool = intensity > 0.0
     # The lamp's own glass, where the vehicle binds a material to it. See `MaterialFlares`.
-    MaterialFlares.light(lamp, lit)
+    MaterialFlares.light(lamp, intensity > GLASS_LIT_ABOVE)
     for child: Node in lamp.get_children():
         var light: Light3D = child as Light3D
         if light != null:
@@ -255,9 +260,9 @@ static func _set_lamp(lamp: Node3D, lit: bool) -> void:
         if material == null:
             continue
         # The glow's own colour carries its brightness: additive, so off is nothing at all.
-        var colour: Color = material.albedo_color
-        var energy: float = LENS_EMISSION_ON if lit else LENS_EMISSION_OFF
-        material.albedo_color = _lamp_colour(lamp) * energy
+        material.albedo_color = _lamp_colour(lamp) * (LENS_EMISSION_ON * intensity if lit else LENS_EMISSION_OFF)
+        lens.visible = lit and amplitude > 0.0
+        lens.scale = Vector3.ONE * maxf(amplitude, 0.001)
 
 
 ## What colour a lamp glows, kept on the holder so that turning it off and on again does not
@@ -286,7 +291,7 @@ static func _placement(nodes: PackedVector3Array, flare: Dictionary) -> Transfor
 
 
 static func _lens(flare: Dictionary, colour: Color, sprite: Texture2D) -> MeshInstance3D:
-    var size: float = (flare["size"] as float) * LENS_METRES_PER_SIZE * GLOW_SIZE_SCALE
+    var size: float = absf(flare["size"] as float) * LENS_METRES_PER_SIZE * GLOW_SIZE_SCALE
     var quad: QuadMesh = QuadMesh.new()
     quad.size = Vector2(size, size)
     var material: StandardMaterial3D = StandardMaterial3D.new()

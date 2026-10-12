@@ -51,13 +51,14 @@ static func flare(
     id_to_index: Dictionary,
     into: Array[Dictionary],
     errors: PackedStringArray,
-    section: String = "flares"
+    section: String = "flares",
+    inertia: Dictionary = {}
 ) -> void:
-    keep(
-        "flare",
-        FlareRows.row(TruckLexer.fields(line), id_to_index, section == "flares2"),
-        line, into, errors
-    )
+    var row: Dictionary = FlareRows.row(TruckLexer.fields(line), id_to_index, section != "flares")
+    # A `flares3` lamp fades like a filament, by the `set_inertia_defaults` in force.
+    if section == "flares3" and (row["error"] as String) == "":
+        row["inertia"] = inertia
+    keep("flare", row, line, into, errors)
 
 
 ## A `managedmaterials` row names a material, the effect it is drawn with, and its textures.

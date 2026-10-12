@@ -6,17 +6,18 @@ extends GateBase
 ## right in a still photograph and is wrong in every other way. A brake light that is on whenever
 ## the headlights are is not a brake light, and an indicator that does not blink is a sidelight.
 ##
-## The vehicle's own flare types are upstream's letters, read from its file; what is on when is
-## this project's rule, and this gate is where that rule is written down as something checkable.
-## So it drives the state rather than the lamps: press the pedal, select reverse, flick the stalk,
-## and ask which lamps are emitting.
+## The vehicle's own flare types are upstream's letters, read from its file, and what is on when is
+## upstream's rule too (`Actor::updateFlareStates`, held line by line by
+## `a_lamp_lights_by_upstreams_switches_and_clock`): the headlight switch lights `f`, `t` and the
+## sidelights it brings, not the brake lights, the main beam or the fog lights. This drives the state
+## on the built hero rather than the lamps: press the pedal, select reverse, flick the stalk, and ask
+## which lamps are emitting. Between blinks is the indicator's own clock run on past half a second.
 
 const MOD_DIR: String = "assets/mods/ChevyS1023"
 const TRUCK: String = "S10offroad.truck"
-## Half a blink period apart: an indicator has to be on at one of these and off at the other, or
-## it is not blinking.
-const BLINK_ON_S: float = 0.0
-const BLINK_OFF_S: float = FlareBuilder.BLINK_PERIOD_S * 0.75
+## An indicator is lit from its first frame and dark once its half-second timer has run out.
+const FIRST_FRAME_S: float = 0.017
+const PAST_HALF_A_SECOND_S: float = 0.5
 
 
 static func meta() -> Dictionary:
@@ -65,11 +66,7 @@ func run(harness: Node) -> Dictionary:
         {
             "name": "headlights",
             "state": {"headlights": true},
-            "lit": [
-                FlareRows.HEADLIGHT, FlareRows.HIGH_BEAM, FlareRows.FOG_LIGHT,
-                FlareRows.TAIL_LIGHT, FlareRows.SIDELIGHT, FlareRows.DASHBOARD,
-                FlareRows.BRAKE_LIGHT,
-            ],
+            "lit": [FlareRows.HEADLIGHT, FlareRows.TAIL_LIGHT, FlareRows.SIDELIGHT],
         },
         {
             "name": "on the brakes",
@@ -83,21 +80,32 @@ func run(harness: Node) -> Dictionary:
         },
         {
             "name": "indicating left",
-            "state": {"left": true, "seconds": BLINK_ON_S},
+            "state": {"left": true},
+            "frames": [FIRST_FRAME_S],
             "lit": [FlareRows.BLINKER_LEFT],
         },
         {
             "name": "indicating left, between blinks",
-            "state": {"left": true, "seconds": BLINK_OFF_S},
+            "state": {"left": true},
+            "frames": [FIRST_FRAME_S, PAST_HALF_A_SECOND_S],
             "lit": [],
         },
         {
             "name": "indicating right",
-            "state": {"right": true, "seconds": BLINK_ON_S},
+            "state": {"right": true},
+            "frames": [FIRST_FRAME_S],
             "lit": [FlareRows.BLINKER_RIGHT],
         },
     ]:
-        FlareBuilder.apply_state(lamps, truck, case["state"] as Dictionary)
+        if case.has("frames"):
+            var light: LightState = LightState.of(truck)
+            light.blink = LightState.Blink.LEFT if case["state"].has("left") else LightState.Blink.RIGHT
+            var shown: PackedFloat32Array = PackedFloat32Array()
+            for frame: float in case["frames"] as Array:
+                shown = light.update(frame)
+            FlareBuilder.apply_lights(lamps, truck, light, shown)
+        else:
+            FlareBuilder.apply_state(lamps, truck, case["state"] as Dictionary)
         var wanted: Array = case["lit"] as Array
         var counted: int = 0
         for index: int in mini(lamps.size(), truck.flares.size()):

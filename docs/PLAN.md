@@ -1862,8 +1862,8 @@ asserting "loads or fails cleanly" and starts asserting fidelity per section.
 Scope, vehicles:
 - **Every section a ground rig uses.** The named gaps today (rams move, ramp by
   their inertia and honour `r` ropes; differentials, the transfer case, detacher groups, traction
-  control and ABS are in, 2026-10-11/12):
-  flares placed but not animated.
+  control, ABS and upstream's lamp switches, blink clocks, `flares3` fades and view-angle sprites
+  are in, 2026-10-11/12): `d` dashboard lamps other than the parking brake are dark.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
 - **A section inventory as a gate**: done 2026-10-12 as `every_keyword_is_read_where_upstream_reads_it`
   (all 120 of upstream's keywords open, keep or close a section as its parser does). Modules

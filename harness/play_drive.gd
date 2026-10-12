@@ -43,13 +43,8 @@ var scripted_throttle: float = NAN
 ## asks the solver anything while it is stepping. See `begin` and `finish`.
 var _state: Dictionary = {}
 var _selector: int = 1
-var _lit: bool = false
-## The main beam. A second filament rather than a second switch: it only shows while the lights
-## are on, and a vehicle with no `h` lamps of its own puts its low beams onto the main-beam
-## pattern instead.
-var _main_beam: bool = false
-var _left_indicator: bool = false
-var _right_indicator: bool = false
+## The lamps and their switches (`DriveLights`).
+var _lights: DriveLights
 var _seconds: float = 0.0
 var _cockpit: Node3D
 ## When a `RorWorld` steps this vehicle together with others, `begin` reads the controls and works
@@ -73,6 +68,7 @@ func setup(built: Dictionary) -> String:
     solver.start_engine()
     solver.set_gear_selector(_selector)
     _cockpit = Cockpit.build(built["root"] as Node3D, truck, built)
+    _lights = DriveLights.new(truck)
     _snapshot()
     _apply_pose()
     return ""
@@ -97,12 +93,12 @@ func eye() -> Vector3:
 
 ## Whether the lamps are on, and a way for a panel to say so.
 func lights_on() -> bool:
-    return _lit
+    return _lights.state.headlights
 
 
 func set_lights(on: bool) -> void:
-    _lit = on
-    print("DRIVE  lights %s" % ("on" if _lit else "off"))
+    _lights.set_headlights(on)
+    print("DRIVE  lights %s" % ("on" if on else "off"))
 
 
 ## Where this world starts a vehicle, and which way it faces. Zero is the middle of a generated
@@ -198,6 +194,8 @@ func _snapshot() -> void:
 
 
 func on_key(keycode: Key) -> bool:
+    if _lights.on_key(DriveKeys.action_of(keys, keycode), keycode, truck):
+        return true
     match DriveKeys.action_of(keys, keycode):
         "reverse":
             _set_selector(-1)
@@ -215,23 +213,6 @@ func on_key(keycode: Key) -> bool:
             else:
                 _start_engine()
             print("DRIVE  engine %s" % ("running" if solver.engine_running() else "off"))
-        "lights":
-            set_lights(not _lit)
-        "main_beam":
-            _main_beam = not _main_beam
-            print("DRIVE  main beam %s" % ("on" if _main_beam else "off"))
-        "indicator_left":
-            _left_indicator = not _left_indicator
-            _right_indicator = false
-            print("DRIVE  left indicator %s" % ("on" if _left_indicator else "off"))
-        "indicator_right":
-            _right_indicator = not _right_indicator
-            _left_indicator = false
-            print("DRIVE  right indicator %s" % ("on" if _right_indicator else "off"))
-        "indicators_off":
-            _left_indicator = false
-            _right_indicator = false
-            print("DRIVE  indicators off")
         "recover":
             _recover()
         "wheel_diffs", "axle_diffs":
@@ -262,7 +243,7 @@ func hud_line() -> String:
         ]
         + "throttle %.2f  brake %.2f  steer %+.2f  lights %s  solver %.2f  wait %.2f  deform %.2f  submit %.2f ms"
         % [
-            _throttle, _brake, float(_state.get("steer", 0.0)), "on" if _lit else "off",
+            _throttle, _brake, float(_state.get("steer", 0.0)), "on" if lights_on() else "off",
             float(solver_usec) / 1000.0, float(wait_usec) / 1000.0,
             float(_deform_usec) / 1000.0, float(_submit_usec) / 1000.0,
         ]
@@ -292,8 +273,10 @@ func _read_controls(delta: float) -> void:
     solver.set_parking_brake(DriveKeys.held(keys, "parking"))
     # Command keys, held: the vehicle's own rams move while their key is down.
     var command_keys: Array = keys.get("commands", []) as Array
+    # Not while Ctrl is down: Ctrl and a digit is a user light.
+    var ctrl: bool = Input.is_key_pressed(KEY_CTRL)
     for index: int in command_keys.size():
-        solver.set_command_key(index + 1, 1.0 if Input.is_key_pressed(command_keys[index] as Key) else 0.0)
+        solver.set_command_key(index + 1, 1.0 if Input.is_key_pressed(command_keys[index] as Key) and not ctrl else 0.0)
     if not is_nan(scripted_steer):
         steer = scripted_steer
     solver.set_steer_command(DriveCfg.steer_command(steer))
@@ -355,8 +338,8 @@ func _recover() -> void:
 ## Puts the rig back where it started, upright and at rest.
 func _respawn() -> void:
     RigBuilder.place(solver, truck, spawn, spawn_heading, DriveCfg.SPAWN_HEIGHT_M)
-    _lit = false
-    _main_beam = false
+    _lights.set_headlights(false)
+    _lights.state.high_beams = false
     _start_engine()
     _snapshot()
     _apply_pose()
@@ -366,18 +349,11 @@ func _respawn() -> void:
 ## The parts of the vehicle that are driven rather than posed: the lamps, the steering wheel and
 ## the instruments. Updated per frame from the state the controls left behind.
 func _apply_cabin() -> void:
-    FlareBuilder.apply_state(_built["lamps"] as Array[Node3D], truck, {
-        "headlights": _lit,
-        "high_beam": _main_beam,
-        "brake": _brake,
-        "reverse": _selector < 0,
-        "left": _left_indicator,
-        "right": _right_indicator,
-        "seconds": _seconds,
-    })
+    _lights.apply(_built["lamps"] as Array[Node3D], truck, _seconds, _brake, DriveKeys.held(keys, "parking"),
+            -1 if _selector < 0 else 1)
     Cockpit.turn_wheel(_built, truck, float(_state.get("steer", 0.0)))
     Cockpit.update(
-        _cockpit, float(_state.get("rpm", 0.0)), float(_state.get("road_speed", 0.0)), _lit
+        _cockpit, float(_state.get("rpm", 0.0)), float(_state.get("road_speed", 0.0)), lights_on()
     )
 
 
