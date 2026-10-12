@@ -33,6 +33,9 @@ const RIM_DAMP_FALLBACK: float = 150.0
 ## tread is generated once every row is read. The hero truck states `set_node_defaults -1, 1.06`
 ## above its front pair and `-1, 1.12` above its rear, and those are the grip its tyres have.
 static func read_row(truck: TruckParser, section: String, line: String) -> String:
+    # The two driving aids act on the wheels' torque and braking; see `DriveAids`.
+    if section == "antilockbrakes" or section == "tractioncontrol":
+        return DriveAids.read(section, line, truck.drivetrain)
     if section == "wheeldetachers":
         # Upstream's `ParseWheelDetachers`: "wheel_id, detacher_group", the wheel counted from 0
         # in the order the wheels spawn.

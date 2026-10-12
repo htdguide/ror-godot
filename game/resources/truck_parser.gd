@@ -263,10 +263,10 @@ func _parse_row(line: String) -> void:
             _note(_section, DriveRows.read(_section, fields, drivetrain), line)
         "managedmaterials":
             BodyRows.managed_material(line, managed_materials, errors)
-        # Five sections, five field orders, and two of them generate twice as many nodes as the
-        # other three. `WheelRows` holds the layouts; this only has to name the section, because
+        # Five wheel sections, five field orders (`WheelRows`), and the rows that act on wheels:
         # which section a row came from is part of reading it.
-        "wheels", "wheels2", "meshwheels", "meshwheels2", "flexbodywheels", "wheeldetachers":
+        "wheels", "wheels2", "meshwheels", "meshwheels2", "flexbodywheels", "wheeldetachers", \
+                "antilockbrakes", "tractioncontrol":
             _note(_section, WheelRig.read_row(self, _section, line), line)
         "cameras":
             _cameras.read_cameras(TruckLexer.fields(line))

@@ -46,7 +46,18 @@ const METADATA_KEYWORDS: Array[String] = [
     "flexbody_camera_mode",
     "speedlimiter",
     "extcamera",
+    "default_skin",
+    "fileformatversion",
+    "set_collision_range",
+    "submesh_groundmodel",
 ]
+
+## Keywords upstream reads on their own line, arguments and all, without changing the open
+## section ("Directives with arguments: process immediately, do not change current block"). Each
+## becomes a row of a section named after itself. Left as data, `AntiLockBrakes 3.5, 15, 1500`
+## under `brakes` was a second brakes row: 29 library files had a brake force of 0 and a parking
+## brake of 2.75 N m.
+const LINE_SECTIONS: Array[String] = ["antilockbrakes", "tractioncontrol", "cruisecontrol"]
 
 ## `forset` is deliberately absent: it belongs to the flexbody above it and that section
 ## consumes it itself.
@@ -112,6 +123,14 @@ static func directive_of(line: String) -> String:
     return ""
 
 
+## The `LINE_SECTIONS` keyword this line states, or "".
+static func line_section_of(line: String) -> String:
+    for keyword: String in LINE_SECTIONS:
+        if _states_keyword(line, keyword):
+            return keyword
+    return ""
+
+
 ## Whether this line is a metadata keyword rather than a row of the open section.
 static func is_metadata(line: String) -> bool:
     for keyword: String in METADATA_KEYWORDS:
@@ -123,6 +142,8 @@ static func is_metadata(line: String) -> bool:
 ## Whether `line` is `keyword`, alone or followed by its arguments. A keyword runs to a
 ## separator or to the end of the line, never into the middle of a longer word.
 static func _states_keyword(line: String, keyword: String) -> bool:
+    # Upstream's keyword regexes are `std::regex::icase`.
+    line = line.to_lower()
     if line == keyword:
         return true
     if not line.begins_with(keyword) or line.length() <= keyword.length():

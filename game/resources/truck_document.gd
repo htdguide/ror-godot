@@ -112,6 +112,10 @@ func read(text: String) -> void:
         # word?" first files it as a section and never acts on it. 56 of this checkout's 69
         # vehicles declare it, and it is what lets a file mean a yield stress below upstream's
         # 400 kN floor — swallowed, every one of them had its bodywork welded solid.
+        var keyword: String = TruckLexer.line_section_of(line)
+        if keyword != "":
+            _append(keyword, line, false, beams, node_defaults, inertia, detacher)
+            continue
         var directive: String = TruckLexer.directive_of(line)
         if directive == "":
             if TruckLexer.is_section_header(line, section):
