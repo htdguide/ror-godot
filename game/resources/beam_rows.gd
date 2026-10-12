@@ -183,13 +183,13 @@ const TIE_DEFAULT_STRESS: float = 100000.0
 ## checkout's corpus reported an unknown node; a row whose reach happened to be written as a
 ## whole number would instead have passed, and welded the rig to whichever node that was.
 ##
-## No beam is built. The beam upstream builds starts disabled and this project has no tying
-## action to enable it with, so a beam here would be a member a real rig does not have.
+## The beam is built by `RigBuilder` with the tie, disabled until the tie key ties it.
 ## Returns {"error", "root", "reach_m", "rate", "min_length", "max_length", "options",
 ## "max_stress", "group"}.
 static func tie(fields: PackedStringArray, id_to_index: Dictionary) -> Dictionary:
-    if fields.size() < 2:
-        return {"error": "row has %d fields, expected at least 2" % fields.size()}
+    # Upstream's `ParseTies` takes no row of fewer than five.
+    if fields.size() < 5:
+        return {"error": "row has %d fields, expected at least 5" % fields.size()}
     var root: int = int(id_to_index.get(fields[0], -1))
     if root < 0:
         return {"error": "row references an unknown node"}
@@ -197,9 +197,9 @@ static func tie(fields: PackedStringArray, id_to_index: Dictionary) -> Dictionar
         "error": "",
         "root": root,
         "reach_m": fields[TIE_REACH_FIELD].to_float(),
-        "rate": _field(fields, TIE_RATE_FIELD, 0.0),
-        "min_length": _field(fields, TIE_MIN_FIELD, 0.0),
-        "max_length": _field(fields, TIE_MAX_FIELD, 0.0),
+        "rate": fields[TIE_RATE_FIELD].to_float(),
+        "min_length": fields[TIE_MIN_FIELD].to_float(),
+        "max_length": fields[TIE_MAX_FIELD].to_float(),
         "options": fields[TIE_OPTIONS_FIELD] if fields.size() > TIE_OPTIONS_FIELD else "n",
         "max_stress": _field(fields, TIE_STRESS_FIELD, TIE_DEFAULT_STRESS),
         "group": int(_field(fields, TIE_GROUP_FIELD, -1.0)),

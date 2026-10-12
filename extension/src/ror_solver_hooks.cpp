@@ -194,50 +194,57 @@ void RorSolver::calc_hooks(float dt) {
     }
 }
 
-// The force of every hook beam whose far end is on another member of `island`, upstream's
-// `CalcBeamsInterActor` for a hook's beam (`BEAM_HYDRO`, so it never yields, and a rope unless
-// the file said `norope`). Applied to both vehicles' nodes.
-void RorSolver::apply_inter_actor_hooks(const std::vector<RorSolver *> &island) {
+// One beam whose far end is node `far` of `other`, upstream's `CalcBeamsInterActor`: a rope
+// unless the file said otherwise, a `BEAM_HYDRO` that never yields, applied to both vehicles.
+void RorSolver::apply_link_beam(RorBeam &beam, RorSolver *other, int far) {
+    RorNode &a = m_nodes[static_cast<size_t>(beam.a)];
+    RorNode &b = other->m_nodes[static_cast<size_t>(far)];
+    const Vector3 offset(static_cast<float>(other->m_frame.x - m_frame.x), 0.0f,
+                         static_cast<float>(other->m_frame.z - m_frame.z));
+    const Vector3 dis = a.position - (b.position + offset);
+    const float squared = static_cast<float>(dis.length_squared());
+    if (squared <= 0.0f) {
+        return;
+    }
+    const float inverted = fast_invSqrt(squared);
+    const float length = squared * inverted;
+    const float extension = length - beam.rest_length;
+    float k = beam.spring;
+    float d = beam.damping;
+    if (beam.bound == BeamBound::ROPE && extension < 0.0f) {
+        k = 0.0f;
+        d *= 0.1f;
+    }
+    const Vector3 v = a.velocity - b.velocity;
+    float stress = -k * extension - d * static_cast<float>(v.dot(dis)) * inverted;
+    beam.stress = stress;
+    // Upstream's break test; its cab-node exemption is left out, as a link counts no cab node.
+    if (std::fabs(stress) > beam.minmax_stress && std::fabs(stress) > beam.strength) {
+        beam.broken = true;
+        beam.disabled = true;
+        stress = 0.0f;
+    }
+    const Vector3 force = dis * (stress * inverted);
+    a.forces += force;
+    b.forces -= force;
+}
+
+// Every hook and tie beam whose far end is on another member of `island`.
+void RorSolver::apply_inter_actor_links(const std::vector<RorSolver *> &island) {
+    auto in_island = [&island](RorSolver *other) {
+        return other != nullptr && std::find(island.begin(), island.end(), other) != island.end();
+    };
     for (RorHook &hook : m_hooks) {
         RorBeam &beam = m_beams[static_cast<size_t>(hook.beam)];
-        if (beam.disabled || !beam.inter_actor || beam.broken || hook.beam_target == nullptr) {
-            continue;
+        if (!beam.disabled && beam.inter_actor && !beam.broken && in_island(hook.beam_target)) {
+            apply_link_beam(beam, hook.beam_target, hook.beam_node);
         }
-        RorSolver *other = hook.beam_target;
-        if (std::find(island.begin(), island.end(), other) == island.end()) {
-            continue;
+    }
+    for (RorTie &tie : m_ties) {
+        RorBeam &beam = m_beams[static_cast<size_t>(tie.beam)];
+        if (!beam.disabled && beam.inter_actor && !beam.broken && in_island(tie.target)) {
+            apply_link_beam(beam, tie.target, tie.target->m_ropables[static_cast<size_t>(tie.ropable)].node);
         }
-        RorNode &a = m_nodes[static_cast<size_t>(beam.a)];
-        RorNode &b = other->m_nodes[static_cast<size_t>(hook.beam_node)];
-        const Vector3 offset(static_cast<float>(other->m_frame.x - m_frame.x), 0.0f,
-                             static_cast<float>(other->m_frame.z - m_frame.z));
-        const Vector3 dis = a.position - (b.position + offset);
-        const float squared = static_cast<float>(dis.length_squared());
-        if (squared <= 0.0f) {
-            continue;
-        }
-        const float inverted = fast_invSqrt(squared);
-        const float length = squared * inverted;
-        const float extension = length - beam.rest_length;
-        float k = beam.spring;
-        float d = beam.damping;
-        if (beam.bound == BeamBound::ROPE && extension < 0.0f) {
-            k = 0.0f;
-            d *= 0.1f;
-        }
-        const Vector3 v = a.velocity - b.velocity;
-        float stress = -k * extension - d * static_cast<float>(v.dot(dis)) * inverted;
-        beam.stress = stress;
-        // Upstream's break test; its cab-node exemption is left out, as a hook's beam is a hundred
-        // times the file's break figure and counts no cab node.
-        if (std::fabs(stress) > beam.minmax_stress && std::fabs(stress) > beam.strength) {
-            beam.broken = true;
-            beam.disabled = true;
-            stress = 0.0f;
-        }
-        const Vector3 force = dis * (stress * inverted);
-        a.forces += force;
-        b.forces -= force;
     }
 }
 

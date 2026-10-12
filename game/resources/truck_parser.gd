@@ -281,8 +281,8 @@ func _parse_row(line: String) -> void:
             BodyRows.flare(line, node_id_to_index, flares, errors, _section, _inertia)
         "materialflarebindings":
             _note("materialflarebinding", FlareRows.bind(TruckLexer.fields(line), material_flares), line)
-        "ties", "hooks", "lockgroups":
-            _note(_section, links.read(_section, line, node_id_to_index), line)
+        "ties", "ropables", "hooks", "lockgroups":
+            _note(_section, links.read(_section, line, node_id_to_index, beam_defaults, beam_table.detacher_group), line)
         "slidenodes":
             _note("slidenode", SlideNodeRows.read(self, line), line)
         _:

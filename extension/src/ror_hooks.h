@@ -39,6 +39,32 @@ struct RorHook {
 constexpr float HOOK_RANGE = 0.4f;
 constexpr float HOOK_SPEED = 0.00025f;
 
+// Upstream's `ropable_t`: a node ties and ropes may take, by group, one at a time unless it is
+// `multilock`.
+struct RorRopable {
+    int node = -1;
+    int group = -1;
+    bool multilock = false;
+    int attached_ties = 0;
+};
+
+// Upstream's `tie_t`: a rope from `root` that reaches up to its beam's reference length for the
+// nearest free ropable, then shortens at `contract_speed` until it is `min_length` of that length
+// or pulls harder than `max_stress`.
+struct RorTie {
+    int beam = -1;
+    int group = -1;
+    float contract_speed = 0.0f;
+    float max_stress = 100000.0f;
+    float min_length = 0.0f;
+    bool no_self_lock = false;
+    bool tied = false;
+    bool tying = false;
+    // The ropable it is tied to: on another solver (null for its own), by index there.
+    RorSolver *target = nullptr;
+    int ropable = -1;
+};
+
 // Upstream's lock group that no hook may take (`LOCKGROUP_NOLOCK`).
 constexpr int LOCKGROUP_NOLOCK = 9999;
 

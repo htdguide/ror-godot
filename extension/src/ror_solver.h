@@ -56,6 +56,7 @@ protected:
     // The wheels' driving aids' and the vehicle direction's methods (`ror_solver_wheels.cpp`).
     static void bind_wheel_methods();
     static void bind_hook_methods();
+    static void bind_tie_methods();
 
 public:
     // Returns the new node's index.
@@ -276,6 +277,18 @@ public:
     int hook_lock_node(int index);
     bool hook_locked_to_self(int index);
     float hook_length(int index);
+    // Upstream's ties and ropables (`ror_solver_ties.cpp`): a `ties` row and a `ropables` row each,
+    // the tie's rope from the beam defaults at its row. `toggle_ties` reaches this vehicle's own
+    // ropables only; `RorWorld::toggle_ties` every vehicle's.
+    int add_tie(int root, float reach, float rate, float min_length, float max_stress, int group, bool no_self_lock,
+                float spring, float damp, float strength, float deform);
+    int add_ropable(int node, int group, bool multilock);
+    void toggle_ties(int group);
+    int tie_count();
+    godot::String tie_state(int index);
+    float tie_length(int index);
+    int tie_ropable(int index);
+    bool tie_locked_to_self(int index);
     // The force along the beam last substep, signed as upstream's `beam.stress`: negative pulls.
     float get_beam_stress(int beam) const;
     // Runs the beam pass alone `passes` times, forces cleared before each and nothing integrated,
@@ -489,7 +502,13 @@ private:
     std::vector<RorHook> m_hooks;
     void toggle_hooks_among(const std::vector<RorSolver *> &actors, int mode, int group);
     void calc_hooks(float dt);
-    void apply_inter_actor_hooks(const std::vector<RorSolver *> &island);
+    void apply_inter_actor_links(const std::vector<RorSolver *> &island);
+    void apply_link_beam(RorBeam &beam, RorSolver *other, int far);
+    std::vector<RorTie> m_ties;
+    std::vector<RorRopable> m_ropables;
+    void toggle_ties_among(const std::vector<RorSolver *> &actors, int group, bool reset);
+    void untie(RorTie &tie);
+    void calc_ties(float dt);
     int m_direction_pos = -1;
     int m_direction_dir = -1;
     float m_direction_yaw = 0.0f;

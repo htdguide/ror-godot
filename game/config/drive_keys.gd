@@ -31,12 +31,16 @@ const SOLO: Dictionary = {
     "wheel_diffs": [KEY_V], "axle_diffs": [KEY_J],
     # Upstream's transfer case keys, Ctrl+W and Shift+W there: 2WD or 4WD, and high or low range.
     "transfer_case": [KEY_T], "transfer_range": [KEY_Y],
-    # Upstream's driving aid toggles, Shift+B and Shift+T there.
-    "antilock": [KEY_O], "traction_control": [KEY_U],
+    # Upstream's tie key: every tie reaches for the nearest ropable, or lets go.
+    "ties": [KEY_O],
     # Command keys 1 to 10, in order: a vehicle's own rams, its doors on the hero. Upstream puts
     # them on F1-F12, which this window answers to itself.
     "commands": [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_0],
 }
+
+## Actions on Shift and a key in the one-driver window: upstream's driving aid toggles.
+const SOLO_SHIFTED: Dictionary = {"antilock": KEY_B, "traction_control": KEY_T}
+const SHIFTED_NAMES: Dictionary = {"antilock": "ABS", "traction_control": "traction control"}
 
 ## The left half of a split window.
 const SPLIT_LEFT: Dictionary = {
@@ -65,7 +69,7 @@ const NAMES: Dictionary = {
     "hazards": "hazards", "fog_lights": "fog lights", "hook": "hooks (Alt: let auto-locks go)",
     "wheel_diffs": "axle differentials", "axle_diffs": "interaxle differentials",
     "transfer_case": "2WD/4WD", "transfer_range": "high/low range",
-    "antilock": "ABS", "traction_control": "traction control",
+    "ties": "ties",
     "commands": "commands 1-10 (doors, rams)",
 }
 
@@ -96,4 +100,7 @@ static func help(keys: Dictionary, label: String) -> String:
         for keycode: Key in keys[action] as Array:
             names.append(OS.get_keycode_string(keycode))
         parts.append("%s %s" % ["/".join(names), NAMES[action]])
+    if keys == SOLO:
+        for action: String in SOLO_SHIFTED:
+            parts.append("Shift+%s %s" % [OS.get_keycode_string(SOLO_SHIFTED[action]), SHIFTED_NAMES[action]])
     return "%s  %s" % [label, ", ".join(parts)]

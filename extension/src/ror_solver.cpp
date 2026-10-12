@@ -232,6 +232,8 @@ void RorSolver::substep(float dt, bool first) {
                 engine ? m_drivetrain.crank_factor() : 1.0f);
         m_drivetrain.set_hydraulics(power.requested, power.work);
     }
+    // Upstream's `CalcTies`, after the commands.
+    calc_ties(dt);
     // The first substep of a call stands in for upstream's per-frame pass, which is
     // the rate it makes gear decisions at.
     m_drivetrain.step(dt, m_wheels.driven_spin() * RAD_PER_SEC_TO_RPM, first);

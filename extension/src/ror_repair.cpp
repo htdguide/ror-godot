@@ -48,6 +48,8 @@ void RorSolver::repair() {
     m_wheels.reattach_all();
     // Upstream's `HOOK_RESET`: every hook let go, its auto-lock free to try again at once.
     toggle_hooks_among({this}, RorHook::RESET, -1);
+    // And every tie, upstream's `TIE_RESET`, giving back the ropables it held.
+    toggle_ties_among({this}, -1, true);
     if (m_undamaged_beams.size() != m_beams.size()) {
         return;
     }

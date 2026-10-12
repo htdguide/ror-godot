@@ -1865,7 +1865,8 @@ Scope, vehicles:
   control, ABS and upstream's lamp switches, blink clocks, `flares3` fades and view-angle sprites
   are in, 2026-10-11/12): `d` dashboard lamps read parking brake, ignition, battery, warning and
   rpm (all the corpus names); other dashboard inputs are dark. Hooks (`h`, `hooks`, `lockgroups`)
-  lock, reel and pull between vehicles (`--add` puts one behind yours); ties and ropes are next.
+  lock, reel and pull between vehicles (`--add` puts one behind yours), and ties take ropables and
+  shorten (O); `ropes` are next.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
 - **A section inventory as a gate**: done 2026-10-12 as `every_keyword_is_read_where_upstream_reads_it`
   (all 120 of upstream's keywords open, keep or close a section as its parser does). Modules

@@ -367,6 +367,7 @@ float RorSolver::steer_state() const {
 void RorSolver::_bind_methods() {
     bind_wheel_methods();
     bind_hook_methods();
+    bind_tie_methods();
     ClassDB::bind_method(D_METHOD("add_node", "position", "mass"), &RorSolver::add_node);
     ClassDB::bind_method(D_METHOD("add_beam", "node_a", "node_b", "rest_length", "spring", "damping"),
                          &RorSolver::add_beam);

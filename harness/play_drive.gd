@@ -200,9 +200,12 @@ func _snapshot() -> void:
 
 
 func on_key(keycode: Key) -> bool:
-    if _lights.on_key(DriveKeys.action_of(keys, keycode), keycode, truck):
+    var action: String = DriveKeys.action_of(keys, keycode)
+    if keys == DriveKeys.SOLO and Input.is_key_pressed(KEY_SHIFT) and DriveKeys.SOLO_SHIFTED.values().has(keycode):
+        action = DriveKeys.SOLO_SHIFTED.find_key(keycode)
+    if _lights.on_key(action, keycode, truck):
         return true
-    match DriveKeys.action_of(keys, keycode):
+    match action:
         "reverse":
             _set_selector(-1)
         "neutral":
@@ -228,12 +231,19 @@ func on_key(keycode: Key) -> bool:
             else:
                 solver.toggle_hooks(mode, group)
             print("DRIVE  hooks %s" % ("auto-locks let go" if mode == 1 else "toggled"))
+        "ties":
+            # Upstream's `TIE_TOGGLE` on group -1.
+            if world != null:
+                world.toggle_ties(solver, -1)
+            else:
+                solver.toggle_ties(-1)
+            print("DRIVE  ties toggled")
         "recover":
             _recover()
         "wheel_diffs", "axle_diffs":
             print("DRIVE  %s" % AxleRows.toggle(solver, DriveKeys.action_of(keys, keycode) == "axle_diffs"))
         "antilock", "traction_control":
-            var kind: String = "abs" if DriveKeys.action_of(keys, keycode) == "antilock" else "tc"
+            var kind: String = "abs" if action == "antilock" else "tc"
             print("DRIVE  %s %s" % [kind.to_upper(), "on" if solver.toggle_drive_aid(kind) else "off"])
         "transfer_case", "transfer_range":
             print("DRIVE  %s" % AxleRows.shift_transfer_case(solver, DriveKeys.action_of(keys, keycode) == "transfer_range"))

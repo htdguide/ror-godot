@@ -61,6 +61,7 @@ void RorWorld::_bind_methods() {
     ClassDB::bind_method(D_METHOD("shares_island", "first", "second", "dt", "substeps"),
                          &RorWorld::shares_island);
     ClassDB::bind_method(D_METHOD("toggle_hooks", "solver", "mode", "group"), &RorWorld::toggle_hooks);
+    ClassDB::bind_method(D_METHOD("toggle_ties", "solver", "group"), &RorWorld::toggle_ties);
 }
 
 void RorWorld::add_solver(const Ref<RorSolver> &solver) {
@@ -93,14 +94,28 @@ void RorWorld::toggle_hooks(const Ref<RorSolver> &solver, int mode, int group) {
     }
 }
 
+void RorWorld::toggle_ties(const Ref<RorSolver> &solver, int group) {
+    sync_all();
+    if (solver.is_valid()) {
+        solver->toggle_ties_among(members(), group, false);
+    }
+}
+
 void RorWorld::join_hooked(std::vector<size_t> &parent) const {
     for (size_t i = 0; i < m_solvers.size(); ++i) {
+        std::vector<const RorSolver *> targets;
         for (const RorHook &hook : m_solvers[i]->m_hooks) {
-            if (hook.beam_target == nullptr) {
+            targets.push_back(hook.beam_target);
+        }
+        for (const RorTie &tie : m_solvers[i]->m_ties) {
+            targets.push_back(tie.target);
+        }
+        for (const RorSolver *target : targets) {
+            if (target == nullptr) {
                 continue;
             }
             for (size_t j = 0; j < m_solvers.size(); ++j) {
-                if (m_solvers[j].ptr() == hook.beam_target) {
+                if (m_solvers[j].ptr() == target) {
                     parent[find_root(parent, i)] = find_root(parent, j);
                 }
             }
@@ -280,7 +295,7 @@ int RorWorld::step_island(const std::vector<RorSolver *> &members, float dt, int
         }
         // Upstream's `CalcBeamsInterActor`, after every member's own forces and before contact.
         for (RorSolver *member : members) {
-            member->apply_inter_actor_hooks(members);
+            member->apply_inter_actor_links(members);
         }
         for (RorSolver *owner : members) {
             RorSolver &a = *owner;
