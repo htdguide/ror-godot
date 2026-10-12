@@ -5,6 +5,7 @@
 #include "ror_drivetrain.h"
 #include "ror_ground.h"
 #include "ror_heightfield.h"
+#include "ror_hooks.h"
 #include "ror_obstacles.h"
 #include "ror_node.h"
 #include "ror_shocks.h"
@@ -54,6 +55,7 @@ protected:
     static void _bind_methods();
     // The wheels' driving aids' and the vehicle direction's methods (`ror_solver_wheels.cpp`).
     static void bind_wheel_methods();
+    static void bind_hook_methods();
 
 public:
     // Returns the new node's index.
@@ -260,6 +262,20 @@ public:
     godot::Dictionary wheel_pass_probe(const godot::PackedFloat32Array &wheel_states,
                                        const godot::PackedFloat32Array &aid_states, const godot::Vector3 &direction,
                                        float steer, float dt);
+    // Upstream's hooks (`ror_solver_hooks.cpp`). `add_hook` makes a node with option `h` a hook,
+    // with its rope beam from the beam defaults at its row; `set_hook_options` is its `hooks` row.
+    // `toggle_hooks` locks or unlocks this vehicle's hooks among its own nodes only (`selflock`);
+    // a world lets them reach other vehicles (`RorWorld::toggle_hooks`). Modes are `RorHook::Mode`.
+    int add_hook(int node, float spring, float damp, float strength, float deform);
+    void set_hook_options(int node, float lockrange, float speed_coef, float maxforce, int group, int lockgroup,
+                          float timer, float min_length, bool selflock, bool autolock, bool nodisable, bool norope);
+    void set_node_lockgroup(int node, int group);
+    void toggle_hooks(int mode, int group);
+    int hook_count();
+    godot::String hook_state(int index);
+    int hook_lock_node(int index);
+    bool hook_locked_to_self(int index);
+    float hook_length(int index);
     // The force along the beam last substep, signed as upstream's `beam.stress`: negative pulls.
     float get_beam_stress(int beam) const;
     // Runs the beam pass alone `passes` times, forces cleared before each and nothing integrated,
@@ -470,6 +486,10 @@ private:
     void apply_bound_law(const RorBeam &beam, float extension, float closing_speed, float &spring,
                          float &damping) const;
     std::vector<RorShock> m_shocks;
+    std::vector<RorHook> m_hooks;
+    void toggle_hooks_among(const std::vector<RorSolver *> &actors, int mode, int group);
+    void calc_hooks(float dt);
+    void apply_inter_actor_hooks(const std::vector<RorSolver *> &island);
     int m_direction_pos = -1;
     int m_direction_dir = -1;
     float m_direction_yaw = 0.0f;

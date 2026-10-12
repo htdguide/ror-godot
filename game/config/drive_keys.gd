@@ -20,7 +20,10 @@ const SOLO: Dictionary = {
     "parking": [KEY_SPACE],
     "drive": [KEY_G], "reverse": [KEY_B], "neutral": [KEY_H],
     "respawn": [KEY_R, KEY_BACKSPACE], "recover": [KEY_ENTER], "ignition": [KEY_I],
-    "lights": [KEY_L, KEY_N], "main_beam": [KEY_K],
+    "lights": [KEY_N], "main_beam": [KEY_K],
+    # Upstream's lock key: every hook reaches for the nearest node in range, or lets go. Alt+L lets
+    # the auto-lock hooks go.
+    "hook": [KEY_L],
     "indicator_left": [KEY_Z], "indicator_right": [KEY_C], "indicators_off": [KEY_X],
     # Upstream's hazards key (minus), and the fog lights, Alt+N there.
     "hazards": [KEY_MINUS], "fog_lights": [KEY_F],
@@ -59,7 +62,7 @@ const NAMES: Dictionary = {
     "respawn": "respawn", "recover": "recover", "ignition": "ignition", "lights": "lights",
     "main_beam": "main beam", "indicator_left": "left indicator",
     "indicator_right": "right indicator", "indicators_off": "indicators off",
-    "hazards": "hazards", "fog_lights": "fog lights",
+    "hazards": "hazards", "fog_lights": "fog lights", "hook": "hooks (Alt: let auto-locks go)",
     "wheel_diffs": "axle differentials", "axle_diffs": "interaxle differentials",
     "transfer_case": "2WD/4WD", "transfer_range": "high/low range",
     "antilock": "ABS", "traction_control": "traction control",

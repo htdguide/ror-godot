@@ -1,0 +1,45 @@
+#pragma once
+
+namespace rorgd {
+
+class RorSolver;
+
+// Upstream's `hook_t`: a node with option `h` and the rope beam it locks with. Its beam lives in
+// its own solver's beams; locked to another vehicle, the beam's far end is `lock_node` of `target`
+// and the world works its force out (`RorWorld`), as upstream's `CalcBeamsInterActor` does.
+struct RorHook {
+    enum class State { UNLOCKED, PRELOCK, LOCKED };
+    // Upstream's `ActorLinkingRequestType` for hooks.
+    enum Mode { LOCK = 0, UNLOCK = 1, TOGGLE = 2, RESET = 3 };
+
+    int node = -1;
+    int beam = -1;
+    // Upstream's defaults (`SimConstants.h`, `ProcessNode`).
+    int group = -1;
+    int lockgroup = -1;
+    bool selflock = false;
+    bool autolock = false;
+    bool nodisable = false;
+    float maxforce = 10000000.0f;
+    float lockrange = 0.4f;
+    float lockspeed = 0.00025f;
+    float timer = 0.0f;
+    float timer_preset = 5.0f;
+    float min_length = 0.0f;
+    State state = State::UNLOCKED;
+    // What it is locked to: another solver (null for its own), and that solver's node.
+    RorSolver *target = nullptr;
+    int lock_node = -1;
+    // Where its beam's far end is: set when the beam is enabled and not after, as upstream's.
+    RorSolver *beam_target = nullptr;
+    int beam_node = -1;
+};
+
+// Upstream's `HOOK_RANGE_DEFAULT` and `HOOK_SPEED_DEFAULT`.
+constexpr float HOOK_RANGE = 0.4f;
+constexpr float HOOK_SPEED = 0.00025f;
+
+// Upstream's lock group that no hook may take (`LOCKGROUP_NOLOCK`).
+constexpr int LOCKGROUP_NOLOCK = 9999;
+
+} // namespace rorgd

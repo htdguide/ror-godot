@@ -67,12 +67,16 @@ static func row(fields: PackedStringArray, defaults: Defaults) -> Dictionary:
         # Upstream's `c`, NO_GROUND_CONTACT: the node passes through the ground and the scenery,
         # and other vehicles' triangles do not test it. From the row or from `set_node_defaults`.
         "no_ground_contact": defaults.options.contains("c"),
+        # Upstream's `h`, a hook point, from the row or from `set_node_defaults`.
+        "hook": defaults.options.contains("h"),
     }
     if fields.size() < 5:
         return out
     var options: String = _letters_of(fields[4])
     if options.contains("c"):
         out["no_ground_contact"] = true
+    if options.contains("h"):
+        out["hook"] = true
     if not options.contains("l"):
         return out
     out["loaded"] = true

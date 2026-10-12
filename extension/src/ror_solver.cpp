@@ -218,6 +218,8 @@ void RorSolver::begin_steps() {
 }
 
 void RorSolver::substep(float dt, bool first) {
+    // Upstream's `CalcForcesEulerPrepare`: the hooks reel in before the step integrates.
+    calc_hooks(dt);
     integrate(dt);
     apply_air_drag();
     m_steering.update(dt, m_wheels.driven_speed(), m_beams);
@@ -292,7 +294,7 @@ void RorSolver::apply_air_drag() {
 
 void RorSolver::accumulate_beam_forces() {
     for (RorBeam &beam : m_beams) {
-        if (beam.broken) {
+        if (beam.broken || beam.disabled || beam.inter_actor) {
             continue;
         }
         RorNode &a = m_nodes[beam.a];

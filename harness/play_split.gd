@@ -211,4 +211,5 @@ func _join_world() -> void:
     _world.clear()
     for driver: PlayDrive in [first, second]:
         driver.world_stepped = true
+        driver.world = _world
         _world.add_solver(driver.solver as RorSolver)

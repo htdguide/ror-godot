@@ -84,6 +84,8 @@ var _order: Dictionary = {}
 ## the game takes the first (`GameContext`: "Preselected config doesn't exist -> use first").
 var modules: PackedStringArray = PackedStringArray()
 var selected_module: String = ""
+## Upstream's `lockgroup_default_nolock` flag, wherever the file states it.
+var lockgroup_default_nolock: bool = false
 ## The module the row being read belongs to; "" is the root.
 var _module: String = ""
 
@@ -159,6 +161,8 @@ func read(text: String) -> void:
             # must keep the rates they were written under.
             if directive == "enable_advanced_deformation":
                 advanced = true
+            elif directive == "lockgroup_default_nolock":
+                lockgroup_default_nolock = true
             elif directive == "set_beam_defaults":
                 beams = beams.copy()
                 beams.set_advanced_deformation(advanced)

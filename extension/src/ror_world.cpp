@@ -60,6 +60,7 @@ void RorWorld::_bind_methods() {
     ClassDB::bind_method(D_METHOD("last_contact_count"), &RorWorld::last_contact_count);
     ClassDB::bind_method(D_METHOD("shares_island", "first", "second", "dt", "substeps"),
                          &RorWorld::shares_island);
+    ClassDB::bind_method(D_METHOD("toggle_hooks", "solver", "mode", "group"), &RorWorld::toggle_hooks);
 }
 
 void RorWorld::add_solver(const Ref<RorSolver> &solver) {
@@ -75,6 +76,36 @@ RorWorld::~RorWorld() {
 void RorWorld::clear() {
     sync_all();
     m_solvers.clear();
+}
+
+std::vector<RorSolver *> RorWorld::members() const {
+    std::vector<RorSolver *> out;
+    for (const Ref<RorSolver> &solver : m_solvers) {
+        out.push_back(solver.ptr());
+    }
+    return out;
+}
+
+void RorWorld::toggle_hooks(const Ref<RorSolver> &solver, int mode, int group) {
+    sync_all();
+    if (solver.is_valid()) {
+        solver->toggle_hooks_among(members(), mode, group);
+    }
+}
+
+void RorWorld::join_hooked(std::vector<size_t> &parent) const {
+    for (size_t i = 0; i < m_solvers.size(); ++i) {
+        for (const RorHook &hook : m_solvers[i]->m_hooks) {
+            if (hook.beam_target == nullptr) {
+                continue;
+            }
+            for (size_t j = 0; j < m_solvers.size(); ++j) {
+                if (m_solvers[j].ptr() == hook.beam_target) {
+                    parent[find_root(parent, i)] = find_root(parent, j);
+                }
+            }
+        }
+    }
 }
 
 void RorWorld::sync_all() const {
@@ -141,6 +172,7 @@ bool RorWorld::shares_island(int first, int second, float dt, int substeps) cons
             }
         }
     }
+    join_hooked(parent);
     return find_root(parent, static_cast<size_t>(first)) ==
            find_root(parent, static_cast<size_t>(second));
 }
@@ -152,6 +184,14 @@ void RorWorld::step(float dt, int substeps) {
     m_last_contacts.store(0, std::memory_order_relaxed);
     if (substeps <= 0 || m_solvers.empty()) {
         return;
+    }
+    // Upstream's once-a-frame attempt of every auto-lock hook (`CalcForcesEulerPrepare` asks for
+    // it on a frame's first substep and the game runs it between frames).
+    const std::vector<RorSolver *> everyone = members();
+    for (RorSolver *solver : everyone) {
+        if (!solver->m_hooks.empty()) {
+            solver->toggle_hooks_among(everyone, RorHook::LOCK, -2);
+        }
     }
     std::vector<Bounds> bounds;
     for (const Ref<RorSolver> &solver : m_solvers) {
@@ -168,6 +208,7 @@ void RorWorld::step(float dt, int substeps) {
             }
         }
     }
+    join_hooked(parent);
     // Members of each island in the order the actors were added, so the order contact is
     // resolved in is a property of the world and not of the partition.
     std::vector<std::vector<size_t>> islands(m_solvers.size());
@@ -236,6 +277,10 @@ int RorWorld::step_island(const std::vector<RorSolver *> &members, float dt, int
     for (int step = 0; step < substeps; ++step) {
         for (RorSolver *member : members) {
             member->substep(dt, step == 0);
+        }
+        // Upstream's `CalcBeamsInterActor`, after every member's own forces and before contact.
+        for (RorSolver *member : members) {
+            member->apply_inter_actor_hooks(members);
         }
         for (RorSolver *owner : members) {
             RorSolver &a = *owner;

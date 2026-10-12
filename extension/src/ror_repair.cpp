@@ -46,6 +46,8 @@ void RorSolver::repair() {
     m_commands.reset();
     m_wheels.differentials().reset_rotation();
     m_wheels.reattach_all();
+    // Upstream's `HOOK_RESET`: every hook let go, its auto-lock free to try again at once.
+    toggle_hooks_among({this}, RorHook::RESET, -1);
     if (m_undamaged_beams.size() != m_beams.size()) {
         return;
     }

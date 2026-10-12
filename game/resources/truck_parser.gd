@@ -106,10 +106,8 @@ var has_cinecam: bool = false
 ## driver's eye. Which one a caller wants depends on what it is for, so the choice is
 ## left to the caller rather than made here.
 var cinecams: PackedVector3Array = PackedVector3Array()
-## Every `ties` row: a rope anchored at one node whose other end is loose until a player hooks
-## it onto something. Nothing acts on them yet; they are kept so that the rows are read rather
-## than mistaken for beams. See `BeamRows.tie`.
-var ties: Array[Dictionary] = []
+## Hooks, lock groups and ties: what links this vehicle to others. See `TruckLinks`.
+var links: TruckLinks = TruckLinks.new()
 ## Every `slidenodes` row: a node that runs along a rail instead of being pinned to one place.
 ## Eight vehicles here declare them and all eight are strut cars. See `SlideNodeRows`.
 var slide_nodes: Array[Dictionary] = []
@@ -156,6 +154,7 @@ func parse_file(path: String) -> String:
 func parse_text(text: String) -> String:
     var document: TruckDocument = TruckDocument.new()
     document.read(text)
+    links.default_nolock = document.lockgroup_default_nolock
     name = document.name
     var generated: bool = false
     var wheels_end: int = document.order_of(TruckDocument.LAST_NODE_GENERATOR)
@@ -282,8 +281,8 @@ func _parse_row(line: String) -> void:
             BodyRows.flare(line, node_id_to_index, flares, errors, _section, _inertia)
         "materialflarebindings":
             _note("materialflarebinding", FlareRows.bind(TruckLexer.fields(line), material_flares), line)
-        "ties":
-            _parse_tie(line)
+        "ties", "hooks", "lockgroups":
+            _note(_section, links.read(_section, line, node_id_to_index), line)
         "slidenodes":
             _note("slidenode", SlideNodeRows.read(self, line), line)
         _:
@@ -308,6 +307,8 @@ func _parse_node(line: String) -> void:
         cargo_share_nodes.append(nodes.size())
     if bool(row["no_ground_contact"]):
         no_ground_contact.append(nodes.size())
+    if bool(row["hook"]):
+        links.add_hook_node(nodes.size(), beam_defaults)
     _register(row["id"] as String)
     node_ids.append(row["id"] as String)
     nodes.append(row["position"] as Vector3)
@@ -346,16 +347,6 @@ func _parse_cinecam(line: String) -> void:
         errors.append("cinecam %s: %s" % [row["error"], line])
         return
     CinecamMount.build(self, row)
-
-
-## `ties`: a rope with one end loose. See `BeamRows.tie` for why it is not a beam row.
-func _parse_tie(line: String) -> void:
-    var row: Dictionary = BeamRows.tie(TruckLexer.fields(line), node_id_to_index)
-    if (row["error"] as String) != "":
-        errors.append("tie %s: %s" % [row["error"], line])
-        return
-    row.erase("error")
-    ties.append(row)
 
 
 func _parse_beam(line: String) -> void:

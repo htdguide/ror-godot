@@ -23,6 +23,8 @@ const GRAVITY: Vector3 = Vector3(0.0, -9.81, 0.0)
 ## are not yet upstream's — see docs/PLAN.md. Per-node drag is the general case and the one
 ## worth having first; the fuselage model is a named gap rather than a forgotten one.
 const AIR_DRAG: float = 0.05
+## Upstream's lock group no hook may take (`LOCKGROUP_NOLOCK`).
+const LOCKGROUP_NOLOCK: int = 9999
 
 
 ## Builds the solver for `truck`. `drop_height_m` lifts the rig so its lowest node starts
@@ -90,6 +92,7 @@ static func build(truck: TruckParser, drop_height_m: float = 0.0) -> Dictionary:
     _configure_engine(solver, truck)
     solver.set_gravity(GRAVITY)
     _add_drag(solver, truck)
+    _add_hooks(solver, truck)
     # The rig as built, kept so `place` can put a damaged one back this way. Taken last, after
     # the bounds and the limits have set every strength the file asks for: a snapshot taken
     # earlier would "repair" a rig to a weaker state than it was ever driven in.
@@ -371,3 +374,21 @@ static func _wheel_on(axle_nodes: Array[Vector2i], a: int, b: int) -> int:
         if axle_nodes[i] == Vector2i(a, b) or axle_nodes[i] == Vector2i(b, a):
             return i
     return -1
+
+
+## Upstream's hooks and lock groups (`TruckLinks`): each `h` node's rope beam, its `hooks` row, and
+## which nodes a hook may lock to.
+static func _add_hooks(solver: RefCounted, truck: TruckParser) -> void:
+    var links: TruckLinks = truck.links
+    for hook: Dictionary in links.hook_nodes:
+        solver.add_hook(hook["node"], hook["spring"], hook["damp"], hook["strength"], hook["deform"])
+    for row: Dictionary in links.hooks:
+        solver.set_hook_options(row["node"], row["lockrange"], row["speed_coef"], row["maxforce"], row["group"],
+                row["lockgroup"], row["timer"], row["min_length"], row["selflock"], row["autolock"],
+                row["nodisable"], row["norope"])
+    if links.default_nolock:
+        for node: int in truck.nodes.size():
+            solver.set_node_lockgroup(node, LOCKGROUP_NOLOCK)
+    for node: int in links.lockgroups:
+        solver.set_node_lockgroup(node, links.lockgroups[node])
+

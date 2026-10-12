@@ -43,6 +43,7 @@ func join_world() -> void:
     _world.clear()
     for member: PlayDrive in [driver] + extras:
         member.world_stepped = true
+        member.world = _world
         _world.add_solver(member.solver as RorSolver)
 
 

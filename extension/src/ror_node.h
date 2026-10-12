@@ -33,6 +33,8 @@ struct RorNode {
     // with no bound: a shock, rope or support beam on the node does not hold it.
     bool cab_node = false;
     int active_beams = 0;
+    // Upstream's `nd_lockgroup`: which hooks may lock to the node (-1 any; 9999 none).
+    int lockgroup = -1;
     // Upstream's `nd_no_ground_contact`, node option `c` and every cinecam node: the node passes
     // through the ground and the scenery and other vehicles' triangles do not test it.
     bool no_ground_contact = false;
@@ -77,6 +79,10 @@ struct RorBeam {
     float long_bound = 0.0f;
     // Index of a `shocks2` or `shocks3` beam's own rates in the solver's shock list, or -1.
     int shock = -1;
+    // Upstream's `bm_disabled` (a hook's beam while unlocked: there, and carrying nothing) and
+    // `bm_inter_actor` (its far end is on another vehicle, so the world works its force out).
+    bool disabled = false;
+    bool inter_actor = false;
     // Upstream's `detacher_group`: a beam of a positive group breaking by strength breaks every
     // beam of that group or its negative. 0 for none.
     int detacher_group = 0;

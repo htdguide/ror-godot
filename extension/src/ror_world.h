@@ -59,6 +59,8 @@ public:
     int last_contact_count() const;
     // Whether two actors are in one island now, judged as the next `step` would judge it.
     bool shares_island(int first, int second, float dt, int substeps) const;
+    // Upstream's hook keys for `solver`'s hooks, reaching every vehicle in this world.
+    void toggle_hooks(const godot::Ref<RorSolver> &solver, int mode, int group);
 
 private:
     struct Bounds {
@@ -71,6 +73,9 @@ private:
     // Steps one island in lockstep on the calling thread; returns the contacts it resolved.
     static int step_island(const std::vector<RorSolver *> &members, float dt, int substeps);
     void sync_all() const;
+    // Joins into one island every pair a hook links, whatever their distance.
+    void join_hooked(std::vector<size_t> &parent) const;
+    std::vector<RorSolver *> members() const;
 
     std::vector<godot::Ref<RorSolver>> m_solvers;
     int m_last_islands = 0;

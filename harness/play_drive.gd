@@ -50,6 +50,8 @@ var _cockpit: Node3D
 ## When a `RorWorld` steps this vehicle together with others, `begin` reads the controls and works
 ## out the substeps but leaves the stepping to the world, which reads them from here.
 var world_stepped: bool = false
+## The world this vehicle is stepped in, for its hooks to reach the others; null alone.
+var world: RorWorld = null
 var substeps_wanted: int = 0
 ## Which key does what for this driver. A one-driver window keeps `DriveKeys.SOLO`; a split
 ## window hands each driver its own half of the keyboard.
@@ -147,6 +149,9 @@ func begin(delta: float) -> void:
     substeps_wanted = substeps
     if not _stepped or world_stepped:
         return
+    # Alone, its auto-lock hooks try their own nodes once a frame; a world does this for everyone.
+    if solver.hook_count() > 0:
+        solver.toggle_hooks(0, -2)
     if synchronous:
         solver.step(1.0 / DriveCfg.SUBSTEP_HZ, substeps)
     else:
@@ -214,6 +219,15 @@ func on_key(keycode: Key) -> bool:
             else:
                 _start_engine()
             print("DRIVE  engine %s" % ("running" if solver.engine_running() else "off"))
+        "hook":
+            # Upstream's `HOOK_TOGGLE` on group -1, or with Alt its `HOOK_UNLOCK` of the auto-locks.
+            var mode: int = 1 if Input.is_key_pressed(KEY_ALT) else 2
+            var group: int = -2 if mode == 1 else -1
+            if world != null:
+                world.toggle_hooks(solver, mode, group)
+            else:
+                solver.toggle_hooks(mode, group)
+            print("DRIVE  hooks %s" % ("auto-locks let go" if mode == 1 else "toggled"))
         "recover":
             _recover()
         "wheel_diffs", "axle_diffs":
