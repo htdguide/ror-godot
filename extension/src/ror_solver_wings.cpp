@@ -59,19 +59,20 @@ int RorSolver::wing_count() {
     return m_wing_set.count();
 }
 
-// A wing's induced drag as the spawner set it: (span, area, 1 left / 0 right), or all -1 for none.
-Vector3 RorSolver::wing_induced(int index) {
+// A wing's state: whether it has broken, its control surface's deflection, its angle of attack,
+// and its induced drag as the spawner set it (span, area, left; -1s for none).
+Dictionary RorSolver::wing_state(int index) {
     sync();
-    if (index < 0 || index >= m_wing_set.count() || !m_wing_set.at(index).use_induced_drag) {
-        return Vector3(-1, -1, -1);
+    Dictionary out;
+    if (index < 0 || index >= m_wing_set.count()) {
+        return out;
     }
     const RorWing &w = m_wing_set.at(index);
-    return Vector3(w.id_span, w.id_area, w.id_left ? 1.0f : 0.0f);
-}
-
-bool RorSolver::wing_broken(int index) {
-    sync();
-    return index >= 0 && index < m_wing_set.count() && m_wing_set.at(index).broken;
+    out["broken"] = w.broken;
+    out["deflection"] = w.deflection;
+    out["aoa"] = w.aoa;
+    out["induced"] = w.use_induced_drag ? Vector3(w.id_span, w.id_area, w.id_left ? 1.0f : 0.0f) : Vector3(-1, -1, -1);
+    return out;
 }
 
 // One wing on eight nodes, `params` [type, chordratio, mindef, maxdef, liftcoef, breakable, induced,
@@ -134,8 +135,7 @@ void RorSolver::bind_wing_methods() {
     ClassDB::bind_method(D_METHOD("finish_wings"), &RorSolver::finish_wings);
     ClassDB::bind_method(D_METHOD("set_aero_controls", "aileron", "rudder", "elevator", "flap"), &RorSolver::set_aero_controls);
     ClassDB::bind_method(D_METHOD("wing_count"), &RorSolver::wing_count);
-    ClassDB::bind_method(D_METHOD("wing_broken", "index"), &RorSolver::wing_broken);
-    ClassDB::bind_method(D_METHOD("wing_induced", "index"), &RorSolver::wing_induced);
+    ClassDB::bind_method(D_METHOD("wing_state", "index"), &RorSolver::wing_state);
 }
 
 } // namespace rorgd

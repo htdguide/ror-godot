@@ -104,8 +104,8 @@ func run(_harness: Node) -> Dictionary:
     # closing the vehicle, both ends at once, so its last call, the left one, stands: 1 m, 0.5 m2.
     var want: Array[Vector3] = [Vector3(4.0, 4.0, 0.0), Vector3(4.0, 4.0, 1.0), Vector3(1.0, 0.5, 1.0)]
     for i: int in 3:
-        if plane.wing_induced(i) != want[i]:
-            return fail("wing %d's induced drag is %s (span, area, left); upstream's spawner gives %s" % [i, plane.wing_induced(i), want[i]])
+        if plane.wing_state(i)["induced"] != want[i]:
+            return fail("wing %d's induced drag is %s (span, area, left); upstream's spawner gives %s" % [i, plane.wing_state(i)["induced"], want[i]])
     var report: String = "rows read, the airfoil-less wing skipped, induced drag spans and areas as upstream's spawner sets them"
 
     var root: String = SourceScan.repo_root()

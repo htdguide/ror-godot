@@ -29,6 +29,9 @@ var triggers: Array[Dictionary] = []
 ## Every `animators` row (`AnimatorRows`), with the beam defaults, detacher group and inertia
 ## defaults in force at it, as `ProcessAnimator` reads them.
 var animators: Array[Dictionary] = []
+## The aero engine rows (`turboprops2`, `pistonprops`, `turbojets`), kept for when they are built;
+## a vehicle with any is an airplane, upstream's `ar_driveable`.
+var aero_engines: Array[Dictionary] = []
 ## Every `wings` row (`WingRows`).
 var wings: Array[Dictionary] = []
 ## The folder the file was read from, where its own airfoils are; "" for text.
@@ -115,6 +118,8 @@ func read(section: String, line: String, id_to_index: Dictionary, defaults: Beam
                 "options": fields[6] if fields.size() > 6 else "", "timer": fields[7].to_float() if fields.size() > 7 else 0.0,
                 "detacher": detacher,
             })
+        "turboprops2", "pistonprops", "turbojets":
+            aero_engines.append({"section": section, "fields": fields})
         "wings":
             var wing: Dictionary = WingRows.read(fields, id_to_index)
             if (wing["error"] as String) != "":

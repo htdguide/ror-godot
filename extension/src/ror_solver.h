@@ -64,8 +64,7 @@ protected:
     void finish_wings();
     void set_aero_controls(float aileron, float rudder, float elevator, int flap);
     int wing_count();
-    bool wing_broken(int index);
-    godot::Vector3 wing_induced(int index);
+    godot::Dictionary wing_state(int index);
     static godot::PackedStringArray wing_probe(const godot::String &afl, const godot::Array &params, const godot::PackedVector3Array &start, const godot::Array &steps);
     // Upstream's animators (`ror_solver_animators.cpp`): a NaN limit is one the row did not state.
     int add_animator(int a, int b, float factor, int flags, float param, float short_limit, float long_limit,

@@ -24,6 +24,7 @@ var solver_usec: int = 0
 var wait_usec: int = 0
 
 var _built: Dictionary = {}
+var _airplane: AirplaneKeys = null
 var _throttle: float = 0.0
 var _brake: float = 0.0
 var _substep_remainder: float = 0.0
@@ -70,6 +71,7 @@ func setup(built: Dictionary) -> String:
     solver.set_gear_selector(_selector)
     _cockpit = Cockpit.build(built["root"] as Node3D, truck, built)
     _lights = DriveLights.new(truck)
+    _airplane = AirplaneKeys.new() if not truck.links.aero_engines.is_empty() else null
     _snapshot()
     _apply_pose()
     return ""
@@ -129,13 +131,9 @@ func step(delta: float) -> void:
 
 ## Reads the controls onto the rig and posts this frame's substeps to the solver's thread.
 ##
-## **The step is posted first and drawn last, inside one frame.** The first version of this drew
-## the *last* frame's step and posted this frame's, which is Rigs of Rods' own model and is one
-## frame of lag; under frame times that vary — a window with vsync off runs 9 to 13 ms — the lag
-## varies with them, and a session saw every vehicle stutter. The thread gate could not: it holds
-## positions, not when they are drawn. So the rig drawn in a frame is the rig the solver has at
-## the end of that frame, and what the thread overlaps is whatever the session does between
-## `begin` and `finish`, which is honest about how little that is at 0.5 ms a step.
+## **The step is posted first and drawn last, inside one frame.** Drawing the last frame's step
+## (Rigs of Rods' own model) is a frame of lag that varies with frame time, and a session saw every
+## vehicle stutter; so the rig drawn in a frame is the rig the solver has at the end of it.
 func begin(delta: float) -> void:
     _seconds += delta
     _read_controls(delta)
@@ -199,7 +197,7 @@ func _snapshot() -> void:
 
 
 func on_key(keycode: Key) -> bool:
-    if DriveKeys.is_cruise_key(keys, keycode):
+    if DriveKeys.is_cruise_key(keys, keycode) or (_airplane != null and _airplane.on_key(keycode)):
         return true
     var action: String = DriveKeys.action_of(keys, keycode)
     if keys == DriveKeys.SOLO and Input.is_key_pressed(KEY_SHIFT) and DriveKeys.SOLO_SHIFTED.values().has(keycode):
@@ -281,6 +279,8 @@ func hud_line() -> String:
 
 
 func _read_controls(delta: float) -> void:
+    if _airplane != null:
+        return _airplane.read(solver, delta)
     var wants_throttle: bool = DriveKeys.held(keys, "throttle")
     if not is_nan(scripted_throttle):
         wants_throttle = scripted_throttle > 0.0
