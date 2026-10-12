@@ -37,10 +37,7 @@ const METADATA_KEYWORDS: Array[String] = [
     "fileinfo",
     "guid",
     "description",
-    "end_description",
     "comment",
-    "end_comment",
-    "sectionconfig",
     "add_animation",
     "prop_camera_mode",
     "flexbody_camera_mode",
@@ -50,6 +47,9 @@ const METADATA_KEYWORDS: Array[String] = [
     "fileformatversion",
     "set_collision_range",
     "submesh_groundmodel",
+    # A module boundary. Upstream reads it at once and keeps the open section; which modules a
+    # vehicle is built from is not modelled yet, so every module is read.
+    "section",
 ]
 
 ## Keywords upstream reads on their own line, arguments and all, without changing the open
@@ -59,8 +59,7 @@ const METADATA_KEYWORDS: Array[String] = [
 ## brake of 2.75 N m.
 const LINE_SECTIONS: Array[String] = ["antilockbrakes", "tractioncontrol", "cruisecontrol"]
 
-## `forset` is deliberately absent: it belongs to the flexbody above it and that section
-## consumes it itself.
+## `forset` is deliberately absent: see `FLEXBODY_LINES`.
 const DIRECTIVES: Array[String] = [
     "set_node_defaults",
     "set_beam_defaults",
@@ -71,9 +70,34 @@ const DIRECTIVES: Array[String] = [
     "set_skeleton_settings",
     "detacher_group",
     "enable_advanced_deformation",
-    "disable_default_sounds",
     "end_section",
+    # Bare flags upstream records without changing the open section. Taken for section headers,
+    # each would have dropped every row after it until the next header.
+    "disabledefaultsounds",
+    "forwardcommands",
+    "hideinchooser",
+    "importcommands",
+    "lockgroup_default_nolock",
+    "rescuer",
+    "rollon",
+    "slidenode_connect_instantly",
+    # Upstream's obsolete keywords, ignored where they stand.
+    "envmap",
+    "hookgroup",
+    "nodecollision",
+    "rigidifiers",
+    # A stray end of a comment or description block changes nothing upstream: the block itself
+    # lasts until the next keyword, which ours already does by opening a section.
+    "end_comment",
+    "end_description",
 ]
+
+## Keywords that carry values on their line and yet open a section of their own: upstream's parser
+## does not name them in its switch, so they begin a block like any bare section header.
+const OPENS_WITH_VALUES: Array[String] = ["sectionconfig", "slopebrake"]
+
+## Flexbody lines that may stand anywhere and attach to the last flexbody, upstream's and ours.
+const FLEXBODY_LINES: Array[String] = ["forset", "forvert"]
 
 
 ## Strips a comment and surrounding whitespace. Returns "" for a line with no content.
@@ -120,6 +144,14 @@ static func directive_of(line: String) -> String:
     for directive: String in DIRECTIVES:
         if _states_keyword(line, directive):
             return directive
+    return ""
+
+
+## The keyword of `keywords` this line states, or "".
+static func keyword_in(line: String, keywords: Array[String]) -> String:
+    for keyword: String in keywords:
+        if _states_keyword(line, keyword):
+            return keyword
     return ""
 
 

@@ -65,6 +65,9 @@ const SHARES_A_PLACE_WITH: Dictionary = {
     "turboprops": "turboprops2",
 }
 
+## Bare headers that start something without leaving the open section.
+const KEEPS_THE_SECTION: PackedStringArray = ["submesh", "backmesh"]
+
 ## The last section that appends nodes. Everything ordered after this may reference what the
 ## wheel sections generated, so the generated nodes have to exist by then.
 const LAST_NODE_GENERATOR: String = "flexbodywheels"
@@ -116,11 +119,24 @@ func read(text: String) -> void:
         if keyword != "":
             _append(keyword, line, false, beams, node_defaults, inertia, detacher)
             continue
+        keyword = TruckLexer.keyword_in(line, TruckLexer.FLEXBODY_LINES)
+        if keyword != "":
+            _append("flexbodies", line, false, beams, node_defaults, inertia, detacher)
+            continue
+        keyword = TruckLexer.keyword_in(line, TruckLexer.OPENS_WITH_VALUES)
+        if keyword != "":
+            section = keyword
+            _append(section, line, true, beams, node_defaults, inertia, detacher)
+            continue
         var directive: String = TruckLexer.directive_of(line)
         if directive == "":
             if TruckLexer.is_section_header(line, section):
-                section = line.to_lower()
-                _append(section, line, true, beams, node_defaults, inertia, detacher)
+                # Upstream reads `submesh` and `backmesh` at once and keeps the open section: the
+                # group they start is filled by the `texcoords` and `cab` headers after them.
+                var opened: String = line.to_lower()
+                if not KEEPS_THE_SECTION.has(opened):
+                    section = opened
+                _append(opened, line, true, beams, node_defaults, inertia, detacher)
                 continue
             if TruckLexer.is_metadata(line):
                 continue

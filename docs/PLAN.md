@@ -1865,8 +1865,10 @@ Scope, vehicles:
   control and ABS are in, 2026-10-11/12):
   flares placed but not animated.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
-- **A section inventory as a gate**: every section upstream's `RigDef::Parser` knows, against what
-  this project reads, reported as a number. A section that is parsed and ignored counts as ignored.
+- **A section inventory as a gate**: done 2026-10-12 as `every_keyword_is_read_where_upstream_reads_it`
+  (all 120 of upstream's keywords open or keep a section as its parser does). Named gap: modules
+  (`section`, `sectionconfig`) are recognised but every module is read, so a file with alternatives
+  (the Star Monster's wheel sets) builds all of them.
 
 Scope, terrains:
 - **Procedural roads** from `.tobj` `road`/`road2`, which are reported as unread lines today.

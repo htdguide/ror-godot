@@ -18,6 +18,9 @@ extends RefCounted
 static func flexbody(
     line: String, id_to_index: Dictionary, into: Array[Dictionary], errors: PackedStringArray
 ) -> void:
+    # `forvert` overrides single vertices' bindings; not modelled, and not a flexbody either.
+    if line.to_lower().begins_with("forvert"):
+        return
     if line.begins_with("forset"):
         if into.is_empty():
             errors.append("forset before any flexbody: %s" % line)
