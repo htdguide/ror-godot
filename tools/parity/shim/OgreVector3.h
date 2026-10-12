@@ -52,6 +52,28 @@ struct Vector3 {
     }
     bool isZeroLength() const { return squaredLength() < 1e-06 * 1e-06; }
 
+    // OgreVector.h's `getRotationTo` (Sam Hocevar's "quaternion from two vectors"), reduced to the
+    // `w` of the normalised result, which is all `CalcFuseDrag` reads.
+    struct RotationW {
+        float w;
+    };
+    RotationW getRotationTo(const Vector3 &dest) const {
+        const float a = std::sqrt(squaredLength() * dest.squaredLength());
+        float b = a + dest.dotProduct(*this);
+        if (std::fabs(b - 2 * a) <= 1.192092896e-07f || a == 0) {
+            return {1.0f};
+        }
+        Vector3 axis;
+        if (b < 1e-06f * a) {
+            b = 0.0f;
+            axis = std::fabs(x) > std::fabs(z) ? Vector3(-y, x, 0.0f) : Vector3(0.0f, -z, y);
+        } else {
+            axis = crossProduct(dest);
+        }
+        const float len = std::sqrt(b * b + axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
+        return {len > 0.0f ? b * (1.0f / len) : b};
+    }
+
     Vector3 operator+(const Vector3 &o) const { return Vector3(x + o.x, y + o.y, z + o.z); }
     Vector3 operator-(const Vector3 &o) const { return Vector3(x - o.x, y - o.y, z - o.z); }
     Vector3 operator*(float s) const { return Vector3(x * s, y * s, z * s); }

@@ -470,6 +470,7 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("add_wheel_detacher", "wheel", "group"), &RorSolver::add_wheel_detacher);
     ClassDB::bind_method(D_METHOD("wheel_detached", "wheel"), &RorSolver::wheel_detached);
     ClassDB::bind_method(D_METHOD("beam_pass_probe", "passes"), &RorSolver::beam_pass_probe);
+    ClassDB::bind_method(D_METHOD("air_drag_probe"), &RorSolver::air_drag_probe);
     ClassDB::bind_method(D_METHOD("set_beam_shock", "beam", "rates", "soft_bump"), &RorSolver::set_beam_shock);
     ClassDB::bind_method(D_METHOD("shock_law_probe", "kind", "rates", "soft_bump", "beam", "extension", "v"),
                          &RorSolver::shock_law_probe);

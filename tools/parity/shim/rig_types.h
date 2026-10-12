@@ -25,6 +25,8 @@ struct node_t {
     // What `Actor::CalcWheels` reads.
     bool nd_has_ground_contact = false;
     bool nd_has_mesh_contact = false;
+    // What `Actor::CalcFuseDrag` reads.
+    Ogre::Vector3 AbsPosition;
 };
 
 // Upstream's ground_model_t, reduced to the fields the contact law reads. The defaults are

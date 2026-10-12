@@ -31,6 +31,7 @@ WANTED = [
     ),
     ("main/physics/ActorForcesEuler.cpp", "void Actor::CalcBeams(bool trigger_hooks)"),
     ("main/physics/ActorForcesEuler.cpp", "void Actor::CalcWheels(bool doUpdate, int num_steps)"),
+    ("main/physics/ActorForcesEuler.cpp", "void Actor::CalcFuseDrag()"),
     ("main/physics/Actor.cpp", "int Actor::GetNumActiveConnectedBeams(int nodeid)"),
     ("main/physics/Differentials.cpp", "void Differential::CalcSeparateDiff(DifferentialData& diff_data)"),
     ("main/physics/Differentials.cpp", "void Differential::CalcOpenDiff(DifferentialData& diff_data)"),

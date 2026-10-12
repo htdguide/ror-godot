@@ -36,6 +36,12 @@
 //   out: one line per node: fx fy fz; one per wheel: last_torque speed avg_speed last_retorque
 //        tc_coef alb_coef net_rp; then: wheel_spin wheel_speed tc_active abs_active
 //
+// A line starting `fuse` runs `Actor::CalcFuseDrag`, the back node the front node as upstream's
+// spawner leaves it:
+//
+//   in:  fuse node_count width vx vy vz altitude
+//   out: fx fy fz   (the force every node is given)
+//
 // A line starting `diff` runs one of `Differential`'s four laws:
 //
 //   in:  diff <s|o|v|l> speed0 speed1 in_torque dt delta_rotation
@@ -251,10 +257,35 @@ static bool run_wheels(const std::string &header) {
     return true;
 }
 
+static bool run_fuse(const std::string &line) {
+    int node_count = 0;
+    node_t front;
+    RoR::Actor actor;
+    if (std::sscanf(line.c_str(), "fuse %d %f %f %f %f %f", &node_count, &actor.m_fusealge_width, &front.Velocity.x,
+                    &front.Velocity.y, &front.Velocity.z, &front.AbsPosition.y) != 6) {
+        return false;
+    }
+    Airfoil airfoil;
+    actor.m_fusealge_airfoil = &airfoil;
+    actor.m_fusealge_front = &front;
+    actor.m_fusealge_back = &front;
+    actor.ar_num_nodes = node_count;
+    actor.CalcFuseDrag();
+    std::printf("%.9g %.9g %.9g\n", actor.ar_fusedrag.x, actor.ar_fusedrag.y, actor.ar_fusedrag.z);
+    return true;
+}
+
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("fuse", 0) == 0) {
+            if (!run_fuse(line)) {
+                std::fprintf(stderr, "oracle: malformed fuse case: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("wheels", 0) == 0) {

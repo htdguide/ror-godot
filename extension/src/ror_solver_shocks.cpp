@@ -136,6 +136,19 @@ PackedVector3Array RorSolver::beam_pass_probe(int passes) {
     return out;
 }
 
+PackedVector3Array RorSolver::air_drag_probe() {
+    sync();
+    for (RorNode &node : m_nodes) {
+        node.forces = Vector3();
+    }
+    apply_air_drag();
+    PackedVector3Array out;
+    for (const RorNode &node : m_nodes) {
+        out.push_back(node.forces);
+    }
+    return out;
+}
+
 Vector2 RorSolver::shock_law_probe(int kind, const PackedFloat32Array &rates, bool soft_bump,
                                    const PackedFloat32Array &beam, float extension, float v) const {
     const BeamBound bound = static_cast<BeamBound>(kind);

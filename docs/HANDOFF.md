@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-189 gates; `--all --every` 189 of 189 at the wheel pass commit (2026-10-12). `--order-check` has one
+190 gates; `--all --every` 190 of 190 at the fuselage drag commit (2026-10-12). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 
@@ -280,8 +280,8 @@ What M1 still owes is human: 5 below.
   of 0.7%. Note the tension with the 2 kHz result: the rig is *stable* at 2 kHz and not *quiet*
   there. Do not fix this by raising the rate without saying so. **Most of it was float32 distance**:
   at La Paz's spawn it rang 1.97 m/s against 0.46 at 50 m; frames make it 0.48 (PLAN §0.12).
-  - **It makes a parked truck creep downhill** at half its friction limit: 3.1 m in 3 s at 0.5 g
-    on La Paz asphalt (`harness/dev/lean_probe.gd`); tread damping x3 gives 0.22 m. Upstream's law.
+  - **It makes a parked truck creep downhill** at half its friction limit: 2.8 m in 3 s at 0.5 g
+    on La Paz asphalt (`harness/dev/lean_probe.gd`); tread damping x3 gives 0.32 m. Upstream's law.
 - **It rolls over more easily than the numbers say it should.** The centre of mass is 0.762 m above
   the contact patch over a 1.80 m track, a 1.18 g static rollover threshold, better than a real
   lifted S10. Every surface being `concrete` was the suspected cause and that is fixed, so this
@@ -289,8 +289,7 @@ What M1 still owes is human: 5 below.
 
 **6. Fidelity gaps that are named rather than forgotten.**
 
-- The hero truck declares a `fusedrag` section. Upstream gives such a rig a single fuselage drag
-  vector instead of the per-node drag it currently gets.
+- `fusedrag` rigs are dragged as one body by upstream's `CalcFuseDrag` (`fuselage_drag_is_upstreams`).
 - `contacters`, flexbody rims, node option `c` and self-collision (on, owner's call) are in (PLAN §0.12;
   gates `a_vehicle_collides_with_…`, `a_node_marked_c_…`, `a_vehicle_does_not_fold_…`).
 - Differentials are upstream's (`ror_differentials.cpp`): `axles`/`interaxles` rows, the automatic
@@ -308,9 +307,9 @@ What M1 still owes is human: 5 below.
 ## Checking against Rigs of Rods itself
 
 `tools/build_parity.sh` extracts functions from the pinned upstream submodule, compiles them on their
-own against a shim in `tools/parity/shim/`; the contact, shock, differential, beam and wheel pass gates compare
-them with ours case by case, both built with `-ffp-contract=off` (no fused multiply-adds). Nothing is
-copied into the tree; a rename upstream fails extraction rather than comparing against a stale copy.
+own against a shim in `tools/parity/shim/`, and the contact, shock, differential, beam, wheel and
+fuselage drag gates compare them with ours case by case, both built with `-ffp-contract=off` (no
+fused multiply-adds). Nothing is copied into the tree; a rename upstream fails extraction.
 
 **Upstream's physics is not exact arithmetic and must not be implemented as though it were.**
 `approx_exp` is three integer operations on a float's bit pattern; `fast_invSqrt` is the Quake

@@ -265,6 +265,8 @@ public:
     // Runs the beam pass alone `passes` times, forces cleared before each and nothing integrated,
     // and returns every node's force: upstream's `CalcBeams`, for comparison case by case.
     godot::PackedVector3Array beam_pass_probe(int passes);
+    // The air drag pass alone, forces cleared first: every node's force.
+    godot::PackedVector3Array air_drag_probe();
 
     // --- Wheels -----------------------------------------------------------------
     // `first_tread` and `tread_count` name the generated tread nodes, which alternate

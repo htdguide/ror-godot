@@ -41,13 +41,18 @@ void apply_fuselage_drag(NodeArray &nodes, int front_node, float width) {
     if (wind_speed <= 0.0f) {
         return;
     }
-    // Upstream's tropospheric model, valid to 11 km.
+    // Upstream's tropospheric model, valid to 11 km, with its approximate power and its double
+    // literals. A frame shifts only x and z, so the local height is the altitude.
     const float altitude = static_cast<float>(front.position.y);
-    const float pressure = 101325.0f * std::pow(1.0f - 0.0065f * altitude / 288.1f, 5.24947f);
+    const float sea_level_pressure = 101325;
+    const float pressure = static_cast<float>(
+            sea_level_pressure * approx_pow(static_cast<float>(1.0 - 0.0065 * altitude / 288.1), 5.24947f));
     const float density = pressure * 0.0000120896f;
-    const float plate = width * width * 0.5f;
-    const Vector3 per_node =
-        wind * (plate * 0.5f * density * wind_speed / static_cast<float>(nodes.size()));
+    // The airfoil term, `cx * s`, has `s` = 0: see above.
+    const float cx_s = 0.0f;
+    const float scale = static_cast<float>((cx_s + width * width * 0.5) * 0.5 * density * wind_speed /
+                                           static_cast<int>(nodes.size()));
+    const Vector3 per_node = wind * scale;
     for (RorNode &node : nodes) {
         node.forces += per_node;
     }

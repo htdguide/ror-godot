@@ -107,6 +107,13 @@ struct wheeldetacher_t {
 #define SOUND_STOP(...) ((void)0)
 #define TOSTRING(x) std::to_string(x)
 
+// Upstream's `Airfoil`: `CalcFuseDrag` asks it for the fuselage's drag coefficient and multiplies
+// it by the fuselage's side area, which is zero because the spawner sets its back node to its front
+// node. Any finite answer gives the same result.
+struct Airfoil {
+    void getparams(float, float, float, float *cl, float *cd, float *cm) { *cl = 0.5f; *cd = 0.3f; *cm = 0.0f; }
+};
+
 namespace RoR {
 template <size_t N> struct Str {
     std::ostringstream out;
@@ -162,6 +169,14 @@ public:
     Ogre::Vector3 direction;
     Ogre::Vector3 getDirection() { return direction; }
     void CalcWheels(bool doUpdate, int num_steps);
+    // What `CalcFuseDrag` reads and writes.
+    Airfoil *m_fusealge_airfoil = nullptr;
+    node_t *m_fusealge_front = nullptr;
+    node_t *m_fusealge_back = nullptr;
+    float m_fusealge_width = 0.0f;
+    Ogre::Vector3 ar_fusedrag;
+    int ar_num_nodes = 0;
+    void CalcFuseDrag();
 
     template <size_t N> void LogBeamNodes(Str<N> &, beam_t &) {}
     void CalcTriggers(int, Real, bool) {}
