@@ -27,8 +27,11 @@ static func read(fields: PackedStringArray, id_to_index: Dictionary) -> Dictiona
     var surface: String = fields[16].substr(0, 1) if fields.size() > 16 else "n"
     if not SURFACES.contains(surface) or surface.is_empty():
         surface = "n"
+    var tex: PackedFloat32Array = PackedFloat32Array()
+    for i: int in range(8, 16):
+        tex.append(fields[i].to_float())
     return {
-        "error": "", "nodes": nodes, "type": surface,
+        "error": "", "nodes": nodes, "type": surface, "tex": tex,
         "chord_point": fields[17].to_float() if fields.size() > 17 else -1.0,
         "min_deflection": fields[18].to_float() if fields.size() > 18 else -1.0,
         "max_deflection": fields[19].to_float() if fields.size() > 19 else -1.0,

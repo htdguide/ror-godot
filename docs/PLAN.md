@@ -1885,7 +1885,9 @@ Scope, vehicles:
   A vehicle with aero engine rows flies on upstream's airplane keys (arrows, Z/X, B, P, 1/2,
   PgUp/PgDn, Ctrl+Home, R; `aircraft_controls_are_upstreams`). Turboprops, piston props and
   turbojets are upstream's, with the prop wash over the wings (`the_aero_engine_is_upstreams`,
-  bit-identical; all 67 corpus engines build). Next: the wing mesh; then a first flight in a window.
+  bit-identical; all 67 corpus engines build). Wings are drawn as upstream's mesh, control surfaces
+  swinging, stabilators turning, broken wings gone (`a_wing_is_drawn_as_upstream_meshes_it`). Next:
+  a first flight in a window, the user's judgement.
   Not in: the autopilot, air brakes, screw props, hydros' aileron/rudder/elevator flags.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
 - **A section inventory as a gate**: done 2026-10-12 as `every_keyword_is_read_where_upstream_reads_it`

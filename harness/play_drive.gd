@@ -1,7 +1,6 @@
 class_name PlayDrive
 extends RefCounted
 ## Drives a built vehicle from the keyboard: the solver runs, the rig moves, the mesh follows.
-##
 ## Everything a person needs in order to say whether the thing drives right, and nothing
 ## else. The controls are read here, the solver is stepped here, and the pose is pushed to
 ## the renderer here, so there is one place to look when the window and the gates disagree.
@@ -72,6 +71,7 @@ func setup(built: Dictionary) -> String:
     _cockpit = Cockpit.build(built["root"] as Node3D, truck, built)
     _lights = DriveLights.new(truck)
     _airplane = AirplaneKeys.new() if not truck.links.aero_engines.is_empty() else null
+    _built["solver"] = solver
     _snapshot()
     _apply_pose()
     return ""

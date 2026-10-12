@@ -71,6 +71,9 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
     )
     parts.append_array(cab_parts)
     built += cab_parts.size()
+    # Wings, drawn as upstream's FlexAirfoil meshes them, in the cab's material.
+    var wings: Array[Dictionary] = WingMesh.build(root, truck, MeshAssembler.material_for(
+        truck.cab_material, truck, mod_dir, dds_reader, textures, scripts))
 
     var prop_nodes: Array[Node3D] = []
     for entry: Dictionary in truck.props:
@@ -126,6 +129,7 @@ static func build(mod_dir: String, truck_file: String) -> Dictionary:
         "frame_origin": render_frame.origin,
         "parts": parts,
         "cab_parts": cab_parts.size(),
+        "wings": wings,
         "wheel_nodes": wheel_nodes,
         "prop_nodes": prop_nodes,
         "lamps": lamps,
@@ -212,6 +216,7 @@ static func apply_pose(
     for i: int in prop_frames.size():
         prop_nodes[i].transform = prop_frames[i]
     FlareBuilder.apply_pose(built["lamps"] as Array[Node3D], truck, nodes, actor)
+    WingMesh.apply(built.get("wings", [] as Array[Dictionary]), nodes, to_local, built.get("solver"))
     # Wheels follow their own axle nodes, so suspension travel moves them.
     for i: int in wheel_frames.size():
         wheel_nodes[i].transform = wheel_frames[i]
