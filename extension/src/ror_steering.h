@@ -18,9 +18,14 @@ namespace rorgd {
 // rack but never moves it.
 class RorSteering {
 public:
+    // Upstream's `HydroFlags`: what a hydro follows. A row with no options steers (`DIR`).
+    enum : uint32_t {
+        HYDRO_SPEED = 1u << 0, HYDRO_DIR = 1u << 1, HYDRO_AILERON = 1u << 2, HYDRO_RUDDER = 1u << 3,
+        HYDRO_ELEVATOR = 1u << 4, HYDRO_REV_AILERON = 1u << 5, HYDRO_REV_RUDDER = 1u << 6, HYDRO_REV_ELEVATOR = 1u << 7,
+    };
     // `factor` is the row's stated fraction of rest length, signed: the rams on opposite
     // sides of a rack carry opposite signs so one pushes while the other pulls.
-    void add_hydro(int beam_index, float factor);
+    void add_hydro(int beam_index, float factor, uint32_t flags = HYDRO_DIR);
     // An `animators` row: a hydro moved by what `flags` (upstream's `hb_anim_flags`) read rather
     // than by the steering, its factor clamped by its beam's own bounds. Returns its hydro index.
     int add_animator(int beam_index, float factor, uint32_t flags, float param);
@@ -33,6 +38,10 @@ public:
     // falls with road speed, so a rig cannot be flicked to full lock at 100 km/h, and
     // self-centres towards zero whenever the driver is not asking.
     float state() const { return m_state; }
+    // An airplane's controls as its hydros follow them (`ar_hydro_aileron_command` and the others),
+    // each state chasing its command at 4 a second and falling back at 1.
+    void set_surface_commands(float aileron, float rudder, float elevator);
+    float surface_state(int k) const { return m_surface_state[k]; }
 
     // `inputs` is what the animators read this substep; null when the vehicle has none.
     void update(float dt, float road_speed, BeamArray &beams, const RorAnimatorInputs *inputs = nullptr);
@@ -49,6 +58,7 @@ private:
     struct Hydro {
         int beam = 0;
         float factor = 0.0f;
+        uint32_t flags = 0;
         uint32_t anim_flags = 0;
         float anim_param = 0.0f;
         RorKeyInertia inertia;
@@ -59,6 +69,9 @@ private:
     std::vector<Hydro> m_hydros;
     float m_command = 0.0f;
     float m_state = 0.0f;
+    // Aileron, rudder, elevator: commands, then states.
+    float m_surface_command[3] = {0.0f, 0.0f, 0.0f};
+    float m_surface_state[3] = {0.0f, 0.0f, 0.0f};
 };
 
 } // namespace rorgd

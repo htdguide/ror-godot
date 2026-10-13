@@ -17,6 +17,9 @@ extends RefCounted
 const SECTIONS: PackedStringArray = ["commands", "commands2"]
 ## Upstream's `Inertia` before any `set_inertia_defaults`: no delay, no curves.
 const NO_INERTIA: Dictionary = {"start_delay": 0.0, "stop_delay": 0.0, "start_function": "", "stop_function": ""}
+## Upstream's hydro options and the `HydroFlags` each gives (`ProcessHydro`): speed 1, steering 2,
+## aileron 4, rudder 8, elevator 16, and the three reversed 32, 64, 128.
+const HYDRO_FLAGS: Dictionary = {"s": 1, "n": 2, "a": 4, "r": 8, "e": 16, "u": 20, "v": 48, "x": 12, "y": 40, "g": 24, "h": 136, "j": 0}
 
 
 ## Appends the row's command to `out` when `section` is a command section. `beam` is the index
@@ -29,7 +32,24 @@ static func hydro(fields: PackedStringArray, beam: int, factor: float, defaults:
     for i: int in 4:
         if fields.size() > 4 + i:
             inertia[keys[i]] = fields[4 + i].to_float() if i < 2 else fields[4 + i]
-    return {"beam": beam, "factor": factor, "inertia": inertia, "inertia_defaults": defaults}
+    return {"beam": beam, "factor": factor, "flags": hydro_flags(fields[3] if fields.size() > 3 else ""),
+            "inertia": inertia, "inertia_defaults": defaults}
+
+
+## Upstream's `GetArgHydroOptions`, then `ParseHydros`' default: `i` steers when nothing came before
+## it, and a row with no option it knows steers; `j` (invisible) follows nothing on its own.
+static func hydro_flags(options: String) -> int:
+    var flags: int = 0
+    var any: bool = false
+    for c: String in options:
+        if c == "i":
+            if not any:
+                flags |= 2
+            any = true
+        elif HYDRO_FLAGS.has(c):
+            flags |= HYDRO_FLAGS[c] as int
+            any = true
+    return flags if any else 2
 
 
 ## `defaults` is the `set_inertia_defaults` in force, as `inertia_defaults` reads it.

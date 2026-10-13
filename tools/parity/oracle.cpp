@@ -421,6 +421,7 @@ static bool run_turbo(const std::string &line) {
 // The trigger and animator modes, in oracle_trigger.cpp and oracle_anim.cpp.
 bool run_trigger(const std::string &line);
 bool run_anim(const std::string &line);
+bool run_hydro(const std::string &line);
 bool run_wing(const std::string &line);
 bool run_aero(const std::string &line);
 
@@ -440,6 +441,13 @@ int main() {
         if (line.rfind("wing", 0) == 0) {
             if (!run_wing(line)) {
                 std::fprintf(stderr, "oracle: malformed wing case: %s\n", line.c_str());
+                return 2;
+            }
+            continue;
+        }
+        if (line.rfind("hydro", 0) == 0) {
+            if (!run_hydro(line)) {
+                std::fprintf(stderr, "oracle: malformed hydro case: %s\n", line.c_str());
                 return 2;
             }
             continue;

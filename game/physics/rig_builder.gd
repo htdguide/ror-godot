@@ -256,7 +256,7 @@ static func _add_wheels(solver: RefCounted, truck: TruckParser) -> void:
 static func _add_steering(solver: RefCounted, truck: TruckParser) -> void:
     for hydro: Dictionary in truck.hydros:
         var before: int = solver.hydro_count()
-        solver.add_hydro(hydro["beam"] as int, hydro["factor"] as float)
+        solver.add_hydro(hydro["beam"] as int, hydro["factor"] as float, hydro.get("flags", 2) as int)
         # Upstream's `ProcessHydro` gives each hydro its own inertia, by the commands' rule.
         var inertia: Array = CommandRows.key_inertia(hydro)
         if not inertia.is_empty() and solver.hydro_count() > before:

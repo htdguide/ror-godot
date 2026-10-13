@@ -76,7 +76,7 @@ protected:
                      float spring, float damp, float strength, int detacher_group);
     void set_camera_roll_node(int node);
     void set_speedo_max(float kph);
-    static godot::PackedStringArray animator_probe(const godot::Array &rows, const godot::Array &steps);
+    static godot::PackedStringArray animator_probe(const godot::Array &rows, const godot::Array &steps), hydro_probe(const godot::Array &rows, const godot::Array &steps);
     // Upstream's triggers (`ror_solver_triggers.cpp`): a `triggers` row each, the beam index or -1
     // when upstream deactivates the row.
     int add_trigger(int a, int b, float contraction_limit, float expansion_limit, int short_action, int long_action,
@@ -426,7 +426,7 @@ public:
     float road_speed() const;
 
     // --- Steering ---------------------------------------------------------------
-    void add_hydro(int beam, float factor);
+    void add_hydro(int beam, float factor, int flags = 2);
     int hydro_count() const;
     void set_steer_command(float command);
     float steer_state() const;

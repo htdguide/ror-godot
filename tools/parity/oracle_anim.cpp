@@ -76,3 +76,51 @@ bool run_anim(const std::string &line) {
     }
     return true;
 }
+
+// `hydro n_hydros n_steps`, then per hydro "flags factor ref_length", then per step "steer_command
+// aileron rudder elevator wheel_speed". Speed coupling on, as ours steers. Prints per step every
+// hydro beam's length and the steering's and three surfaces' states.
+bool run_hydro(const std::string &line) {
+    std::istringstream in(line.substr(5));
+    int n_hydros = 0, n_steps = 0;
+    if (!(in >> n_hydros >> n_steps)) {
+        return false;
+    }
+    RoR::Actor actor;
+    actor.beams.resize(static_cast<size_t>(n_hydros));
+    actor.ar_beams = actor.beams.data();
+    actor.ar_num_beams = n_hydros;
+    actor.ar_hydro_speed_coupling_active = true;
+    actor.ar_hydro_speed_coupling_enabled = true;
+    for (int i = 0; i < n_hydros; ++i) {
+        hydrobeam_t hb;
+        float ref = 0;
+        in >> hb.hb_flags >> hb.hb_speed >> ref;
+        hb.hb_beam_index = static_cast<uint16_t>(i);
+        hb.hb_ref_length = ref;
+        actor.beams[static_cast<size_t>(i)].L = ref;
+        actor.ar_hydros.push_back(hb);
+    }
+    for (int step = 0; step < n_steps; ++step) {
+        float steer = 0;
+        in >> steer >> actor.ar_hydro_aileron_command >> actor.ar_hydro_rudder_command >>
+                actor.ar_hydro_elevator_command >> actor.ar_wheel_speed;
+        if (!in) {
+            return false;
+        }
+        // Ours clamps the steering command as it is set, as upstream's input does.
+        actor.ar_hydro_dir_command = steer < -1.0f ? -1.0f : (steer > 1.0f ? 1.0f : steer);
+        actor.CalcHydros();
+        std::string out;
+        char buffer[48];
+        for (int i = 0; i < n_hydros; ++i) {
+            std::snprintf(buffer, sizeof buffer, "%.9g ", actor.beams[static_cast<size_t>(i)].L);
+            out += buffer;
+        }
+        std::snprintf(buffer, sizeof buffer, "| %.9g %.9g %.9g %.9g", actor.ar_hydro_dir_state,
+                      actor.ar_hydro_aileron_state, actor.ar_hydro_rudder_state, actor.ar_hydro_elevator_state);
+        out += buffer;
+        std::printf("%s\n", out.c_str());
+    }
+    return true;
+}

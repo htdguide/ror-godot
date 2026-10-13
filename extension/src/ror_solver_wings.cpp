@@ -1,5 +1,7 @@
 #include "ror_solver.h"
 
+#include <algorithm>
+
 #include "ror_aero.h"
 
 #include <godot_cpp/core/class_db.hpp>
@@ -119,6 +121,9 @@ void RorSolver::finish_wings() {
 void RorSolver::set_aero_controls(float aileron, float rudder, float elevator, int flap) {
     sync();
     m_wing_set.set_controls(aileron, rudder, elevator, flap);
+    // Upstream's `ar_hydro_*_command`, the controls clamped as the wings read them.
+    m_steering.set_surface_commands(std::clamp(aileron, -1.0f, 1.0f), std::clamp(rudder, -1.0f, 1.0f),
+            std::clamp(elevator, -1.0f, 1.0f));
 }
 
 int RorSolver::wing_count() {

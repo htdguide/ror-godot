@@ -340,10 +340,10 @@ float RorSolver::road_speed() const {
 
 // --- Steering -------------------------------------------------------------------
 
-void RorSolver::add_hydro(int beam, float factor) {
+void RorSolver::add_hydro(int beam, float factor, int flags) {
     sync();
     if (beam >= 0 && beam < static_cast<int>(m_beams.size())) {
-        m_steering.add_hydro(beam, factor);
+        m_steering.add_hydro(beam, factor, static_cast<uint32_t>(flags));
     }
 }
 
@@ -550,7 +550,7 @@ void RorSolver::_bind_methods() {
     ClassDB::bind_method(D_METHOD("has_engine"), &RorSolver::has_engine);
     ClassDB::bind_method(D_METHOD("road_speed"), &RorSolver::road_speed);
 
-    ClassDB::bind_method(D_METHOD("add_hydro", "beam", "factor"), &RorSolver::add_hydro);
+    ClassDB::bind_method(D_METHOD("add_hydro", "beam", "factor", "flags"), &RorSolver::add_hydro, DEFVAL(2));
     ClassDB::bind_method(D_METHOD("hydro_count"), &RorSolver::hydro_count);
     ClassDB::bind_method(D_METHOD("set_steer_command", "command"), &RorSolver::set_steer_command);
     ClassDB::bind_method(D_METHOD("steer_state"), &RorSolver::steer_state);

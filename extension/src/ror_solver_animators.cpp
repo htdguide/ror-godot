@@ -135,8 +135,41 @@ PackedStringArray RorSolver::animator_probe(const Array &rows, const Array &step
     return out;
 }
 
+// `rows` each [flags, factor, ref_length]; `steps` each [steer command, aileron, rudder, elevator,
+// wheel speed]. Per step, `hydros_follow_their_flags_as_upstreams`' line: every hydro beam's length,
+// then the steering's and the three surfaces' states.
+PackedStringArray RorSolver::hydro_probe(const Array &rows, const Array &steps) {
+    RorSteering steering;
+    BeamArray beams(static_cast<size_t>(rows.size()));
+    for (int i = 0; i < rows.size(); ++i) {
+        const Array row = rows[i];
+        beams[static_cast<size_t>(i)].reference_length = row[2];
+        beams[static_cast<size_t>(i)].rest_length = row[2];
+        steering.add_hydro(i, row[1], static_cast<uint32_t>(static_cast<int64_t>(row[0])));
+    }
+    PackedStringArray out;
+    for (int step = 0; step < steps.size(); ++step) {
+        const PackedFloat32Array v = steps[step];
+        steering.set_command(v[0]);
+        steering.set_surface_commands(v[1], v[2], v[3]);
+        steering.update(0.0005f, v[4], beams);
+        std::string line;
+        char buffer[48];
+        for (const RorBeam &beam : beams) {
+            std::snprintf(buffer, sizeof buffer, "%.9g ", beam.rest_length);
+            line += buffer;
+        }
+        std::snprintf(buffer, sizeof buffer, "| %.9g %.9g %.9g %.9g", steering.state(), steering.surface_state(0),
+                      steering.surface_state(1), steering.surface_state(2));
+        line += buffer;
+        out.push_back(String(line.c_str()));
+    }
+    return out;
+}
+
 void RorSolver::bind_animator_methods() {
     ClassDB::bind_static_method("RorSolver", D_METHOD("animator_probe", "rows", "steps"), &RorSolver::animator_probe);
+    ClassDB::bind_static_method("RorSolver", D_METHOD("hydro_probe", "rows", "steps"), &RorSolver::hydro_probe);
     ClassDB::bind_method(D_METHOD("add_animator", "a", "b", "factor", "flags", "param", "short_limit", "long_limit",
                                   "spring", "damp", "strength", "detacher_group"),
                          &RorSolver::add_animator);
