@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-208 gates; `--all --every` 208 of 208 at the wing-mesh commit (2026-10-13). `--order-check` has one
+211 gates; 211 of 211 at the hydro-flags commit (2026-10-13), in ten batches: six `--all --every` runs that day ended early, the engine exiting 0 mid-suite with no `HARNESS_QUIT` line (open). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 

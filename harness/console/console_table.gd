@@ -302,5 +302,6 @@ func transcript() -> PackedStringArray:
 func _cmd_quit(_args: PackedStringArray, harness_node: Node) -> Dictionary:
     if harness_node == null:
         return ConsoleResult.err("no harness to quit")
+    print("HARNESS_QUIT {\"code\": 0, \"from\": \"the console's quit\"}")
     harness_node.get_tree().quit(0)
     return ConsoleResult.ok("quitting")

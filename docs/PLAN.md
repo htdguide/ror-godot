@@ -1886,9 +1886,17 @@ Scope, vehicles:
   PgUp/PgDn, Ctrl+Home, R; `aircraft_controls_are_upstreams`). Turboprops, piston props and
   turbojets are upstream's, with the prop wash over the wings (`the_aero_engine_is_upstreams`,
   bit-identical; all 67 corpus engines build). Wings are drawn as upstream's mesh, control surfaces
-  swinging, stabilators turning, broken wings gone (`a_wing_is_drawn_as_upstream_meshes_it`). Next:
-  a first flight in a window, the user's judgement.
-  Not in: the autopilot, air brakes, screw props, hydros' aileron/rudder/elevator flags.
+  swinging, stabilators turning, broken wings gone (`a_wing_is_drawn_as_upstream_meshes_it`). Hydros
+  follow their option letters as upstream's `CalcHydros` moves them: steering, speed, aileron,
+  rudder, elevator and the mixes (`hydros_follow_their_flags_as_upstreams`, bit-identical); before,
+  every hydro steered and the Spitfire's elevators and rudder moved with its ailerons. The play
+  window shows on-screen airplane buttons for keyboards without Home and PgUp/PgDn
+  (`the_airplane_pad_presses_the_airplane_keys`). First flights in a window, 2026-10-13: the user
+  found the controls right once the hydro flags were in.
+  Not in: the autopilot, air brakes, screw props.
+- **`forset` read as upstream reads it** (2026-10-13, `a_forset_is_read_as_upstream_reads_it`):
+  "0 - 36" is a range, not nodes 0 and 36, and a vertex on a flat triad binds at zero as upstream's
+  `Matrix3::Inverse` leaves it. The Spitfire's fuselage and canopy had bound to two nodes.
 - **Every ground type**: `.truck`, `.load`, `.trailer`, `.car`, `.fixed`.
 - **A section inventory as a gate**: done 2026-10-12 as `every_keyword_is_read_where_upstream_reads_it`
   (all 120 of upstream's keywords open, keep or close a section as its parser does). Modules

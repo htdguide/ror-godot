@@ -99,7 +99,7 @@ func setup(camera: Camera3D, world: Node3D, weather: String, vehicle: Dictionary
         _map.name = ""
         _main_menu = MainMenu.new()
         add_child(_main_menu)
-        _main_menu.setup(_graphics, _start_game, func() -> void: get_tree().quit(0),
+        _main_menu.setup(_graphics, _start_game, func() -> void: _quit_from("the main menu"),
             func() -> void: _apply_graphics())
         _main_menu.open()
     _map.build()
@@ -214,7 +214,13 @@ func _on_key(keycode: Key) -> void:
                 _menu.toggle()
                 print("PLAY  settings %s" % ("open" if _menu.is_open() else "closed"))
             else:
-                get_tree().quit(0)
+                _quit_from("Esc")
+
+
+## Every way a person ends the session, said on the way out: a run that stops early names why.
+func _quit_from(where: String) -> void:
+    print("HARNESS_QUIT {\"code\": 0, \"from\": \"%s\"}" % where)
+    get_tree().quit(0)
 
 
 func _set_looking(looking: bool) -> void:
@@ -277,7 +283,7 @@ func _build_menu(weather: String) -> PlayMenu:
         func(name: String) -> void: _weather.apply(_world, name),
         func(hour: float) -> void: _weather.set_hour(_world, hour),
         func(key: String, value: float) -> void: _weather.set_override(_world, key, value),
-        func() -> void: get_tree().quit(0),
+        func() -> void: _quit_from("the settings panel"),
         func(name: String) -> void: _change_map(name),
         func(name: String) -> void: _change_vehicle(name),
         func() -> Dictionary: return _weather.state()

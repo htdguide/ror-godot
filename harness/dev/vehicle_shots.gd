@@ -62,6 +62,12 @@ func _initialize() -> void:
     var angles: PackedFloat32Array = PackedFloat32Array()
     for wheel: int in solver.wheel_count():
         angles.append(solver.get_wheel_rotation(wheel))
+    # Optional fourth argument, "aileron,rudder,elevator,flap": an aircraft's wings deflected so.
+    built["solver"] = solver
+    if argv.size() > 3:
+        var c: PackedFloat64Array = argv[3].split_floats(",")
+        solver.set_aero_controls(c[0], c[1], c[2], int(c[3]))
+        solver.step(1.0 / 2000.0, 1000)
     # "nopose" leaves the vehicle exactly as `VehicleBuilder.build` left it, which is the state
     # `vehicle_assembly` measures. Driving it is what a window does, and the two are not the same.
     if (argv[2] if argv.size() > 2 else "") != "nopose":
@@ -76,6 +82,12 @@ func _initialize() -> void:
             node.visible = only == "rigid"
         for node: Node3D in built["wheel_nodes"] as Array[Node3D]:
             node.visible = only == "rigid"
+    if only == "nowings" or only == "wings":
+        for wing: Dictionary in built["wings"] as Array[Dictionary]:
+            (wing["instance"] as Node3D).visible = only == "wings"
+        if only == "wings":
+            for part: SkinnedFlexbody in built["parts"] as Array[SkinnedFlexbody]:
+                part.mesh_instance.visible = false
     _bounds = VehicleBuilder.world_bounds(_root)
     _interior = _bounds.get_center()
     print("%s: %d parts, bounds %.2f x %.2f x %.2f m at %v" % [

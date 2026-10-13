@@ -120,9 +120,10 @@ static func bind(
             triad_index[key] = triads.size()
             triads.append(triad)
         bone_of_vertex[i] = triad_index[key] as int
-        coords[i] = FlexReference.triad_transform(
-            nodes, triad.x, triad.y, triad.z, Vector3.ZERO
-        ).affine_inverse() * vertices[i]
+        # Upstream's `Matrix3::Inverse` gives zero for a flat triad (determinant 1e-6 or less), so
+        # such a vertex sits on its reference node.
+        var frame: Transform3D = FlexReference.triad_transform(nodes, triad.x, triad.y, triad.z, Vector3.ZERO)
+        coords[i] = Vector3.ZERO if absf(frame.basis.determinant()) <= 1e-6 else frame.affine_inverse() * vertices[i]
 
     return {"triads": triads, "bone_of_vertex": bone_of_vertex, "coords": coords}
 
