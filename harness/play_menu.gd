@@ -162,6 +162,8 @@ func refresh() -> void:
 func _build() -> void:
     var centre: CenterContainer = CenterContainer.new()
     centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+    # Over the whole window even with the panel shut: it must let clicks through to what is under it.
+    centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
     add_child(centre)
 
     _panel = PanelContainer.new()

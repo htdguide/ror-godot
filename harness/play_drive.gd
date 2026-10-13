@@ -12,10 +12,8 @@ var truck: TruckParser
 ## The vehicle's own frame after the last pose, for a camera to follow.
 var frame: Transform3D = Transform3D.IDENTITY
 
-## Whether the solver steps on this thread or on its own. PLAN §3.2 says `--deterministic` forces
-## one thread, and this is where the harness grants it. The thread changes where the arithmetic
-## runs and not what it is — `the_solver_steps_on_its_own_thread` hashes the two against each
-## other — so the flag is policy rather than a fix.
+## Whether the solver steps on this thread or its own. `--deterministic` forces one (PLAN §3.2); the
+## thread changes where the arithmetic runs, not what it is (`the_solver_steps_on_its_own_thread`).
 var synchronous: bool = Harness.args.has_flag("deterministic")
 ## What the solver cost last frame, on whichever thread ran it, and how long this thread waited
 ## for it. Public so a gate can read a frame's figures without parsing the metric line.
@@ -30,8 +28,7 @@ var _substep_remainder: float = 0.0
 var _deform_usec: int = 0
 var _submit_usec: int = 0
 var _stepped: bool = false
-## A steer held by a script instead of the keys, as a photograph wants the wheels turned. NAN
-## leaves the keys in charge.
+## A steer held by a script instead of the keys, as a photograph wants the wheels turned (NAN: keys).
 var scripted_steer: float = NAN
 ## And a throttle, for a measurement that drives: NAN leaves the keys in charge.
 var scripted_throttle: float = NAN
@@ -72,12 +69,14 @@ func setup(built: Dictionary) -> String:
     _lights = DriveLights.new(truck)
     _airplane = AirplaneKeys.new() if not truck.links.aero_engines.is_empty() else null
     _built["solver"] = solver
+    if _airplane != null:
+        (built["root"] as Node3D).add_child(AirplanePad.new(_airplane, solver))
     _snapshot()
     _apply_pose()
     return ""
 
 
-## The node this vehicle draws through, for a session swapping one vehicle for another.
+## The node this vehicle draws through, for a swap of one vehicle for another.
 func vehicle_root() -> Node3D:
     return _built.get("root", null) as Node3D
 

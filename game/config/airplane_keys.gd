@@ -19,6 +19,8 @@ var elevator: float = 0.0
 var rudder: float = 0.0
 var flap: int = 0
 var parking: bool = false
+## Keys held on screen (`AirplanePad`), counted as held on the keyboard.
+var held: Dictionary = {}
 ## Upstream's `getEventBoolValueBounce(..., 0.1)`: a held throttle key repeats every tenth of a second.
 var _throttle_wait: float = 0.0
 
@@ -46,9 +48,9 @@ func read(solver: RefCounted, delta: float) -> void:
         _throttle_wait = 0.1
 
 
-## A key press: the flaps and the parking brake. Whether it was one of these.
-func on_key(keycode: Key, solver: RefCounted = null) -> bool:
-    var ctrl: bool = Input.is_key_pressed(KEY_CTRL)
+## A key press: the flaps and the parking brake, `ctrl` as if Ctrl were held. Whether it was one of these.
+func on_key(keycode: Key, solver: RefCounted = null, ctrl: bool = false) -> bool:
+    ctrl = ctrl or Input.is_key_pressed(KEY_CTRL)
     if solver != null:
         var command: Array = [] if not ctrl and keycode != KEY_R else \
                 {KEY_PAGEUP: ["throttle", 1.0], KEY_PAGEDOWN: ["throttle", 0.0], KEY_HOME: ["start", 0.0], KEY_R: ["reverse", 0.0]}.get(keycode, [])
@@ -82,4 +84,4 @@ static func smooth(ref: float, value: float, rate: float) -> float:
 
 
 func _key(keycode: Key) -> float:
-    return 1.0 if Input.is_key_pressed(keycode) else 0.0
+    return 1.0 if Input.is_key_pressed(keycode) or held.has(keycode) else 0.0
