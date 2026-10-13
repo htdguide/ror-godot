@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include <godot_cpp/variant/vector3.hpp>
 
 #include <cstdint>
@@ -39,6 +41,18 @@ enum RorAnimFlag : uint32_t {
 // What an animator reads of the vehicle, gathered once a substep: upstream's `Actor` and `Engine`
 // fields that `CalcAnimators` asks for. A vehicle here has no aero engines, wings, screw props or
 // air brake, so those read as upstream's do with none.
+// What an animator reads of one aero engine (upstream's `AeroEngine` and, for a prop, `Turboprop`).
+struct RorAnimatorAero {
+    float rpm_pc = 0.0f;
+    float throttle = 0.0f;
+    bool xprop = false;
+    float indicated_torque = 0.0f;
+    float max_torque = 0.0f;
+    float pitch = 0.0f;
+    bool ignition = false;
+    bool failed = false;
+};
+
 struct RorAnimatorInputs {
     bool engine = false;
     float crank_factor = 0.0f;
@@ -60,6 +74,13 @@ struct RorAnimatorInputs {
     float node0_height = 0.0f;
     godot::Vector3 camera_dir;
     godot::Vector3 camera_roll;
+    // An airplane's: the flap step and air brake step (0 to 5 each), the wing count and wing 4's
+    // angle of attack (the one upstream's gauge reads), and the aero engines.
+    int aerial_flap = 0;
+    int airbrake = 0;
+    int num_wings = 0;
+    float wing4_aoa = 0.0f;
+    std::vector<RorAnimatorAero> aero;
 };
 
 // Upstream's `Actor` fields the animators share across all of a vehicle's animators.

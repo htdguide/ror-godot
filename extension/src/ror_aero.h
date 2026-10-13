@@ -54,6 +54,7 @@ public:
     float pitch = 0.0f;
     float indicated_torque = 0.0f;
     float rpm = 0.0f;
+    float max_torque_nm() const { return max_torque; }
 
 private:
     bool is_piston;

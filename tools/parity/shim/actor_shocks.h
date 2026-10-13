@@ -208,25 +208,30 @@ struct CVar {
     float value;
     float getFloat() const { return value; }
 };
-// The parts of aero engines, wings and screw props the animators would read; a vehicle in these
-// cases has none, so these are never called.
+// The parts of aero engines, wings and screw props the animators read, with the values an
+// oracle case gives them. A prop's `Turboprop` is reached by a cast of `GetRef()`, so the engine
+// pointer also carries one.
 enum class AeroEngineType { AE_UNKNOWN, AE_XPROP };
 struct AeroEngine {
     // What a wing's wash reads, set by the oracle's wing cases.
     float propwash = 0;
     Ogre::Vector3 axis;
+    float rpmpc = 0, throttle = 0;
+    AeroEngineType type = AeroEngineType::AE_UNKNOWN;
+    bool ignition = false, failed = false;
     float getpropwash() { return propwash; }
     Ogre::Vector3 getAxis() { return axis; }
-    float getRPMpc() { return 0; }
-    float getThrottle() { return 0; }
-    AeroEngineType getType() { return AeroEngineType::AE_UNKNOWN; }
-    bool getIgnition() { return false; }
-    bool isFailed() { return false; }
+    float getRPMpc() { return rpmpc; }
+    float getThrottle() { return throttle; }
+    AeroEngineType getType() { return type; }
+    bool getIgnition() { return ignition; }
+    bool isFailed() { return failed; }
 };
 struct AeroEnginePtr {
     AeroEngine *p = nullptr;
+    void *prop = nullptr;
     AeroEngine *operator->() { return p; }
-    AeroEngine *GetRef() { return p; }
+    void *GetRef() { return prop; }
 };
 struct Screwprop {
     float getRudder() { return 0; }
@@ -367,11 +372,11 @@ public:
     float ar_anim_previous_crank = 0, ar_anim_shift_timer = 0;
     int m_previous_gear = 0;
     float ar_guisettings_speedo_max_kph = 140.f;
-    AeroEnginePtr ar_aeroengines[1];
+    AeroEnginePtr ar_aeroengines[8];
     int ar_num_aeroengines = 0;
     wing_t *ar_wings = nullptr;
     int ar_num_wings = 0;
-    float ar_airbrake_intensity = 0;
+    int ar_airbrake_intensity = 0;
     int ar_aerial_flap = 0;
     int ar_main_camera_node_pos = 0, ar_main_camera_node_dir = 0, ar_main_camera_node_roll = 0;
     Ogre::Vector3 GetCameraDir() { return (ar_nodes[ar_main_camera_node_pos].RelPosition - ar_nodes[ar_main_camera_node_dir].RelPosition).normalisedCopy(); }

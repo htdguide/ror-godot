@@ -1,5 +1,9 @@
 #include "ror_solver.h"
 
+#include "ror_aero.h"
+
+#include <algorithm>
+
 #include "ror_ogre_math.h"
 
 #include <godot_cpp/core/class_db.hpp>
@@ -79,11 +83,33 @@ RorAnimatorInputs RorSolver::animator_inputs() const {
         in.camera_roll =
                 ogre_normalised(m_nodes[static_cast<size_t>(pos)].position - m_nodes[static_cast<size_t>(m_camera_roll)].position);
     }
+    in.aerial_flap = std::clamp(m_wing_set.flap(), 0, 5);
+    in.airbrake = m_wing_set.airbrake_intensity();
+    in.num_wings = m_wing_set.count();
+    if (in.num_wings > 4) {
+        in.wing4_aoa = m_wing_set.at(4).aoa;
+    }
+    RorWingSet &wings = const_cast<RorWingSet &>(m_wing_set);
+    for (int i = 0; i < wings.engine_count(); ++i) {
+        RorAeroEngine &engine = wings.engine(i);
+        RorAnimatorAero aero;
+        aero.rpm_pc = engine.rpm_pc();
+        aero.throttle = engine.throttle();
+        aero.ignition = engine.ignition();
+        aero.failed = engine.failed();
+        if (const RorTurboprop *prop = dynamic_cast<const RorTurboprop *>(&engine)) {
+            aero.xprop = true;
+            aero.indicated_torque = prop->indicated_torque;
+            aero.max_torque = prop->max_torque_nm();
+            aero.pitch = prop->pitch;
+        }
+        in.aero.push_back(aero);
+    }
     return in;
 }
 
 // `rows` each [flags, param, factor, ref_length, short, long]; `steps` each the values the
-// oracle's `anim` mode reads, in its order. Per step, `the_animator_is_upstreams`' line: every
+// oracle's `anim` mode reads, in its order, the airplane's included. Per step, `the_animator_is_upstreams`' line: every
 // animator beam's length and the shared memory.
 PackedStringArray RorSolver::animator_probe(const Array &rows, const Array &steps) {
     RorSteering steering;
@@ -120,6 +146,25 @@ PackedStringArray RorSolver::animator_probe(const Array &rows, const Array &step
         const Vector3 pos(v[18], v[19], v[20]);
         in.camera_dir = ogre_normalised(pos - Vector3(v[21], v[22], v[23]));
         in.camera_roll = ogre_normalised(pos - Vector3(v[24], v[25], v[26]));
+        if (v.size() >= 32) {
+            in.aerial_flap = static_cast<int>(v[27]);
+            in.airbrake = static_cast<int>(v[28]);
+            in.num_wings = static_cast<int>(v[29]);
+            in.wing4_aoa = v[30];
+            for (int e = 0; e < static_cast<int>(v[31]) && 32 + 8 * e + 7 < v.size(); ++e) {
+                const int b = 32 + 8 * e;
+                RorAnimatorAero aero;
+                aero.rpm_pc = v[b];
+                aero.throttle = v[b + 1];
+                aero.xprop = v[b + 2] != 0.0f;
+                aero.indicated_torque = v[b + 3];
+                aero.max_torque = v[b + 4];
+                aero.pitch = v[b + 5];
+                aero.ignition = v[b + 6] != 0.0f;
+                aero.failed = v[b + 7] != 0.0f;
+                in.aero.push_back(aero);
+            }
+        }
         steering.update(0.0005f, in.wheel_speed, beams, &in);
         std::string line;
         char buffer[48];

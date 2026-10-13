@@ -4,11 +4,12 @@ extends GateBase
 ## by what `CalcAnimators` reads of the vehicle — engine torque, the rev counter, boost, the pedals,
 ## the clutch, the parking brake, the gear lever four ways, the speedometer, the differential, the
 ## air-speed, climb and altitude gauges, roll and pitch. Compared step by step with those functions
-## compiled from the pinned submodule (`tools/build_parity.sh`), on a vehicle with no aero engines,
-## wings or screw props, as ours are.
+## compiled from the pinned submodule (`tools/build_parity.sh`), with an airplane's flaps, air
+## brakes, wing 4's angle of attack and aero engines; screw props are not in.
 ##
 ## Ours read no animators: 30 corpus files declare 257, the moving gauges, levers and pistons of a
-## cab and an engine bay.
+## cab and an engine bay. Then an airplane's read nothing of it: flaps that never lowered, gauges
+## that never moved.
 ##
 ## Animators here run without inertia; the inertia they take is the hydros' own, held by
 ## `a_hydro_follows_…`.
@@ -19,6 +20,10 @@ const STEPS: int = 60
 ## Upstream's flag bits for the options a ground vehicle's animator can read.
 const FLAGS: Array[int] = [1 << 0, 1 << 1, 1 << 3, 1 << 4, 1 << 5, 1 << 6, 1 << 7, 1 << 10, 1 << 11, 1 << 12,
         1 << 13, 1 << 14, 1 << 15, 1 << 16, 1 << 21, 1 << 23, 1 << 28, 1 << 29]
+## And an airplane's: angle of attack, flaps, air brakes, then the aero engines' throttle, rpm,
+## torque, pitch and status, which read the engine the parameter names.
+const AIRPLANE: Array[int] = [1 << 3, 1 << 4, 1 << 5]
+const AERO_ENGINE: Array[int] = [1 << 8, 1 << 9, 1 << 18, 1 << 19, 1 << 20]
 const SHIFTER: int = 1 << 17
 const ALTIMETER: int = 1 << 2
 
@@ -26,7 +31,7 @@ const ALTIMETER: int = 1 << 2
 static func meta() -> Dictionary:
     return {
         "name": "the_animator_is_upstreams",
-        "proves": "animator rows are read and move their beams as upstream's ParseAnimator, ProcessAnimator, CalcHydros and CalcAnimators do, every input a ground vehicle has",
+        "proves": "animator rows are read and move their beams as upstream's ParseAnimator, ProcessAnimator, CalcHydros and CalcAnimators do, every input a ground vehicle or an airplane has",
         "builds_on": [],
         "oracle": GateBase.ORACLE_EXTERNAL,
         "threshold": "every beam length and the shared memory of %d cases x %d steps identical to upstream's; options read to upstream's flags, parameter and limits" % [CASES, STEPS],
@@ -90,8 +95,13 @@ func _case(rng: RandomNumberGenerator) -> Dictionary:
         var flags: int = 0
         var param: float = 0.0
         for k: int in rng.randi_range(1, 3):
-            var pick: int = rng.randi_range(0, FLAGS.size() + 1)
-            if pick == FLAGS.size():
+            var pick: int = rng.randi_range(0, FLAGS.size() + 3)
+            if pick == FLAGS.size() + 2:
+                flags |= AIRPLANE[rng.randi_range(0, AIRPLANE.size() - 1)]
+            elif pick == FLAGS.size() + 3:
+                flags |= AERO_ENGINE[rng.randi_range(0, AERO_ENGINE.size() - 1)]
+                param = float(rng.randi_range(0, 3))
+            elif pick == FLAGS.size():
                 flags |= SHIFTER
                 param = float(rng.randi_range(1, 4))
             elif pick == FLAGS.size() + 1:
@@ -104,6 +114,13 @@ func _case(rng: RandomNumberGenerator) -> Dictionary:
         rows.append([flags, param, _f1(rng.randf_range(-2.0, 2.0)), _f1(rng.randf_range(0.3, 2.0)), short, long])
         kinds.append(str(flags))
     var steps: Array = []
+    # The airplane: a wing count either side of upstream's wing 4, up to three engines, props or not.
+    var num_wings: int = [0, 4, 5, 8][rng.randi_range(0, 3)]
+    var engines: int = rng.randi_range(0, 3)
+    var xprop: Array[float] = [1.0, 0.0, 1.0]
+    var max_torque: Array[float] = [_f1(rng.randf_range(500.0, 5000.0)), 0.0, _f1(rng.randf_range(500.0, 5000.0))]
+    var flap: int = 0
+    var airbrake: int = 0
     var gear: int = 1
     var crank: float = 1.0
     var pitch: float = 0.0
@@ -127,6 +144,13 @@ func _case(rng: RandomNumberGenerator) -> Dictionary:
             rng.randf_range(-30.0, 30.0), rng.randf_range(-8.0, 8.0), rng.randf_range(-30.0, 30.0), rng.randf_range(-50.0, 4000.0),
             pos.x, pos.y, pos.z, dir.x, dir.y, dir.z, roll_node.x, roll_node.y, roll_node.z,
         ]
+        flap = clampi(flap + rng.randi_range(-1, 1), 0, 5)
+        airbrake = clampi(airbrake + rng.randi_range(-1, 1), 0, 5)
+        values.append_array([float(flap), float(airbrake), float(num_wings), rng.randf_range(-30.0, 30.0), float(engines)])
+        for e: int in engines:
+            values.append_array([rng.randf_range(0.0, 130.0), rng.randf_range(0.0, 1.0), xprop[e],
+                    rng.randf_range(0.0, 6000.0), max_torque[e], rng.randf_range(-10.0, 90.0),
+                    1.0 if rng.randf() < 0.8 else 0.0, 1.0 if rng.randf() < 0.1 else 0.0])
         var packed: PackedFloat32Array = PackedFloat32Array(values)
         steps.append(packed)
     return {"rows": rows, "steps": steps, "kinds": ",".join(kinds)}
@@ -138,7 +162,8 @@ func _line(c: Dictionary) -> String:
         parts.append_array([str(row[0]), _n(row[1]), _n(row[2]), _n(row[3]), _n(row[4]), _n(row[5])])
     for step: PackedFloat32Array in c["steps"]:
         for k: int in step.size():
-            parts.append(str(int(step[k])) if k in [0, 2, 3, 4, 13] else _n(step[k]))
+            var whole: bool = k in [0, 2, 3, 4, 13, 27, 28, 29, 31] or (k >= 32 and (k - 32) % 8 in [2, 6, 7])
+            parts.append(str(int(step[k])) if whole else _n(step[k]))
     return " ".join(parts)
 
 

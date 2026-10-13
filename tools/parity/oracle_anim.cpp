@@ -1,6 +1,7 @@
 // The parity oracle's animator mode (see oracle.cpp): upstream's `CalcHydros`, which calls its
 // `CalcAnimators`, on animators a gate describes.
 #include "actor_shocks.h"
+#include "aero_engines.h"
 #include "differentials.h"
 
 #include <cstdio>
@@ -10,8 +11,10 @@
 
 // `anim n_animators n_steps`, then per animator "flags param factor ref_length short long", then per
 // step "engine crank gear num_gears parking wheel_speed speedo_max rpm shift_up psi brake acc clutch
-// diff_kind", node 0's velocity and height, and the camera's pos, dir and roll nodes. Prints per
-// step every animator beam's length and the animators' shared memory.
+// diff_kind", node 0's velocity and height, the camera's pos, dir and roll nodes, then the
+// airplane's "flap airbrake num_wings wing4_aoa num_engines" and per engine "rpm_pc throttle xprop
+// indicated_torque max_torque pitch ignition failed". Prints per step every animator beam's length
+// and the animators' shared memory.
 bool run_anim(const std::string &line) {
     std::istringstream in(line.substr(4));
     int n_anims = 0, n_steps = 0;
@@ -41,6 +44,16 @@ bool run_anim(const std::string &line) {
     }
     RoR::Actor::Engine engine;
     RoR::Differential diff;
+    static FlexAirfoilShim airfoils[8];
+    static wing_t wings[8];
+    static AeroEngine aero[8];
+    static RoR::Turboprop props[8];
+    for (int i = 0; i < 8; ++i) {
+        wings[i].fa = &airfoils[i];
+        actor.ar_aeroengines[i].p = &aero[i];
+        actor.ar_aeroengines[i].prop = &props[i];
+    }
+    actor.ar_wings = wings;
     const char *names[] = {"Open", "Split", "Locked", "Viscous"};
     for (int step = 0; step < n_steps; ++step) {
         int has_engine = 0, parking = 0, diff_kind = 0;
@@ -52,7 +65,17 @@ bool run_anim(const std::string &line) {
             in >> nodes[static_cast<size_t>(n)].RelPosition.x >> nodes[static_cast<size_t>(n)].RelPosition.y >>
                     nodes[static_cast<size_t>(n)].RelPosition.z;
         }
-        if (!in) {
+        in >> actor.ar_aerial_flap >> actor.ar_airbrake_intensity >> actor.ar_num_wings >> airfoils[4].aoa >>
+                actor.ar_num_aeroengines;
+        for (int e = 0; e < actor.ar_num_aeroengines && e < 8; ++e) {
+            int xprop = 0, ignition = 0, failed = 0;
+            in >> aero[e].rpmpc >> aero[e].throttle >> xprop >> props[e].indicated_torque >> props[e].max_torque >>
+                    props[e].pitch >> ignition >> failed;
+            aero[e].type = xprop ? AeroEngineType::AE_XPROP : AeroEngineType::AE_UNKNOWN;
+            aero[e].ignition = ignition != 0;
+            aero[e].failed = failed != 0;
+        }
+        if (!in || actor.ar_num_aeroengines > 8 || actor.ar_num_wings > 8) {
             return false;
         }
         actor.ar_engine = has_engine ? &engine : nullptr;

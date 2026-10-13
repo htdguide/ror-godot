@@ -11,8 +11,8 @@ namespace {
 constexpr float PHYSICS_DT = 0.0005f;
 // Ogre 1.11's `Math::fRad2Deg`: `Real(180.0) / PI`, PI itself `Real(4.0 * atan(1.0))`.
 const float RAD2DEG = 180.0f / static_cast<float>(4.0 * std::atan(1.0));
-// SimConstants.h's `FLAP_ANGLES[0]`: a vehicle here never lowers flaps.
-constexpr float FLAP_UP = 0.0f;
+// SimConstants.h's `FLAP_ANGLES`.
+constexpr float FLAP_ANGLES[6] = {0.f, -0.07f, -0.17f, -0.33f, -0.67f, -1.f};
 } // namespace
 
 void calc_animator(uint32_t flags, float param, const RorAnimatorInputs &in, RorAnimatorMemory &memory, float &cstate,
@@ -145,7 +145,47 @@ void calc_animator(uint32_t flags, float param, const RorAnimatorInputs &in, Ror
         cstate -= std::fabs(1.0f - clutch);
         div++;
     }
-    // Upstream's aero engine block needs an aero engine; a vehicle here has none.
+    // The aero engines: the parameter is the engine's index.
+    if ((int)param < static_cast<int>(in.aero.size())) {
+        const RorAnimatorAero &engine = in.aero[static_cast<size_t>((int)param)];
+        if (flags & ANIM_RPM) {
+            float angle;
+            const float pcent = engine.rpm_pc;
+            if (pcent < 60.0) {
+                angle = -5.0 + pcent * 1.9167;
+            } else if (pcent < 110.0) {
+                angle = 110.0 + (pcent - 60.0) * 4.075;
+            } else {
+                angle = 314.0;
+            }
+            cstate -= angle / 314.0f;
+            div++;
+        }
+        if (flags & ANIM_THROTTLE) {
+            const float throttle = engine.throttle;
+            cstate -= throttle;
+            div++;
+        }
+        if ((flags & ANIM_AETORQUE) && engine.xprop) {
+            cstate = (100.0 * engine.indicated_torque / engine.max_torque) / 120.0f;
+            div++;
+        }
+        if ((flags & ANIM_AEPITCH) && engine.xprop) {
+            cstate = engine.pitch / 120.0f;
+            div++;
+        }
+        if (flags & ANIM_AESTATUS) {
+            if (!engine.ignition) {
+                cstate = 0.0f;
+            } else {
+                cstate = 0.5f;
+            }
+            if (engine.failed) {
+                cstate = 1.0f;
+            }
+            div++;
+        }
+    }
     if (flags & ANIM_AIRSPEED) {
         const float ground_speed_kt = static_cast<float>(in.node0_velocity.length()) * 1.9438;
         const float altitude = in.node0_height;
@@ -193,8 +233,13 @@ void calc_animator(uint32_t flags, float param, const RorAnimatorInputs &in, Ror
         div++;
     }
     if (flags & ANIM_AOA) {
-        // No wings: upstream's angle of attack stays 0.
-        const float aoa = 0;
+        float aoa = 0;
+        if (in.num_wings > 4) {
+            aoa = in.wing4_aoa / 25.0f;
+        }
+        if ((static_cast<float>(in.node0_velocity.length()) * 1.9438) < 10.0f) {
+            aoa = 0;
+        }
         cstate -= aoa;
         if (cstate <= -1.0f) {
             cstate = -1.0f;
@@ -225,12 +270,13 @@ void calc_animator(uint32_t flags, float param, const RorAnimatorInputs &in, Ror
         div++;
     }
     if (flags & ANIM_AIRBRAKE) {
-        const float airbrake = 0;
+        const float airbrake = in.airbrake;
         cstate -= airbrake / 5.0f;
         div++;
     }
     if (flags & ANIM_FLAP) {
-        cstate = FLAP_UP;
+        const float flaps = FLAP_ANGLES[in.aerial_flap];
+        cstate = flaps;
         div++;
     }
 }
