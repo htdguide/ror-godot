@@ -21,7 +21,7 @@ var solver_usec: int = 0
 var wait_usec: int = 0
 
 var _built: Dictionary = {}
-var _airplane: AirplaneKeys = null
+var _airplane: RefCounted = null  # An airplane's `AirplaneKeys`, a boat's `BoatKeys`, or null.
 var _throttle: float = 0.0
 var _brake: float = 0.0
 var _substep_remainder: float = 0.0
@@ -67,7 +67,7 @@ func setup(built: Dictionary) -> String:
     solver.set_gear_selector(_selector)
     _cockpit = Cockpit.build(built["root"] as Node3D, truck, built)
     _lights = DriveLights.new(truck)
-    _airplane = AirplaneKeys.new() if not truck.links.aero_engines.is_empty() else null
+    _airplane = AirplaneKeys.new() if not truck.links.aero_engines.is_empty() else (BoatKeys.new() if not truck.links.screwprops.is_empty() else null)
     _built["solver"] = solver
     if _airplane != null:
         (built["root"] as Node3D).add_child(AirplanePad.new(_airplane, solver))

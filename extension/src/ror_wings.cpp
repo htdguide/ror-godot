@@ -242,6 +242,9 @@ void RorWingSet::reset_engines() {
     for (std::unique_ptr<RorAeroEngine> &engine : m_engines) {
         engine->reset();
     }
+    for (RorScrewprop &prop : m_screwprops) {
+        prop.reset();
+    }
 }
 
 // Upstream's wing closure, then its `WashCalculator`: a wing between 0 and 15 m behind a prop along
@@ -353,6 +356,11 @@ void RorAirbrake::apply_force(NodeArray &nodes) const {
     nodes[static_cast<size_t>(nodea)].forces += drag;
 }
 
+int RorWingSet::add_screwprop(const RorScrewprop &prop) {
+    m_screwprops.push_back(prop);
+    return screwprop_count() - 1;
+}
+
 int RorWingSet::add_airbrake(const RorAirbrake &airbrake) {
     m_airbrakes.push_back(airbrake);
     return airbrake_count() - 1;
@@ -365,13 +373,17 @@ void RorWingSet::set_airbrake_intensity(int intensity) {
     }
 }
 
-// Upstream's `CalcAircraftForces`: the air brakes, the engines, then the wings in their wash.
+// Upstream's `CalcAircraftForces`: the air brakes, the engines, the screw props, then the wings in
+// their wash.
 void RorWingSet::update_forces(NodeArray &nodes, float dt, bool do_update) {
     for (const RorAirbrake &airbrake : m_airbrakes) {
         airbrake.apply_force(nodes);
     }
     for (std::unique_ptr<RorAeroEngine> &engine : m_engines) {
         engine->update_forces(nodes, dt, do_update);
+    }
+    for (const RorScrewprop &prop : m_screwprops) {
+        prop.update_forces(nodes, m_has_water, m_water_height);
     }
     for (RorWing &wing : m_wings) {
         wing.update_forces(nodes, &m_engines);

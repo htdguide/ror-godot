@@ -1,5 +1,6 @@
 // The parity oracle's aero engine mode (see oracle.cpp): upstream's `Turboprop` and `Turbojet` on
 // an engine a gate describes.
+#include "actor_shocks.h"
 #include "aero_engines.h"
 #include "autopilot.h"
 
@@ -242,6 +243,123 @@ bool run_autopilot(const std::string &line) {
         const float elevator = ap.getElevator();
         const float throttle = ap.getThrottle(thrtl, dt);
         std::printf("%.9g %.9g %.9g %d %d %d %d\n", aileron, elevator, throttle, ap.heading, ap.alt, ap.vs, ap.ias);
+    }
+    return true;
+}
+
+// `buoy n_nodes n_cabs n_steps height`, then per cab "a b c type", then per step every node's
+// position then every node's velocity. Upstream's `Actor::CalcBuoyance` on the cabs as buoycabs,
+// cached as `ActorManager` caches them. Prints per step the force it adds to each node.
+bool run_buoy(const std::string &line) {
+    std::istringstream in(line.substr(4));
+    int n_nodes = 0, n_cabs = 0, n_steps = 0;
+    float height = 0;
+    if (!(in >> n_nodes >> n_cabs >> n_steps >> height) || n_nodes <= 0 || n_cabs <= 0) {
+        return false;
+    }
+    std::vector<node_t> nodes(static_cast<size_t>(n_nodes));
+    for (int i = 0; i < n_nodes; ++i) {
+        nodes[static_cast<size_t>(i)].pos = i;
+    }
+    std::vector<int> cabs(static_cast<size_t>(3 * n_cabs)), buoycabs(static_cast<size_t>(n_cabs)), types(static_cast<size_t>(n_cabs));
+    std::vector<RoR::BuoyCachedNodeID_t> ids(static_cast<size_t>(3 * n_cabs));
+    for (int i = 0; i < n_cabs; ++i) {
+        in >> cabs[static_cast<size_t>(3 * i)] >> cabs[static_cast<size_t>(3 * i + 1)] >> cabs[static_cast<size_t>(3 * i + 2)] >>
+                types[static_cast<size_t>(i)];
+        buoycabs[static_cast<size_t>(i)] = i;
+    }
+    RoR::Buoyance buoyance;
+    RoR::Actor actor;
+    actor.ar_nodes = nodes.data();
+    actor.ar_num_nodes = n_nodes;
+    actor.ar_cabs = cabs.data();
+    actor.ar_buoycabs = buoycabs.data();
+    actor.ar_buoycab_types = types.data();
+    actor.ar_num_buoycabs = n_cabs;
+    actor.ar_cabs_buoy_cache_ids = ids.data();
+    actor.m_buoyance = &buoyance;
+    static RoR::Wavefield water;
+    water.height = height;
+    RoR::App::GetGameContext()->terrain.water = &water;
+    for (int i = 0; i < n_cabs; i++) {
+        int tmpv = buoycabs[static_cast<size_t>(i)] * 3;
+        ids[static_cast<size_t>(tmpv)] = buoyance.cacheBuoycabNode(&nodes[static_cast<size_t>(cabs[static_cast<size_t>(tmpv)])]);
+        ids[static_cast<size_t>(tmpv + 1)] = buoyance.cacheBuoycabNode(&nodes[static_cast<size_t>(cabs[static_cast<size_t>(tmpv + 1)])]);
+        ids[static_cast<size_t>(tmpv + 2)] = buoyance.cacheBuoycabNode(&nodes[static_cast<size_t>(cabs[static_cast<size_t>(tmpv + 2)])]);
+    }
+    buoyance.buoy_projected_nodes = buoyance.buoy_cached_nodes;
+    for (int step = 0; step < n_steps; ++step) {
+        for (int k = 0; k < n_nodes; ++k) {
+            in >> nodes[static_cast<size_t>(k)].AbsPosition.x >> nodes[static_cast<size_t>(k)].AbsPosition.y >>
+                    nodes[static_cast<size_t>(k)].AbsPosition.z;
+            nodes[static_cast<size_t>(k)].RelPosition = nodes[static_cast<size_t>(k)].AbsPosition;
+            nodes[static_cast<size_t>(k)].Forces = Ogre::Vector3::ZERO;
+        }
+        for (int k = 0; k < n_nodes; ++k) {
+            in >> nodes[static_cast<size_t>(k)].Velocity.x >> nodes[static_cast<size_t>(k)].Velocity.y >> nodes[static_cast<size_t>(k)].Velocity.z;
+        }
+        if (!in) {
+            return false;
+        }
+        actor.CalcBuoyance(false);
+        std::string out;
+        char buffer[96];
+        for (int k = 0; k < n_nodes; ++k) {
+            std::snprintf(buffer, sizeof buffer, "%.9g %.9g %.9g ", nodes[static_cast<size_t>(k)].Forces.x,
+                          nodes[static_cast<size_t>(k)].Forces.y, nodes[static_cast<size_t>(k)].Forces.z);
+            out += buffer;
+        }
+        std::printf("%s\n", out.c_str());
+    }
+    return true;
+}
+
+// `screw n_steps power`, then per step an action (0 none, 1 throttle step, 2 rudder step, 3 centre,
+// 4 reverse) and its value, the water height, and the reference, back and up nodes' positions.
+// Upstream's `Screwprop` on nodes 0, 1 and 2, reset as built. Prints per step the force on the
+// reference node, the throttle and the rudder it reads back.
+bool run_screw(const std::string &line) {
+    std::istringstream in(line.substr(5));
+    int n_steps = 0;
+    float power = 0;
+    if (!(in >> n_steps >> power)) {
+        return false;
+    }
+    node_t nodes[3];
+    RoR::Actor actor;
+    actor.ar_nodes = nodes;
+    actor.ar_num_nodes = 3;
+    static RoR::Wavefield water;
+    RoR::App::GetGameContext()->terrain.water = &water;
+    Screwprop prop;
+    prop.m_actor = &actor;
+    prop.noderef = 0;
+    prop.nodeback = 1;
+    prop.nodeup = 2;
+    prop.fullpower = power;
+    prop.reset();
+    for (int step = 0; step < n_steps; ++step) {
+        int action = 0;
+        float value = 0;
+        in >> action >> value >> water.height;
+        for (int k = 0; k < 3; ++k) {
+            in >> nodes[k].AbsPosition.x >> nodes[k].AbsPosition.y >> nodes[k].AbsPosition.z;
+            nodes[k].RelPosition = nodes[k].AbsPosition;
+            nodes[k].Forces = Ogre::Vector3::ZERO;
+        }
+        if (!in) {
+            return false;
+        }
+        switch (action) {
+            case 1: prop.setThrottle(prop.getThrottle() + value); break;
+            case 2: prop.setRudder(prop.getRudder() + value); break;
+            case 3: prop.setRudder(0); break;
+            case 4: prop.toggleReverse(); break;
+            default: break;
+        }
+        prop.updateForces(false);
+        std::printf("%.9g %.9g %.9g %.9g %.9g\n", nodes[0].Forces.x, nodes[0].Forces.y, nodes[0].Forces.z, prop.getThrottle(),
+                    prop.getRudder());
     }
     return true;
 }

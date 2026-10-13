@@ -1,6 +1,7 @@
 class_name AirplanePad
 extends CanvasLayer
-## On-screen buttons for an airplane's keys, for a keyboard without Home, PgUp and PgDn (a Mac's).
+## On-screen buttons for an airplane's or a boat's keys, for a keyboard without Home, PgUp and PgDn
+## (a Mac's).
 ## A held button counts as its key held (`AirplaneKeys.held`); a tapped one is its key pressed,
 ## the Ctrl ones as if Ctrl were down. Press Esc to free the mouse first, then click. A button
 ## lights while held, flashes when tapped, and the parking brake stays lit while it is on.
@@ -34,12 +35,18 @@ const AUTOPILOT_STEPS: Array = [
     ["V/S -", "adj_vs", -100], ["V/S +", "adj_vs", 100], ["IAS -", "adj_ias", -1], ["IAS +", "adj_ias", 1],
 ]
 
-var _keys: AirplaneKeys
+## A boat's: every control is held, the rudder centred and the reverser toggled by a short hold.
+const BOAT_HELD: Array = [
+    ["Throttle +", KEY_UP], ["Throttle -", KEY_DOWN], ["Rudder left", KEY_LEFT], ["Rudder right", KEY_RIGHT],
+    ["Center rudder", KEY_PAGEDOWN], ["Reverse", KEY_PAGEUP],
+]
+
+var _keys: RefCounted
 var _solver: RefCounted
 var _autopilot_label: Label = null
 
 
-func _init(keys: AirplaneKeys, solver: RefCounted) -> void:
+func _init(keys: RefCounted, solver: RefCounted) -> void:
     _keys = keys
     _solver = solver
     name = "AirplanePad"
@@ -50,7 +57,8 @@ func _init(keys: AirplaneKeys, solver: RefCounted) -> void:
     grid.grow_horizontal = Control.GROW_DIRECTION_BEGIN
     grid.grow_vertical = Control.GROW_DIRECTION_BOTH
     add_child(grid)
-    for row: Array in HELD:
+    var boat: bool = keys is BoatKeys
+    for row: Array in (BOAT_HELD if boat else HELD):
         var key: Key = row[1]
         var button: Button = _button(grid, row[0])
         button.button_down.connect(func() -> void:
@@ -59,14 +67,14 @@ func _init(keys: AirplaneKeys, solver: RefCounted) -> void:
         button.button_up.connect(func() -> void:
             _keys.held.erase(key)
             button.modulate = Color.WHITE)
-    for row: Array in TAPPED:
+    for row: Array in ([] if boat else TAPPED):
         var key: Key = row[1]
         var ctrl: bool = row[2]
         var button: Button = _button(grid, row[0])
         button.pressed.connect(func() -> void:
             _keys.on_key(key, _solver, ctrl)
-            _flash(button, key == KEY_P and _keys.parking))
-    if not (_solver.autopilot("state") as Dictionary).is_empty():
+            _flash(button, key == KEY_P and bool(_keys.get("parking"))))
+    if not boat and not (_solver.autopilot("state") as Dictionary).is_empty():
         _build_autopilot()
 
 

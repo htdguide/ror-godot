@@ -10,6 +10,7 @@
 
 #include "OgreVector3.h"
 #include "rig_types.h"
+#include "buoyance.h"
 
 #include <algorithm>
 #include <cmath>
@@ -233,9 +234,22 @@ struct AeroEnginePtr {
     AeroEngine *operator->() { return p; }
     void *GetRef() { return prop; }
 };
+// What upstream's `Screwprop` (physics/water/ScrewProp.h) holds, without its particles' pools'
+// contents; its methods are upstream's, lifted by extract.py.
+namespace RoR { class Actor; }
 struct Screwprop {
-    float getRudder() { return 0; }
-    float getThrottle() { return 0; }
+    RoR::Actor *m_actor = nullptr;
+    int noderef = 0, nodeback = 0, nodeup = 0;
+    RoR::DustPool *splashp = nullptr, *ripplep = nullptr;
+    bool reverse = false;
+    float fullpower = 0, rudder = 0, throtle = 0;
+    void updateForces(int update);
+    void setThrottle(float val);
+    void setRudder(float val);
+    float getThrottle();
+    float getRudder();
+    void reset();
+    void toggleReverse();
 };
 struct FlexAirfoilShim {
     float aoa = 0;
@@ -257,6 +271,8 @@ struct Message {
     ActorLinkingRequest *request;
 };
 struct GameContext {
+    RoR::Terrain terrain;
+    RoR::Terrain *GetTerrain() { return &terrain; }
     std::vector<std::string> requests;
     void PushMessage(Message m) {
         requests.push_back(std::string(m.request->alr_type == ActorLinkingRequestType::HOOK_LOCK ? "lock " : "unlock ") +
@@ -285,10 +301,6 @@ inline CVar *io_analog_sensitivity = new CVar{1.0f};
 inline Console *GetConsole() { static Console console; return &console; }
 inline GameContext *GetGameContext() { static GameContext context; return &context; }
 }
-struct Buoyance {
-    enum { BUOY_NORMAL, BUOY_DRAGONLY, BUOY_DRAGLESS };
-    bool sink = false;
-};
 
 class Actor {
 public:
@@ -303,6 +315,7 @@ public:
     int *ar_buoycabs = nullptr;
     int *ar_buoycab_types = nullptr;
     int *ar_cabs = nullptr;
+    RoR::BuoyCachedNodeID_t *ar_cabs_buoy_cache_ids = nullptr;
     Buoyance *m_buoyance = nullptr;
     int ar_instance_id = 0;
     bool m_beam_break_debug_enabled = false;
@@ -365,7 +378,7 @@ public:
     float ar_hydro_aileron_state = 0, ar_hydro_aileron_command = 0, ar_hydro_rudder_state = 0;
     float ar_hydro_rudder_command = 0, ar_hydro_elevator_state = 0, ar_hydro_elevator_command = 0;
     std::vector<hydrobeam_t> ar_hydros;
-    Screwprop *ar_screwprops[1] = {nullptr};
+    Screwprop *ar_screwprops[8] = {nullptr};
     int ar_num_screwprops = 0;
     Differential *m_wheel_diffs[1] = {nullptr};
     int m_num_wheel_diffs = 0;
@@ -385,6 +398,7 @@ public:
     float getRotation() { return 0.0f; }
     void CalcHydros();
     void CalcAnimators(hydrobeam_t const &hydrobeam, float &cstate, int &div);
+    void CalcBuoyance(bool doUpdate);
     void engineTriggerHelper(int engineNumber, EngineTriggerType type, float triggerValue);
     void CalcBeams(bool trigger_hooks);
     int GetNumActiveConnectedBeams(int nodeid);

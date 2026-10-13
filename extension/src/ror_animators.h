@@ -81,6 +81,9 @@ struct RorAnimatorInputs {
     int num_wings = 0;
     float wing4_aoa = 0.0f;
     std::vector<RorAnimatorAero> aero;
+    // A boat's screw props' rudders and throttles, as upstream's `getRudder` and `getThrottle` read them.
+    std::vector<float> screw_rudders;
+    std::vector<float> screw_throttles;
 };
 
 // Upstream's `Actor` fields the animators share across all of a vehicle's animators.

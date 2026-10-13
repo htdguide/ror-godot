@@ -374,6 +374,7 @@ void RorSolver::_bind_methods() {
     bind_trigger_methods();
     bind_animator_methods();
     bind_wing_methods();
+    bind_boat_methods();
     ClassDB::bind_method(D_METHOD("add_node", "position", "mass"), &RorSolver::add_node);
     ClassDB::bind_method(D_METHOD("add_beam", "node_a", "node_b", "rest_length", "spring", "damping"),
                          &RorSolver::add_beam);

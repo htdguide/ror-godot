@@ -69,6 +69,19 @@ WANTED = [
     ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::enableInducedDrag(float span, float area, bool l)"),
     ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::updateForces()"),
     ("main/physics/air/AirBrake.cpp", "void Airbrake::applyForce()"),
+    ("main/physics/water/ScrewProp.cpp", "void Screwprop::updateForces(int update)"),
+    ("main/physics/water/ScrewProp.cpp", "void Screwprop::setThrottle(float val)"),
+    ("main/physics/water/ScrewProp.cpp", "void Screwprop::setRudder(float val)"),
+    ("main/physics/water/ScrewProp.cpp", "float Screwprop::getThrottle()"),
+    ("main/physics/water/ScrewProp.cpp", "float Screwprop::getRudder()"),
+    ("main/physics/water/ScrewProp.cpp", "void Screwprop::reset()"),
+    ("main/physics/water/ScrewProp.cpp", "void Screwprop::toggleReverse()"),
+    ("main/physics/water/Buoyance.cpp", "BuoyCachedNodeID_t Buoyance::cacheBuoycabNode(node_t* n)"),
+    ("main/physics/water/Buoyance.cpp", "inline float Buoyance::computeVolume(Vec3 o, Vec3 a, Vec3 b, Vec3 c)"),
+    ("main/physics/water/Buoyance.cpp", "Vec3 Buoyance::computePressureForceSub(Vec3 a, Vec3 b, Vec3 c, Vec3 vel, int type)"),
+    ("main/physics/water/Buoyance.cpp", "Vec3 Buoyance::computePressureForce(Vec3 a, Vec3 b, Vec3 c, Vec3 vel, int type)"),
+    ("main/physics/ActorForcesEuler.cpp", "void Actor::CalcBuoyance(bool doUpdate)"),
+    ("main/physics/water/Buoyance.cpp", "void Buoyance::computeNodeForce(BuoyCachedNode* a, BuoyCachedNode* b, BuoyCachedNode* c, int type, float timeshift)"),
     ("main/gameplay/AutoPilot.cpp", "void Autopilot::setInertialReferences(node_t* refl, node_t* refr, node_t* refb, node_t* refc)"),
     ("main/gameplay/AutoPilot.cpp", "float Autopilot::getAilerons()"),
     ("main/gameplay/AutoPilot.cpp", "float Autopilot::getElevator()"),
@@ -120,6 +133,13 @@ BLOCKS = [
         "    ",
         "\n}\n",
     ),
+]
+
+# Single lines lifted whole, a file-scope constant a lifted function reads: (file, the line's start).
+# The start must name exactly one line.
+LINES = [
+    ("main/physics/ActorForcesEuler.cpp", "const int BUOYANCY_SAMPLING_INTERVAL"),
+    ("main/physics/ActorForcesEuler.cpp", "const int BUOYANCY_VISUAL_UPDATE_INTERVAL"),
 ]
 
 PROLOGUE = """// GENERATED — do not edit. Produced by tools/parity/extract.py from the pinned
@@ -191,6 +211,11 @@ def main() -> None:
     root = Path(sys.argv[1])
     out = Path(sys.argv[2])
     pieces = [PROLOGUE]
+    for relative, start in LINES:
+        found = [l for l in (root / relative).read_text(encoding="utf-8", errors="replace").splitlines() if l.startswith(start)]
+        if len(found) != 1:
+            raise SystemExit(f"extract.py: {len(found)} lines in {relative} start with {start!r}, not one")
+        pieces.append(f"// From {relative}, one line\n{found[0]}\n")
     for relative, signature in WANTED:
         source = root / relative
         if not source.is_file():

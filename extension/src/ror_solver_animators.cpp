@@ -105,6 +105,10 @@ RorAnimatorInputs RorSolver::animator_inputs() const {
         }
         in.aero.push_back(aero);
     }
+    for (int i = 0; i < m_wing_set.screwprop_count(); ++i) {
+        in.screw_rudders.push_back(m_wing_set.screwprop(i).rudder_value());
+        in.screw_throttles.push_back(m_wing_set.screwprop(i).throttle());
+    }
     return in;
 }
 
@@ -163,6 +167,12 @@ PackedStringArray RorSolver::animator_probe(const Array &rows, const Array &step
                 aero.ignition = v[b + 6] != 0.0f;
                 aero.failed = v[b + 7] != 0.0f;
                 in.aero.push_back(aero);
+            }
+            const int screws_at = 32 + 8 * static_cast<int>(v[31]);
+            for (int e = 0; screws_at < v.size() && e < static_cast<int>(v[screws_at]); ++e) {
+                // Its rudder in degrees, read back as upstream's `getRudder` reads it.
+                in.screw_rudders.push_back(v[screws_at + 1 + 2 * e] / 45.0);
+                in.screw_throttles.push_back(v[screws_at + 2 + 2 * e]);
             }
         }
         steering.update(0.0005f, in.wheel_speed, beams, &in);

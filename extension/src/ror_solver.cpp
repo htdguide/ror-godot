@@ -208,9 +208,8 @@ void RorSolver::step_now(float dt, int substeps) {
     }
 }
 
-// The obstacles near the rig, found once per call rather than per substep: they never move,
-// the rig moves centimetres inside one call, and testing every box against every node at
-// 2 kHz would cost more than the simulation it is protecting.
+// The obstacles near the rig, found once per call rather than per substep: they never move, the
+// rig moves centimetres in a call, and testing every box at 2 kHz would cost more than the rest.
 void RorSolver::begin_steps() {
     m_wing_set.update_frame(m_nodes, m_fuselage_enabled ? m_fuselage_node : -1);
     // Upstream's `ar_hydro_*_command`: what the surfaces follow, the autopilot's included.
@@ -226,14 +225,15 @@ void RorSolver::begin_steps() {
 
 void RorSolver::substep(float dt, bool first) {
     m_first_substep = first;
-    // Upstream's `CalcForcesEulerPrepare`: the hooks reel in and the ropes take their ropables
-    // before the step integrates.
+    // Upstream's `CalcForcesEulerPrepare`: hooks reel in and ropes take their ropables, then the step.
     calc_hooks(dt);
     calc_ropes(false);
     integrate(dt);
     // Upstream's `CalcAircraftForces`: the aero engines and the wings, before the fuselage drag.
     m_wing_set.update_forces(m_nodes, dt, first);
     apply_air_drag();
+    // Upstream's `CalcBuoyance`, after the fuselage drag.
+    m_buoyance.update(m_nodes, dt);
     if (m_steering.has_animators()) {
         const RorAnimatorInputs inputs = animator_inputs();
         m_steering.update(dt, m_wheels.driven_speed(), m_beams, &inputs);
@@ -251,8 +251,7 @@ void RorSolver::substep(float dt, bool first) {
     }
     // Upstream's `CalcTies`, after the commands.
     calc_ties(dt);
-    // The first substep of a call stands in for upstream's per-frame pass, which is
-    // the rate it makes gear decisions at.
+    // The first substep stands in for upstream's per-frame pass, where it makes gear decisions.
     m_drivetrain.step(dt, m_wheels.driven_spin() * RAD_PER_SEC_TO_RPM, first);
     m_wheels.apply(m_nodes, m_drivetrain.clutch_torque(), direction(), m_steering.state(), dt);
     accumulate_beam_forces();

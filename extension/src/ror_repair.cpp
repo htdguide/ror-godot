@@ -51,6 +51,7 @@ void RorSolver::repair() {
     m_wheels.reset_avg_speed();
     m_cc_mode = false;
     m_wing_set.reset_engines();
+    m_buoyance.sink = false;
     if (RorAutopilot *autopilot = m_wing_set.autopilot()) {
         autopilot->reset();
     }

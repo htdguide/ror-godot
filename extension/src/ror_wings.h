@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ror_autopilot.h"
+#include "ror_screwprop.h"
 #include "ror_node.h"
 
 #include <godot_cpp/variant/string.hpp>
@@ -84,7 +85,14 @@ public:
     void finish(const NodeArray &nodes);
     int engine_count() const { return static_cast<int>(m_engines.size()); }
     RorAeroEngine &engine(int index) { return *m_engines[static_cast<size_t>(index)]; }
+    // Upstream's `SyncReset` for the aero engines and the screw props.
     void reset_engines();
+    int add_screwprop(const RorScrewprop &prop);
+    int screwprop_count() const { return static_cast<int>(m_screwprops.size()); }
+    RorScrewprop &screwprop(int index) { return m_screwprops[static_cast<size_t>(index)]; }
+    const RorScrewprop &screwprop(int index) const { return m_screwprops[static_cast<size_t>(index)]; }
+    // The sea the screw props push in.
+    void set_water(bool has_water, float height) { m_has_water = has_water; m_water_height = height; }
     void set_controls(float aileron, float rudder, float elevator, int flap);
     int flap() const { return m_flap; }
     int add_airbrake(const RorAirbrake &airbrake);
@@ -111,6 +119,9 @@ private:
     std::vector<RorWing> m_wings;
     std::vector<std::unique_ptr<RorAeroEngine>> m_engines;
     std::vector<RorAirbrake> m_airbrakes;
+    std::vector<RorScrewprop> m_screwprops;
+    bool m_has_water = false;
+    float m_water_height = 0.0f;
     std::unique_ptr<RorAutopilot> m_autopilot;
     // The first run's last wing's tips, where upstream hangs the navigation lights.
     int m_left_light = -1, m_right_light = -1;

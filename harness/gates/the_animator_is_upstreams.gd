@@ -5,7 +5,7 @@ extends GateBase
 ## the clutch, the parking brake, the gear lever four ways, the speedometer, the differential, the
 ## air-speed, climb and altitude gauges, roll and pitch. Compared step by step with those functions
 ## compiled from the pinned submodule (`tools/build_parity.sh`), with an airplane's flaps, air
-## brakes, wing 4's angle of attack and aero engines; screw props are not in.
+## brakes, wing 4's angle of attack and aero engines, and a boat's screw props.
 ##
 ## Ours read no animators: 30 corpus files declare 257, the moving gauges, levers and pistons of a
 ## cab and an engine bay. Then an airplane's read nothing of it: flaps that never lowered, gauges
@@ -24,6 +24,8 @@ const FLAGS: Array[int] = [1 << 0, 1 << 1, 1 << 3, 1 << 4, 1 << 5, 1 << 6, 1 << 
 ## torque, pitch and status, which read the engine the parameter names.
 const AIRPLANE: Array[int] = [1 << 3, 1 << 4, 1 << 5]
 const AERO_ENGINE: Array[int] = [1 << 8, 1 << 9, 1 << 18, 1 << 19, 1 << 20]
+## And a boat's: its screw props' rudder and throttle.
+const BOAT: Array[int] = [1 << 28, 1 << 29]
 const SHIFTER: int = 1 << 17
 const ALTIMETER: int = 1 << 2
 
@@ -95,9 +97,11 @@ func _case(rng: RandomNumberGenerator) -> Dictionary:
         var flags: int = 0
         var param: float = 0.0
         for k: int in rng.randi_range(1, 3):
-            var pick: int = rng.randi_range(0, FLAGS.size() + 3)
+            var pick: int = rng.randi_range(0, FLAGS.size() + 4)
             if pick == FLAGS.size() + 2:
                 flags |= AIRPLANE[rng.randi_range(0, AIRPLANE.size() - 1)]
+            elif pick == FLAGS.size() + 4:
+                flags |= BOAT[rng.randi_range(0, 1)]
             elif pick == FLAGS.size() + 3:
                 flags |= AERO_ENGINE[rng.randi_range(0, AERO_ENGINE.size() - 1)]
                 param = float(rng.randi_range(0, 3))
@@ -117,6 +121,7 @@ func _case(rng: RandomNumberGenerator) -> Dictionary:
     # The airplane: a wing count either side of upstream's wing 4, up to three engines, props or not.
     var num_wings: int = [0, 4, 5, 8][rng.randi_range(0, 3)]
     var engines: int = rng.randi_range(0, 3)
+    var screws: int = rng.randi_range(0, 3)
     var xprop: Array[float] = [1.0, 0.0, 1.0]
     var max_torque: Array[float] = [_f1(rng.randf_range(500.0, 5000.0)), 0.0, _f1(rng.randf_range(500.0, 5000.0))]
     var flap: int = 0
@@ -151,6 +156,9 @@ func _case(rng: RandomNumberGenerator) -> Dictionary:
             values.append_array([rng.randf_range(0.0, 130.0), rng.randf_range(0.0, 1.0), xprop[e],
                     rng.randf_range(0.0, 6000.0), max_torque[e], rng.randf_range(-10.0, 90.0),
                     1.0 if rng.randf() < 0.8 else 0.0, 1.0 if rng.randf() < 0.1 else 0.0])
+        values.append(float(screws))
+        for e: int in screws:
+            values.append_array([rng.randf_range(-45.0, 45.0), rng.randf_range(-1.0, 1.0)])
         var packed: PackedFloat32Array = PackedFloat32Array(values)
         steps.append(packed)
     return {"rows": rows, "steps": steps, "kinds": ",".join(kinds)}
@@ -162,7 +170,8 @@ func _line(c: Dictionary) -> String:
         parts.append_array([str(row[0]), _n(row[1]), _n(row[2]), _n(row[3]), _n(row[4]), _n(row[5])])
     for step: PackedFloat32Array in c["steps"]:
         for k: int in step.size():
-            var whole: bool = k in [0, 2, 3, 4, 13, 27, 28, 29, 31] or (k >= 32 and (k - 32) % 8 in [2, 6, 7])
+            var screws_at: int = 32 + 8 * int(step[31])
+            var whole: bool = k in [0, 2, 3, 4, 13, 27, 28, 29, 31, screws_at] or (k >= 32 and k < screws_at and (k - 32) % 8 in [2, 6, 7])
             parts.append(str(int(step[k])) if whole else _n(step[k]))
     return " ".join(parts)
 

@@ -426,11 +426,27 @@ bool run_wing(const std::string &line);
 bool run_aero(const std::string &line);
 bool run_airbrake(const std::string &line);
 bool run_autopilot(const std::string &line);
+bool run_buoy(const std::string &line);
+bool run_screw(const std::string &line);
 
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("screw", 0) == 0) {
+            if (!run_screw(line)) {
+                std::fprintf(stderr, "oracle: malformed screw case: %s\n", line.c_str());
+                return 2;
+            }
+            continue;
+        }
+        if (line.rfind("buoy", 0) == 0) {
+            if (!run_buoy(line)) {
+                std::fprintf(stderr, "oracle: malformed buoy case: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("autopilot", 0) == 0) {

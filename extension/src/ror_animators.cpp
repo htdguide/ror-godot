@@ -17,13 +17,29 @@ constexpr float FLAP_ANGLES[6] = {0.f, -0.07f, -0.17f, -0.33f, -0.67f, -1.f};
 
 void calc_animator(uint32_t flags, float param, const RorAnimatorInputs &in, RorAnimatorMemory &memory, float &cstate,
                    int &div) {
-    // Boat rudder and throttle: with no screw props upstream's average is its starting 0.
+    // Boat rudder and throttle: the screw props' average, 0 with none.
     if (flags & ANIM_BRUDDER) {
-        cstate = 0.0f;
+        int spi;
+        float ctmp = 0.0f;
+        for (spi = 0; spi < static_cast<int>(in.screw_rudders.size()); spi++) {
+            ctmp += in.screw_rudders[static_cast<size_t>(spi)];
+        }
+        if (spi > 0) {
+            ctmp = ctmp / spi;
+        }
+        cstate = ctmp;
         div++;
     }
     if (flags & ANIM_BTHROTTLE) {
-        cstate = 0.0f;
+        int spi;
+        float ctmp = 0.0f;
+        for (spi = 0; spi < static_cast<int>(in.screw_throttles.size()); spi++) {
+            ctmp += in.screw_throttles[static_cast<size_t>(spi)];
+        }
+        if (spi > 0) {
+            ctmp = ctmp / spi;
+        }
+        cstate = ctmp;
         div++;
     }
     if (flags & ANIM_DIFFLOCK) {

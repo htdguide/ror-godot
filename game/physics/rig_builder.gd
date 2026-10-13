@@ -303,6 +303,16 @@ static func _configure_engine(solver: RefCounted, truck: TruckParser) -> void:
 ## The cab triangles other vehicles collide with: upstream's `collcabs`, the rows whose options
 ## say `c` contact, `p` ten times tougher or `u` invulnerable, or their buoyant twins `D`, `F`
 ## and `S` (ActorSpawner.cpp, the cab section). The rest are drawn and float but are not hit.
+static func _buoyancy_types(option: String) -> Array[int]:
+    var types: Array[int] = []
+    for pair: Array in [["b", 0], ["r", 1], ["s", 2]]:
+        if option.contains(pair[0]):
+            types.append(pair[1])
+    if option.contains("D") or option.contains("F") or option.contains("S"):
+        types.append(0)
+    return types
+
+
 static func _add_collision_cabs(solver: RefCounted, truck: TruckParser) -> void:
     var triangles: PackedInt32Array = truck.submeshes.cab_triangles
     var options: PackedStringArray = truck.submeshes.cab_options
@@ -317,6 +327,10 @@ static func _add_collision_cabs(solver: RefCounted, truck: TruckParser) -> void:
             solver.add_collision_cab(
                 triangles[index * 3], triangles[index * 3 + 1], triangles[index * 3 + 2]
             )
+        # Upstream's buoycabs, one per buoyant option in the spawner's order: b normal, r drag
+        # only, s no drag, then D, F or S (also contact) normal.
+        for type: int in _buoyancy_types(option):
+            solver.add_buoy_cab(triangles[index * 3], triangles[index * 3 + 1], triangles[index * 3 + 2], type)
     for node: int in truck.contacters:
         solver.set_node_contact_role(node, true, false)
     for node: int in truck.rim_nodes:

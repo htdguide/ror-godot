@@ -7,6 +7,7 @@
 #include "ror_heightfield.h"
 #include "ror_hooks.h"
 #include "ror_triggers.h"
+#include "ror_buoyance.h"
 #include "ror_wings.h"
 #include "ror_obstacles.h"
 #include "ror_node.h"
@@ -55,6 +56,13 @@ protected:
     static void bind_trigger_methods();
     static void bind_animator_methods();
     static void bind_wing_methods();  // Upstream's wings (`ror_solver_wings.cpp`, `ror_wings.cpp`).
+    static void bind_boat_methods();  // Buoyancy and screw props (`ror_solver_boats.cpp`).
+    void set_water(bool has_water, float height);
+    void add_buoy_cab(int a, int b, int c, int type);
+    int add_screwprop(int noderef, int nodeback, int nodeup, float power);
+    godot::Dictionary boat_command(const godot::String &action, float value);
+    static godot::PackedStringArray screwprop_probe(const godot::PackedInt32Array &nodes, float power, const godot::Array &steps);
+    static godot::PackedStringArray buoyancy_probe(float height, const godot::Array &cabs, const godot::Array &steps);
     int add_wing(const godot::PackedInt32Array &nodes, const godot::String &type, float chord_point, float min_deflection,
                  float max_deflection, const godot::String &afl, float lift_coef);
     void finish_wings();
@@ -166,22 +174,16 @@ public:
                                         float mass, float friction_coef, const godot::Vector3 &normal,
                                         float penetration, float dt) const;
     // A `shocks2` (kind 4) or `shocks3` (kind 5) beam's own rates, in its row's order after the
-    // nodes: shocks2 spring_in, damp_in, sprog_in, dprog_in, spring_out, damp_out, sprog_out,
-    // dprog_out; shocks3 spring_in, damp_in, dslow_in, split_in, dfast_in, spring_out, damp_out,
-    // dslow_out, split_out, dfast_out. Call after `set_beam_bounds` gives it the kind.
+    // nodes. Call after `set_beam_bounds` gives it the kind.
     void set_beam_shock(int beam, const godot::PackedFloat32Array &rates, bool soft_bump);
-    // Runs a `shocks2`/`shocks3` law once on a beam described by its arguments and returns the
-    // spring and damping it chooses, for comparison against upstream's own, case by case.
+    // A `shocks2`/`shocks3` law once, its spring and damping, for comparison with upstream's.
     godot::Vector2 shock_law_probe(int kind, const godot::PackedFloat32Array &rates, bool soft_bump,
                                    const godot::PackedFloat32Array &beam, float extension, float v) const;
     // The friction surface. Defaults to upstream's `concrete`.
     void set_ground_friction(float adhesion_velocity, float static_friction, float sliding_friction,
                              float hydrodynamic_friction, float stribeck_velocity, float strength);
-    // Defines the ground model at `index`, for a world with more than one surface. Index 0 is
-    // the one `set_ground_friction` sets and the one used where no surface map says otherwise.
-    // The soft half of a ground model: how deep the fluid layer is and what it is made of.
-    // Separate from the friction setter because most surfaces have none of it, and because a
-    // twelve-argument call is a call nobody can read.
+    // The ground model at `index` (0: `set_ground_friction`'s, used where no surface map says
+    // otherwise), and its soft half: how deep the fluid layer is and what it is made of.
     void set_ground_fluid(int index, float solid_ground_level, float fluid_density,
                           float flow_consistency_index, float flow_behavior_index,
                           float drag_anisotropy);
@@ -194,13 +196,9 @@ public:
     // The model a node standing here would be gripped by. For checking that a track's
     // surfaces are where they are drawn.
     int surface_at(const godot::Vector3 &position) const;
-    // Per-node viscous drag against still air, upstream's turbulent model. Its random
-    // turbulence term is deliberately left out: this project's gates may not depend on
-    // unseeded randomness.
+    // Per-node drag against still air, upstream's turbulent model without its unseeded random term.
     void set_air_drag(float coefficient, bool enabled);
-    // The fuselage drag a rig's own `fusedrag` section asks for, which replaces the per-node
-    // turbulent model for rigs that declare one. `width` is the section's approximate width in
-    // metres, or the area its autocalc form works out.
+    // A `fusedrag` section's drag, replacing the per-node model; `width` its width or autocalc area.
     void set_fuselage_drag(int front_node, float width, bool enabled);
     void set_node_immovable(int node, bool immovable);
     void set_node_position(int node, const godot::Vector3 &position);
@@ -265,9 +263,7 @@ public:
     bool beam_broken(int beam) const;
     float beam_strength(int beam) const;
     int broken_beam_count() const;
-    // Taking the rig as built, and putting it back that way. Damage is spread over six beam
-    // fields and a per-node count, so repairing it means restoring a snapshot rather than
-    // recomputing values that building already worked out. See ror_repair.cpp.
+    // Taking the rig as built, and putting it back that way (a snapshot; see ror_repair.cpp).
     void snapshot_undamaged();
     void repair();
     // Marks a node as part of a collision triangle, which upstream protects from losing its
@@ -569,6 +565,7 @@ private:
     void calc_trigger(int i, float diff, bool hooks);
     void run_trigger_hook_requests(const std::vector<RorSolver *> &actors);
     RorWingSet m_wing_set;
+    RorBuoyance m_buoyance;
     int m_camera_roll = 0;
     float m_speedo_max_kph = 140.0f;
     RorAnimatorInputs animator_inputs() const;

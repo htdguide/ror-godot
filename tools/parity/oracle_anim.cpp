@@ -4,6 +4,7 @@
 #include "aero_engines.h"
 #include "differentials.h"
 
+#include <cmath>
 #include <cstdio>
 #include <sstream>
 #include <string>
@@ -13,7 +14,8 @@
 // step "engine crank gear num_gears parking wheel_speed speedo_max rpm shift_up psi brake acc clutch
 // diff_kind", node 0's velocity and height, the camera's pos, dir and roll nodes, then the
 // airplane's "flap airbrake num_wings wing4_aoa num_engines" and per engine "rpm_pc throttle xprop
-// indicated_torque max_torque pitch ignition failed". Prints per step every animator beam's length
+// indicated_torque max_torque pitch ignition failed", then "num_screwprops" and per screw prop
+// its rudder in degrees and its signed throttle. Prints per step every animator beam's length
 // and the animators' shared memory.
 bool run_anim(const std::string &line) {
     std::istringstream in(line.substr(4));
@@ -75,7 +77,16 @@ bool run_anim(const std::string &line) {
             aero[e].ignition = ignition != 0;
             aero[e].failed = failed != 0;
         }
-        if (!in || actor.ar_num_aeroengines > 8 || actor.ar_num_wings > 8) {
+        static Screwprop screws[8];
+        in >> actor.ar_num_screwprops;
+        for (int e = 0; e < actor.ar_num_screwprops && e < 8; ++e) {
+            float throttle = 0;
+            in >> screws[e].rudder >> throttle;
+            screws[e].throtle = std::fabs(throttle);
+            screws[e].reverse = throttle < 0;
+            actor.ar_screwprops[e] = &screws[e];
+        }
+        if (!in || actor.ar_num_aeroengines > 8 || actor.ar_num_wings > 8 || actor.ar_num_screwprops > 8) {
             return false;
         }
         actor.ar_engine = has_engine ? &engine : nullptr;

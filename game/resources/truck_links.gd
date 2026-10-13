@@ -32,6 +32,9 @@ var animators: Array[Dictionary] = []
 ## The aero engine rows (`turboprops2`, `pistonprops`, `turbojets`), kept for when they are built;
 ## a vehicle with any is an airplane, upstream's `ar_driveable`.
 var aero_engines: Array[Dictionary] = []
+## Every `screwprops` row, upstream's `ParseScrewprops`: {nodes (prop, back, top), power}. A
+## vehicle with any is a boat.
+var screwprops: Array[Dictionary] = []
 ## Every `wings` row (`WingRows`).
 var wings: Array[Dictionary] = []
 ## Every `airbrakes` row, upstream's `ParseAirbrakes`: {nodes (ref, x, y, additional), offset,
@@ -81,6 +84,8 @@ func build(solver: RefCounted, node_count: int) -> void:
         _build_engine(solver, row)
     if not wings.is_empty():
         WingRows.build(solver, wings, mod_dir)
+    for row: Dictionary in screwprops:
+        solver.add_screwprop(row["nodes"][0], row["nodes"][1], row["nodes"][2], row["power"])
     for row: Dictionary in airbrakes:
         solver.add_airbrake(row["nodes"], row["width"], row["length"], row["max_angle"])
     for row: Dictionary in animators:
@@ -164,6 +169,15 @@ func read(section: String, line: String, id_to_index: Dictionary, defaults: Beam
             if section == "turboprops":
                 nodes.append(-1)
             aero_engines.append({"section": section, "fields": fields, "nodes": nodes})
+        "screwprops":
+            if fields.size() < 4:
+                return "row has %d fields, expected 4" % fields.size()
+            var props: PackedInt32Array = PackedInt32Array()
+            for i: int in 3:
+                props.append(int(id_to_index.get(fields[i], -1)))
+                if props[i] < 0:
+                    return "row references an unknown node"
+            screwprops.append({"nodes": props, "power": fields[3].to_float()})
         "airbrakes":
             # Upstream needs all fourteen, and skips a shorter row.
             if fields.size() < 14:

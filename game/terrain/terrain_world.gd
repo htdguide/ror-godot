@@ -139,6 +139,9 @@ func give_to_solver(solver: RefCounted, data: Object) -> String:
     var field: Dictionary = TerrainHeightfield.read(
         data, grid["origin"] as Vector3, size, size, grid["spacing"] as float
     )
+    # The terrain's sea, which buoyancy floats a boat on.
+    var terrain: RorTerrain = _shape as RorTerrain
+    solver.set_water(terrain != null and RorWater.declares_water(terrain), RorWater.height_at(terrain) if terrain != null else 0.0)
     return TerrainHeightfield.apply(
         solver, field, surface_map(), _shape.call("ground_models") as GroundModelSet
     )
