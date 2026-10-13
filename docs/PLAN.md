@@ -1896,8 +1896,11 @@ Scope, vehicles:
   air brake steps, wing 4's angle of attack, each aero engine's throttle, rpm, torque, pitch and
   status; `the_animator_is_upstreams`, bit-identical): the Spitfire's flap meshes lower with the
   flaps. Air brakes are upstream's (`an_air_brake_is_upstreams`, bit-identical; 3/4 and Ctrl+3/4,
-  drawn hinged; all 22 corpus rows build).
-  Not in: the autopilot, screw props.
+  drawn hinged; all 22 corpus rows build). The autopilot is upstream's (`the_autopilot_is_upstreams`,
+  bit-identical): WLV, HDG, ALT, V/S and IAS from a panel on the airplane pad, referenced to the
+  first wing run's tips and the fuselage drag's node as upstream's spawner does.
+  Not in: screw props; ILS approaches (terrain localizers are not read, so NAV disconnects as
+  upstream's does with none in range); the ground-proximity warnings (sounds).
 - **`forset` read as upstream reads it** (2026-10-13, `a_forset_is_read_as_upstream_reads_it`):
   "0 - 36" is a range, not nodes 0 and 36, and a vertex on a flat triad binds at zero as upstream's
   `Matrix3::Inverse` leaves it. The Spitfire's fuselage and canopy had bound to two nodes.

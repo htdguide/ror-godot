@@ -212,7 +212,9 @@ void RorSolver::step_now(float dt, int substeps) {
 // the rig moves centimetres inside one call, and testing every box against every node at
 // 2 kHz would cost more than the simulation it is protecting.
 void RorSolver::begin_steps() {
-    m_wing_set.update_frame(m_nodes);
+    m_wing_set.update_frame(m_nodes, m_fuselage_enabled ? m_fuselage_node : -1);
+    // Upstream's `ar_hydro_*_command`: what the surfaces follow, the autopilot's included.
+    m_steering.set_surface_commands(m_wing_set.auto_aileron(), m_wing_set.auto_rudder(), m_wing_set.auto_elevator());
     // Alone, the hook requests its triggers queued are carried out here; a world does it for all.
     if (m_world == nullptr && !m_trigger_hook_requests.empty()) {
         run_trigger_hook_requests({this});

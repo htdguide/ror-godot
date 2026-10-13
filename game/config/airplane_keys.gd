@@ -29,6 +29,8 @@ var _throttle_wait: float = 0.0
 
 ## One frame: the surfaces smoothed towards the keys, the brake, all handed to `solver`.
 func read(solver: RefCounted, delta: float) -> void:
+    # Upstream's first: an autopilot that asked to disconnect (NAV with no approach) is dropped.
+    solver.autopilot("disconnect")
     var steer: float = _key(KEY_RIGHT) - _key(KEY_LEFT)
     var pitch: float = _key(KEY_DOWN) - _key(KEY_UP)
     var yaw: float = _key(KEY_Z) - _key(KEY_X)
@@ -48,6 +50,8 @@ func read(solver: RefCounted, delta: float) -> void:
     elif _throttle_wait <= 0.0:
         solver.aero_command("throttle_step", 0.05 * step)
         _throttle_wait = 0.1
+    # And last, the autopilot's airspeed hold on every engine's throttle.
+    solver.aero_command("autopilot_throttle", delta)
 
 
 ## A key press: the flaps and the parking brake, `ctrl` as if Ctrl were held. Whether it was one of these.

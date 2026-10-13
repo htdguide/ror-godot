@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ror_autopilot.h"
 #include "ror_node.h"
 
 #include <godot_cpp/variant/string.hpp>
@@ -92,8 +93,16 @@ public:
     // Upstream's `setAirbrakeIntensity`: 0 to 5, each air brake's ratio a fifth of it.
     void set_airbrake_intensity(int intensity);
     int airbrake_intensity() const { return m_airbrake_intensity; }
-    // Upstream's `updateVisual` for the wings, once a frame.
-    void update_frame(const NodeArray &nodes);
+    // Upstream's `updateVisual` for the wings, once a frame: the autopilot's aileron and elevator
+    // added to the controls, then the control surfaces. `fuselage_back` is the fuselage drag's
+    // node, or -1.
+    void update_frame(const NodeArray &nodes, int fuselage_back = -1);
+    // The aileron, rudder and elevator the surfaces and the hydros followed this frame.
+    float auto_aileron() const { return m_auto[0]; }
+    float auto_rudder() const { return m_auto[1]; }
+    float auto_elevator() const { return m_auto[2]; }
+    // Upstream's `ar_autopilot`: made with the first aero engine, its references set as the wings close.
+    RorAutopilot *autopilot() { return m_autopilot.get(); }
     void update_forces(NodeArray &nodes, float dt, bool do_update);
     int count() const { return static_cast<int>(m_wings.size()); }
     const RorWing &at(int index) const { return m_wings[static_cast<size_t>(index)]; }
@@ -102,6 +111,10 @@ private:
     std::vector<RorWing> m_wings;
     std::vector<std::unique_ptr<RorAeroEngine>> m_engines;
     std::vector<RorAirbrake> m_airbrakes;
+    std::unique_ptr<RorAutopilot> m_autopilot;
+    // The first run's last wing's tips, where upstream hangs the navigation lights.
+    int m_left_light = -1, m_right_light = -1;
+    float m_auto[3] = {0.0f, 0.0f, 0.0f};
     int m_airbrake_intensity = 0;
     int m_first = -1;
     float m_area = 0.0f;

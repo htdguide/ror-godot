@@ -1,6 +1,7 @@
 // The parity oracle's aero engine mode (see oracle.cpp): upstream's `Turboprop` and `Turbojet` on
 // an engine a gate describes.
 #include "aero_engines.h"
+#include "autopilot.h"
 
 #include <cstdio>
 #include <memory>
@@ -190,6 +191,57 @@ bool run_airbrake(const std::string &line) {
             out += buffer;
         }
         std::printf("%s\n", out.c_str());
+    }
+    return true;
+}
+
+// `autopilot n_steps`, then left, right and back nodes' starting positions; per step an action
+// (0 none, 1-4 heading mode none/fixed/wlv/nav toggle, 5-6 alt fixed/vs toggle, 7 ias toggle,
+// 8-11 adj hdg/alt/vs/ias by value) and its value, each node's height and velocity, then a throttle
+// and dt. Upstream's `Autopilot` as reset, references set as the wings close. Prints per step the
+// aileron, elevator and throttle it asks for and its heading, alt, vs and ias.
+bool run_autopilot(const std::string &line) {
+    std::istringstream in(line.substr(9));
+    int n_steps = 0;
+    if (!(in >> n_steps)) {
+        return false;
+    }
+    node_t nodes[3];
+    for (int k = 0; k < 3; ++k) {
+        in >> nodes[k].RelPosition.x >> nodes[k].RelPosition.y >> nodes[k].RelPosition.z;
+        nodes[k].AbsPosition = nodes[k].RelPosition;
+    }
+    RoR::Autopilot ap;
+    ap.setInertialReferences(&nodes[0], &nodes[1], &nodes[2], &nodes[0]);
+    for (int step = 0; step < n_steps; ++step) {
+        int action = 0, value = 0;
+        in >> action >> value;
+        for (int k = 0; k < 3; ++k) {
+            in >> nodes[k].RelPosition.y >> nodes[k].Velocity.x >> nodes[k].Velocity.y >> nodes[k].Velocity.z;
+            nodes[k].AbsPosition.y = nodes[k].RelPosition.y;
+        }
+        float thrtl = 0, dt = 0;
+        in >> thrtl >> dt;
+        if (!in) {
+            return false;
+        }
+        switch (action) {
+            case 2: ap.toggleHeading(RoR::Autopilot::HEADING_FIXED); break;
+            case 3: ap.toggleHeading(RoR::Autopilot::HEADING_WLV); break;
+            case 4: ap.toggleHeading(RoR::Autopilot::HEADING_NAV); break;
+            case 5: ap.toggleAlt(RoR::Autopilot::ALT_FIXED); break;
+            case 6: ap.toggleAlt(RoR::Autopilot::ALT_VS); break;
+            case 7: ap.toggleIAS(); break;
+            case 8: ap.adjHDG(value); break;
+            case 9: ap.adjALT(value); break;
+            case 10: ap.adjVS(value); break;
+            case 11: ap.adjIAS(value); break;
+            default: break;
+        }
+        const float aileron = ap.getAilerons();
+        const float elevator = ap.getElevator();
+        const float throttle = ap.getThrottle(thrtl, dt);
+        std::printf("%.9g %.9g %.9g %d %d %d %d\n", aileron, elevator, throttle, ap.heading, ap.alt, ap.vs, ap.ias);
     }
     return true;
 }

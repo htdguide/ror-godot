@@ -13,7 +13,7 @@ const FRAME: float = 1.0 / 60.0
 static func meta() -> Dictionary:
     return {
         "name": "the_airplane_pad_presses_the_airplane_keys",
-        "proves": "the on-screen airplane buttons hold and press the airplane's keys, the Ctrl ones with Ctrl, and light when pressed",
+        "proves": "the on-screen airplane buttons hold and press the airplane's keys, the Ctrl ones with Ctrl, and light when pressed; the autopilot panel toggles and steps it",
         "builds_on": ["aircraft_controls_are_upstreams"],
         "oracle": GateBase.ORACLE_COMPUTED,
         "threshold": "held roll gives full aileron and letting go starts it back; brake 0.66; flaps step, the parking brake toggles; the throttle steps 0.05 and Full throttle (Ctrl+PgUp) reaches 1",
@@ -63,7 +63,15 @@ func run(_harness: Node) -> Dictionary:
     var stepped: float = solver.aero_state(0)["throttle"]
     pad.button("Full throttle").pressed.emit()
     var full: float = solver.aero_state(0)["throttle"]
+    # The autopilot's panel: HDG on and lit, HDG + steps the heading by one.
+    pad.button("HDG").pressed.emit()
+    pad.button("HDG +").pressed.emit()
+    pad._process(FRAME)
+    var ap: Dictionary = solver.autopilot("state")
+    var lit: bool = pad.button("HDG").modulate == AirplanePad.LIT and pad.button("WLV").modulate != AirplanePad.LIT
     pad.free()
+    if ap["heading_mode"] != "hdg" or ap["heading"] != 1 or not lit:
+        return fail("HDG and HDG + left the autopilot at %s, HDG lit alone %s" % [ap, lit])
     if absf(stepped - start - 0.05) > 1e-6 or full != 1.0:
         return fail("Throttle + took the throttle %.3f to %.3f, Full throttle to %.3f" % [start, stepped, full])
     return ok("held roll and brake, flaps stepped, parking brake, throttle stepped %.2f and full %.2f" % [stepped, full], 0)

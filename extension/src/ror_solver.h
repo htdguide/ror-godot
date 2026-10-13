@@ -33,12 +33,10 @@ namespace rorgd {
 
 class RorWorld;
 
-// The node/beam core of Rigs of Rods' soft-body simulation, and the force sources that
-// make a rig a vehicle rather than a structure. Point masses joined by damped springs, integrated with symplectic (semi-implicit)
-// Euler exactly as upstream does it: velocity from the force accumulated during the previous step,
-// then position from the new velocity, then the accumulator reset to gravity. The force sources
-// run in upstream's order, which is part of its behaviour; each lives in its own file and knows
-// nothing about Godot, so each can be checked on its own.
+// The node/beam core of Rigs of Rods' soft-body simulation and the force sources that make a rig a
+// vehicle. Point masses joined by damped springs, integrated with symplectic Euler as upstream
+// does: velocity from the previous step's force, then position, then the accumulator reset to
+// gravity. The force sources run in upstream's order, each in its own file, free of Godot.
 class RorSolver : public godot::RefCounted {
     GDCLASS(RorSolver, godot::RefCounted)
     // Steps several solvers together and resolves contact between them; reaches the nodes, the
@@ -65,6 +63,8 @@ protected:
     int add_airbrake(const godot::PackedInt32Array &nodes, float width, float length, float max_angle);
     static godot::PackedStringArray airbrake_probe(const godot::PackedFloat32Array &params, const godot::Array &steps);
     void aero_command(const godot::String &action, float value);
+    godot::Dictionary autopilot(const godot::String &action, int value);
+    static godot::PackedStringArray autopilot_probe(const godot::PackedVector3Array &start, const godot::Array &steps);
     godot::Dictionary aero_state(int index);
     static godot::PackedStringArray aero_probe(const godot::String &kind, const godot::PackedInt32Array &ids, const godot::Array &params, const godot::PackedVector3Array &positions, const godot::PackedFloat32Array &masses, const godot::String &afl, const godot::Array &steps);
     void set_aero_controls(float aileron, float rudder, float elevator, int flap);

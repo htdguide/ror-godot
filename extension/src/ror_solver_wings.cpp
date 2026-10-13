@@ -145,6 +145,15 @@ void RorSolver::aero_command(const String &action, float value) {
         m_wing_set.set_airbrake_intensity(static_cast<int>(value));
         return;
     }
+    RorAutopilot *autopilot = m_wing_set.autopilot();
+    if (action == "autopilot_throttle") {
+        // Upstream's `UpdateAirplaneInputEvents` last: each engine's throttle through the autopilot.
+        for (int i = 0; autopilot != nullptr && i < m_wing_set.engine_count(); ++i) {
+            RorAeroEngine &engine = m_wing_set.engine(i);
+            engine.set_throttle(autopilot->throttle(m_nodes, engine.throttle(), value));
+        }
+        return;
+    }
     for (int i = 0; i < m_wing_set.engine_count(); ++i) {
         RorAeroEngine &engine = m_wing_set.engine(i);
         if (action == "throttle") {
@@ -157,6 +166,100 @@ void RorSolver::aero_command(const String &action, float value) {
             engine.flip_start();
         }
     }
+}
+
+// The autopilot's panel: "hdg", "wlv" and "nav" toggle its heading mode, "alt" and "vs" its altitude
+// mode, "ias" and "gpws" toggle; "adj_hdg", "adj_alt", "adj_vs" and "adj_ias" add `value`;
+// "disconnect" drops it if it asked to; anything else only reads. Returns its state, empty for a
+// vehicle without one.
+Dictionary RorSolver::autopilot(const String &action, int value) {
+    sync();
+    Dictionary out;
+    RorAutopilot *ap = m_wing_set.autopilot();
+    if (ap == nullptr) {
+        return out;
+    }
+    if (action == "hdg") {
+        ap->toggle_heading(RorAutopilot::HEADING_FIXED);
+    } else if (action == "wlv") {
+        ap->toggle_heading(RorAutopilot::HEADING_WLV);
+    } else if (action == "nav") {
+        ap->toggle_heading(RorAutopilot::HEADING_NAV);
+    } else if (action == "alt") {
+        ap->toggle_alt(RorAutopilot::ALT_FIXED);
+    } else if (action == "vs") {
+        ap->toggle_alt(RorAutopilot::ALT_VS);
+    } else if (action == "ias") {
+        ap->toggle_ias();
+    } else if (action == "gpws") {
+        ap->toggle_gpws();
+    } else if (action == "adj_hdg") {
+        ap->adj_hdg(value);
+    } else if (action == "adj_alt") {
+        ap->adj_alt(value);
+    } else if (action == "adj_vs") {
+        ap->adj_vs(value);
+    } else if (action == "adj_ias") {
+        ap->adj_ias(value);
+    } else if (action == "disconnect" && ap->wantsdisconnect) {
+        ap->disconnect();
+    }
+    static const char *HEADINGS[] = {"", "hdg", "wlv", "nav"};
+    static const char *ALTS[] = {"", "alt", "vs"};
+    out["heading_mode"] = HEADINGS[ap->mode_heading];
+    out["alt_mode"] = ALTS[ap->mode_alt];
+    out["ias_mode"] = ap->mode_ias;
+    out["gpws"] = ap->mode_gpws;
+    out["heading"] = ap->heading;
+    out["alt"] = ap->alt;
+    out["vs"] = ap->vs;
+    out["ias"] = ap->ias;
+    out["ils"] = ap->ils_available();
+    return out;
+}
+
+// `start` the left, right and back nodes; `steps` each [action, value, then per node height and
+// velocity x y z, then throttle and dt], actions as the oracle's `autopilot` mode numbers them.
+// Per step, `the_autopilot_is_upstreams`' line.
+PackedStringArray RorSolver::autopilot_probe(const PackedVector3Array &start, const Array &steps) {
+    NodeArray nodes(3);
+    for (int k = 0; k < 3; ++k) {
+        nodes[static_cast<size_t>(k)].position = start[k];
+    }
+    RorAutopilot ap;
+    ap.set_references(nodes, 0, 1, 2);
+    PackedStringArray out;
+    for (int step = 0; step < steps.size(); ++step) {
+        const PackedFloat32Array v = steps[step];
+        const int action = static_cast<int>(v[0]);
+        const int value = static_cast<int>(v[1]);
+        for (int k = 0; k < 3; ++k) {
+            RorNode &node = nodes[static_cast<size_t>(k)];
+            node.position.y = v[2 + 4 * k];
+            node.velocity = Vector3(v[3 + 4 * k], v[4 + 4 * k], v[5 + 4 * k]);
+        }
+        switch (action) {
+            case 2: ap.toggle_heading(RorAutopilot::HEADING_FIXED); break;
+            case 3: ap.toggle_heading(RorAutopilot::HEADING_WLV); break;
+            case 4: ap.toggle_heading(RorAutopilot::HEADING_NAV); break;
+            case 5: ap.toggle_alt(RorAutopilot::ALT_FIXED); break;
+            case 6: ap.toggle_alt(RorAutopilot::ALT_VS); break;
+            case 7: ap.toggle_ias(); break;
+            case 8: ap.adj_hdg(value); break;
+            case 9: ap.adj_alt(value); break;
+            case 10: ap.adj_vs(value); break;
+            case 11: ap.adj_ias(value); break;
+            default: break;
+        }
+        const float aileron = ap.ailerons(nodes);
+        const float elevator = ap.elevator(nodes);
+        const float throttle = ap.throttle(nodes, v[14], v[15]);
+        char buffer[160];
+        std::snprintf(buffer, sizeof buffer, "%.9g %.9g %.9g %d %d %d %d", aileron, elevator, throttle, ap.heading, ap.alt,
+                      ap.vs, ap.ias);
+        out.push_back(String(buffer));
+    }
+    return out;
 }
 
 // An engine's state, or for index -1 the airplane's own: its flap and air brake steps.
@@ -188,9 +291,6 @@ void RorSolver::finish_wings() {
 void RorSolver::set_aero_controls(float aileron, float rudder, float elevator, int flap) {
     sync();
     m_wing_set.set_controls(aileron, rudder, elevator, flap);
-    // Upstream's `ar_hydro_*_command`, the controls clamped as the wings read them.
-    m_steering.set_surface_commands(std::clamp(aileron, -1.0f, 1.0f), std::clamp(rudder, -1.0f, 1.0f),
-            std::clamp(elevator, -1.0f, 1.0f));
 }
 
 int RorSolver::wing_count() {
@@ -377,6 +477,8 @@ void RorSolver::bind_wing_methods() {
     ClassDB::bind_method(D_METHOD("aero_command", "action", "value"), &RorSolver::aero_command);
     ClassDB::bind_method(D_METHOD("aero_state", "index"), &RorSolver::aero_state);
     ClassDB::bind_method(D_METHOD("add_airbrake", "nodes", "width", "length", "max_angle"), &RorSolver::add_airbrake);
+    ClassDB::bind_method(D_METHOD("autopilot", "action", "value"), &RorSolver::autopilot, DEFVAL(0));
+    ClassDB::bind_static_method("RorSolver", D_METHOD("autopilot_probe", "start", "steps"), &RorSolver::autopilot_probe);
     ClassDB::bind_static_method("RorSolver", D_METHOD("airbrake_probe", "params", "steps"), &RorSolver::airbrake_probe);
     ClassDB::bind_method(D_METHOD("set_aero_controls", "aileron", "rudder", "elevator", "flap"), &RorSolver::set_aero_controls);
     ClassDB::bind_method(D_METHOD("wing_count"), &RorSolver::wing_count);

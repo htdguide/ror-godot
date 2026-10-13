@@ -209,6 +209,10 @@ int RorWingSet::add(RorWing wing, const NodeArray &nodes) {
     } else {
         RorWing &previous = m_wings.back();
         if (wing.nfrd != previous.nfld) {
+            if (m_left_light < 0) {
+                m_left_light = previous.nfld;
+                m_right_light = previous.nfrd;
+            }
             RorWing &start = m_wings[static_cast<size_t>(m_first)];
             const float span = static_cast<float>(at(start.nfrd).distance_to(at(previous.nfld)));
             start.enable_induced_drag(span, m_area, false);
@@ -228,6 +232,9 @@ RorWingSet::~RorWingSet() = default;
 
 int RorWingSet::add_engine(std::unique_ptr<RorAeroEngine> engine) {
     m_engines.push_back(std::move(engine));
+    if (!m_autopilot) {
+        m_autopilot = std::make_unique<RorAutopilot>();
+    }
     return engine_count() - 1;
 }
 
@@ -269,6 +276,9 @@ void RorWingSet::finish(const NodeArray &nodes) {
             }
         }
     }
+    if (m_autopilot) {
+        m_autopilot->set_references(nodes, m_left_light, m_right_light, -1);
+    }
     RorWing &first = m_wings[static_cast<size_t>(m_first)];
     RorWing &last = m_wings.back();
     const float span = static_cast<float>(
@@ -285,10 +295,26 @@ void RorWingSet::set_controls(float aileron, float rudder, float elevator, int f
 }
 
 // Each control surface deflected by the controls its kind follows, then the panel checked.
-void RorWingSet::update_frame(const NodeArray &nodes) {
-    const float aileron = std::clamp(m_aileron, -1.0f, 1.0f);
-    const float rudder = std::clamp(m_rudder, -1.0f, 1.0f);
-    const float elevator = std::clamp(m_elevator, -1.0f, 1.0f);
+void RorWingSet::update_frame(const NodeArray &nodes, int fuselage_back) {
+    float autoaileron = 0;
+    float autorudder = 0;
+    float autoelevator = 0;
+    if (m_autopilot) {
+        m_autopilot->set_back(fuselage_back);
+        m_autopilot->update_ils();
+        autoaileron = m_autopilot->ailerons(nodes);
+        autorudder = m_autopilot->rudder();
+        autoelevator = m_autopilot->elevator(nodes);
+    }
+    autoaileron += m_aileron;
+    autorudder += m_rudder;
+    autoelevator += m_elevator;
+    const float aileron = std::clamp(autoaileron, -1.0f, 1.0f);
+    const float rudder = std::clamp(autorudder, -1.0f, 1.0f);
+    const float elevator = std::clamp(autoelevator, -1.0f, 1.0f);
+    m_auto[0] = aileron;
+    m_auto[1] = rudder;
+    m_auto[2] = elevator;
     static const float FLAP_ANGLES[6] = {0.f, -0.07f, -0.17f, -0.33f, -0.67f, -1.f};
     const float flap = FLAP_ANGLES[std::clamp(m_flap, 0, 5)];
     for (RorWing &wing : m_wings) {

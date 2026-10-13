@@ -69,6 +69,17 @@ WANTED = [
     ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::enableInducedDrag(float span, float area, bool l)"),
     ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::updateForces()"),
     ("main/physics/air/AirBrake.cpp", "void Airbrake::applyForce()"),
+    ("main/gameplay/AutoPilot.cpp", "void Autopilot::setInertialReferences(node_t* refl, node_t* refr, node_t* refb, node_t* refc)"),
+    ("main/gameplay/AutoPilot.cpp", "float Autopilot::getAilerons()"),
+    ("main/gameplay/AutoPilot.cpp", "float Autopilot::getElevator()"),
+    ("main/gameplay/AutoPilot.cpp", "float Autopilot::getThrottle(float thrtl, float dt)"),
+    ("main/gameplay/AutoPilot.cpp", "int Autopilot::toggleHeading(int mode)"),
+    ("main/gameplay/AutoPilot.cpp", "int Autopilot::toggleAlt(int mode)"),
+    ("main/gameplay/AutoPilot.cpp", "bool Autopilot::toggleIAS()"),
+    ("main/gameplay/AutoPilot.cpp", "int Autopilot::adjHDG(int d)"),
+    ("main/gameplay/AutoPilot.cpp", "int Autopilot::adjALT(int d)"),
+    ("main/gameplay/AutoPilot.cpp", "int Autopilot::adjVS(int d)"),
+    ("main/gameplay/AutoPilot.cpp", "int Autopilot::adjIAS(int d)"),
     ("main/physics/air/TurboProp.cpp", "void Turboprop::updateForces(float dt, int doUpdate)"),
     ("main/physics/air/TurboProp.cpp", "void Turboprop::setThrottle(float val)"),
     ("main/physics/air/TurboProp.cpp", "void Turboprop::reset()"),
@@ -125,6 +136,7 @@ PROLOGUE = """// GENERATED — do not edit. Produced by tools/parity/extract.py 
 #include "spawner_trigger.h"
 #include "flex_airfoil.h"
 #include "aero_engines.h"
+#include "autopilot.h"
 
 #include <algorithm>
 #include <cmath>

@@ -51,6 +51,9 @@ void RorSolver::repair() {
     m_wheels.reset_avg_speed();
     m_cc_mode = false;
     m_wing_set.reset_engines();
+    if (RorAutopilot *autopilot = m_wing_set.autopilot()) {
+        autopilot->reset();
+    }
     m_trigger_hook_requests.clear();
     // Upstream's `HOOK_RESET`: every hook let go, its auto-lock free to try again at once.
     toggle_hooks_among({this}, RorHook::RESET, -1);
