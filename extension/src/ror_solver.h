@@ -34,9 +34,7 @@ namespace rorgd {
 class RorWorld;
 
 // The node/beam core of Rigs of Rods' soft-body simulation, and the force sources that
-// make a rig a vehicle rather than a structure.
-//
-// Point masses joined by damped springs, integrated with symplectic (semi-implicit)
+// make a rig a vehicle rather than a structure. Point masses joined by damped springs, integrated with symplectic (semi-implicit)
 // Euler exactly as upstream does it: velocity from the force accumulated during the previous step,
 // then position from the new velocity, then the accumulator reset to gravity. The force sources
 // run in upstream's order, which is part of its behaviour; each lives in its own file and knows
@@ -64,6 +62,8 @@ protected:
     void finish_wings();
     int add_turboprop(const godot::PackedInt32Array &nodes, float power, const godot::String &afl, bool piston, float pitch);
     int add_turbojet(const godot::PackedInt32Array &nodes, bool reversable, float dry_thrust, float wet_thrust, float back_diameter);
+    int add_airbrake(const godot::PackedInt32Array &nodes, float width, float length, float max_angle);
+    static godot::PackedStringArray airbrake_probe(const godot::PackedFloat32Array &params, const godot::Array &steps);
     void aero_command(const godot::String &action, float value);
     godot::Dictionary aero_state(int index);
     static godot::PackedStringArray aero_probe(const godot::String &kind, const godot::PackedInt32Array &ids, const godot::Array &params, const godot::PackedVector3Array &positions, const godot::PackedFloat32Array &masses, const godot::String &afl, const godot::Array &steps);

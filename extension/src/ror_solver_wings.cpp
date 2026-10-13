@@ -80,10 +80,71 @@ int RorSolver::add_turbojet(const PackedInt32Array &nodes, bool reversable, floa
                                                                wet_thrust, back_diameter));
 }
 
+// An `airbrakes` row: reference, x, y and additional nodes, its size and maximum angle; upstream's
+// lift coefficient is always its default 1. The index, or -1 for a node out of range.
+int RorSolver::add_airbrake(const PackedInt32Array &nodes, float width, float length, float max_angle) {
+    sync();
+    if (nodes.size() != 4) {
+        return -1;
+    }
+    for (int i = 0; i < 4; ++i) {
+        if (nodes[i] < 0 || nodes[i] >= static_cast<int>(m_nodes.size())) {
+            return -1;
+        }
+    }
+    RorAirbrake airbrake;
+    airbrake.noderef = nodes[0];
+    airbrake.nodex = nodes[1];
+    airbrake.nodey = nodes[2];
+    airbrake.nodea = nodes[3];
+    airbrake.maxangle = max_angle;
+    airbrake.area = width * length * 1.f;
+    return m_wing_set.add_airbrake(airbrake);
+}
+
+// `params` [width, length, max_angle]; `steps` each [intensity, ref height, ref velocity x y z, then
+// the four nodes' starting forces]. Per step, `an_air_brake_is_upstreams`' line: the four forces.
+PackedStringArray RorSolver::airbrake_probe(const PackedFloat32Array &params, const Array &steps) {
+    NodeArray nodes(4);
+    RorWingSet set;
+    RorAirbrake airbrake;
+    airbrake.noderef = 0;
+    airbrake.nodex = 1;
+    airbrake.nodey = 2;
+    airbrake.nodea = 3;
+    airbrake.maxangle = params[2];
+    airbrake.area = params[0] * params[1] * 1.f;
+    set.add_airbrake(airbrake);
+    PackedStringArray out;
+    for (int step = 0; step < steps.size(); ++step) {
+        const PackedFloat32Array v = steps[step];
+        set.set_airbrake_intensity(static_cast<int>(v[0]));
+        nodes[0].position.y = v[1];
+        nodes[0].velocity = Vector3(v[2], v[3], v[4]);
+        for (int k = 0; k < 4; ++k) {
+            nodes[static_cast<size_t>(k)].forces = Vector3(v[5 + 3 * k], v[6 + 3 * k], v[7 + 3 * k]);
+        }
+        set.airbrake(0).apply_force(nodes);
+        std::string line;
+        char buffer[96];
+        for (const RorNode &node : nodes) {
+            std::snprintf(buffer, sizeof buffer, "%.9g %.9g %.9g ", node.forces.x, node.forces.y, node.forces.z);
+            line += buffer;
+        }
+        out.push_back(String(line.c_str()));
+    }
+    return out;
+}
+
 // Upstream's airplane keys for every aero engine: "throttle" sets it to `value`, "throttle_step"
-// adds `value`, "reverse" toggles the reversers, "start" flips the ignition.
+// adds `value`, "reverse" toggles the reversers, "start" flips the ignition; "airbrake" sets the
+// air brakes' step, 0 to 5.
 void RorSolver::aero_command(const String &action, float value) {
     sync();
+    if (action == "airbrake") {
+        m_wing_set.set_airbrake_intensity(static_cast<int>(value));
+        return;
+    }
     for (int i = 0; i < m_wing_set.engine_count(); ++i) {
         RorAeroEngine &engine = m_wing_set.engine(i);
         if (action == "throttle") {
@@ -98,9 +159,15 @@ void RorSolver::aero_command(const String &action, float value) {
     }
 }
 
+// An engine's state, or for index -1 the airplane's own: its flap and air brake steps.
 Dictionary RorSolver::aero_state(int index) {
     sync();
     Dictionary out;
+    if (index == -1) {
+        out["flap"] = m_wing_set.flap();
+        out["airbrake"] = m_wing_set.airbrake_intensity();
+        return out;
+    }
     if (index < 0 || index >= m_wing_set.engine_count()) {
         return out;
     }
@@ -309,6 +376,8 @@ void RorSolver::bind_wing_methods() {
                          &RorSolver::add_turbojet);
     ClassDB::bind_method(D_METHOD("aero_command", "action", "value"), &RorSolver::aero_command);
     ClassDB::bind_method(D_METHOD("aero_state", "index"), &RorSolver::aero_state);
+    ClassDB::bind_method(D_METHOD("add_airbrake", "nodes", "width", "length", "max_angle"), &RorSolver::add_airbrake);
+    ClassDB::bind_static_method("RorSolver", D_METHOD("airbrake_probe", "params", "steps"), &RorSolver::airbrake_probe);
     ClassDB::bind_method(D_METHOD("set_aero_controls", "aileron", "rudder", "elevator", "flap"), &RorSolver::set_aero_controls);
     ClassDB::bind_method(D_METHOD("wing_count"), &RorSolver::wing_count);
     ClassDB::bind_method(D_METHOD("wing_state", "index"), &RorSolver::wing_state);

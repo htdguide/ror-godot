@@ -310,8 +310,40 @@ void RorWingSet::update_frame(const NodeArray &nodes) {
     }
 }
 
-// Upstream's `CalcAircraftForces`: the engines, then the wings in their wash.
+void RorAirbrake::apply_force(NodeArray &nodes) const {
+    RorNode &ref = nodes[static_cast<size_t>(noderef)];
+    // Upstream's tropospheric model, valid up to 11,000 m.
+    const float altitude = ref.position.y;
+    const float sea_level_pressure = 101325;
+    const float airpressure = sea_level_pressure * std::pow(1.0 - 0.0065 * altitude / 288.15, 5.24947);
+    const float airdensity = airpressure * 0.0000120896;
+    const Vector3 wind = -ref.velocity;
+    const float wspeed = static_cast<float>(wind.length());
+    const Vector3 drag =
+            static_cast<float>(1.2 * area * std::sin(std::fabs(ratio * maxangle / 57.3)) * 0.5 * airdensity * wspeed / 4.0) * wind;
+    ref.forces += drag;
+    nodes[static_cast<size_t>(nodex)].forces += drag;
+    nodes[static_cast<size_t>(nodey)].forces += drag;
+    nodes[static_cast<size_t>(nodea)].forces += drag;
+}
+
+int RorWingSet::add_airbrake(const RorAirbrake &airbrake) {
+    m_airbrakes.push_back(airbrake);
+    return airbrake_count() - 1;
+}
+
+void RorWingSet::set_airbrake_intensity(int intensity) {
+    m_airbrake_intensity = intensity;
+    for (RorAirbrake &airbrake : m_airbrakes) {
+        airbrake.ratio = (float)m_airbrake_intensity / 5.0;
+    }
+}
+
+// Upstream's `CalcAircraftForces`: the air brakes, the engines, then the wings in their wash.
 void RorWingSet::update_forces(NodeArray &nodes, float dt, bool do_update) {
+    for (const RorAirbrake &airbrake : m_airbrakes) {
+        airbrake.apply_force(nodes);
+    }
     for (std::unique_ptr<RorAeroEngine> &engine : m_engines) {
         engine->update_forces(nodes, dt, do_update);
     }

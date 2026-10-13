@@ -60,6 +60,16 @@ struct RorWing {
     void update_forces(NodeArray &nodes, const std::vector<std::unique_ptr<RorAeroEngine>> *engines = nullptr);
 };
 
+// Upstream's `Airbrake` (physics/air/AirBrake.cpp): a panel that drags its four nodes as it opens,
+// by the sine of its angle and the air's density at the reference node's height.
+struct RorAirbrake {
+    int noderef = 0, nodex = 0, nodey = 0, nodea = 0;
+    float maxangle = 0.0f;
+    float area = 0.0f;
+    float ratio = 0.0f;
+    void apply_force(NodeArray &nodes) const;
+};
+
 // A vehicle's wings and aero engines, with what upstream's spawner and actor keep for them: the
 // induced drag run being built, the prop wash over each wing, and the aileron, rudder, elevator and
 // flap the control surfaces follow.
@@ -75,6 +85,13 @@ public:
     RorAeroEngine &engine(int index) { return *m_engines[static_cast<size_t>(index)]; }
     void reset_engines();
     void set_controls(float aileron, float rudder, float elevator, int flap);
+    int flap() const { return m_flap; }
+    int add_airbrake(const RorAirbrake &airbrake);
+    int airbrake_count() const { return static_cast<int>(m_airbrakes.size()); }
+    const RorAirbrake &airbrake(int index) const { return m_airbrakes[static_cast<size_t>(index)]; }
+    // Upstream's `setAirbrakeIntensity`: 0 to 5, each air brake's ratio a fifth of it.
+    void set_airbrake_intensity(int intensity);
+    int airbrake_intensity() const { return m_airbrake_intensity; }
     // Upstream's `updateVisual` for the wings, once a frame.
     void update_frame(const NodeArray &nodes);
     void update_forces(NodeArray &nodes, float dt, bool do_update);
@@ -84,6 +101,8 @@ public:
 private:
     std::vector<RorWing> m_wings;
     std::vector<std::unique_ptr<RorAeroEngine>> m_engines;
+    std::vector<RorAirbrake> m_airbrakes;
+    int m_airbrake_intensity = 0;
     int m_first = -1;
     float m_area = 0.0f;
     float m_aileron = 0.0f, m_rudder = 0.0f, m_elevator = 0.0f;

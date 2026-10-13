@@ -3,8 +3,8 @@ extends RefCounted
 ## An airplane's controls, upstream's `GameContext::UpdateAirplaneInputEvents` and its default keys:
 ## the arrows bank (aileron, which also steers the nose wheel through the hydros) and pitch
 ## (elevator), Z and X the rudder, B the brake, P the parking brake, 1 and 2 a step of flaps less or
-## more, Ctrl+1 and Ctrl+2 none or full; PgUp and PgDn a twentieth of throttle more or less every
-## tenth of a second held, Ctrl+PgUp and Ctrl+PgDn full and none, Ctrl+Home the engines on or off,
+## more, Ctrl+1 and Ctrl+2 none or full, 3 and 4 the air brakes the same way; PgUp and PgDn a
+## twentieth of throttle more or less every tenth of a second held, Ctrl+PgUp and Ctrl+PgDn full and none, Ctrl+Home the engines on or off,
 ## R the reversers. The three surfaces follow their keys at 4 a second, as upstream's
 ## `smoothValue` moves them.
 ##
@@ -18,6 +18,8 @@ var aileron: float = 0.0
 var elevator: float = 0.0
 var rudder: float = 0.0
 var flap: int = 0
+## Upstream's `ar_airbrake_intensity`, 0 to 5: 3 and 4 a step less or more, Ctrl+3 and Ctrl+4 none and full.
+var airbrake: int = 0
 var parking: bool = false
 ## Keys held on screen (`AirplanePad`), counted as held on the keyboard.
 var held: Dictionary = {}
@@ -65,9 +67,15 @@ func on_key(keycode: Key, solver: RefCounted = null, ctrl: bool = false) -> bool
             flap = 0 if ctrl else maxi(flap - 1, 0)
         KEY_2:
             flap = 5 if ctrl else mini(flap + 1, 5)
+        KEY_3, KEY_4:
+            if solver == null:
+                return false
+            var more: bool = keycode == KEY_4
+            airbrake = (5 if more else 0) if ctrl else clampi(airbrake + (1 if more else -1), 0, 5)
+            solver.aero_command("airbrake", airbrake)
         _:
             return false
-    print("DRIVE  flaps %d, parking brake %s" % [flap, "on" if parking else "off"])
+    print("DRIVE  flaps %d, air brakes %d, parking brake %s" % [flap, airbrake, "on" if parking else "off"])
     return true
 
 

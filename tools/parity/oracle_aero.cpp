@@ -152,3 +152,44 @@ bool run_aero(const std::string &line) {
     }
     return true;
 }
+
+// `airbrake n_steps`, then "width length maxangle", then per step "intensity", node ref's height
+// and velocity, and the four nodes' starting forces (ref, x, y, a). Upstream's `Airbrake` with its
+// spawner's area and its `updatePosition` from `setAirbrakeIntensity`. Prints per step the four
+// nodes' forces.
+bool run_airbrake(const std::string &line) {
+    std::istringstream in(line.substr(8));
+    int n_steps = 0;
+    float width = 0, length = 0, maxangle = 0;
+    if (!(in >> n_steps >> width >> length >> maxangle)) {
+        return false;
+    }
+    RoR::Airbrake ab;
+    node_t nodes[4];
+    ab.noderef = &nodes[0];
+    ab.nodex = &nodes[1];
+    ab.nodey = &nodes[2];
+    ab.nodea = &nodes[3];
+    ab.maxangle = maxangle;
+    ab.area = width * length * 1.f;
+    for (int step = 0; step < n_steps; ++step) {
+        int intensity = 0;
+        in >> intensity >> nodes[0].AbsPosition.y >> nodes[0].Velocity.x >> nodes[0].Velocity.y >> nodes[0].Velocity.z;
+        for (int k = 0; k < 4; ++k) {
+            in >> nodes[k].Forces.x >> nodes[k].Forces.y >> nodes[k].Forces.z;
+        }
+        if (!in) {
+            return false;
+        }
+        ab.ratio = (float)intensity / 5.0;
+        ab.applyForce();
+        std::string out;
+        char buffer[96];
+        for (int k = 0; k < 4; ++k) {
+            std::snprintf(buffer, sizeof buffer, "%.9g %.9g %.9g ", nodes[k].Forces.x, nodes[k].Forces.y, nodes[k].Forces.z);
+            out += buffer;
+        }
+        std::printf("%s\n", out.c_str());
+    }
+    return true;
+}

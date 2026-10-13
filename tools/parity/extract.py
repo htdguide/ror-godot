@@ -68,6 +68,7 @@ WANTED = [
     ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::setControlDeflection(float val)"),
     ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::enableInducedDrag(float span, float area, bool l)"),
     ("main/physics/flex/FlexAirfoil.cpp", "void FlexAirfoil::updateForces()"),
+    ("main/physics/air/AirBrake.cpp", "void Airbrake::applyForce()"),
     ("main/physics/air/TurboProp.cpp", "void Turboprop::updateForces(float dt, int doUpdate)"),
     ("main/physics/air/TurboProp.cpp", "void Turboprop::setThrottle(float val)"),
     ("main/physics/air/TurboProp.cpp", "void Turboprop::reset()"),

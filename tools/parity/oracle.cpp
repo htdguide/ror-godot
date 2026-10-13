@@ -424,11 +424,19 @@ bool run_anim(const std::string &line);
 bool run_hydro(const std::string &line);
 bool run_wing(const std::string &line);
 bool run_aero(const std::string &line);
+bool run_airbrake(const std::string &line);
 
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("airbrake", 0) == 0) {
+            if (!run_airbrake(line)) {
+                std::fprintf(stderr, "oracle: malformed airbrake case: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("aero", 0) == 0) {

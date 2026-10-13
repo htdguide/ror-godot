@@ -79,4 +79,11 @@ public:
     ActorPtr m_actor = nullptr;
     int m_node_back = 0, m_node_front = 0, m_node_ref = 0;
 };
+// Upstream's `Airbrake` (physics/air/AirBrake.h), what `applyForce` reads, without its mesh.
+class Airbrake {
+public:
+    void applyForce();
+    node_t *noderef = nullptr, *nodex = nullptr, *nodey = nullptr, *nodea = nullptr;
+    float ratio = 0, maxangle = 0, area = 0;
+};
 } // namespace RoR

@@ -1892,8 +1892,12 @@ Scope, vehicles:
   every hydro steered and the Spitfire's elevators and rudder moved with its ailerons. The play
   window shows on-screen airplane buttons for keyboards without Home and PgUp/PgDn
   (`the_airplane_pad_presses_the_airplane_keys`). First flights in a window, 2026-10-13: the user
-  found the controls right once the hydro flags were in.
-  Not in: the autopilot, air brakes, screw props.
+  found the controls right once the hydro flags were in. Animators read the airplane too (flap and
+  air brake steps, wing 4's angle of attack, each aero engine's throttle, rpm, torque, pitch and
+  status; `the_animator_is_upstreams`, bit-identical): the Spitfire's flap meshes lower with the
+  flaps. Air brakes are upstream's (`an_air_brake_is_upstreams`, bit-identical; 3/4 and Ctrl+3/4,
+  drawn hinged; all 22 corpus rows build).
+  Not in: the autopilot, screw props.
 - **`forset` read as upstream reads it** (2026-10-13, `a_forset_is_read_as_upstream_reads_it`):
   "0 - 36" is a range, not nodes 0 and 36, and a vertex on a flat triad binds at zero as upstream's
   `Matrix3::Inverse` leaves it. The Spitfire's fuselage and canopy had bound to two nodes.

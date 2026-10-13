@@ -34,6 +34,9 @@ var animators: Array[Dictionary] = []
 var aero_engines: Array[Dictionary] = []
 ## Every `wings` row (`WingRows`).
 var wings: Array[Dictionary] = []
+## Every `airbrakes` row, upstream's `ParseAirbrakes`: {nodes (ref, x, y, additional), offset,
+## width, length, max_angle, tex (x1, y1, x2, y2)}.
+var airbrakes: Array[Dictionary] = []
 ## The folder the file was read from, where its own airfoils are; "" for text.
 var mod_dir: String = ""
 ## {node, group, multilock} per `ropables` row, upstream's `ParseRopables`.
@@ -78,6 +81,8 @@ func build(solver: RefCounted, node_count: int) -> void:
         _build_engine(solver, row)
     if not wings.is_empty():
         WingRows.build(solver, wings, mod_dir)
+    for row: Dictionary in airbrakes:
+        solver.add_airbrake(row["nodes"], row["width"], row["length"], row["max_angle"])
     for row: Dictionary in animators:
         var hydro: int = solver.add_animator(row["a"], row["b"], row["factor"], row["flags"], row["param"],
                 row["short_limit"], row["long_limit"], row["spring"], row["damp"], row["strength"], row["detacher"])
@@ -159,6 +164,18 @@ func read(section: String, line: String, id_to_index: Dictionary, defaults: Beam
             if section == "turboprops":
                 nodes.append(-1)
             aero_engines.append({"section": section, "fields": fields, "nodes": nodes})
+        "airbrakes":
+            # Upstream needs all fourteen, and skips a shorter row.
+            if fields.size() < 14:
+                return "row has %d fields, expected 14" % fields.size()
+            var nodes: PackedInt32Array = PackedInt32Array()
+            for i: int in 4:
+                nodes.append(int(id_to_index.get(fields[i], -1)))
+                if nodes[i] < 0:
+                    return "row references an unknown node"
+            airbrakes.append({"nodes": nodes, "offset": Vector3(fields[4].to_float(), fields[5].to_float(), fields[6].to_float()),
+                    "width": fields[7].to_float(), "length": fields[8].to_float(), "max_angle": fields[9].to_float(),
+                    "tex": PackedFloat32Array([fields[10].to_float(), fields[11].to_float(), fields[12].to_float(), fields[13].to_float()])})
         "wings":
             var wing: Dictionary = WingRows.read(fields, id_to_index)
             if (wing["error"] as String) != "":

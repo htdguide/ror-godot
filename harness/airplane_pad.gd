@@ -16,7 +16,8 @@ const HELD: Array = [
 ## Label, key, with Ctrl: one press per click.
 const TAPPED: Array = [
     ["Engines on/off", KEY_HOME, true], ["Full throttle", KEY_PAGEUP, true], ["Idle", KEY_PAGEDOWN, true],
-    ["Reverse", KEY_R, false], ["Flaps -", KEY_1, false], ["Flaps +", KEY_2, false], ["Parking brake", KEY_P, false],
+    ["Reverse", KEY_R, false], ["Flaps -", KEY_1, false], ["Flaps +", KEY_2, false], ["Air brakes -", KEY_3, false],
+    ["Air brakes +", KEY_4, false], ["Parking brake", KEY_P, false],
 ]
 
 var _keys: AirplaneKeys
