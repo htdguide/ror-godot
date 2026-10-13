@@ -83,7 +83,7 @@ run_engine() {
         --fixed-fps "$FIXED_FPS" \
         --quit-after "$QUIT_AFTER" \
         ${extra[@]+"${extra[@]}"} \
-        -- "$@"
+        -- --frame-cap "$QUIT_AFTER" "$@"
 }
 
 # Artifacts are pruned, so without this the record of how the project looked is thrown
@@ -373,6 +373,10 @@ for line in sys.stdin:
     fi
     archive_history
     prune_artifacts
+    # How close the run came to the frame cap, which it reaches without a word of its own.
+    local frames
+    frames="$(printf '%s\n' "$output" | sed -n 's/.*HARNESS_SUITE_DONE .*"frames": *\([0-9]*\).*/\1/p' | tail -1)"
+    echo "gate.sh: the suite took ${frames:-?} frames of the ${QUIT_AFTER} --quit-after allows"
     if [[ $failed -eq 0 ]]; then
         printf '%d gates run in 1 window, %d implied by a higher gate; all passed' "$ran" "$implied"
         if [[ $implied -gt 0 ]]; then
