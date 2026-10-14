@@ -86,9 +86,8 @@ The hero: `tools/play.sh --truck`. Keys are printed on start (and in the window'
 20. **Command rams.** The hero's doors open on 1-4, ramping by their inertia; rope rams (option r)
     pull and never push. (`a_ram_moves_by_its_rate_and_stops_at_its_bounds`,
     `a_command_key_ramps_by_its_inertia_curve`, `a_rope_ram_pulls_but_never_pushes`)
-21. **Hooks and ropes** (L; Alt+L lets auto-locks go, Ctrl+L ropes): the crane's hook locks onto a
-    load and reels it in; a rope rides on the nearest ropable.
-    (`a_hook_locks_reels_in_and_lets_go`, `a_rope_rides_on_the_nearest_ropable`)
+21. **Ropes** (Ctrl+L): a rope rides on the nearest ropable and pulls the load along.
+    (`a_rope_rides_on_the_nearest_ropable`)
 22. **Respawn with links.** Tie or hook a second vehicle (`--add`), then respawn yours: every link
     to it lets go. (`a_respawn_lets_go_of_every_link_to_it`)
 23. **Detacher groups.** Crash a vehicle whose wheels are in detacher groups hard enough: the wheel
@@ -103,16 +102,14 @@ The hero: `tools/play.sh --truck`. Keys are printed on start (and in the window'
 
 ## Lamps and look
 
-27. **Lamps.** Headlights, brake, reverse and indicator lamps follow upstream's switches (N, K, Z,
-    C, X, Minus, F); blinkers blink at upstream's rate; dashboard lamps read the inputs their file
-    names. (`a_lamp_lights_by_upstreams_switches_and_clock`)
+27. **Dashboard lamps.** On a vehicle with a dashboard, the warning lamps read the inputs their
+    file names (indicators, high beam, parking brake and the rest).
 28. **Spitfire body.** The fuselage and canopy hold together when the plane flexes (their binding
     was fixed: `a_forset_is_read_as_upstream_reads_it`).
 
 ## Several vehicles
 
-29. **`--add`.** `tools/play.sh --truck --add assets/corpus/<dir>:<file>` puts undriven vehicles
-    behind yours, in the same world; they collide with yours and with each other.
+29. **`--add` with several.** Two or more added vehicles collide with yours and with each other.
     (`an_added_vehicle_stands_behind_and_shares_the_world`)
 30. **Split screen** (`--split`): two drivers, each on their own half of the keyboard.
 
@@ -124,6 +121,8 @@ ripples and other particles, trigger and animator beams are not drawn, the manua
 
 ## Already confirmed by the user
 
+- Hooks, towing the S10 bed trailer behind the hero with `--add`, and the lights: "lgtm"
+  (2026-10-12). The differential panel (2026-10-11).
 - Ties on the Tatra 815 with `EAGER_BEAVER_JEEP.load`: "It works" (2026-10-13).
 - Airplane keys and the pad, with the highlight: "looks good" (2026-10-13).
 - The Spitfire's rudder moving on Z and X, once hydros followed their flags: "now its fine"
