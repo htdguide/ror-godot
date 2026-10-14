@@ -149,7 +149,7 @@ has just stated.
 
 ## The suite is green
 
-216 gates; `--all --every` 216 of 216 in one window at the engine commit (2026-10-15). Open: six runs on 2026-10-13 ended early, exit 0, no `HARNESS_QUIT`; not the cap (`gate.sh` now prints frames used and the suite says when it reaches the cap). `--order-check` has one
+217 gates; `--all --every` 217 of 217 in one window, 8,156 frames (2026-10-14). The early exits were the cap after all: a minimised window iterates 180,000 times a second, drawing nothing; `FrameCapWatch` now throttles it and logs `HARNESS_STALL` (`a_hidden_window_does_not_spend_the_frame_cap`). `--order-check` has one
 drift, pre-existing (same on the old solver): `an_object_is_not_a_hole_from_outside` reads 1 mesh
 in order, 0 shuffled, since the new gate list reshuffled seed 7. Open; run both before solver work.
 

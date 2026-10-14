@@ -8,9 +8,10 @@ extends GateBase
 ## Compared step by step with those functions compiled from the pinned submodule
 ## (`tools/build_parity.sh`), on random engines, gearboxes and drivers.
 ##
-## Not reached by these cases (a mutation to either passes): the kickdown delay that holds a
-## downshift back for 100 frames after a redline upshift, and the g-force hold on an averaged
-## shift. Both guard narrow branches of the averaged gear choice that random driving does not find.
+## Random driving does not find two narrow branches of the averaged gear choice: the kickdown delay
+## that holds a downshift back for 100 frames after a redline upshift, and the g-force hold on an
+## averaged shift. Scripted drives do: a truck floored up its gears on a shaft that loses speed now
+## and then, at times pitching.
 ##
 ## Ours was a reduction of upstream's: the automatic box shifted on rpm alone, a shift did not ramp
 ## the throttle back, the clutch smoothing used `std::exp` where upstream uses `approx_exp`, and there
@@ -19,6 +20,7 @@ extends GateBase
 const ORACLE: String = "build/parity/upstream_oracle"
 const CASES: int = 60
 const STEPS: int = 16000
+const SCRIPTED: int = 20
 
 
 static func meta() -> Dictionary:
@@ -27,7 +29,7 @@ static func meta() -> Dictionary:
         "proves": "the engine, gearbox and clutch step as upstream's Engine does in every gearbox mode, with its torque curve",
         "builds_on": [],
         "oracle": GateBase.ORACLE_EXTERNAL,
-        "threshold": "rpm, throttle, clutch, clutch torque, gear, selector, mode and shift state of %d cases x %d substeps identical to upstream's" % [CASES, STEPS],
+        "threshold": "rpm, throttle, clutch, clutch torque, gear, selector, mode and shift state of %d random and %d scripted cases x %d substeps identical to upstream's" % [CASES, SCRIPTED, STEPS],
         "why": "the engine was a reduction of upstream's: no averaged gear choice, no throttle ramp after a shift, no manual gearbox or clutch.",
         "budget_s": 120.0,
         "needs_gpu": false,
@@ -106,6 +108,10 @@ func run(_harness: Node) -> Dictionary:
                 parts.append(str(int(v[k])) if k in [0, 1, 4, 6] else _n(v[k]))
         cases.append([config, steps])
         lines.append(" ".join(parts))
+    for n: int in SCRIPTED:
+        var scripted: Array = _scripted(rng)
+        cases.append(scripted)
+        lines.append(_line(scripted[0], scripted[1]))
     var path: String = root.path_join("build/parity/engine_cases.txt")
     var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
     file.store_string("\n".join(lines) + "\n")
@@ -115,11 +121,11 @@ func run(_harness: Node) -> Dictionary:
     if status != 0:
         return fail("the upstream oracle exited %d: %s" % [status, "\n".join(output).left(400)])
     var results: PackedStringArray = ("\n".join(output)).strip_edges().split("\n")
-    if results.size() != CASES * STEPS:
-        return fail("the oracle printed %d steps, not %d" % [results.size(), CASES * STEPS])
+    if results.size() != cases.size() * STEPS:
+        return fail("the oracle printed %d steps, not %d" % [results.size(), cases.size() * STEPS])
     var shifted: int = 0
     var modes: Dictionary = {}
-    for i: int in CASES:
+    for i: int in cases.size():
         var ours: PackedStringArray = RorSolver.engine_probe(cases[i][0], cases[i][1])
         var last_gear: String = ""
         for step: int in STEPS:
@@ -131,7 +137,7 @@ func run(_harness: Node) -> Dictionary:
             if last_gear != "" and f[4] != last_gear:
                 shifted += 1
             last_gear = f[4]
-    return ok("%s; %d cases x %d substeps identical to upstream's; %d gear changes, modes %s seen" % [keys_report, CASES, STEPS, shifted, modes.keys()], 0)
+    return ok("%s; %d random and %d scripted cases x %d substeps identical to upstream's; %d gear changes, modes %s seen" % [keys_report, CASES, SCRIPTED, STEPS, shifted, modes.keys()], 0)
 
 
 ## Upstream's keys on the hero, through real key events: Q to semi-automatic, A a gear up (a timed
@@ -190,6 +196,53 @@ func _keys(root: String) -> String:
         return "!keys: Q gave %s, A gear %d, Z %d, D %d; manual: Shift clutch %.2f then %.2f, A without it gear %d, with it %d; stick engaged gear %d, clutch down %s; back %s" % [
             semi["mode"], up, down, neutral, pedal, released, grind, manual_gear, stick_engaged, stick, back["mode"]]
     return "keys as upstream's: Q steps the modes, A/Z shift, D neutral, Left Shift the clutch (manual shifts need it), a stick with no gear held drops to neutral with the clutch down"
+
+
+## A truck floored up through its gears on a driveshaft we turn: every half second the shaft may
+## lose speed (a hill, a hard landing) and the throttle may ease to half, and for stretches the
+## vehicle pitches. These are the drives that reach the kickdown delay and the g-force hold.
+func _scripted(rng: RandomNumberGenerator) -> Array:
+    var min_rpm: float = rng.randf_range(800, 1000)
+    var config: PackedFloat32Array = PackedFloat32Array([min_rpm, min_rpm + rng.randf_range(2000, 2600), 1500, 3.5, 3, 10, 5])
+    var gear: float = 4.0
+    for g: int in 5:
+        config.append(gear)
+        gear *= rng.randf_range(0.7, 0.85)
+    config.append_array([2.0, "t".unicode_at(0), -1, rng.randf_range(0.15, 0.3), 0.2, 0.1, 300, 800, -1, -1, -1,
+            3, 0, 1, 1000, 1, 10000, 1, 0, 0.5])
+    var steps: Array = []
+    var wheel: float = 0.0
+    var acc: float = 1.0
+    var pitch: float = 0.0
+    var rise: float = rng.randf_range(0.03, 0.08)
+    for step: int in STEPS:
+        if step % 1000 == 999:
+            if rng.randf() < 0.5:
+                wheel *= 1.0 - rng.randf_range(0.1, 0.35)
+            acc = 1.0 if rng.randf() < 0.6 else 0.5
+        if step % 1600 == 0:
+            pitch = 0.3 * (1.0 if rng.randf() < 0.5 else -1.0) if rng.randf() < 0.4 else 0.0
+        wheel += rise
+        steps.append(PackedFloat32Array([8 if step == 0 else 0, 0, acc, wheel, 1 if step % 8 == 0 else 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0.4, 0, pitch]))
+    return [config, steps]
+
+
+## A case as the oracle reads it: the counts and the engine type as integers and a letter.
+func _line(config: PackedFloat32Array, steps: Array) -> String:
+    var n_gears: int = int(config[6])
+    var parts: PackedStringArray = PackedStringArray(["engine", str(STEPS)])
+    for i: int in config.size():
+        if i == 6 or i == 7 + n_gears + 11:
+            parts.append(str(int(config[i])))
+        elif i == 7 + n_gears + 1:
+            parts.append(String.chr(int(config[i])))
+        else:
+            parts.append(_n(config[i]))
+    for v: PackedFloat32Array in steps:
+        for k: int in v.size():
+            parts.append(str(int(v[k])) if k in [0, 1, 4, 6] else _n(v[k]))
+    return " ".join(parts)
 
 
 func _press(keycode: Key, down: bool) -> void:

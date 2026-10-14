@@ -127,7 +127,7 @@ The hero: `tools/play.sh --truck`. Keys are printed on start (and in the window'
 ## Known not in
 
 Not for testing, listed so nobody files them: the ground-proximity warnings and every other sound, waves (upstream's are off by default), splashes,
-ripples and other particles, trigger and animator beams are not drawn, the manual clutch.
+ripples and other particles, trigger and animator beams are not drawn.
 
 ## Already confirmed by the user
 

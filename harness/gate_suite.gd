@@ -19,6 +19,9 @@ extends RefCounted
 signal gate_finished(row: Dictionary)
 signal gate_implied(name: String, implier: String)
 
+## The cap's notice and the hidden-window throttle for the length of a run: see `FrameCapWatch`.
+var _watch: FrameCapWatch = FrameCapWatch.new()
+
 
 ## Runs the suite and returns {"ran", "failed", "implied", "results": {name: row}}.
 ##
@@ -33,7 +36,9 @@ func run(harness: Node, every: bool) -> Dictionary:
             "ran": 0, "failed": 1, "implied": 0, "results": {},
             "error": "the gate graph is broken: %s" % ", ".join(problems),
         }
-    _watch_frame_cap(harness)
+    # Godot keeps `--quit-after` to itself, so `tools/gate.sh` hands the same number over as
+    # `--frame-cap`.
+    _watch.attach(harness.get_tree(), (harness.get("args") as HarnessArgs).get_int("frame-cap", 0))
     var runner: GateRunner = GateRunner.new()
     runner.gate_finished.connect(func(row: Dictionary) -> void: gate_finished.emit(row))
 
@@ -81,20 +86,6 @@ func run(harness: Node, every: bool) -> Dictionary:
         "ran": ran, "implied": implied_by.size(), "planned": planned.size(),
         "frames": Engine.get_process_frames(),
     }))
+    _watch.detach()
     return {"ran": ran, "failed": failed, "implied": implied_by.size(), "results": results}
 
-
-## Says so on the last frame `--quit-after` allows. The engine stops there with code 0 and no word
-## of its own, and on 2026-10-13 six suite runs ended that way part way through, read for a day as
-## a crash: the suite had grown past the cap. `HARNESS_SUITE_DONE` reports the frames a run took.
-static func _watch_frame_cap(harness: Node) -> void:
-    # Godot keeps `--quit-after` to itself, so `tools/gate.sh` hands the same number over as
-    # `--frame-cap`.
-    var cap: int = (harness.get("args") as HarnessArgs).get_int("frame-cap", 0)
-    if cap <= 0:
-        return
-    var said: Array[bool] = [false]
-    harness.get_tree().process_frame.connect(func() -> void:
-        if not said[0] and Engine.get_process_frames() >= cap - 2:
-            said[0] = true
-            print("HARNESS_QUIT {\"code\": 0, \"from\": \"the --quit-after cap of %d frames\"}" % cap))

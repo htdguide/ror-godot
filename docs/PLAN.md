@@ -1907,6 +1907,8 @@ Scope, vehicles:
   curve through Ogre's `SimpleSpline`, the `engoption` idle mixtures, and the camera g-forces the
   box reads. The speed limiter gate now checks the speed away from shifts (owner's decision):
   upstream's post-shift ramp overrides the limiter for a fifth of a second after an upshift.
+  Twenty scripted drives (floored up the gears on a shaft that loses speed, at times pitching)
+  reach the two branches random driving missed, the kickdown delay and the g-force hold.
 - **Boats** (2026-10-14): buoyant `cab` triangles float and drag a rig on the terrain's sea as
   upstream's `Buoyance` and `CalcBuoyance` do (`a_boat_floats_as_upstreams`, bit-identical; the
   Weasel floats, and sinks on a dry map); screw props push on upstream's boat keys (Up/Down,
