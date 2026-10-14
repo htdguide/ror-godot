@@ -155,6 +155,10 @@ static func _engoption(fields: PackedStringArray, drive: Dictionary) -> String:
         drive["stall_rpm"] = fields[6].to_float()
     if fields.size() > 7:
         drive["idle_rpm"] = fields[7].to_float()
+    if fields.size() > 8:
+        drive["max_idle_mixture"] = fields[8].to_float()
+    if fields.size() > 9:
+        drive["min_idle_mixture"] = fields[9].to_float()
     if fields.size() > 10:
         drive["braking_torque"] = fields[10].to_float()
     return ""

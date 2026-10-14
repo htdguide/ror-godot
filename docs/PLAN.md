@@ -1900,6 +1900,13 @@ Scope, vehicles:
   bit-identical): WLV, HDG, ALT, V/S and IAS from a panel on the airplane pad, referenced to the
   first wing run's tips and the fuselage drag's node as upstream's spawner does; NAV flies upstream's
   ILS approach to the localizers a terrain's objects declare (NhelensGrass has two runways).
+- **The engine is upstream's** (2026-10-15, `the_engine_is_upstreams`, bit-identical): its whole
+  `UpdateEngine` (the averaged automatic gear choice with kickdown, the throttle ramp after a
+  shift, `approx_exp` in the clutch), the five gearbox modes and the manual clutch (Q, A/Z, D,
+  PgUp/PgDn, Left Shift; indicators moved to comma and period, the owner's choice), the torque
+  curve through Ogre's `SimpleSpline`, the `engoption` idle mixtures, and the camera g-forces the
+  box reads. The speed limiter gate now checks the speed away from shifts (owner's decision):
+  upstream's post-shift ramp overrides the limiter for a fifth of a second after an upshift.
 - **Boats** (2026-10-14): buoyant `cab` triangles float and drag a rig on the terrain's sea as
   upstream's `Buoyance` and `CalcBuoyance` do (`a_boat_floats_as_upstreams`, bit-identical; the
   Weasel floats, and sinks on a dry map); screw props push on upstream's boat keys (Up/Down,

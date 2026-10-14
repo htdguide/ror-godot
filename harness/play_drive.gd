@@ -37,6 +37,7 @@ var scripted_throttle: float = NAN
 ## asks the solver anything while it is stepping. See `begin` and `finish`.
 var _state: Dictionary = {}
 var _selector: int = 1
+var _gearbox: GearboxKeys = GearboxKeys.new()
 ## The lamps and their switches (`DriveLights`).
 var _lights: DriveLights
 var _seconds: float = 0.0
@@ -300,7 +301,7 @@ func _read_controls(delta: float) -> void:
     solver.set_throttle(_throttle)
     solver.set_brake(_brake)
     solver.set_parking_brake(DriveKeys.held(keys, "parking") and not DriveKeys.cruise_modifier(keys))
-    # Command keys, held: the vehicle's own rams move while their key is down.
+    _gearbox.read(solver, keys, delta)
     var command_keys: Array = keys.get("commands", []) as Array
     # Not while Ctrl is down: Ctrl and a digit is a user light.
     var ctrl: bool = Input.is_key_pressed(KEY_CTRL)

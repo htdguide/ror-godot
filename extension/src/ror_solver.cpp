@@ -208,6 +208,7 @@ void RorSolver::step_now(float dt, int substeps) {
 // The obstacles near the rig, found once per call rather than per substep: they never move, the
 // rig moves centimetres in a call, and testing every box at 2 kHz would cost more than the rest.
 void RorSolver::begin_steps() {
+    update_camera_gforces();
     std::vector<RorLocalizer> localizers = m_localizers;
     for (RorLocalizer &localizer : localizers) {
         localizer.position = m_frame.to_local(localizer.position);
@@ -253,7 +254,7 @@ void RorSolver::substep(float dt, bool first) {
     // Upstream's `CalcTies`, after the commands.
     calc_ties(dt);
     // The first substep stands in for upstream's per-frame pass, where it makes gear decisions.
-    m_drivetrain.step(dt, m_wheels.driven_spin() * RAD_PER_SEC_TO_RPM, first);
+    m_drivetrain.step(dt, m_wheels.driven_spin() * RAD_PER_SEC_TO_RPM, first, engine_actor());
     m_wheels.apply(m_nodes, m_drivetrain.clutch_torque(), direction(), m_steering.state(), dt);
     accumulate_beam_forces();
     // Upstream's `CalcCabCollisions`, after the beams and before the slide nodes: the rig's own
@@ -267,32 +268,6 @@ void RorSolver::substep(float dt, bool first) {
     apply_triangle_forces(m_nodes, m_triangles, m_ground_models, dt);
     // Last, because the contact law works on the node's fully accumulated force.
     apply_ground_contact(dt);
-}
-
-// Velocity from the force accumulated last step, then position from the new velocity,
-// then reset the accumulator to gravity. Upstream's order, which is what makes the
-// integrator symplectic and keeps a rig from gaining energy at rest.
-//
-// The speed limit sits between the two, so no node moves further than `limit * dt` in one
-// substep — the property PLAN §0.12's causality bound is built on. The cut leaves a hair of
-// margin under the limit, because scaling a vector by `limit / length` in floats can land an ulp
-// over it, and a bound that is exceeded by an ulp is not a bound.
-void RorSolver::integrate(float dt) {
-    constexpr float CUT_MARGIN = 1.0f - 1.0e-6f;
-    const float limit_squared = m_speed_limit * m_speed_limit;
-    for (RorNode &node : m_nodes) {
-        if (!node.immovable) {
-            node.velocity += node.forces / node.mass * dt;
-            const float speed_squared = static_cast<float>(node.velocity.length_squared());
-            if (speed_squared > limit_squared) {
-                node.velocity *= m_speed_limit / std::sqrt(speed_squared) * CUT_MARGIN;
-                ++m_speed_limit_hits;
-            }
-            node.position += node.velocity * dt;
-        }
-        node.forces = m_gravity * node.mass;
-        node.ground_contact = false;
-    }
 }
 
 // Which of the two aerodynamic models this rig gets, which is upstream's own branch: a rig that

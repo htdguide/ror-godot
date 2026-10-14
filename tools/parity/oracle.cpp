@@ -431,11 +431,19 @@ bool run_autopilot(const std::string &line);
 bool run_buoy(const std::string &line);
 bool run_screw(const std::string &line);
 bool run_ils(const std::string &line);
+bool run_engine(const std::string &line);
 
 int main() {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line.rfind("engine", 0) == 0) {
+            if (!run_engine(line)) {
+                std::fprintf(stderr, "oracle: malformed engine case: %s\n", line.c_str());
+                return 2;
+            }
             continue;
         }
         if (line.rfind("ils", 0) == 0) {

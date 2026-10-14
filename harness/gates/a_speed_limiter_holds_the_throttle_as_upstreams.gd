@@ -22,7 +22,7 @@ static func meta() -> Dictionary:
         "proves": "the speedlimiter line limits the throttle every frame by upstream's rule and caps the cruise control's target",
         "builds_on": [],
         "oracle": GateBase.ORACLE_COMPUTED,
-        "threshold": "every frame's throttle exactly clamp((limit - |wheel speed / 1.02|) x 2, 0, engine throttle) in gear and untouched in neutral; the cruise target never over the limit",
+        "threshold": "every frame's throttle exactly clamp((limit - |wheel speed / 1.02|) x 2, 0, engine throttle) in gear and untouched in neutral; away from shifts the driven wheels' speed never rises over half a second above 1.02 x the limit (where the rule cuts the throttle) and the longest stretch without one settles within 10% of it; the cruise target never over the limit",
         "why": "33 corpus files state a speed limiter and it was read as metadata: none was limited.",
         "budget_s": 60.0,
         "needs_gpu": false,
@@ -42,6 +42,13 @@ func run(_harness: Node) -> Dictionary:
     var limited: RorSolver = _truck(mod_dir)
     limited.set_speed_limiter(LIMIT)
     var fastest: float = 0.0
+    # Away from gear changes: the speed never rises above the limit (as the rule reads it, 2% over), and the longest stretch with
+    # no shift settles within 10% of it. Upstream's post-shift ramp brings the throttle back to the
+    # driver's pedal for a fifth of a second after an upshift, inside the frame and over the
+    # limiter, so a shift is allowed its overshoot (owner's decision, 2026-10-15).
+    var worst_rise: float = 0.0
+    var stretch: PackedFloat32Array = PackedFloat32Array()
+    var longest: PackedFloat32Array = PackedFloat32Array()
     for frame: int in int(DRIVE_S / FRAME):
         limited.set_throttle(1.0)
         var speed: float = limited.wheel_speed()
@@ -54,14 +61,34 @@ func run(_harness: Node) -> Dictionary:
         if limited.commanded_throttle() != want:
             return fail("frame %d at %.3f m/s in gear %d: throttle %.6f, upstream's rule gives %.6f" % [
                 frame, speed, limited.engine_gear(), limited.commanded_throttle(), want])
+        # The speed the rule itself reads is the driven wheels'.
+        var shifting: bool = limited.gearbox("")["shifting"]
         limited.step(SUBSTEP, 33)
         fastest = maxf(fastest, limited.avg_wheel_speed())
+        shifting = shifting or limited.gearbox("")["shifting"]
+        if shifting:
+            stretch = PackedFloat32Array()
+            continue
+        stretch.append(limited.wheel_speed())
+        if stretch.size() > longest.size():
+            longest = stretch.duplicate()
+        # Upstream's rule reads the wheels 2% fast: it cuts the throttle only past 1.02 x the limit.
+        # Over half a second, as the wheels jitter by hundredths frame to frame: past the margin,
+        # half a second on it is lower.
+        var back: int = stretch.size() - 1 - int(0.5 / FRAME)
+        if back >= 0 and stretch[back] > LIMIT * 1.02:
+            worst_rise = maxf(worst_rise, stretch[stretch.size() - 1] - stretch[back])
     var free: RorSolver = _truck(mod_dir)
     for frame: int in int(DRIVE_S / FRAME):
         free.set_throttle(1.0)
         free.step(SUBSTEP, 33)
-    if fastest > LIMIT * 1.1 or free.avg_wheel_speed() < LIMIT * 2.0:
-        return fail("limited to %.0f m/s the truck reached %.2f; unlimited %.2f" % [LIMIT, fastest, free.avg_wheel_speed()], fastest)
+    var settled: float = 0.0
+    var tail: int = mini(longest.size(), int(1.0 / FRAME))
+    for i: int in range(longest.size() - tail, longest.size()):
+        settled += longest[i] / float(tail)
+    if worst_rise > 0.0 or longest.size() < int(2.0 / FRAME) or absf(settled - LIMIT) > LIMIT * 0.1 or free.avg_wheel_speed() < LIMIT * 2.0:
+        return fail("limited to %.0f m/s: away from shifts the speed rose %.4f m/s in half a second above 1.02 x the limit; the longest stretch without a shift lasted %.1f s and ended at %.2f m/s; unlimited %.2f" % [
+            LIMIT, worst_rise, longest.size() * FRAME, settled, free.avg_wheel_speed()], settled)
 
     # In neutral the limiter leaves the throttle alone, whatever the speed.
     var coasting: RorSolver = _truck(mod_dir)
@@ -84,8 +111,8 @@ func run(_harness: Node) -> Dictionary:
     free.update_cruise_control(0.1, 0.0, 0.0, false, false, true)
     if free.cruise_target_speed() != LIMIT:
         return fail("Ctrl+Space at %.1f m/s set the cruise target to %.3f, not the %.0f m/s limit" % [free.avg_wheel_speed(), free.cruise_target_speed(), LIMIT])
-    return ok("every frame's throttle by upstream's rule; held to %.2f m/s under a %.0f m/s limit where unlimited reached %.1f; the cruise target capped" % [
-        fastest, LIMIT, free.avg_wheel_speed()], fastest)
+    return ok("every frame's throttle by upstream's rule; away from shifts never rising above the %.0f m/s limit's 2%% margin, settled at %.2f m/s over a %.1f s stretch (%.2f peak after a shift's ramp) where unlimited reached %.1f; the cruise target capped" % [
+        LIMIT, settled, longest.size() * FRAME, fastest, free.avg_wheel_speed()], settled)
 
 
 func _truck(mod_dir: String) -> RorSolver:

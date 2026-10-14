@@ -113,6 +113,7 @@ protected:
     float turbo_psi() const;
     // The torque the engine makes at `rpm` at full throttle: upstream's `getEnginePower`, turbo included.
     float engine_power_at(float rpm) const;
+    static godot::PackedStringArray engine_probe(const godot::PackedFloat32Array &config, const godot::Array &steps);
     static godot::PackedFloat32Array turbo_probe(int version, float inertia_factor, int count,
                                                  const godot::PackedFloat32Array &params, const godot::PackedFloat32Array &acc,
                                                  const godot::PackedFloat32Array &cur_acc, const godot::PackedFloat32Array &rpm,
@@ -401,18 +402,17 @@ public:
                           float neutral_gear, const godot::PackedFloat32Array &forward_gears);
     void set_engine_options(float inertia, const godot::String &type, float clutch_force, float clutch_time,
                             float shift_time, float post_shift_time, float idle_rpm, float stall_rpm,
-                            float braking_torque);
+                            float braking_torque, float max_idle_mixture = -1.0f, float min_idle_mixture = -1.0f);
     void set_torque_curve(const godot::PackedFloat32Array &rpm, const godot::PackedFloat32Array &ratio);
-    void start_engine();
-    void stop_engine();
+    void start_engine(), stop_engine();
+    // Upstream's gearbox keys (mode, up, down, neutral, to, auto_up, auto_down, clutch); its state.
+    godot::Dictionary gearbox(const godot::String &action, float value);
     void set_throttle(float throttle);
     void set_brake(float brake);
     void set_parking_brake(bool on);
     void set_gear_selector(int selector);
-    float engine_rpm() const;
-    float engine_max_rpm() const;
-    int engine_gear() const;
-    int engine_gear_count() const;
+    float engine_rpm() const, engine_max_rpm() const;
+    int engine_gear() const, engine_gear_count() const;
     float engine_clutch() const;
     float engine_torque() const;
     bool engine_running() const;
@@ -581,18 +581,17 @@ private:
     RorWorld *m_world = nullptr;
     void toggle_ropes_among(const std::vector<RorSolver *> &actors, int group, bool reset, RorSolver *only_to = nullptr);
     void calc_ropes(bool inter_actor);
-    int m_direction_pos = -1;
-    int m_direction_dir = -1;
+    int m_direction_pos = -1, m_direction_dir = -1;
+    // Upstream's camera g-forces (per substep, averaged into each frame) and their longitudinal part.
+    godot::Vector3 m_camera_gforces_accu, m_camera_gforces; float m_gforce_y = 0.0f; int m_gforce_steps = 0;
     float m_direction_yaw = 0.0f;
-    // {wheel, group} per `wheeldetachers` row.
-    std::vector<std::pair<int, int>> m_wheel_detachers;
+    std::vector<std::pair<int, int>> m_wheel_detachers;  // {wheel, group} per `wheeldetachers` row.
     // A beam of `group` broke by strength: the rest of the group goes, and its wheels come off.
     void detach_group(int group);
     void accumulate_beam_forces();
-    void apply_ground_contact(float dt);
-    void apply_obstacle_contact(float dt);
-    void select_nearby_obstacles();
-    void follow_frame();
+    void apply_ground_contact(float dt), apply_obstacle_contact(float dt);
+    void select_nearby_obstacles(), follow_frame(), update_camera_gforces();  // `ror_solver_frame.cpp`
+    RorEngineActor engine_actor() const;
     void shift_frame(double shift_x, double shift_z);
 };
 

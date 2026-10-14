@@ -245,12 +245,12 @@ void RorSolver::configure_engine(float min_rpm, float max_rpm, float torque, flo
 
 void RorSolver::set_engine_options(float inertia, const String &type, float clutch_force, float clutch_time,
                                    float shift_time, float post_shift_time, float idle_rpm, float stall_rpm,
-                                   float braking_torque) {
+                                   float braking_torque, float max_idle_mixture, float min_idle_mixture) {
     sync();
     const CharString utf8 = type.utf8();
     const char kind = utf8.length() > 0 ? utf8.get_data()[0] : 't';
     m_drivetrain.set_options(inertia, kind, clutch_force, clutch_time, shift_time, post_shift_time, idle_rpm,
-                             stall_rpm, braking_torque);
+                             stall_rpm, braking_torque, max_idle_mixture, min_idle_mixture);
 }
 
 void RorSolver::set_torque_curve(const PackedFloat32Array &rpm, const PackedFloat32Array &ratio) {
@@ -531,8 +531,9 @@ void RorSolver::_bind_methods() {
                                   "reverse_gear", "neutral_gear", "forward_gears"),
                          &RorSolver::configure_engine);
     ClassDB::bind_method(D_METHOD("set_engine_options", "inertia", "type", "clutch_force", "clutch_time",
-                                  "shift_time", "post_shift_time", "idle_rpm", "stall_rpm", "braking_torque"),
-                         &RorSolver::set_engine_options);
+                                  "shift_time", "post_shift_time", "idle_rpm", "stall_rpm", "braking_torque",
+                                  "max_idle_mixture", "min_idle_mixture"),
+                         &RorSolver::set_engine_options, DEFVAL(-1.0f), DEFVAL(-1.0f));
     ClassDB::bind_method(D_METHOD("set_torque_curve", "rpm", "ratio"), &RorSolver::set_torque_curve);
     ClassDB::bind_method(D_METHOD("start_engine"), &RorSolver::start_engine);
     ClassDB::bind_method(D_METHOD("stop_engine"), &RorSolver::stop_engine);

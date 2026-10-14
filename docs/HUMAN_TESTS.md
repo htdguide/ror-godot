@@ -66,6 +66,12 @@ Open: `tools/play.sh --vehicle "assets/corpus/189_weasel-class-boat:780dUIDwease
 
 The hero: `tools/play.sh --truck`. Keys are printed on start (and in the window's help).
 
+11a. **Gearbox modes and the clutch.** On the hero: Q steps automatic, semi-automatic, manual,
+    manual stick, manual with ranges (the console says which). Automatic: PgUp/PgDn move the
+    selector (R, N, D, 2, 1), and the box shifts as Rigs of Rods' does, kicking down when floored.
+    Semi-automatic: A and Z shift with the clutch done for you. Manual: hold Left Shift to shift
+    with A and Z (without it the gear grinds and stays out) and to set off. The stick modes sit in
+    neutral (upstream binds no gear keys). Indicators are now comma and period. (`the_engine_is_upstreams`)
 12. **Cruise control** (Shift+Space; Ctrl+R faster, Ctrl+F slower, Ctrl+Space match): holds its
     speed up and down hills, lets go on the brake. (`cruise_control_holds_its_speed_as_upstreams`)
 13. **Speed limiter.** `assets/corpus/1028_lotus-76-1:Lotus_F1_70s2.truck`: full throttle stops

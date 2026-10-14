@@ -24,7 +24,12 @@ const SOLO: Dictionary = {
     # Upstream's lock key: every hook reaches for the nearest node in range, or lets go. Alt+L lets
     # the auto-lock hooks go.
     "hook": [KEY_L],
-    "indicator_left": [KEY_Z], "indicator_right": [KEY_C], "indicators_off": [KEY_X],
+    # Upstream's indicator keys, comma and period; X turns them off.
+    "indicator_left": [KEY_COMMA], "indicator_right": [KEY_PERIOD], "indicators_off": [KEY_X],
+    # Upstream's gearbox keys (`GearboxKeys`): Q the mode, A and Z a gear up and down, D neutral,
+    # PgUp and PgDn the automatic selector, Left Shift the manual clutch.
+    "shift_mode": [KEY_Q], "shift_up": [KEY_A], "shift_down": [KEY_Z], "shift_neutral": [KEY_D],
+    "auto_up": [KEY_PAGEUP], "auto_down": [KEY_PAGEDOWN], "clutch": [KEY_SHIFT],
     # Upstream's hazards key (minus), and the fog lights, Alt+N there.
     "hazards": [KEY_MINUS], "fog_lights": [KEY_F],
     # Upstream's differential switches: each axle's own, and the ones between axles.
@@ -73,6 +78,8 @@ const NAMES: Dictionary = {
     "wheel_diffs": "axle differentials", "axle_diffs": "interaxle differentials",
     "transfer_case": "2WD/4WD", "transfer_range": "high/low range",
     "ties": "ties",
+    "shift_mode": "gearbox mode", "shift_up": "gear up", "shift_down": "gear down", "shift_neutral": "gear neutral",
+    "auto_up": "selector up", "auto_down": "selector down", "clutch": "clutch (manual modes)",
     "commands": "commands 1-10 (doors, rams)",
 }
 

@@ -292,7 +292,9 @@ static func _configure_engine(solver: RefCounted, truck: TruckParser) -> void:
         drive["post_shift_time"] as float,
         drive["idle_rpm"] as float,
         drive["stall_rpm"] as float,
-        drive["braking_torque"] as float
+        drive["braking_torque"] as float,
+        drive.get("max_idle_mixture", -1.0) as float,
+        drive.get("min_idle_mixture", -1.0) as float
     )
     # Upstream's `ProcessEngturbo`, after `engoption` as its spawner orders them.
     if drive.has("turbo"):

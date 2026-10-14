@@ -394,6 +394,9 @@ public:
     int ar_main_camera_node_pos = 0, ar_main_camera_node_dir = 0, ar_main_camera_node_roll = 0;
     Ogre::Vector3 GetCameraDir() { return (ar_nodes[ar_main_camera_node_pos].RelPosition - ar_nodes[ar_main_camera_node_dir].RelPosition).normalisedCopy(); }
     Ogre::Vector3 GetCameraRoll() { return (ar_nodes[ar_main_camera_node_pos].RelPosition - ar_nodes[ar_main_camera_node_roll].RelPosition).normalisedCopy(); }
+    // What the engine's gear choice reads: the camera's g-forces.
+    Ogre::Vector3 gforces;
+    Ogre::Vector3 getGForces() { return gforces; }
     // The heading animator flag has no option that sets it.
     float getRotation() { return 0.0f; }
     void CalcHydros();

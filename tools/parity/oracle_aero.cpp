@@ -1,6 +1,7 @@
 // The parity oracle's aero engine mode (see oracle.cpp): upstream's `Turboprop` and `Turbojet` on
 // an engine a gate describes.
 #include "actor_shocks.h"
+#include "engine_turbo.h"
 #include "aero_engines.h"
 #include "autopilot.h"
 
@@ -427,6 +428,90 @@ bool run_ils(const std::string &line) {
         std::printf("%.9g %.9g %.9g %.9g %d %d %d\n", ap.m_ils_angle_hdev, ap.m_ils_angle_vdev, ap.m_ils_runway_heading,
                     ap.m_ils_runway_distance, ap.m_horizontal_locator_available ? 1 : 0, ap.m_vertical_locator_available ? 1 : 0,
                     ap.wantsdisconnect ? 1 : 0);
+    }
+    return true;
+}
+
+// `engine n_steps`, then "min max torque diff reverse neutral n_gears gears...", then the
+// `engoption` "inertia type clutch_force shift_time clutch_time post_shift_time stall idle maximix
+// minimix braking" (type a letter), then "n_points rpm ratio...", then "gain drag" (a vehicle the
+// clutch drives when gain is not 0, the step's wheel_rpm ignored), then per step "action value acc
+// wheel_rpm do_update clutch_pedal priming pump", node 0's velocity, the camera's dir vector, wheel 0's
+// radius, the brake and the longitudinal g-force. Actions: 1 shift, 2 toggleAutoMode,
+// 3 autoShiftUp, 4 autoShiftDown, 5 autoShiftSet, 6 contact on/off by value, 7 starter by value,
+// 8 startEngine, 9 offStart. Upstream's constructor, `SetEngineOptions` and torque curve, then per
+// step the input upstream's frame gives (`autoSetAcc`, `setManualClutch`, `setWheelSpin`,
+// `setPrime`, `setHydroPump`) and `UpdateEngine`. Prints per step rpm, acc, clutch, clutch torque,
+// gear, autoselect, mode and the shift state.
+bool run_engine(const std::string &line) {
+    std::istringstream in(line.substr(6));
+    int n_steps = 0, n_gears = 0;
+    float min_rpm, max_rpm, torque, diff, rev, neutral;
+    if (!(in >> n_steps >> min_rpm >> max_rpm >> torque >> diff >> rev >> neutral >> n_gears)) {
+        return false;
+    }
+    std::vector<float> gears(static_cast<size_t>(n_gears));
+    for (float &g : gears) {
+        in >> g;
+    }
+    float inertia, clutch_force, stime, ctime, pstime, stall, idle, maximix, minimix, braking;
+    char type;
+    in >> inertia >> type >> clutch_force >> stime >> ctime >> pstime >> stall >> idle >> maximix >> minimix >> braking;
+    static std::vector<node_t> nodes(3);
+    RoR::Actor actor;
+    actor.ar_nodes = nodes.data();
+    actor.ar_num_nodes = 3;
+    actor.ar_main_camera_node_pos = 1;
+    actor.ar_main_camera_node_dir = 2;
+    static wheel_t wheels[1];
+    actor.ar_wheels = wheels;
+    RoR::Engine engine(min_rpm, max_rpm, torque, rev, neutral, gears, diff, &actor);
+    engine.SetEngineOptions(inertia, type, clutch_force, ctime, stime, pstime, idle, stall, maximix, minimix, braking);
+    int n_points = 0;
+    in >> n_points;
+    for (int i = 0; i < n_points; ++i) {
+        float x, y;
+        in >> x >> y;
+        engine.m_torque_curve->spline.addPoint(Ogre::Vector3(x, y, 0));
+    }
+    // A vehicle for the engine to drive, when the case asks for one: the wheels pushed by the
+    // clutch and held back by drag, so the gearbox sees a car. Input generation, not a claim.
+    float gain = 0, drag = 0;
+    in >> gain >> drag;
+    for (int step = 0; step < n_steps; ++step) {
+        int action = 0, do_update = 0, priming = 0;
+        float value, acc, wheel_rpm, pedal, pump;
+        in >> action >> value >> acc >> wheel_rpm >> do_update >> pedal >> priming >> pump;
+        in >> nodes[0].Velocity.x >> nodes[0].Velocity.y >> nodes[0].Velocity.z;
+        in >> nodes[1].RelPosition.x >> nodes[1].RelPosition.y >> nodes[1].RelPosition.z;
+        in >> wheels[0].wh_radius >> actor.ar_brake >> actor.gforces.y;
+        if (!in) {
+            return false;
+        }
+        switch (action) {
+            case 1: engine.shift((int)value); break;
+            case 2: engine.toggleAutoMode(); break;
+            case 3: engine.autoShiftUp(); break;
+            case 4: engine.autoShiftDown(); break;
+            case 5: engine.autoShiftSet((int)value); break;
+            case 6: engine.m_contact = value != 0; break;
+            case 7: engine.m_starter = value != 0; break;
+            case 8: engine.startEngine(); break;
+            case 9: engine.offStart(); break;
+            default: break;
+        }
+        engine.autoSetAcc(acc);
+        engine.setManualClutch(pedal);
+        if (gain != 0) {
+            wheel_rpm = engine.m_cur_wheel_revolutions + 0.0005f * (engine.m_cur_clutch_torque * gain - engine.m_cur_wheel_revolutions * drag);
+        }
+        engine.m_cur_wheel_revolutions = wheel_rpm;
+        engine.m_engine_is_priming = priming != 0;
+        engine.m_hydropump_state = pump;
+        engine.UpdateEngine(0.0005f, do_update);
+        std::printf("%.9g %.9g %.9g %.9g %d %d %d %d %d %.9g %d\n", engine.m_cur_engine_rpm, engine.m_cur_acc, engine.m_cur_clutch,
+                    engine.m_cur_clutch_torque, engine.m_cur_gear, (int)engine.m_autoselect, (int)engine.m_auto_mode,
+                    engine.m_shifting, engine.m_post_shifting, engine.m_shift_behaviour, engine.m_engine_is_running ? 1 : 0);
     }
     return true;
 }

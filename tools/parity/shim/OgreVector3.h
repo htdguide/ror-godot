@@ -25,6 +25,8 @@ struct Vector3 {
     Vector3(float in_x, float in_y, float in_z) : x(in_x), y(in_y), z(in_z) {}
 
     static const Vector3 ZERO;
+    bool operator==(const Vector3 &r) const { return x == r.x && y == r.y && z == r.z; }
+    bool operator!=(const Vector3 &r) const { return x != r.x || y != r.y || z != r.z; }
     static const Vector3 UNIT_X;
     static const Vector3 UNIT_Y;
     static const Vector3 UNIT_Z;
