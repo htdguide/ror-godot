@@ -54,8 +54,22 @@ struct Wavefield {
     float CalcWavesHeight(Vec3, float = 0.f) { return height; }
     Vec3 CalcWavesVelocity(Vec3, float = 0.f) { return Vec3(); }
 };
+// Upstream's ILS localizers (SimData.h, TerrainObjectManager.h), as a case gives them.
+enum LocalizerType { LOCALIZER_VERTICAL, LOCALIZER_HORIZONTAL, LOCALIZER_NDB, LOCALIZER_VOR };
+struct Localizer {
+    LocalizerType type;
+    Ogre::Vector3 position;
+    Ogre::Quaternion rotation;
+};
+typedef std::vector<Localizer> LocalizerVec;
+struct TerrainObjectManager {
+    LocalizerVec localizers;
+    LocalizerVec &GetLocalizers() { return localizers; }
+};
 struct Terrain {
     Wavefield *water = nullptr;
+    TerrainObjectManager objects;
     Wavefield *getWater() { return water; }
+    TerrainObjectManager *getObjectManager() { return &objects; }
 };
 } // namespace RoR

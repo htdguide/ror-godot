@@ -76,6 +76,29 @@ inline godot::Vector3 ogre_rotate_degrees(float degrees, const godot::Vector3 &a
     return v + uv + uuv;
 }
 
+// An Ogre 1.11 `Quaternion`: `Quaternion(Degree, axis)` (`FromAngleAxis`), the product
+// (OgreQuaternion.cpp) and the nVidia-SDK rotation of a vector.
+struct OgreQuat {
+    float w, x, y, z;
+};
+inline OgreQuat ogre_quat(float degrees, const godot::Vector3 &axis) {
+    const float half = 0.5f * (degrees * ogre_deg2rad());
+    const float s = std::sin(half);
+    return {std::cos(half), s * axis.x, s * axis.y, s * axis.z};
+}
+inline OgreQuat ogre_mul(const OgreQuat &a, const OgreQuat &b) {
+    return {a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z, a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+            a.w * b.y + a.y * b.w + a.z * b.x - a.x * b.z, a.w * b.z + a.z * b.w + a.x * b.y - a.y * b.x};
+}
+inline godot::Vector3 ogre_rotate(const OgreQuat &q, const godot::Vector3 &v) {
+    const godot::Vector3 qvec(q.x, q.y, q.z);
+    godot::Vector3 uv = qvec.cross(v);
+    godot::Vector3 uuv = qvec.cross(uv);
+    uv *= (2.0f * q.w);
+    uuv *= 2.0f;
+    return v + uv + uuv;
+}
+
 // Ogre 1.11's `godot::Vector3::getRotationTo` (Sam Hocevar's "quaternion from two vectors") followed by
 // `Quaternion::ToAngleAxis`, as `FlexAirfoil::updateForces` uses them: the angle in degrees and
 // the axis.

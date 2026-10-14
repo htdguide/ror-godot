@@ -93,6 +93,7 @@ WANTED = [
     ("main/gameplay/AutoPilot.cpp", "int Autopilot::adjALT(int d)"),
     ("main/gameplay/AutoPilot.cpp", "int Autopilot::adjVS(int d)"),
     ("main/gameplay/AutoPilot.cpp", "int Autopilot::adjIAS(int d)"),
+    ("main/gameplay/AutoPilot.cpp", "void Autopilot::UpdateIls()"),
     ("main/physics/air/TurboProp.cpp", "void Turboprop::updateForces(float dt, int doUpdate)"),
     ("main/physics/air/TurboProp.cpp", "void Turboprop::setThrottle(float val)"),
     ("main/physics/air/TurboProp.cpp", "void Turboprop::reset()"),

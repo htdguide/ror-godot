@@ -298,13 +298,13 @@ void RorWingSet::set_controls(float aileron, float rudder, float elevator, int f
 }
 
 // Each control surface deflected by the controls its kind follows, then the panel checked.
-void RorWingSet::update_frame(const NodeArray &nodes, int fuselage_back) {
+void RorWingSet::update_frame(const NodeArray &nodes, int fuselage_back, const std::vector<RorLocalizer> &localizers) {
     float autoaileron = 0;
     float autorudder = 0;
     float autoelevator = 0;
     if (m_autopilot) {
         m_autopilot->set_back(fuselage_back);
-        m_autopilot->update_ils();
+        m_autopilot->update_ils(nodes, localizers);
         autoaileron = m_autopilot->ailerons(nodes);
         autorudder = m_autopilot->rudder();
         autoelevator = m_autopilot->elevator(nodes);

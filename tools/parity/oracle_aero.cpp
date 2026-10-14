@@ -196,7 +196,8 @@ bool run_airbrake(const std::string &line) {
     return true;
 }
 
-// `autopilot n_steps`, then left, right and back nodes' starting positions; per step an action
+// `autopilot n_steps`, then left, right and back nodes' starting positions, then localizers as the
+// `ils` mode reads them (a count first); per step an action
 // (0 none, 1-4 heading mode none/fixed/wlv/nav toggle, 5-6 alt fixed/vs toggle, 7 ias toggle,
 // 8-11 adj hdg/alt/vs/ias by value) and its value, each node's height and velocity, then a throttle
 // and dt. Upstream's `Autopilot` as reset, references set as the wings close. Prints per step the
@@ -211,6 +212,21 @@ bool run_autopilot(const std::string &line) {
     for (int k = 0; k < 3; ++k) {
         in >> nodes[k].RelPosition.x >> nodes[k].RelPosition.y >> nodes[k].RelPosition.z;
         nodes[k].AbsPosition = nodes[k].RelPosition;
+    }
+    int n_loc = 0;
+    in >> n_loc;
+    RoR::LocalizerVec &locs = RoR::App::GetGameContext()->terrain.objects.localizers;
+    locs.clear();
+    for (int i = 0; i < n_loc; ++i) {
+        float x, y, z, rx, ry, rz;
+        int type;
+        in >> x >> y >> z >> rx >> ry >> rz >> type;
+        RoR::Localizer loc;
+        loc.position = Ogre::Vector3(x, y, z);
+        loc.rotation = Ogre::Quaternion(Ogre::Degree(rx), Ogre::Vector3::UNIT_X) * Ogre::Quaternion(Ogre::Degree(ry), Ogre::Vector3::UNIT_Y) *
+                       Ogre::Quaternion(Ogre::Degree(rz), Ogre::Vector3::UNIT_Z);
+        loc.type = static_cast<RoR::LocalizerType>(type);
+        locs.push_back(loc);
     }
     RoR::Autopilot ap;
     ap.setInertialReferences(&nodes[0], &nodes[1], &nodes[2], &nodes[0]);
@@ -239,10 +255,13 @@ bool run_autopilot(const std::string &line) {
             case 11: ap.adjIAS(value); break;
             default: break;
         }
+        // `Actor::updateVisual`'s order: the approach, then the surfaces.
+        ap.UpdateIls();
         const float aileron = ap.getAilerons();
         const float elevator = ap.getElevator();
         const float throttle = ap.getThrottle(thrtl, dt);
-        std::printf("%.9g %.9g %.9g %d %d %d %d\n", aileron, elevator, throttle, ap.heading, ap.alt, ap.vs, ap.ias);
+        std::printf("%.9g %.9g %.9g %d %d %d %d %d\n", aileron, elevator, throttle, ap.heading, ap.alt, ap.vs, ap.ias,
+                    ap.wantsdisconnect ? 1 : 0);
     }
     return true;
 }
@@ -360,6 +379,54 @@ bool run_screw(const std::string &line) {
         prop.updateForces(false);
         std::printf("%.9g %.9g %.9g %.9g %.9g\n", nodes[0].Forces.x, nodes[0].Forces.y, nodes[0].Forces.z, prop.getThrottle(),
                     prop.getRudder());
+    }
+    return true;
+}
+
+// `ils n_localizers n_steps`, then per localizer "x y z rx ry rz type" (an object's position, its
+// `.tobj` rotation in degrees, upstream's LocalizerType), then per step "nav" (1 for NAV on) and
+// the left and right nodes' positions. Upstream's `Autopilot::UpdateIls`, each localizer's rotation
+// built as `TerrainObjectManager::LoadTerrainObject` builds it. Prints per step the deviations, the
+// runway heading and distance, which locators are available and whether NAV asks to disconnect.
+bool run_ils(const std::string &line) {
+    std::istringstream in(line.substr(4));
+    int n_loc = 0, n_steps = 0;
+    if (!(in >> n_loc >> n_steps)) {
+        return false;
+    }
+    RoR::LocalizerVec &locs = RoR::App::GetGameContext()->terrain.objects.localizers;
+    locs.clear();
+    for (int i = 0; i < n_loc; ++i) {
+        float x, y, z, rx, ry, rz;
+        int type;
+        in >> x >> y >> z >> rx >> ry >> rz >> type;
+        RoR::Localizer loc;
+        loc.position = Ogre::Vector3(x, y, z);
+        loc.rotation = Ogre::Quaternion(Ogre::Degree(rx), Ogre::Vector3::UNIT_X) * Ogre::Quaternion(Ogre::Degree(ry), Ogre::Vector3::UNIT_Y) *
+                       Ogre::Quaternion(Ogre::Degree(rz), Ogre::Vector3::UNIT_Z);
+        loc.type = static_cast<RoR::LocalizerType>(type);
+        locs.push_back(loc);
+    }
+    node_t nodes[2];
+    RoR::Autopilot ap;
+    for (int step = 0; step < n_steps; ++step) {
+        int nav = 0;
+        in >> nav;
+        for (int k = 0; k < 2; ++k) {
+            in >> nodes[k].AbsPosition.x >> nodes[k].AbsPosition.y >> nodes[k].AbsPosition.z;
+            nodes[k].RelPosition = nodes[k].AbsPosition;
+        }
+        if (!in) {
+            return false;
+        }
+        ap.ref_l = &nodes[0];
+        ap.ref_r = &nodes[1];
+        ap.mode_heading = nav ? RoR::Autopilot::HEADING_NAV : RoR::Autopilot::HEADING_NONE;
+        ap.wantsdisconnect = false;
+        ap.UpdateIls();
+        std::printf("%.9g %.9g %.9g %.9g %d %d %d\n", ap.m_ils_angle_hdev, ap.m_ils_angle_vdev, ap.m_ils_runway_heading,
+                    ap.m_ils_runway_distance, ap.m_horizontal_locator_available ? 1 : 0, ap.m_vertical_locator_available ? 1 : 0,
+                    ap.wantsdisconnect ? 1 : 0);
     }
     return true;
 }

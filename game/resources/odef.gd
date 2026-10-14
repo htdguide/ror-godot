@@ -39,7 +39,8 @@ extends RefCounted
 ## The flags beyond that are not read: `event`, `forcecamera`, `direction`, `stdfriction`.
 
 
-## Reads an .odef. Returns {"error", "meshes", "collision_meshes", "lods", "scale", "boxes"},
+## Reads an .odef. Returns {"error", "meshes", "collision_meshes", "lods", "scale", "boxes",
+## "localizers"} (each localizer 0 vertical, 1 horizontal, 2 NDB, 3 VOR),
 ## where a box is {"min", "max", "rotation", "virtual"} in the object's own Y-up frame and a lod
 ## is {"distance", "mesh"}.
 static func read(path: String) -> Dictionary:
@@ -50,6 +51,7 @@ static func read(path: String) -> Dictionary:
         "lods": [] as Array[Dictionary],
         "scale": Vector3.ONE,
         "boxes": [] as Array[Dictionary],
+        "localizers": PackedInt32Array(),
     }
     var text: String = RorText.read(path)
     if text.is_empty():
@@ -63,6 +65,7 @@ static func read(path: String) -> Dictionary:
     var box: Dictionary = {}
     var seen: int = 0
     var in_mesh: bool = false
+    var localizers: PackedInt32Array = PackedInt32Array()
     for raw_line: String in text.split("\n"):
         var line: String = RorText.strip_comment(raw_line)
         if line.is_empty():
@@ -133,6 +136,14 @@ static func read(path: String) -> Dictionary:
                 if in_mesh:
                     hulls.append(line.substr(line.find(" ") + 1).strip_edges())
                 continue
+        # Upstream's `localizer-` lines: an ILS beacon this object is, by the letters after the dash
+        # (`ODefFileFormat.cpp`, vor, ndb, then a leading v or h).
+        if seen >= 2 and line.begins_with("localizer-"):
+            var kind: String = line.substr(10)
+            var found: int = 3 if kind.begins_with("vor") else (2 if kind.begins_with("ndb") else (0 if kind.begins_with("v") else (1 if kind.begins_with("h") else -1)))
+            if found >= 0:
+                localizers.append(found)
+            continue
         if seen == 0:
             meshes.append(line)
             seen += 1
@@ -147,6 +158,7 @@ static func read(path: String) -> Dictionary:
     )
     out["lods"] = lods
     out["boxes"] = boxes
+    out["localizers"] = localizers
     if (out["meshes"] as PackedStringArray).is_empty():
         out["error"] = "%s names no mesh" % path.get_file()
     return out

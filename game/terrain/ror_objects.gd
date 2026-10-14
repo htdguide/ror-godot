@@ -169,6 +169,23 @@ static func placements(terrain: RorTerrain) -> Array[Dictionary]:
     return out
 
 
+## The terrain's ILS localizers, as upstream's `TerrainObjectManager` collects them: one per
+## `localizer-` line of each placed object's definition, at the object's position and rotation.
+## {"positions", "rotations" (the `.tobj` degrees), "types"}, for `RorSolver.set_localizers`.
+static func localizers(terrain: RorTerrain) -> Dictionary:
+    var positions: PackedVector3Array = PackedVector3Array()
+    var rotations: PackedVector3Array = PackedVector3Array()
+    var types: PackedInt32Array = PackedInt32Array()
+    var state: Dictionary = {"definitions": {}}
+    for placement: Dictionary in placements(terrain):
+        var definition: Dictionary = definition(terrain, placement["name"] as String, state)
+        for type: int in definition.get("localizers", PackedInt32Array()) as PackedInt32Array:
+            positions.append(placement["position"] as Vector3)
+            rotations.append(placement["rotation"] as Vector3)
+            types.append(type)
+    return {"positions": positions, "rotations": rotations, "types": types}
+
+
 ## What a terrain asks for beyond the objects this builds, as a line for a gate or a session to
 ## report. Not all of it is unbuilt any more: vegetation is grown by `RorVegetation`, collision
 ## boxes by `RorObjectCollision` and road points by `RorProceduralRoad`. Only actor spawns and

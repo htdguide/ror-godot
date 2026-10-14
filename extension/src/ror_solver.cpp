@@ -15,8 +15,7 @@ using namespace godot;
 namespace rorgd {
 
 namespace {
-// Radians per second to RPM. Upstream's RAD_PER_SEC_TO_RPM, and the unit its drivetrain
-// expects the driveshaft speed in.
+// Radians per second to RPM: upstream's RAD_PER_SEC_TO_RPM, the drivetrain's driveshaft unit.
 constexpr float RAD_PER_SEC_TO_RPM = 9.5492965855137f;
 // Upstream's `SUPPORT_BEAM_LIMIT_DEFAULT`: how many of its own lengths a support beam stretches.
 constexpr float SUPPORT_BREAK_LIMIT = 4.0f;
@@ -47,8 +46,7 @@ int RorSolver::add_beam(int node_a, int node_b, float rest_length, float spring,
     beam.spring = spring;
     beam.damping = damping;
     m_beams.push_back(beam);
-    // Upstream's break rule counts how many unbroken beams still hold a node, so the count is
-    // kept as beams are added rather than searched for when one is about to break.
+    // Upstream's break rule counts the unbroken beams holding a node: kept as beams are added.
     m_nodes[static_cast<size_t>(node_a)].active_beams += 1;
     m_nodes[static_cast<size_t>(node_b)].active_beams += 1;
     return static_cast<int>(m_beams.size()) - 1;
@@ -198,9 +196,8 @@ float RorSolver::get_beam_length(int beam) const {
     return squared * fast_invSqrt(squared);
 }
 
-// Upstream's order, and each step is one whole pass of it. The drivetrain runs at the
-// same rate as the rest: its clutch couples an engine of 0.12 kg m2 to the road through a
-// stiff spring, and at frame rate that system does not integrate.
+// Upstream's order, each step one whole pass. The drivetrain runs at the same rate: its clutch
+// couples a 0.12 kg m2 engine to the road through a stiff spring, which frame rate cannot integrate.
 void RorSolver::step_now(float dt, int substeps) {
     begin_steps();
     for (int i = 0; i < substeps; ++i) {
@@ -211,7 +208,11 @@ void RorSolver::step_now(float dt, int substeps) {
 // The obstacles near the rig, found once per call rather than per substep: they never move, the
 // rig moves centimetres in a call, and testing every box at 2 kHz would cost more than the rest.
 void RorSolver::begin_steps() {
-    m_wing_set.update_frame(m_nodes, m_fuselage_enabled ? m_fuselage_node : -1);
+    std::vector<RorLocalizer> localizers = m_localizers;
+    for (RorLocalizer &localizer : localizers) {
+        localizer.position = m_frame.to_local(localizer.position);
+    }
+    m_wing_set.update_frame(m_nodes, m_fuselage_enabled ? m_fuselage_node : -1, localizers);
     // Upstream's `ar_hydro_*_command`: what the surfaces follow, the autopilot's included.
     m_steering.set_surface_commands(m_wing_set.auto_aileron(), m_wing_set.auto_rudder(), m_wing_set.auto_elevator());
     // Alone, the hook requests its triggers queued are carried out here; a world does it for all.

@@ -104,7 +104,7 @@ public:
     // Upstream's `updateVisual` for the wings, once a frame: the autopilot's aileron and elevator
     // added to the controls, then the control surfaces. `fuselage_back` is the fuselage drag's
     // node, or -1.
-    void update_frame(const NodeArray &nodes, int fuselage_back = -1);
+    void update_frame(const NodeArray &nodes, int fuselage_back = -1, const std::vector<RorLocalizer> &localizers = {});
     // The aileron, rudder and elevator the surfaces and the hydros followed this frame.
     float auto_aileron() const { return m_auto[0]; }
     float auto_rudder() const { return m_auto[1]; }

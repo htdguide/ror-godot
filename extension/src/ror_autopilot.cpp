@@ -8,6 +8,16 @@ using godot::Vector3;
 
 namespace rorgd {
 
+RorLocalizer make_localizer(const Vector3 &position, const Vector3 &degrees, int type) {
+    const OgreQuat q = ogre_mul(ogre_mul(ogre_quat(degrees.x, Vector3(1, 0, 0)), ogre_quat(degrees.y, Vector3(0, 1, 0))),
+                                ogre_quat(degrees.z, Vector3(0, 0, 1)));
+    RorLocalizer localizer;
+    localizer.position = position;
+    localizer.facing = ogre_rotate(q, Vector3(0, 0, 1));
+    localizer.type = type;
+    return localizer;
+}
+
 void RorAutopilot::reset() {
     mode_heading = HEADING_NONE;
     mode_alt = ALT_NONE;
@@ -259,19 +269,81 @@ int RorAutopilot::adj_ias(int d) {
     return ias;
 }
 
-void RorAutopilot::update_ils() {
+void RorAutopilot::update_ils(const NodeArray &nodes, const std::vector<RorLocalizer> &localizers) {
     if (ref_l < 0 || ref_r < 0) {
         return;
     }
+    const Vector3 position =
+            ogre_div(nodes[static_cast<size_t>(ref_l)].position + nodes[static_cast<size_t>(ref_r)].position, 2.0);
+    float closest_hdist = -1;
+    float closest_hangle = -90;
+    float closest_vdist = -1;
+    float closest_vangle = -90;
     m_ils_runway_heading = 0;
-    m_ils_angle_hdev = -90;
-    m_ils_angle_vdev = -90;
-    m_horizontal_locator_available = false;
-    m_vertical_locator_available = false;
-    // Upstream disconnects NAV when an approach is close or none is available; with no
-    // localizers, none ever is.
+    const Vector3 up(0, 1, 0);
+    for (const RorLocalizer &localizer : localizers) {
+        const Vector3 plocd = ogre_project(up, localizer.facing);
+        const float loc = std::atan2(static_cast<float>(plocd.z), static_cast<float>(plocd.x));
+        const Vector3 posd = ogre_project(up, position - localizer.position);
+        const float dir = std::atan2(static_cast<float>(posd.z), static_cast<float>(posd.x));
+        float diff = (dir - loc) * 57.295779513082;
+        if (diff > 180.0) {
+            diff -= 360.0;
+        }
+        if (diff < -180.0) {
+            diff += 360.0;
+        }
+        if (diff < 80 && diff > -80) {
+            const float dist = static_cast<float>((localizer.position - position).length());
+            if (localizer.type == RorLocalizer::HORIZONTAL) {
+                if (closest_hdist < 0 || closest_hdist > dist) {
+                    closest_hdist = dist;
+                    closest_hangle = diff;
+                    m_ils_runway_heading = loc * 57.295779513082 - 90.0;
+                    if (m_ils_runway_heading < 0.0) {
+                        m_ils_runway_heading += 360.0;
+                    }
+                    m_ils_runway_distance = dist;
+                }
+            }
+            if (localizer.type == RorLocalizer::VERTICAL) {
+                if (closest_vdist < 0 || closest_vdist > dist) {
+                    const Vector3 normv = localizer.facing.cross(up);
+                    const float glideslope = 4;
+                    const Vector3 posd2 = ogre_project(normv, position - localizer.position);
+                    float d = static_cast<float>(posd2.length());
+                    if (d < 0.01) {
+                        d = 0.01;
+                    }
+                    float dir2 = 90.0;
+                    d = posd2.y / d;
+                    if (d >= 1.0) {
+                        dir2 = 90.0;
+                    } else if (d <= -1.0) {
+                        dir2 = -90.0;
+                    } else {
+                        dir2 = std::asin(d) * 57.295779513082;
+                    }
+                    const float diff2 = dir2 - glideslope;
+                    closest_vdist = dist;
+                    closest_vangle = diff2;
+                }
+            }
+        }
+    }
+    m_ils_angle_hdev = closest_hangle;
+    m_ils_angle_vdev = closest_vangle;
+    m_horizontal_locator_available = (closest_hdist != -1);
+    m_vertical_locator_available = (closest_vdist != -1);
+    last_closest_hdist = closest_hdist;
     if (mode_heading == HEADING_NAV) {
-        wantsdisconnect = true;
+        // Disconnect close to the runway, or with no approach in range.
+        if (closest_hdist < 20.0 || closest_vdist < 20.0) {
+            wantsdisconnect = true;
+        }
+        if (!ils_available()) {
+            wantsdisconnect = true;
+        }
     }
 }
 

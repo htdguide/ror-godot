@@ -22,6 +22,9 @@ public:
     float getAilerons();
     float getElevator();
     float getThrottle(float thrtl, float dt);
+    void UpdateIls();
+    bool IsIlsAvailable() { return m_horizontal_locator_available && m_vertical_locator_available; }
+    int m_actor_id = 0;
     bool force_disabled = false;
     int mode_heading = HEADING_NONE;
     int mode_alt = ALT_NONE;

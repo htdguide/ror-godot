@@ -1898,15 +1898,15 @@ Scope, vehicles:
   flaps. Air brakes are upstream's (`an_air_brake_is_upstreams`, bit-identical; 3/4 and Ctrl+3/4,
   drawn hinged; all 22 corpus rows build). The autopilot is upstream's (`the_autopilot_is_upstreams`,
   bit-identical): WLV, HDG, ALT, V/S and IAS from a panel on the airplane pad, referenced to the
-  first wing run's tips and the fuselage drag's node as upstream's spawner does.
+  first wing run's tips and the fuselage drag's node as upstream's spawner does; NAV flies upstream's
+  ILS approach to the localizers a terrain's objects declare (NhelensGrass has two runways).
 - **Boats** (2026-10-14): buoyant `cab` triangles float and drag a rig on the terrain's sea as
   upstream's `Buoyance` and `CalcBuoyance` do (`a_boat_floats_as_upstreams`, bit-identical; the
   Weasel floats, and sinks on a dry map); screw props push on upstream's boat keys (Up/Down,
   Left/Right, PgDn centre, PgUp reverse; on the pad too) only under water
   (`a_screw_prop_is_upstreams`, bit-identical; all 7 corpus props build); the boat animators read
   them. Not in: waves (upstream's are off by default), splashes and ripples (particles).
-- Aircraft, not in: ILS approaches (terrain localizers are not read, so NAV disconnects as
-  upstream's does with none in range); the ground-proximity warnings (sounds).
+- Aircraft, not in: the ground-proximity warnings (sounds).
 - **`forset` read as upstream reads it** (2026-10-13, `a_forset_is_read_as_upstream_reads_it`):
   "0 - 36" is a range, not nodes 0 and 36, and a vertex on a flat triad binds at zero as upstream's
   `Matrix3::Inverse` leaves it. The Spitfire's fuselage and canopy had bound to two nodes.

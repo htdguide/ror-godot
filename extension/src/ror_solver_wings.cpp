@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "ror_aero.h"
+#include "ror_ogre_math.h"
 
 #include <godot_cpp/core/class_db.hpp>
 
@@ -218,13 +219,18 @@ Dictionary RorSolver::autopilot(const String &action, int value) {
     return out;
 }
 
-// `start` the left, right and back nodes; `steps` each [action, value, then per node height and
+// `start` the left, right and back nodes, then any localizers; `steps` each [action, value, then per node height and
 // velocity x y z, then throttle and dt], actions as the oracle's `autopilot` mode numbers them.
 // Per step, `the_autopilot_is_upstreams`' line.
 PackedStringArray RorSolver::autopilot_probe(const PackedVector3Array &start, const Array &steps) {
     NodeArray nodes(3);
     for (int k = 0; k < 3; ++k) {
         nodes[static_cast<size_t>(k)].position = start[k];
+    }
+    // Localizers ride after the three nodes, three entries each: position, rotation, (type, 0, 0).
+    std::vector<RorLocalizer> locs;
+    for (int k = 3; k + 2 < start.size(); k += 3) {
+        locs.push_back(make_localizer(start[k], start[k + 1], static_cast<int>(start[k + 2].x)));
     }
     RorAutopilot ap;
     ap.set_references(nodes, 0, 1, 2);
@@ -251,12 +257,49 @@ PackedStringArray RorSolver::autopilot_probe(const PackedVector3Array &start, co
             case 11: ap.adj_ias(value); break;
             default: break;
         }
+        ap.update_ils(nodes, locs);
         const float aileron = ap.ailerons(nodes);
         const float elevator = ap.elevator(nodes);
         const float throttle = ap.throttle(nodes, v[14], v[15]);
         char buffer[160];
-        std::snprintf(buffer, sizeof buffer, "%.9g %.9g %.9g %d %d %d %d", aileron, elevator, throttle, ap.heading, ap.alt,
-                      ap.vs, ap.ias);
+        std::snprintf(buffer, sizeof buffer, "%.9g %.9g %.9g %d %d %d %d %d", aileron, elevator, throttle, ap.heading, ap.alt,
+                      ap.vs, ap.ias, ap.wantsdisconnect ? 1 : 0);
+        out.push_back(String(buffer));
+    }
+    return out;
+}
+
+void RorSolver::set_localizers(const PackedVector3Array &positions, const PackedVector3Array &rotations, const PackedInt32Array &types) {
+    sync();
+    m_localizers.clear();
+    for (int i = 0; i < positions.size() && i < rotations.size() && i < types.size(); ++i) {
+        m_localizers.push_back(make_localizer(positions[i], rotations[i], types[i]));
+    }
+}
+
+// `localizers` each [x, y, z, rx, ry, rz, type]; `steps` each [nav, left node xyz, right node xyz].
+// Per step, `the_autopilot_is_upstreams`' ILS line.
+PackedStringArray RorSolver::ils_probe(const Array &localizers, const Array &steps) {
+    std::vector<RorLocalizer> locs;
+    for (int i = 0; i < localizers.size(); ++i) {
+        const PackedFloat32Array l = localizers[i];
+        locs.push_back(make_localizer(Vector3(l[0], l[1], l[2]), Vector3(l[3], l[4], l[5]), static_cast<int>(l[6])));
+    }
+    NodeArray nodes(2);
+    RorAutopilot ap;
+    PackedStringArray out;
+    for (int step = 0; step < steps.size(); ++step) {
+        const PackedFloat32Array v = steps[step];
+        nodes[0].position = Vector3(v[1], v[2], v[3]);
+        nodes[1].position = Vector3(v[4], v[5], v[6]);
+        ap.set_references(nodes, 0, 1, -1);
+        ap.mode_heading = v[0] != 0.0f ? RorAutopilot::HEADING_NAV : RorAutopilot::HEADING_NONE;
+        ap.wantsdisconnect = false;
+        ap.update_ils(nodes, locs);
+        char buffer[200];
+        std::snprintf(buffer, sizeof buffer, "%.9g %.9g %.9g %.9g %d %d %d", ap.ils_hdev(), ap.ils_vdev(), ap.ils_heading(),
+                      ap.ils_distance(), ap.horizontal_available() ? 1 : 0, ap.vertical_available() ? 1 : 0,
+                      ap.wantsdisconnect ? 1 : 0);
         out.push_back(String(buffer));
     }
     return out;
@@ -478,6 +521,8 @@ void RorSolver::bind_wing_methods() {
     ClassDB::bind_method(D_METHOD("aero_state", "index"), &RorSolver::aero_state);
     ClassDB::bind_method(D_METHOD("add_airbrake", "nodes", "width", "length", "max_angle"), &RorSolver::add_airbrake);
     ClassDB::bind_method(D_METHOD("autopilot", "action", "value"), &RorSolver::autopilot, DEFVAL(0));
+    ClassDB::bind_method(D_METHOD("set_localizers", "positions", "rotations", "types"), &RorSolver::set_localizers);
+    ClassDB::bind_static_method("RorSolver", D_METHOD("ils_probe", "localizers", "steps"), &RorSolver::ils_probe);
     ClassDB::bind_static_method("RorSolver", D_METHOD("autopilot_probe", "start", "steps"), &RorSolver::autopilot_probe);
     ClassDB::bind_static_method("RorSolver", D_METHOD("airbrake_probe", "params", "steps"), &RorSolver::airbrake_probe);
     ClassDB::bind_method(D_METHOD("set_aero_controls", "aileron", "rudder", "elevator", "flap"), &RorSolver::set_aero_controls);

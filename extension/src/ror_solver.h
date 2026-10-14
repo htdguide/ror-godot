@@ -72,7 +72,9 @@ protected:
     static godot::PackedStringArray airbrake_probe(const godot::PackedFloat32Array &params, const godot::Array &steps);
     void aero_command(const godot::String &action, float value);
     godot::Dictionary autopilot(const godot::String &action, int value);
-    static godot::PackedStringArray autopilot_probe(const godot::PackedVector3Array &start, const godot::Array &steps);
+    // The terrain's ILS localizers: world positions, `.tobj` rotations in degrees, kinds (0 v, 1 h, 2 NDB, 3 VOR).
+    void set_localizers(const godot::PackedVector3Array &positions, const godot::PackedVector3Array &rotations, const godot::PackedInt32Array &types);
+    static godot::PackedStringArray autopilot_probe(const godot::PackedVector3Array &start, const godot::Array &steps), ils_probe(const godot::Array &localizers, const godot::Array &steps);
     godot::Dictionary aero_state(int index);
     static godot::PackedStringArray aero_probe(const godot::String &kind, const godot::PackedInt32Array &ids, const godot::Array &params, const godot::PackedVector3Array &positions, const godot::PackedFloat32Array &masses, const godot::String &afl, const godot::Array &steps);
     void set_aero_controls(float aileron, float rudder, float elevator, int flap);
@@ -566,6 +568,7 @@ private:
     void run_trigger_hook_requests(const std::vector<RorSolver *> &actors);
     RorWingSet m_wing_set;
     RorBuoyance m_buoyance;
+    std::vector<RorLocalizer> m_localizers;
     int m_camera_roll = 0;
     float m_speedo_max_kph = 140.0f;
     RorAnimatorInputs animator_inputs() const;

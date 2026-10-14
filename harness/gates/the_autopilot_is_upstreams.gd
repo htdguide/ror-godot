@@ -3,16 +3,19 @@ extends GateBase
 ## most 45 degrees, an altitude or a vertical speed held through the elevator, an airspeed through
 ## every engine's throttle, the settings stepped as its dashboard steps them; made with the first
 ## aero engine and referenced, as the wings close, to the first run's last wing's tips and the
-## fuselage drag's node, as upstream's spawner does. Compared step by step with upstream's methods
-## compiled from the pinned submodule (`tools/build_parity.sh`).
+## fuselage drag's node, as upstream's spawner does; and its ILS approach, `UpdateIls`, to the
+## localizers a terrain's objects declare (`localizer-h`, `localizer-v` in their definitions).
+## Compared step by step with upstream's methods compiled from the pinned submodule
+## (`tools/build_parity.sh`).
 ##
-## Ours had none. ILS approaches need a terrain's localizers, which are not read: as upstream with
-## none in range, NAV disconnects itself. Its warnings are sounds, and there are none yet.
+## Ours had none. Its warnings are sounds, and there are none yet.
 
 const ORACLE: String = "build/parity/upstream_oracle"
 const CASES: int = 200
 const STEPS: int = 300
 const FRAME: float = 1.0 / 60.0
+const ILS_STEPS: int = 50
+const ILS_MAP: String = "a1da0UID-nhelensgrass"
 const MOD_DIR: String = "assets/corpus/181_supermarine-spitfire"
 
 
@@ -22,7 +25,7 @@ static func meta() -> Dictionary:
         "proves": "the autopilot's aileron, elevator and throttle are upstream's Autopilot's in every mode, wired to an airplane's surfaces, hydros and engines as upstream's",
         "builds_on": [],
         "oracle": GateBase.ORACLE_EXTERNAL,
-        "threshold": "every output and setting of %d cases x %d steps identical to upstream's; on the Spitfire HDG banks the ailerons, IAS opens the throttle, NAV disconnects, a respawn resets" % [CASES, STEPS],
+        "threshold": "every output and setting of %d cases x %d steps, and every ILS reading of %d cases x %d steps, identical to upstream's; NhelensGrass's four localizers read; on the Spitfire HDG banks the ailerons, IAS opens the throttle, NAV disconnects, a respawn resets" % [CASES, STEPS, CASES, ILS_STEPS],
         "why": "airplanes had no autopilot.",
         "budget_s": 30.0,
         "needs_gpu": false,
@@ -41,8 +44,18 @@ func run(_harness: Node) -> Dictionary:
         report = spitfire
     else:
         report = "the Spitfire is not present"
+    var loaded: Dictionary = RorTerrainLibrary.load_named(ILS_MAP)
+    if (loaded.get("error", "") as String) == "":
+        var ils: Dictionary = RorObjects.localizers(loaded["terrain"] as RorTerrain)
+        if ils["types"] != PackedInt32Array([0, 1, 1, 0]) or (ils["rotations"] as PackedVector3Array)[2] != Vector3(0, -140, 0):
+            return fail("NhelensGrass's localizers read as %s; its objects place a v, h, h, v at -54 and -140 degrees" % ils)
+        report += "; NhelensGrass's 4 localizers read"
     if not FileAccess.file_exists(root.path_join(ORACLE)):
         return ok(report + "; parity skipped: the upstream oracle is not built. Run tools/build_parity.sh", 0)
+    var ils_report: String = _ils_parity(root)
+    if ils_report.begins_with("!"):
+        return fail(ils_report.substr(1))
+    report += "; " + ils_report
     var rng: RandomNumberGenerator = RandomNumberGenerator.new()
     rng.seed = 20261014
     var cases: Array = []
@@ -53,6 +66,20 @@ func run(_harness: Node) -> Dictionary:
         var parts: PackedStringArray = PackedStringArray(["autopilot", str(STEPS)])
         for p: Vector3 in start:
             parts.append_array([_n(p.x), _n(p.y), _n(p.z)])
+        # A runway half the time: a localizer and a glide slope ahead of where it flies, so NAV
+        # has an approach to fly.
+        var locs: int = 2 if rng.randf() < 0.5 else 0
+        parts.append(str(locs))
+        # Facing the wing tips' midpoint from up to 3 km away and a few degrees off, so the
+        # deviations NAV steers by are inside their limits.
+        var yaw: float = rng.randf_range(-180, 180)
+        var reach: float = rng.randf_range(300, 3000)
+        for k: int in locs:
+            var facing: Vector3 = Vector3(sin(deg_to_rad(yaw)), 0, cos(deg_to_rad(yaw)))
+            var at: Vector3 = -facing * reach + Vector3(rng.randf_range(-30, 30), rng.randf_range(-100, 0), rng.randf_range(-30, 30))
+            var turn: Vector3 = Vector3(0, yaw + rng.randf_range(-3, 3), 0)
+            start.append_array([at, turn, Vector3(k, 0, 0)])
+            parts.append_array([_n(at.x), _n(at.y), _n(at.z), _n(turn.x), _n(turn.y), _n(turn.z), str(k)])
         var steps: Array = []
         var height: float = rng.randf_range(0.0, 3000.0)
         var bank: float = 0.0
@@ -150,6 +177,61 @@ func _spitfire(mod_dir: String) -> String:
     if state["alt_mode"] != "" or state["heading"] != 0 or state["ias"] != 150:
         return "!a respawn left the autopilot at %s" % state
     return "Spitfire: HDG moves the aileron hydros %.3f m, IAS opens the throttle, NAV disconnects, a respawn resets" % deflected
+
+
+## Upstream's `UpdateIls` against ours: one to four localizers of every kind, turned every way,
+## and two wing tips flown around them, NAV on and off.
+func _ils_parity(root: String) -> String:
+    var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+    rng.seed = 20261015
+    var cases: Array = []
+    var lines: PackedStringArray = PackedStringArray()
+    for n: int in CASES:
+        var locs: Array = []
+        var parts: PackedStringArray = PackedStringArray(["ils"])
+        var count: int = rng.randi_range(1, 4)
+        parts.append_array([str(count), str(ILS_STEPS)])
+        for k: int in count:
+            var l: PackedFloat32Array = PackedFloat32Array([rng.randf_range(-500, 500), rng.randf_range(0, 50), rng.randf_range(-500, 500),
+                    rng.randf_range(-5, 5), rng.randf_range(-180, 180), rng.randf_range(-5, 5), rng.randi_range(0, 3)])
+            locs.append(l)
+            for i: int in 6:
+                parts.append(_n(l[i]))
+            parts.append(str(int(l[6])))
+        var steps: Array = []
+        var at: Vector3 = Vector3(rng.randf_range(-3000, 3000), rng.randf_range(10, 800), rng.randf_range(-3000, 3000))
+        var vel: Vector3 = (Vector3.ZERO - at).normalized() * 60.0
+        for step: int in ILS_STEPS:
+            at += vel * 0.5 + Vector3(rng.randf_range(-5, 5), rng.randf_range(-2, 2), rng.randf_range(-5, 5))
+            var side: Vector3 = Vector3(vel.z, 0, -vel.x).normalized() * 5.0
+            var v: PackedFloat32Array = PackedFloat32Array([1.0 if rng.randf() < 0.7 else 0.0])
+            v.append_array([at.x + side.x, at.y + rng.randf_range(-0.5, 0.5), at.z + side.z, at.x - side.x, at.y, at.z - side.z])
+            steps.append(v)
+            parts.append(str(int(v[0])))
+            for i: int in range(1, 7):
+                parts.append(_n(v[i]))
+        cases.append([locs, steps])
+        lines.append(" ".join(parts))
+    var path: String = root.path_join("build/parity/ils_cases.txt")
+    var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+    file.store_string("\n".join(lines) + "\n")
+    file.close()
+    var output: Array = []
+    var status: int = OS.execute("/bin/sh", ["-c", "'%s' < '%s'" % [root.path_join(ORACLE), path]], output, true)
+    if status != 0:
+        return "!the upstream oracle exited %d on ILS: %s" % [status, "\n".join(output)]
+    var results: PackedStringArray = ("\n".join(output)).strip_edges().split("\n")
+    if results.size() != CASES * ILS_STEPS:
+        return "!the oracle printed %d ILS steps, not %d" % [results.size(), CASES * ILS_STEPS]
+    var approaching: int = 0
+    for i: int in CASES:
+        var ours: PackedStringArray = RorSolver.ils_probe(cases[i][0], cases[i][1])
+        for step: int in ILS_STEPS:
+            var theirs: String = results[i * ILS_STEPS + step].strip_edges()
+            if ours[step].strip_edges() != theirs:
+                return "!ILS case %d, step %d:\n upstream %s\n ours     %s" % [i, step, theirs, ours[step]]
+            approaching += 1 if theirs.contains(" 1 1 ") else 0
+    return "%d ILS cases x %d steps identical to upstream's, %d with both locators in range" % [CASES, ILS_STEPS, approaching]
 
 
 func _n(value: float) -> String:

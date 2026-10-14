@@ -25,7 +25,9 @@ struct Vector3 {
     Vector3(float in_x, float in_y, float in_z) : x(in_x), y(in_y), z(in_z) {}
 
     static const Vector3 ZERO;
+    static const Vector3 UNIT_X;
     static const Vector3 UNIT_Y;
+    static const Vector3 UNIT_Z;
 
     float dotProduct(const Vector3 &other) const { return x * other.x + y * other.y + z * other.z; }
     float squaredLength() const { return x * x + y * y + z * z; }
@@ -112,6 +114,11 @@ struct Quaternion {
         x = fSin * axis.x;
         y = fSin * axis.y;
         z = fSin * axis.z;
+    }
+    // `Quaternion::operator*(const Quaternion&)`, OgreQuaternion.cpp in 1.11.6.
+    Quaternion operator*(const Quaternion &rkQ) const {
+        return Quaternion(w * rkQ.w - x * rkQ.x - y * rkQ.y - z * rkQ.z, w * rkQ.x + x * rkQ.w + y * rkQ.z - z * rkQ.y,
+                          w * rkQ.y + y * rkQ.w + z * rkQ.x - x * rkQ.z, w * rkQ.z + z * rkQ.w + x * rkQ.y - y * rkQ.x);
     }
     // `Quaternion::operator*(const Vector3&)`, the nVidia SDK implementation.
     Vector3 operator*(const Vector3 &v) const {

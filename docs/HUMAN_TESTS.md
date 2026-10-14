@@ -26,8 +26,13 @@ Open: `tools/play.sh --vehicle "assets/corpus/181_supermarine-spitfire:spitfire_
    `the_aero_engine_is_upstreams`)
 3. **Autopilot.** Once climbing: WLV levels the wings; HDG holds the heading shown (HDG +/-); ALT
    holds the altitude shown (100 ft steps); V/S holds a climb rate; IAS moves the throttle to hold
-   the airspeed. Lit buttons are the modes that are on. NAV turns itself off at once (no ILS yet).
-   (`the_autopilot_is_upstreams`)
+   the airspeed. Lit buttons are the modes that are on. NAV turns itself off where there is no
+   runway beacon in range. (`the_autopilot_is_upstreams`)
+3a. **An ILS approach.** `tools/play.sh --vehicle "assets/corpus/181_supermarine-spitfire:spitfire_Vb.airplane" --map a1da0UID-nhelensgrass`:
+   take off, fly out a couple of kilometres and turn back towards the runway the beacons stand
+   beside. NAV (with V/S for the glide slope) should line up with the runway and descend along
+   its 4-degree slope; it lets go within 20 m of the beacons. The status line says "(no ILS)"
+   while no approach is in range.
 4. **Gauges.** Cockpit gauges that read the engine (rpm, throttle, torque, pitch, status), the
    flaps, the air brakes or the angle of attack move with them. Try any airplane with a cockpit.
 5. **Wing panels.** The drawn wing panels sit on the wings, their control surfaces swing with the
@@ -115,8 +120,7 @@ The hero: `tools/play.sh --truck`. Keys are printed on start (and in the window'
 
 ## Known not in
 
-Not for testing, listed so nobody files them: ILS approaches (terrain localizers are not read), the
-ground-proximity warnings and every other sound, waves (upstream's are off by default), splashes,
+Not for testing, listed so nobody files them: the ground-proximity warnings and every other sound, waves (upstream's are off by default), splashes,
 ripples and other particles, trigger and animator beams are not drawn, the manual clutch.
 
 ## Already confirmed by the user
